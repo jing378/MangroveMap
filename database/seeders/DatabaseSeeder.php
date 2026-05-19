@@ -16,35 +16,48 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create Admin Account
-        User::factory()->create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-            'organization' => 'MangroveMap Admin',
-            'phone' => '+1234567890',
-        ]);
+        User::updateOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin User',
+                'password' => Hash::make('password'),
+                'role' => 'admin',
+                'organization' => 'MangroveMap Admin',
+                'phone' => '09123456789',
+                'email_verified_at' => now(),
+            ]
+        );
 
-        // Create Demo Resident Account
-        User::factory()->create([
-            'name' => 'Demo Resident',
-            'email' => 'demo@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'end_user',
-            'organization' => 'Demo Organization',
-            'phone' => '+0987654321',
-        ]);
+        User::updateOrCreate(
+            ['email' => 'demo@example.com'],
+            [
+                'name' => 'Demo Resident',
+                'password' => Hash::make('password'),
+                'role' => 'end_user',
+                'organization' => 'Demo Organization',
+                'phone' => '09987654321',
+                'email_verified_at' => now(),
+            ]
+        );
 
-        // Create Expert Account
-        User::factory()->create([
-            'name' => 'Expert User',
-            'email' => 'expert@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'expert',
-            'organization' => 'MangroveMap Review',
-            'phone' => '+1122334455',
-            'email_verified_at' => now(),
+        User::updateOrCreate(
+            ['email' => 'expert@example.com'],
+            [
+                'name' => 'Expert User',
+                'password' => Hash::make('password'),
+                'role' => 'expert',
+                'organization' => 'MangroveMap Review',
+                'phone' => '09112233445',
+                'email_verified_at' => now(),
+            ]
+        );
+
+        $this->call([
+            GenusSeeder::class,
+            MangroveDataSeeder::class,
+            DelineationSeeder::class,
+            AnalysisSeeder::class,
+            AIModelSeeder::class,
         ]);
     }
 }

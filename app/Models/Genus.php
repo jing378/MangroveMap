@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Genus extends Model
 {
+    protected $table = 'genera';
+
     protected $fillable = [
         'common_name',
         'scientific_name',
