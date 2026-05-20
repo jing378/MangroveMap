@@ -9,23 +9,23 @@
     <div class="grid cols-4">
         <div class="stat-card">
             <div class="stat-label">Total Datasets</div>
-            <div class="stat-value">47</div>
-            <div class="stat-change positive">↑ 5 this month</div>
+            <div class="stat-value">{{ number_format($totalDatasets) }}</div>
+            <div class="stat-change positive">{{ $newThisMonth }} new this month</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Storage Used</div>
-            <div class="stat-value">2.3 GB</div>
-            <div class="stat-change">of 10 GB</div>
+            <div class="stat-label">Total Coverage</div>
+            <div class="stat-value">{{ number_format($totalCoverage, 2) }} km²</div>
+            <div class="stat-change">Across all regions</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Records Processed</div>
-            <div class="stat-value">125,847</div>
-            <div class="stat-change positive">↑ 18,200 this month</div>
+            <div class="stat-label">Avg. Confidence</div>
+            <div class="stat-value">{{ $avgConfidence ? number_format($avgConfidence * 100, 1) . '%' : '—' }}</div>
+            <div class="stat-change">Model / survey score</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Import Success Rate</div>
-            <div class="stat-value green">98.4%</div>
-            <div class="stat-change">Last 30 days</div>
+            <div class="stat-label">Healthy Stands</div>
+            <div class="stat-value green">{{ $healthRate }}%</div>
+            <div class="stat-change">Of observation records</div>
         </div>
     </div>
 
@@ -61,107 +61,59 @@
                     <tr>
                         <th>Dataset Name</th>
                         <th>Type</th>
-                        <th>Records</th>
-                        <th>Size</th>
-                        <th>Status</th>
-                        <th>Last Updated</th>
+                        <th>Coverage</th>
+                        <th>Confidence</th>
+                        <th>Health</th>
+                        <th>Observed</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse($datasets as $dataset)
+                    @php
+                        $sourceClass = str_contains(strtolower($dataset->data_source ?? ''), 'field') ? 'json' : 'csv';
+                        $healthClass = match ($dataset->health_status) {
+                            'healthy' => 'success',
+                            'recovering' => 'warning',
+                            'degraded' => 'danger',
+                            default => 'secondary',
+                        };
+                    @endphp
                     <tr>
-                        <td>Sogod Bay Genus Data</td>
-                        <td><span class="type-badge csv">CSV</span></td>
-                        <td>12,450</td>
-                        <td>156 MB</td>
-                        <td><span class="badge success">Active</span></td>
-                        <td>2 days ago</td>
+                        <td>{{ $dataset->region }} — {{ $dataset->genus?->genus ?? 'Unknown genus' }}</td>
+                        <td><span class="type-badge {{ $sourceClass }}">{{ $dataset->data_source ?? 'N/A' }}</span></td>
+                        <td>{{ number_format($dataset->coverage_area_km2, 2) }} km²</td>
+                        <td>{{ $dataset->confidence_score ? number_format($dataset->confidence_score * 100, 0) . '%' : '—' }}</td>
+                        <td><span class="badge {{ $healthClass }}">{{ ucfirst($dataset->health_status ?? 'unknown') }}</span></td>
+                        <td>{{ $dataset->observation_date?->format('M j, Y') ?? '—' }}</td>
                         <td class="actions-cell">
                             <button class="action-btn view" title="View"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn edit" title="Edit"><i class="bi bi-pencil"></i></button>
-                            <button class="action-btn download" title="Download"><i class="bi bi-download"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
                         </td>
                     </tr>
+                    @empty
                     <tr>
-                        <td>Limon Bay Zone Mapping</td>
-                        <td><span class="type-badge shapefile">Shapefile</span></td>
-                        <td>3,890</td>
-                        <td>287 MB</td>
-                        <td><span class="badge success">Active</span></td>
-                        <td>1 week ago</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn edit" title="Edit"><i class="bi bi-pencil"></i></button>
-                            <button class="action-btn download" title="Download"><i class="bi bi-download"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
+                        <td colspan="7">No observation records. Run <code>php artisan db:seed</code>.</td>
                     </tr>
-                    <tr>
-                        <td>Saint Bernard Wetland Survey</td>
-                        <td><span class="type-badge json">JSON</span></td>
-                        <td>8,234</td>
-                        <td>92 MB</td>
-                        <td><span class="badge warning">Processing</span></td>
-                        <td>1 hour ago</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn edit" title="Edit"><i class="bi bi-pencil"></i></button>
-                            <button class="action-btn download" title="Download"><i class="bi bi-download"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Southern Coastal Belt Dataset</td>
-                        <td><span class="type-badge csv">CSV</span></td>
-                        <td>45,120</td>
-                        <td>512 MB</td>
-                        <td><span class="badge success">Active</span></td>
-                        <td>3 days ago</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn edit" title="Edit"><i class="bi bi-pencil"></i></button>
-                            <button class="action-btn download" title="Download"><i class="bi bi-download"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Hinunangan Margin Historical Data</td>
-                        <td><span class="type-badge xls">Excel</span></td>
-                        <td>5,670</td>
-                        <td>74 MB</td>
-                        <td><span class="badge success">Active</span></td>
-                        <td>5 days ago</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn edit" title="Edit"><i class="bi bi-pencil"></i></button>
-                            <button class="action-btn download" title="Download"><i class="bi bi-download"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Archived 2024 Survey</td>
-                        <td><span class="type-badge csv">CSV</span></td>
-                        <td>28,900</td>
-                        <td>403 MB</td>
-                        <td><span class="badge secondary">Archived</span></td>
-                        <td>2 months ago</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn edit" title="Edit"><i class="bi bi-pencil"></i></button>
-                            <button class="action-btn download" title="Download"><i class="bi bi-download"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
 
+        @if($datasets->hasPages())
         <div class="pagination">
-            <button class="pagination-btn disabled">← Previous</button>
-            <div class="pagination-info">Page 1 of 3 (47 datasets)</div>
-            <button class="pagination-btn">Next →</button>
+            @if($datasets->onFirstPage())
+            <span class="pagination-btn disabled">← Previous</span>
+            @else
+            <a class="pagination-btn" href="{{ $datasets->previousPageUrl() }}">← Previous</a>
+            @endif
+            <div class="pagination-info">Page {{ $datasets->currentPage() }} of {{ $datasets->lastPage() }} ({{ $datasets->total() }} records)</div>
+            @if($datasets->hasMorePages())
+            <a class="pagination-btn" href="{{ $datasets->nextPageUrl() }}">Next →</a>
+            @else
+            <span class="pagination-btn disabled">Next →</span>
+            @endif
         </div>
+        @endif
     </div>
 
     <div class="section">
@@ -180,51 +132,29 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse($importHistory as $analysis)
+                    @php
+                        $statusClass = match ($analysis->status) {
+                            'completed' => 'success',
+                            'pending' => 'warning',
+                            'failed' => 'danger',
+                            default => 'secondary',
+                        };
+                    @endphp
                     <tr>
-                        <td>#IMP-2026-0847</td>
-                        <td>Saint Bernard Wetland Survey</td>
-                        <td>8,234</td>
-                        <td>12 minutes</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Dr. Maria Santos</td>
-                        <td>Today 2:30 PM</td>
+                        <td>#AN-{{ str_pad((string) $analysis->id, 4, '0', STR_PAD_LEFT) }}</td>
+                        <td>{{ ucwords(str_replace('_', ' ', $analysis->analysis_type)) }}</td>
+                        <td>{{ $analysis->species_detected ?? '—' }}</td>
+                        <td>—</td>
+                        <td><span class="badge {{ $statusClass }}">{{ ucfirst($analysis->status) }}</span></td>
+                        <td>{{ $analysis->user?->name ?? 'Unknown' }}</td>
+                        <td>{{ $analysis->created_at?->format('M j, g:i A') ?? '—' }}</td>
                     </tr>
+                    @empty
                     <tr>
-                        <td>#IMP-2026-0846</td>
-                        <td>Sogod Bay Genus Data</td>
-                        <td>2,100</td>
-                        <td>4 minutes</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Juan Dela Cruz</td>
-                        <td>Yesterday 5:15 PM</td>
+                        <td colspan="7">No analysis activity yet.</td>
                     </tr>
-                    <tr>
-                        <td>#IMP-2026-0845</td>
-                        <td>Southern Coastal Belt Dataset</td>
-                        <td>15,670</td>
-                        <td>28 minutes</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Rina Gonzales</td>
-                        <td>Mar 31, 2:45 PM</td>
-                    </tr>
-                    <tr>
-                        <td>#IMP-2026-0844</td>
-                        <td>Limon Bay Zone Mapping</td>
-                        <td>3,890</td>
-                        <td>18 minutes</td>
-                        <td><span class="badge danger">Failed</span></td>
-                        <td>Carlos Mendoza</td>
-                        <td>Mar 30, 11:20 AM</td>
-                    </tr>
-                    <tr>
-                        <td>#IMP-2026-0843</td>
-                        <td>Test Dataset</td>
-                        <td>567</td>
-                        <td>2 minutes</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Ana Rivera</td>
-                        <td>Mar 29, 3:50 PM</td>
-                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>

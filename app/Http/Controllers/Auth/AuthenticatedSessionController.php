@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\UserActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -20,6 +21,11 @@ class AuthenticatedSessionController extends Controller
             $request->session()->regenerate();
 
             $user = Auth::user();
+
+            if ($user instanceof \App\Models\User) {
+                $user->update(['last_login_at' => now()]);
+                UserActivity::record($user, 'Logged in', 'Authentication', 'success');
+            }
 
             if ($user instanceof \App\Models\User && ! $user->hasVerifiedEmail()) {
                 return redirect()->intended(route('verification.notice'));

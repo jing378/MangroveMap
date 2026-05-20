@@ -9,22 +9,22 @@
     <div class="grid cols-4">
         <div class="stat-card">
             <div class="stat-label">Active Models</div>
-            <div class="stat-value">8</div>
-            <div class="stat-change positive">↑ 2 this month</div>
+            <div class="stat-value">{{ $activeModels }}</div>
+            <div class="stat-change positive">Deployed for inference</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Total Accuracy</div>
-            <div class="stat-value green">94.7%</div>
-            <div class="stat-change positive">↑ 2.1% improvement</div>
+            <div class="stat-label">Avg. Accuracy</div>
+            <div class="stat-value green">{{ $avgAccuracy }}%</div>
+            <div class="stat-change positive">Completed models</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Training Hours</div>
-            <div class="stat-value">1,247</div>
-            <div class="stat-change">This month</div>
+            <div class="stat-label">Training Now</div>
+            <div class="stat-value">{{ $trainingModels }}</div>
+            <div class="stat-change">In progress</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Models In Queue</div>
-            <div class="stat-value">3</div>
+            <div class="stat-label">In Queue</div>
+            <div class="stat-value">{{ $queuedModels }}</div>
             <div class="stat-change">Waiting to train</div>
         </div>
     </div>
@@ -51,108 +51,57 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse($models as $model)
+                    @php
+                        $progress = match ($model->status) {
+                            'completed' => 100,
+                            'training' => 68,
+                            'failed' => 23,
+                            default => 0,
+                        };
+                        $statusClass = match ($model->status) {
+                            'completed' => 'success',
+                            'training' => 'warning',
+                            'failed' => 'danger',
+                            default => 'secondary',
+                        };
+                        $accuracy = $model->accuracy ? round($model->accuracy * 100, 1) : null;
+                        $accClass = $accuracy === null ? 'pending' : ($accuracy >= 90 ? 'excellent' : ($accuracy >= 85 ? 'good' : 'fair'));
+                        $typeClass = match ($model->model_type) {
+                            'classification' => 'cnn',
+                            'segmentation' => 'transformer',
+                            'change_detection' => 'lstm',
+                            default => 'ensemble',
+                        };
+                    @endphp
                     <tr>
-                        <td>Genus Classification v3.2</td>
-                        <td><span class="type-badge cnn">CNN</span></td>
-                        <td><span class="badge success">Completed</span></td>
+                        <td>{{ $model->name }}</td>
+                        <td><span class="type-badge {{ $typeClass }}">{{ ucwords(str_replace('_', ' ', $model->model_type)) }}</span></td>
+                        <td><span class="badge {{ $statusClass }}">{{ ucfirst($model->status) }}</span></td>
                         <td>
                             <div class="progress-bar">
-                                <div class="progress-fill" style="width: 100%"></div>
+                                <div class="progress-fill" style="width: {{ $progress }}%"></div>
                             </div>
                         </td>
-                        <td><span class="accuracy-badge excellent">96.2%</span></td>
-                        <td>Mar 28, 10:00 AM</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View Details"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn deploy" title="Deploy"><i class="bi bi-cloud-upload"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Mangrove Health Detection v2.1</td>
-                        <td><span class="type-badge lstm">LSTM</span></td>
-                        <td><span class="badge success">Completed</span></td>
                         <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 100%"></div>
-                            </div>
+                            @if($accuracy !== null)
+                            <span class="accuracy-badge {{ $accClass }}">{{ $accuracy }}%</span>
+                            @else
+                            <span class="accuracy-badge pending">Pending</span>
+                            @endif
                         </td>
-                        <td><span class="accuracy-badge excellent">95.8%</span></td>
-                        <td>Mar 25, 2:30 PM</td>
+                        <td>{{ $model->training_date?->format('M j, Y') ?? '—' }}</td>
                         <td class="actions-cell">
-                            <button class="action-btn view" title="View Details"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn deploy" title="Deploy"><i class="bi bi-cloud-upload"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
+                            @if($model->is_active)
+                            <span class="badge success">Active</span>
+                            @endif
                         </td>
                     </tr>
+                    @empty
                     <tr>
-                        <td>Zone Segmentation v4.0</td>
-                        <td><span class="type-badge transformer">Transformer</span></td>
-                        <td><span class="badge warning">Training</span></td>
-                        <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 68%"></div>
-                            </div>
-                        </td>
-                        <td><span class="accuracy-badge good">93.4%</span></td>
-                        <td>Apr 7, 8:15 AM</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View Details"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn stop" title="Stop"><i class="bi bi-stop-circle"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
+                        <td colspan="7">No models. Run <code>php artisan db:seed</code>.</td>
                     </tr>
-                    <tr>
-                        <td>Water Quality Prediction v1.5</td>
-                        <td><span class="type-badge cnn">CNN</span></td>
-                        <td><span class="badge warning">Training</span></td>
-                        <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 45%"></div>
-                            </div>
-                        </td>
-                        <td><span class="accuracy-badge fair">88.2%</span></td>
-                        <td>Apr 7, 3:45 PM</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View Details"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn stop" title="Stop"><i class="bi bi-stop-circle"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Biodiversity Index v2.0</td>
-                        <td><span class="type-badge ensemble">Ensemble</span></td>
-                        <td><span class="badge secondary">Queued</span></td>
-                        <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 0%"></div>
-                            </div>
-                        </td>
-                        <td><span class="accuracy-badge pending">Pending</span></td>
-                        <td>Apr 8, 9:00 AM</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View Details"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn start" title="Start"><i class="bi bi-play-circle"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Erosion Risk Assessment v1.3</td>
-                        <td><span class="type-badge lstm">LSTM</span></td>
-                        <td><span class="badge danger">Failed</span></td>
-                        <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 23%"></div>
-                            </div>
-                        </td>
-                        <td><span class="accuracy-badge poor">72.1%</span></td>
-                        <td>Apr 6, 4:20 PM</td>
-                        <td class="actions-cell">
-                            <button class="action-btn view" title="View Details"><i class="bi bi-eye"></i></button>
-                            <button class="action-btn retry" title="Retry"><i class="bi bi-arrow-clockwise"></i></button>
-                            <button class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -213,42 +162,25 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse($completedModels as $model)
+                    @php
+                        $accuracy = $model->accuracy ? round($model->accuracy * 100, 1) : 0;
+                        $accClass = $accuracy >= 90 ? 'excellent' : 'good';
+                    @endphp
                     <tr>
-                        <td>Genus Classification</td>
-                        <td>v3.1</td>
+                        <td>{{ $model->name }}</td>
+                        <td>v{{ $model->version }}</td>
                         <td><span class="badge success">Completed</span></td>
-                        <td><span class="accuracy-badge excellent">95.9%</span></td>
-                        <td>4h 23m</td>
-                        <td>Dr. Maria Santos</td>
-                        <td>Mar 20, 2:00 PM</td>
+                        <td><span class="accuracy-badge {{ $accClass }}">{{ $accuracy }}%</span></td>
+                        <td>{{ number_format($model->dataset_size) }} samples</td>
+                        <td>System</td>
+                        <td>{{ $model->training_date?->format('M j, Y') ?? '—' }}</td>
                     </tr>
+                    @empty
                     <tr>
-                        <td>Mangrove Health Detection</td>
-                        <td>v2.0</td>
-                        <td><span class="badge success">Completed</span></td>
-                        <td><span class="accuracy-badge excellent">94.2%</span></td>
-                        <td>3h 15m</td>
-                        <td>Juan Dela Cruz</td>
-                        <td>Mar 18, 5:30 PM</td>
+                        <td colspan="7">No completed training runs yet.</td>
                     </tr>
-                    <tr>
-                        <td>Zone Segmentation</td>
-                        <td>v3.9</td>
-                        <td><span class="badge success">Completed</span></td>
-                        <td><span class="accuracy-badge good">92.1%</span></td>
-                        <td>5h 42m</td>
-                        <td>Rina Gonzales</td>
-                        <td>Mar 15, 10:00 AM</td>
-                    </tr>
-                    <tr>
-                        <td>Water Quality Prediction</td>
-                        <td>v1.4</td>
-                        <td><span class="badge success">Completed</span></td>
-                        <td><span class="accuracy-badge good">89.8%</span></td>
-                        <td>6h 18m</td>
-                        <td>Carlos Mendoza</td>
-                        <td>Mar 12, 1:15 PM</td>
-                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -686,10 +618,10 @@
     new Chart(document.getElementById('performanceChart'), {
         type: 'line',
         data: {
-            labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+            labels: @json($accuracyChartLabels),
             datasets: [{
-                    label: 'Model Accuracy',
-                    data: [89.2, 90.8, 92.5, 94.7],
+                    label: 'Model Accuracy (%)',
+                    data: @json($accuracyChartValues),
                     borderColor: '#1e9e62',
                     backgroundColor: 'rgba(30,158,98,.1)',
                     fill: true,

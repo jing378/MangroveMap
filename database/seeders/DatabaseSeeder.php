@@ -58,6 +58,7 @@ class DatabaseSeeder extends Seeder
             DelineationSeeder::class,
             AnalysisSeeder::class,
             AIModelSeeder::class,
+            UserActivitySeeder::class,
         ]);
     }
 }

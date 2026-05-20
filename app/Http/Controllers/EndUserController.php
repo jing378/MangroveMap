@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Analysis;
 use App\Models\Delineation;
 use App\Models\MangroveData;
+use App\Models\UserActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -110,6 +111,8 @@ class EndUserController extends Controller
             'notes' => $data['notes'] ?? null,
             'features' => $data['features'],
         ]);
+
+        UserActivity::recordDelineationSubmitted($delineation);
 
         return response()->json([
             'message' => 'Delineation saved and submitted for expert review.',

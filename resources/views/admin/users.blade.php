@@ -231,41 +231,19 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse($recentActivities as $activity)
                     <tr>
-                        <td>Dr. Maria Santos</td>
-                        <td>Trained AI Model</td>
-                        <td>Model Training</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Today 2:30 PM</td>
+                        <td>{{ $activity->user?->name ?? 'Unknown' }}</td>
+                        <td>{{ $activity->activity }}</td>
+                        <td>{{ $activity->module }}</td>
+                        <td><span class="badge {{ $activity->status }}">{{ ucfirst($activity->status) }}</span></td>
+                        <td>{{ $activity->created_at?->format('M j, g:i A') ?? '—' }}</td>
                     </tr>
+                    @empty
                     <tr>
-                        <td>Juan Dela Cruz</td>
-                        <td>Uploaded Dataset</td>
-                        <td>Dataset Management</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Today 1:15 PM</td>
+                        <td colspan="5">No activity recorded yet. Run <code>php artisan db:seed</code>.</td>
                     </tr>
-                    <tr>
-                        <td>Rina Gonzales</td>
-                        <td>Viewed Report</td>
-                        <td>Analytics</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Today 12:45 PM</td>
-                    </tr>
-                    <tr>
-                        <td>Carlos Mendoza</td>
-                        <td>Updated User Profile</td>
-                        <td>Account Management</td>
-                        <td><span class="badge success">Success</span></td>
-                        <td>Yesterday 4:20 PM</td>
-                    </tr>
-                    <tr>
-                        <td>Patricia Lim</td>
-                        <td>Account Activation</td>
-                        <td>User Management</td>
-                        <td><span class="badge secondary">Pending</span></td>
-                        <td>2 hours ago</td>
-                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -466,13 +444,13 @@
         border: 1px solid #b0e0c0;
     }
 
-    .badge.warning {
+    .badge.pending {
         background: #fdf5e8;
         color: #c07818;
         border: 1px solid #e8cc98;
     }
 
-    .badge.danger {
+    .badge.rejected {
         background: #fdf0ee;
         color: #d04030;
         border: 1px solid #e8b8b0;

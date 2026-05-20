@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Analysis;
+use App\Models\UserActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -30,6 +31,8 @@ class ClassifyController extends Controller
             'analysis_type' => 'classification',
             'status' => 'processing'
         ]);
+
+        UserActivity::recordAnalysis($analysis);
 
         // TODO: Call AI model for classification
         // $results = $this->callAIModel($path);

@@ -9,23 +9,23 @@
     <div class="grid cols-4">
         <div class="stat-card">
             <div class="stat-label">Total Users</div>
-            <div class="stat-value green">248</div>
-            <div class="stat-change positive">↑ 12% this month</div>
+            <div class="stat-value green">{{ number_format($totalUsers) }}</div>
+            <div class="stat-change positive">{{ $newUsersThisMonth }} new this month</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Mapped Zones</div>
-            <div class="stat-value">1,247</div>
-            <div class="stat-change positive">↑ 84 new this month</div>
+            <div class="stat-label">Observation Records</div>
+            <div class="stat-value">{{ number_format($mappedZones) }}</div>
+            <div class="stat-change positive">{{ $newZonesThisMonth }} new this month</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Genera Classified</div>
-            <div class="stat-value">45,392</div>
-            <div class="stat-change positive">↑ 5,200 this month</div>
+            <div class="stat-label">Completed Analyses</div>
+            <div class="stat-value">{{ number_format($generaClassified) }}</div>
+            <div class="stat-change positive">Demo &amp; field data</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">System Health</div>
-            <div class="stat-value green">99.8%</div>
-            <div class="stat-change">Uptime (7 days)</div>
+            <div class="stat-label">Analysis Success Rate</div>
+            <div class="stat-value green">{{ $systemHealth }}%</div>
+            <div class="stat-change">Completed vs. total runs</div>
         </div>
     </div>
 
@@ -36,48 +36,26 @@
                 <thead>
                     <tr>
                         <th>User</th>
-                        <th>Action</th>
-                        <th>Zone</th>
+                        <th>Activity</th>
+                        <th>Module</th>
                         <th>Status</th>
                         <th>Time</th>
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse($recentActivities as $activity)
                     <tr>
-                        <td>Dr. Maria Santos</td>
-                        <td>Classified 45 genera</td>
-                        <td>Sogod Bay North</td>
-                        <td><span class="badge success">Completed</span></td>
-                        <td>2 hours ago</td>
+                        <td>{{ $activity->user?->name ?? 'Unknown' }}</td>
+                        <td>{{ $activity->activity }}</td>
+                        <td>{{ $activity->module }}</td>
+                        <td><span class="badge {{ $activity->status }}">{{ ucfirst($activity->status) }}</span></td>
+                        <td>{{ $activity->created_at?->diffForHumans() ?? '—' }}</td>
                     </tr>
+                    @empty
                     <tr>
-                        <td>Juan Dela Cruz</td>
-                        <td>Mapped new zone</td>
-                        <td>Limon Bay Zone</td>
-                        <td><span class="badge success">Completed</span></td>
-                        <td>4 hours ago</td>
+                        <td colspan="5">No activity recorded yet. Run <code>php artisan db:seed</code> to load demo data.</td>
                     </tr>
-                    <tr>
-                        <td>Rina Gonzales</td>
-                        <td>Updated zone data</td>
-                        <td>Saint Bernard Wetland</td>
-                        <td><span class="badge warning">In Progress</span></td>
-                        <td>6 hours ago</td>
-                    </tr>
-                    <tr>
-                        <td>Carlos Mendoza</td>
-                        <td>Generated report</td>
-                        <td>Southern Coastal Belt</td>
-                        <td><span class="badge success">Completed</span></td>
-                        <td>8 hours ago</td>
-                    </tr>
-                    <tr>
-                        <td>Ana Rivera</td>
-                        <td>Classification failed</td>
-                        <td>Hinunangan Margin</td>
-                        <td><span class="badge danger">Failed</span></td>
-                        <td>10 hours ago</td>
-                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -221,16 +199,22 @@
         border: 1px solid #b0e0c0;
     }
 
-    .badge.warning {
+    .badge.pending {
         background: #fdf5e8;
         color: #c07818;
         border: 1px solid #e8cc98;
     }
 
-    .badge.danger {
+    .badge.rejected {
         background: #fdf0ee;
         color: #d04030;
         border: 1px solid #e8b8b0;
+    }
+
+    .badge.secondary {
+        background: #f0f4f0;
+        color: #6a8a6a;
+        border: 1px solid #d4e0d4;
     }
 
     .chart-container {
@@ -279,7 +263,7 @@
         maintainAspectRatio: false,
         plugins: {
             legend: {
-                display: false
+                display: true
             }
         },
         animation: {
@@ -290,10 +274,10 @@
     new Chart(document.getElementById('growthChart'), {
         type: 'line',
         data: {
-            labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+            labels: @json($growthChartLabels),
             datasets: [{
-                    label: 'New Zones',
-                    data: [12, 28, 45, 84],
+                    label: 'New observation records',
+                    data: @json($growthChartZones),
                     borderColor: '#1e9e62',
                     backgroundColor: 'rgba(30,158,98,.1)',
                     fill: true,
@@ -301,8 +285,8 @@
                     borderWidth: 2
                 },
                 {
-                    label: 'Genera Classified',
-                    data: [800, 1200, 3400, 5200],
+                    label: 'Analyses run',
+                    data: @json($growthChartAnalyses),
                     borderColor: '#5ab8de',
                     backgroundColor: 'rgba(90,184,222,.1)',
                     fill: true,

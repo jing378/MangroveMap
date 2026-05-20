@@ -57,6 +57,36 @@
             </table>
         </div>
     </div>
+
+    <div class="section">
+        <div class="section-title"><i class="bi bi-clock-history"></i> Recent Activity</div>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Activity</th>
+                        <th>Module</th>
+                        <th>Status</th>
+                        <th>When</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($userActivities as $activity)
+                    <tr>
+                        <td>{{ $activity->activity }}</td>
+                        <td>{{ $activity->module }}</td>
+                        <td><span class="badge {{ $activity->status }}">{{ ucfirst($activity->status) }}</span></td>
+                        <td>{{ $activity->created_at?->diffForHumans() ?? '—' }}</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="4">No activity recorded for this user yet.</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 @endsection
 
@@ -174,6 +204,29 @@
         border-bottom: 1px solid #f0f4f0;
         color: #3a5a3a;
     }
+
+    .section-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a2e1a;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 700;
+    }
+
+    .badge.success { background: #edf7f2; color: #1e9e62; border: 1px solid #b0e0c0; }
+    .badge.pending { background: #fdf5e8; color: #c07818; border: 1px solid #e8cc98; }
+    .badge.rejected { background: #fdf0ee; color: #d04030; border: 1px solid #e8b8b0; }
+    .badge.secondary { background: #f0f4f0; color: #6a8a6a; border: 1px solid #d4e0d4; }
 
     @media (max-width: 768px) {
         .section-title-with-actions {

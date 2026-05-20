@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\AIModel;
 use App\Models\MangroveData;
 use App\Models\Analysis;
+use App\Models\UserActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,30 +19,114 @@ class AdminController extends Controller
         abort_if(Auth::user()->role !== 'admin', 403);
 
         $totalUsers = User::count();
-        $totalDatasets = MangroveData::count();
-        $activeModels = AIModel::where('is_active', true)->count();
-        $recentAnalyses = Analysis::latest()->take(5)->get();
+        $mappedZones = MangroveData::count();
+        $totalAnalyses = Analysis::count();
+        $completedAnalyses = Analysis::where('status', 'completed')->count();
+        $generaClassified = $completedAnalyses;
+        $systemHealth = $totalAnalyses > 0
+            ? round(($completedAnalyses / $totalAnalyses) * 100, 1)
+            : 100;
+        $newUsersThisMonth = User::where('created_at', '>=', now()->subMonth())->count();
+        $newZonesThisMonth = MangroveData::where('created_at', '>=', now()->subMonth())->count();
+        $recentActivities = UserActivity::with('user')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $growthChart = $this->weeklyGrowthChartData();
 
         return view('admin.dashboard', [
             'totalUsers' => $totalUsers,
-            'totalDatasets' => $totalDatasets,
-            'activeModels' => $activeModels,
-            'recentAnalyses' => $recentAnalyses
+            'mappedZones' => $mappedZones,
+            'generaClassified' => $generaClassified,
+            'systemHealth' => $systemHealth,
+            'newUsersThisMonth' => $newUsersThisMonth,
+            'newZonesThisMonth' => $newZonesThisMonth,
+            'recentActivities' => $recentActivities,
+            'growthChartLabels' => $growthChart['labels'],
+            'growthChartZones' => $growthChart['zones'],
+            'growthChartAnalyses' => $growthChart['analyses'],
         ]);
     }
 
     public function datasets()
     {
         abort_if(Auth::user()->role !== 'admin', 403);
-        $datasets = MangroveData::paginate(20);
-        return view('admin.dataset-management', ['datasets' => $datasets]);
+
+        $datasets = MangroveData::with('genus')
+            ->latest('observation_date')
+            ->paginate(20);
+
+        $totalDatasets = MangroveData::count();
+        $totalCoverage = MangroveData::sum('coverage_area_km2') ?? 0;
+        $avgConfidence = MangroveData::avg('confidence_score');
+        $healthyCount = MangroveData::where('health_status', 'healthy')->count();
+        $healthRate = $totalDatasets > 0
+            ? round(($healthyCount / $totalDatasets) * 100, 1)
+            : 0;
+        $newThisMonth = MangroveData::where('created_at', '>=', now()->subMonth())->count();
+
+        $importHistory = Analysis::with('user')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        return view('admin.dataset-management', [
+            'datasets' => $datasets,
+            'totalDatasets' => $totalDatasets,
+            'totalCoverage' => $totalCoverage,
+            'avgConfidence' => $avgConfidence,
+            'healthRate' => $healthRate,
+            'newThisMonth' => $newThisMonth,
+            'importHistory' => $importHistory,
+        ]);
     }
 
     public function models()
     {
         abort_if(Auth::user()->role !== 'admin', 403);
-        $models = AIModel::all();
-        return view('admin.model-training', ['models' => $models]);
+
+        $models = AIModel::orderByDesc('training_date')->get();
+        $activeModels = $models->where('is_active', true)->count();
+        $completedModels = $models->where('status', 'completed');
+        $avgAccuracy = $completedModels->isNotEmpty()
+            ? round($completedModels->avg('accuracy') * 100, 1)
+            : 0;
+        $trainingModels = $models->where('status', 'training')->count();
+        $queuedModels = $models->whereNotIn('status', ['completed', 'training', 'failed'])->count();
+
+        $accuracyChart = $completedModels
+            ->sortBy('training_date')
+            ->values()
+            ->map(fn ($m) => round(($m->accuracy ?? 0) * 100, 1));
+
+        return view('admin.model-training', [
+            'models' => $models,
+            'activeModels' => $activeModels,
+            'avgAccuracy' => $avgAccuracy,
+            'trainingModels' => $trainingModels,
+            'queuedModels' => $queuedModels,
+            'accuracyChartLabels' => $accuracyChart->keys()->map(fn ($i) => 'Model ' . ($i + 1))->values()->all(),
+            'accuracyChartValues' => $accuracyChart->values()->all(),
+            'completedModels' => $completedModels->sortByDesc('training_date')->take(5),
+        ]);
+    }
+
+    private function weeklyGrowthChartData(): array
+    {
+        $labels = [];
+        $zones = [];
+        $analyses = [];
+
+        for ($i = 3; $i >= 0; $i--) {
+            $start = now()->subWeeks($i + 1)->startOfDay();
+            $end = now()->subWeeks($i)->endOfDay();
+            $labels[] = 'Week ' . (4 - $i);
+            $zones[] = MangroveData::whereBetween('created_at', [$start, $end])->count();
+            $analyses[] = Analysis::whereBetween('created_at', [$start, $end])->count();
+        }
+
+        return compact('labels', 'zones', 'analyses');
     }
 
     public function users()
@@ -58,6 +143,11 @@ class AdminController extends Controller
             ->pluck('count', 'role')
             ->toArray();
 
+        $recentActivities = UserActivity::with('user')
+            ->latest()
+            ->take(10)
+            ->get();
+
         return view('admin.users', [
             'users' => $users,
             'totalUsers' => $totalUsers,
@@ -65,6 +155,7 @@ class AdminController extends Controller
             'newSignups' => $newSignups,
             'adminUsers' => $adminUsers,
             'roleCounts' => $roleCounts,
+            'recentActivities' => $recentActivities,
         ]);
     }
 
@@ -72,11 +163,19 @@ class AdminController extends Controller
     {
         abort_if(Auth::user()->role !== 'admin', 403);
 
+        $userActivities = $user->activities()->latest()->take(15)->get();
+
         if ($request->ajax()) {
-            return view('admin.partials.user-show-modal', ['user' => $user]);
+            return view('admin.partials.user-show-modal', [
+                'user' => $user,
+                'userActivities' => $userActivities,
+            ]);
         }
 
-        return view('admin.user-show', ['user' => $user]);
+        return view('admin.user-show', [
+            'user' => $user,
+            'userActivities' => $userActivities,
+        ]);
     }
 
     public function edit(Request $request, User $user)
@@ -122,6 +221,14 @@ class AdminController extends Controller
         }
 
         $user->save();
+
+        UserActivity::record(
+            Auth::user(),
+            'Updated user profile: ' . $user->name,
+            'User Management',
+            'success',
+            $user,
+        );
 
         if ($request->ajax()) {
             return response()->json([

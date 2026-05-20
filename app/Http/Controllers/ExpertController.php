@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Delineation;
+use App\Models\UserActivity;
 use App\Notifications\DelineationApproved;
 use App\Notifications\DelineationRejected;
 use Illuminate\Http\Request;
@@ -48,6 +49,8 @@ class ExpertController extends Controller
             'approved_by' => $request->user()->id,
         ]);
 
+        UserActivity::recordDelineationPublished($delineation, $request->user());
+
         return response()->json([
             'message' => 'Delineation saved and published to the map immediately.',
             'delineation' => $delineation,
@@ -77,6 +80,8 @@ class ExpertController extends Controller
         $delineation->load('user');
         $delineation->user?->notify(new DelineationApproved($delineation));
 
+        UserActivity::recordDelineationApproved($delineation, Auth::user());
+
         return redirect()
             ->route('expert.dashboard')
             ->with('success', 'Delineation approved. The resident has been notified.');
@@ -105,6 +110,8 @@ class ExpertController extends Controller
 
         $delineation->load('user');
         $delineation->user?->notify(new DelineationRejected($delineation));
+
+        UserActivity::recordDelineationRejected($delineation, Auth::user());
 
         return redirect()
             ->route('expert.dashboard')

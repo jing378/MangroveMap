@@ -21,7 +21,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'organization',
         'phone',
-        'profile_image'
+        'profile_image',
+        'last_login_at',
     ];
 
     protected $hidden = [
@@ -31,8 +32,14 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'last_login_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(UserActivity::class);
+    }
 
     public function analyses(): HasMany
     {
