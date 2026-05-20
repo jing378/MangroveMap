@@ -110,6 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Resident dashboard - RESTRICTED TO END_USER ROLE ONLY
     Route::middleware('end_user')->get('/dashboard', [EndUserController::class, 'dashboard'])->name('dashboard');
     Route::middleware('end_user')->post('/delineations', [EndUserController::class, 'storeDelineation'])->name('delineations.store');
+    Route::middleware('end_user')->delete('/delineations/{delineation}', [EndUserController::class, 'destroyDelineation'])->name('delineations.destroy');
 
     // Expert routes - review and approve resident delineations
     Route::middleware('expert')->prefix('expert')->group(function () {

@@ -125,4 +125,23 @@ class EndUserController extends Controller
             'delineation' => $delineation,
         ]);
     }
+
+    public function destroyDelineation(Request $request, Delineation $delineation)
+    {
+        if ($delineation->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        if ($delineation->is_approved) {
+            return response()->json([
+                'message' => 'Approved delineations cannot be deleted.',
+            ], 422);
+        }
+
+        $delineation->delete();
+
+        return response()->json([
+            'message' => 'Delineation deleted.',
+        ]);
+    }
 }

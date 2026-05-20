@@ -1998,6 +1998,7 @@
   <script>
     // DATA & MAP INITIALIZATION (same as before)
     const saveDelineationUrl = "{{ Auth::user()->isExpert() ? route('expert.delineations.store') : route('delineations.store') }}";
+    const deleteDelineationBaseUrl = "{{ url('/delineations') }}";
     const savedDelineations = @json($delineations);
     const approvedDelineations = @json($approvedDelineationsForMap);
     // Combine user delineations with approved delineations from all users
@@ -2057,7 +2058,11 @@
       };
     }
 
-    const zones = Array.isArray(savedDelineations) ? savedDelineations.map(record => {
+    // "Mangrove Zones" should show approved/public delineations (not the user's drafts).
+    // Drafts/pending delineations are handled separately in the edit/drawing layer.
+    const zoneRecords = Array.isArray(allDelineations) ? allDelineations.filter(r => !!r?.is_approved && !r?.is_rejected) : [];
+
+    const zones = zoneRecords.map(record => {
       const feature = Array.isArray(record.features) ? record.features[0] : null;
       const [lat, lng] = getFeatureCenter(feature);
       const review = getDelineationStatus(record);
@@ -2075,7 +2080,7 @@
         color: review.color,
         chip: review.chip
       };
-    }) : [];
+    });
 
     const plantSites = [];
 
@@ -2151,17 +2156,22 @@
         .on(locateBtn, 'click', showMyLocation);
     }
 
+    // Keep overlay layers in dedicated groups so redraws are cheap.
+    // This avoids expensive mainMap.eachLayer() scans/removals which can get laggy fast.
+    const zoneMarkerLayer = L.layerGroup().addTo(mainMap);
+    const delineationLayer = L.layerGroup().addTo(mainMap);
+    const vertexLayer = L.layerGroup().addTo(mainMap);
+
     let polys = [];
     zones.forEach((z, i) => {
-      // Replaced polygon "box" with a clean circle marker
-      let p = L.circleMarker([z.lat, z.lng], {
+      const p = L.circleMarker([z.lat, z.lng], {
         radius: 8,
         fillColor: z.color,
         color: "#fff",
         weight: 2,
         opacity: 1,
         fillOpacity: 0.8
-      }).addTo(mainMap);
+      }).addTo(zoneMarkerLayer);
 
       p.bindPopup(`<div><b>${z.name}</b><br>Area: ${z.area}<br>NDVI: ${z.ndvi}<br>Status: ${z.status}</div>`);
       p.on('click', () => selectZone(i));
@@ -2383,8 +2393,43 @@
       alert('Delineation details saved.');
     }
 
-    window.removeCurrentDelineation = function() {
+    window.removeCurrentDelineation = async function() {
       if (selectedDrawnIndex < 0) return;
+
+      const feature = drawnFeatures[selectedDrawnIndex];
+      const delineationId = feature?.delineation_id;
+
+      // If this feature came from a saved draft delineation record, deleting it must happen server-side.
+      // Otherwise it will reappear on refresh (because it is loaded again from the DB).
+      if (delineationId && feature?.is_own && !feature?.is_approved) {
+        const ok = confirm('Remove this draft delineation? This will permanently delete it.');
+        if (!ok) return;
+
+        try {
+          const response = await fetch(`${deleteDelineationBaseUrl}/${delineationId}`, {
+            method: 'DELETE',
+            headers: {
+              'Accept': 'application/json',
+              'X-CSRF-TOKEN': csrfToken,
+            },
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload.message || 'Unable to delete delineation.');
+          }
+
+          alert(payload.message || 'Delineation deleted.');
+          window.location.reload();
+          return;
+        } catch (error) {
+          console.error('Delete delineation failed:', error);
+          alert('Unable to delete delineation. Please try again.');
+          return;
+        }
+      }
+
+      // Unsaved / in-memory only: remove locally.
       drawnFeatures.splice(selectedDrawnIndex, 1);
       selectedDrawnIndex = -1;
       currentFeature = null;
@@ -2561,12 +2606,9 @@
     }
 
     function redrawFeatures() {
-      mainMap.eachLayer(layer => {
-        if (layer === snapMarker || layer === locationMarker || layer === locationCircle) return;
-        if (layer instanceof L.Polyline || layer instanceof L.Polygon || layer instanceof L.Marker || layer instanceof L.CircleMarker) {
-          mainMap.removeLayer(layer);
-        }
-      });
+      // Clear only our overlay layers; keep the base tiles + controls intact.
+      delineationLayer.clearLayers();
+      vertexLayer.clearLayers();
 
       function getFeatureColor(f) {
         if (f.is_rejected) return '#d04030';
@@ -2584,76 +2626,89 @@
             color,
             fillColor: color,
             fillOpacity: 0.85,
-          }).addTo(mainMap);
+          }).addTo(delineationLayer);
           marker.on('click', () => selectDrawnFeature(i));
         } else if (f.type === 'line') {
           const line = L.polyline(f.coords, {
             color,
             weight: 3,
-          }).addTo(mainMap);
+          }).addTo(delineationLayer);
           line.on('click', () => selectDrawnFeature(i));
-          // Add markers for each point
-          f.coords.forEach(coord => L.marker(coord, {
-            icon: L.divIcon({
-              className: 'line-point',
-              html: '●',
-              iconSize: [8, 8]
-            })
-          }).addTo(mainMap));
+          // Vertex markers are visually nice but expensive; only render them in edit mode.
+          if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
+            f.coords.forEach(coord => L.circleMarker(coord, {
+              radius: 3,
+              color,
+              weight: 1,
+              fillColor: color,
+              fillOpacity: 0.9,
+              interactive: false,
+            }).addTo(vertexLayer));
+          }
         } else if (f.type === 'area') {
           const polygon = L.polygon(f.coords, {
             color,
             fillColor: color,
             fillOpacity: 0.45,
             weight: 2,
-          }).addTo(mainMap);
+          }).addTo(delineationLayer);
           polygon.on('click', () => selectDrawnFeature(i));
-          // Add markers for each point
-          f.coords.forEach(coord => L.marker(coord, {
-            icon: L.divIcon({
-              className: 'area-point',
-              html: '●',
-              iconSize: [8, 8]
-            })
-          }).addTo(mainMap));
+          if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
+            f.coords.forEach(coord => L.circleMarker(coord, {
+              radius: 3,
+              color,
+              weight: 1,
+              fillColor: color,
+              fillOpacity: 0.9,
+              interactive: false,
+            }).addTo(vertexLayer));
+          }
         }
       });
 
       // Draw current feature being drawn
       if (currentFeature) {
         if (currentFeature.type === 'point') {
-          L.marker(currentFeature.coords).addTo(mainMap);
+          L.circleMarker(currentFeature.coords, {
+            radius: 7,
+            color: '#ff6b6b',
+            fillColor: '#ff6b6b',
+            fillOpacity: 0.6,
+            interactive: false,
+          }).addTo(delineationLayer);
         } else if (currentFeature.type === 'line') {
           L.polyline(currentFeature.coords, {
             color: '#ff6b6b',
             opacity: 0.7
-          }).addTo(mainMap);
-          currentFeature.coords.forEach(coord => L.marker(coord, {
-            icon: L.divIcon({
-              className: 'line-point',
-              html: '●',
-              iconSize: [8, 8]
-            })
-          }).addTo(mainMap));
+          }).addTo(delineationLayer);
+          currentFeature.coords.forEach(coord => L.circleMarker(coord, {
+            radius: 3,
+            color: '#ff6b6b',
+            weight: 1,
+            fillColor: '#ff6b6b',
+            fillOpacity: 0.9,
+            interactive: false,
+          }).addTo(vertexLayer));
         } else if (currentFeature.type === 'area') {
           if (currentFeature.coords.length >= 3) {
             L.polygon(currentFeature.coords, {
               color: '#4ecdc4',
               fillOpacity: 0.3
-            }).addTo(mainMap);
+            }).addTo(delineationLayer);
           } else {
             L.polyline(currentFeature.coords, {
               color: '#4ecdc4',
               opacity: 0.7
-            }).addTo(mainMap);
+            }).addTo(delineationLayer);
           }
-          currentFeature.coords.forEach(coord => L.marker(coord, {
-            icon: L.divIcon({
-              className: 'area-point',
-              html: '●',
-              iconSize: [8, 8]
-            })
-          }).addTo(mainMap));
+          currentFeature.coords.forEach(coord => L.circleMarker(coord, {
+            radius: 3,
+            color: '#4ecdc4',
+            weight: 1,
+            fillColor: '#4ecdc4',
+            fillOpacity: 0.9,
+            interactive: false,
+          }).addTo(vertexLayer));
         }
       }
     }
@@ -2729,27 +2784,26 @@
       redrawFeatures();
     });
 
+    // Throttle snapping updates to one per animation frame (mousemove can fire *a lot*).
+    let snapRaf = 0;
+    let lastMouseLatLng = null;
     mainMap.on('mousemove', (e) => {
-      if (!drawingMode) {
-        snapMarker.setStyle({
-          opacity: 0,
-          fillOpacity: 0
-        });
-        return;
-      }
-      const snapped = getSnappedLatLng(e.latlng);
-      if (snapped) {
-        snapMarker.setLatLng(snapped);
-        snapMarker.setStyle({
-          opacity: 1,
-          fillOpacity: 0.35
-        });
-      } else {
-        snapMarker.setStyle({
-          opacity: 0,
-          fillOpacity: 0
-        });
-      }
+      lastMouseLatLng = e.latlng;
+      if (snapRaf) return;
+      snapRaf = requestAnimationFrame(() => {
+        snapRaf = 0;
+        if (!drawingMode || !lastMouseLatLng) {
+          snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+          return;
+        }
+        const snapped = getSnappedLatLng(lastMouseLatLng);
+        if (snapped) {
+          snapMarker.setLatLng(snapped);
+          snapMarker.setStyle({ opacity: 1, fillOpacity: 0.35 });
+        } else {
+          snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+        }
+      });
     });
 
     window.toggleLayerMenu = () => {
@@ -2913,12 +2967,8 @@
       card.innerHTML = `<div class="sc-head"><div class="sc-rank ${s.priority==='Critical'?'rg':(s.priority==='High'?'ra':'rb')}">${i+1}</div><div class="sc-name">${s.name}</div></div><div class="sc-sp">${s.priority} priority zone</div><div class="sc-foot"><div class="sbar"><div class="strack"><div class="sfill" style="width:${s.score}%;background:${s.color}"></div></div><span style="font-size:10px;font-weight:700;color:${s.color}">${s.score}%</span></div><span class="ptag" style="background:${s.color}20;border-color:${s.color};color:${s.color}">${s.priority}</span></div>`;
       plantListDiv.appendChild(card);
     });
-    const mapObserver = new ResizeObserver(() => {
-      mainMap.invalidateSize();
-      plantMap.invalidateSize();
-    });
-    mapObserver.observe(document.getElementById('mainMap'));
-    mapObserver.observe(document.getElementById('plantMap'));
+    // Avoid ResizeObserver -> invalidateSize() feedback loops (can cause constant reflow).
+    // We already invalidate on tab switches / panel open-close / window resize.
 
     // Notification dropdown toggle
     const notificationToggle = document.getElementById('notificationToggle');

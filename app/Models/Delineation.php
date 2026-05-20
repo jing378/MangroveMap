@@ -2,12 +2,21 @@
 
 namespace App\Models;
 
+use App\Notifications\DelineationSubmittedForReview;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Delineation extends Model
 {
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Delineation $delineation) {
+            $delineation->deleteReviewNotifications();
+        });
+    }
 
     protected $fillable = [
         'user_id',
@@ -64,5 +73,16 @@ class Delineation extends Model
     public function scopeByUser($query, $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Remove expert "submitted for review" notifications for this delineation.
+     */
+    public function deleteReviewNotifications(): void
+    {
+        DB::table('notifications')
+            ->where('type', DelineationSubmittedForReview::class)
+            ->where('data->delineation_id', $this->id)
+            ->delete();
     }
 }
