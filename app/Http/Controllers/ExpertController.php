@@ -6,6 +6,7 @@ use App\Models\Delineation;
 use App\Models\UserActivity;
 use App\Notifications\DelineationApproved;
 use App\Notifications\DelineationRejected;
+use App\Http\Controllers\EndUserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -13,22 +14,7 @@ class ExpertController extends Controller
 {
     public function dashboard()
     {
-        return view('expert.dashboard', [
-            'pendingDelineations' => Delineation::with('user:id,name,email,organization')
-                ->pending()
-                ->latest()
-                ->get(),
-            'recentlyApproved' => Delineation::with(['user:id,name', 'approvedBy:id,name'])
-                ->approved()
-                ->latest('approved_at')
-                ->take(10)
-                ->get(),
-            'recentlyRejected' => Delineation::with(['user:id,name', 'rejectedBy:id,name'])
-                ->rejected()
-                ->latest('rejected_at')
-                ->take(10)
-                ->get(),
-        ]);
+        return app(EndUserController::class)->dashboard();
     }
 
     public function storeDelineation(Request $request)

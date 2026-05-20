@@ -1583,7 +1583,7 @@
           @endif
           <div class="profile-info">
             <div class="profile-name">{{ Auth::user()->name }}</div>
-            <div class="profile-role">Resident</div>
+            <div class="profile-role">{{ Auth::user()->isExpert() ? 'Expert' : 'Resident' }}</div>
           </div>
         </button>
 
@@ -1680,7 +1680,7 @@
                 <button id="undoBtn" title="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
                 <button id="redoBtn" title="Redo"><i class="bi bi-arrow-clockwise"></i></button>
               </div>
-              <button id="saveBtn" class="toolbar-save-btn" title="Save changes"><i class="bi bi-download"></i></button>
+              <button id="saveBtn" class="toolbar-save-btn" title="Save draft"><i class="bi bi-download"></i></button>
             </div>
           </div>
           <div class="map-layer-control">
@@ -1769,7 +1769,7 @@
       <div class="left-panel">
         <div class="scroll">
           <div class="sec">Upload Image</div>
-          <a href="{{ route('dashboard') }}" class="btn" style="margin-bottom:14px; display:inline-flex; align-items:center;"><i class="bi bi-arrow-left-short" style="margin-right:6px;"></i> Back to Dashboard</a>
+          <a href="{{ Auth::user()->isExpert() ? route('expert.dashboard') : route('dashboard') }}" class="btn" style="margin-bottom:14px; display:inline-flex; align-items:center;"><i class="bi bi-arrow-left-short" style="margin-right:6px;"></i> Back to Dashboard</a>
           <div class="upload-zone" id="uploadBox" onclick="document.getElementById('fileInput').click()">
             <div class="ico">📷</div>
             <h3>Click to upload mangrove image</h3>
@@ -1997,7 +1997,7 @@
 
   <script>
     // DATA & MAP INITIALIZATION (same as before)
-    const saveDelineationUrl = "{{ route('delineations.store') }}";
+    const saveDelineationUrl = "{{ Auth::user()->isExpert() ? route('expert.delineations.store') : route('delineations.store') }}";
     const savedDelineations = @json($delineations);
     const approvedDelineations = @json($approvedDelineationsForMap);
     // Combine user delineations with approved delineations from all users
@@ -2031,15 +2031,30 @@
     }
 
     function formatDelineationScan(record) {
-      if (!record?.created_at) return 'Saved';
+      if (!record?.created_at) return 'Draft';
       const d = new Date(record.created_at);
-      return isNaN(d.getTime()) ? 'Saved' : d.toLocaleDateString();
+      return isNaN(d.getTime()) ? 'Draft' : d.toLocaleDateString();
     }
 
     function getDelineationStatus(record) {
-      if (record.is_rejected) return { label: 'Rejected', chip: 'cr', color: '#d04030', sc: 'r' };
-      if (record.is_approved) return { label: 'Approved', chip: 'cg', color: '#1e9e62', sc: 'g' };
-      return { label: 'Pending', chip: 'cp', color: '#c07818', sc: 'p' };
+      if (record.is_rejected) return {
+        label: 'Rejected',
+        chip: 'cr',
+        color: '#d04030',
+        sc: 'r'
+      };
+      if (record.is_approved) return {
+        label: 'Approved',
+        chip: 'cg',
+        color: '#1e9e62',
+        sc: 'g'
+      };
+      return {
+        label: 'Pending',
+        chip: 'cp',
+        color: '#c07818',
+        sc: 'p'
+      };
     }
 
     const zones = Array.isArray(savedDelineations) ? savedDelineations.map(record => {
@@ -2277,7 +2292,9 @@
     function loadDelineationsOnMap() {
       drawnFeatures = [];
       if (Array.isArray(savedDelineations)) {
-        savedDelineations.forEach(record => pushDelineationFeatures(record, { is_own: true }));
+        savedDelineations.forEach(record => pushDelineationFeatures(record, {
+          is_own: true
+        }));
       }
       if (Array.isArray(approvedDelineations)) {
         approvedDelineations.forEach(record => {
@@ -2525,7 +2542,7 @@
           throw new Error(payload.message || 'Unable to save delineation.');
         }
 
-        alert(payload.message || 'Delineation saved successfully.');
+        alert(payload.message || 'Delineation draft saved successfully.');
       } catch (error) {
         console.error('Delineation save failed:', error);
         alert('Unable to save delineation. Please try again.');

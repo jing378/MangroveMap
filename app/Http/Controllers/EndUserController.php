@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Analysis;
 use App\Models\Delineation;
 use App\Models\MangroveData;
+use App\Models\User;
 use App\Models\UserActivity;
+use App\Notifications\DelineationSubmittedForReview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -107,15 +109,19 @@ class EndUserController extends Controller
 
         $delineation = Delineation::create([
             'user_id' => $request->user()->id,
-            'name' => $data['name'] ?? 'Saved delineation',
+            'name' => $data['name'] ?? 'Draft delineation',
             'notes' => $data['notes'] ?? null,
             'features' => $data['features'],
         ]);
 
         UserActivity::recordDelineationSubmitted($delineation);
 
+        User::where('role', 'expert')
+            ->get()
+            ->each(fn($expert) => $expert->notify(new DelineationSubmittedForReview($delineation)));
+
         return response()->json([
-            'message' => 'Delineation saved and submitted for expert review.',
+            'message' => 'Delineation saved as draft and submitted for expert review.',
             'delineation' => $delineation,
         ]);
     }

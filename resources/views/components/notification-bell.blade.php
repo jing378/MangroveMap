@@ -14,13 +14,6 @@
                 <div class="dropdown-header-name">Notifications</div>
                 <div class="dropdown-header-email">{{ Auth::user()->unreadNotifications->count() }} unread</div>
             </div>
-        </div>
-
-        <div class="dropdown-menu notification-menu">
-            @php
-            $recentNotifications = Auth::user()->notifications()->limit(5)->get();
-            @endphp
-
             @if(Auth::user()->unreadNotifications->count() > 0)
             <form action="{{ route('notifications.mark-all-as-read') }}" method="POST" class="mark-all-read-form mark-all-read-form--header" data-ajax-mark-all>
                 @csrf
@@ -29,28 +22,32 @@
                 </button>
             </form>
             @endif
+        </div>
+
+        <div class="dropdown-menu notification-menu">
+            @php
+            $recentNotifications = Auth::user()->notifications()->limit(5)->get();
+            @endphp
 
             @if($recentNotifications->count() > 0)
             @foreach($recentNotifications as $notification)
             <div class="notification-item {{ !$notification->read_at ? 'unread' : '' }}">
-                <div class="notification-icon">
-                    <i class="bi {{ $notification->data['icon'] ?? 'bi-info-circle' }}"></i>
-                </div>
-                <div class="notification-content">
-                    <p class="notification-title">{{ $notification->data['title'] ?? 'Notification' }}</p>
-                    <p class="notification-message">{{ $notification->data['message'] ?? '' }}</p>
-                    <p class="notification-time">{{ $notification->created_at->diffForHumans() }}</p>
-                </div>
-                @if(!$notification->read_at)
-                <form action="{{ route('notifications.mark-as-read', $notification->id) }}" method="POST" class="notification-mark-read-form" data-ajax-mark-read>
-                    @csrf
-                    @method('PUT')
-                    <button type="submit" class="notification-mark-read-btn" title="Mark as read">
-                        <i class="bi bi-check2"></i>
-                        <span class="mark-read-label">Read</span>
-                    </button>
-                </form>
-                @endif
+                <a href="{{ $notification->data['url'] ?? route('notifications.index') }}" class="notification-link" @if(!$notification->read_at) data-mark-read-url="{{ route('notifications.mark-as-read', $notification->id) }}" @endif>
+                    <div class="notification-icon">
+                        <i class="bi {{ $notification->data['icon'] ?? 'bi-info-circle' }}"></i>
+                    </div>
+                    <div class="notification-content">
+                        <p class="notification-title">{{ $notification->data['title'] ?? 'Notification' }}</p>
+                        <p class="notification-message">{{ $notification->data['message'] ?? '' }}</p>
+                        @if(!empty($notification->data['delineation_name']))
+                        <p class="notification-detail">{{ $notification->data['delineation_name'] }}</p>
+                        @endif
+                        @if(!empty($notification->data['submitted_by']))
+                        <p class="notification-detail">Submitted by {{ $notification->data['submitted_by'] }}</p>
+                        @endif
+                        <p class="notification-time">{{ $notification->created_at->diffForHumans() }}</p>
+                    </div>
+                </a>
             </div>
             @endforeach
             @else
@@ -123,13 +120,13 @@
     .notification-dropdown {
         position: absolute;
         top: 68px;
-        /* Adjusted to match profile dropdown spacing */
         right: 0;
         background: #fff;
         border: 1px solid #e0e8e0;
-        border-radius: 10px;
-        min-width: 340px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        border-radius: 12px;
+        min-width: 360px;
+        max-width: 420px;
+        box-shadow: 0 16px 38px rgba(0, 0, 0, 0.14);
         display: none;
         z-index: 999;
         overflow: hidden;
@@ -139,10 +136,41 @@
         display: block;
     }
 
+    .dropdown-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px;
+        border-bottom: 1px solid #f0f4f0;
+        background: #f8faf8;
+    }
+
+    .dropdown-header-text {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .mark-all-read-form--header {
+        margin: 0;
+    }
+
+    .dropdown-header-name {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1a2e1a;
+    }
+
+    .dropdown-header-email {
+        font-size: 12px;
+        color: #6a8a6a;
+    }
+
     .notification-menu {
-        max-height: 360px;
+        max-height: 380px;
         overflow-y: auto;
-        padding: 0;
+        padding: 8px 0;
     }
 
     .notification-menu::-webkit-scrollbar {
@@ -164,8 +192,9 @@
 
     .notification-item {
         display: flex;
+        align-items: center;
         gap: 12px;
-        padding: 12px 16px;
+        padding: 14px 16px;
         border-bottom: 1px solid #f0f4f0;
         transition: all 0.15s;
         position: relative;
@@ -174,6 +203,19 @@
 
     .notification-item:hover {
         background: #f5f7f6;
+    }
+
+    .notification-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .notification-link:hover {
+        text-decoration: none;
     }
 
     .notification-item.unread {
@@ -186,47 +228,57 @@
 
     .notification-icon {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
         background: #edf7f2;
         color: #1e9e62;
         flex-shrink: 0;
-        font-size: 14px;
+        font-size: 16px;
     }
 
     .notification-content {
+        display: grid;
+        gap: 4px;
         flex: 1;
         min-width: 0;
     }
 
     .notification-title {
-        font-size: 12px;
-        font-weight: 600;
+        font-size: 13px;
+        font-weight: 700;
         color: #1a2e1a;
-        margin: 0 0 4px 0;
-        line-height: 1.4;
+        margin: 0;
+        line-height: 1.3;
     }
 
     .notification-message {
+        font-size: 12px;
+        color: #556d55;
+        margin: 0;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+
+    .notification-detail {
         font-size: 11px;
-        color: #7a9a7a;
-        margin: 0 0 4px 0;
+        color: #6a8a6a;
+        margin: 0;
         line-height: 1.4;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 
     .notification-time {
-        font-size: 10px;
+        font-size: 11px;
         color: #a8bfa8;
         margin: 0;
     }
 
     .mark-all-read-form--header {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
         padding: 0 16px 10px;
         border-bottom: 1px solid #f0f4f0;
     }
@@ -239,13 +291,13 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 4px 10px;
+        padding: 6px 12px;
         border: 1px solid #c8e6d4;
-        border-radius: 6px;
+        border-radius: 8px;
         background: #fff;
         color: #1e9e62;
-        font-size: 11px;
-        font-weight: 600;
+        font-size: 12px;
+        font-weight: 700;
         cursor: pointer;
         font-family: inherit;
         transition: all 0.15s;
@@ -253,40 +305,6 @@
 
     .mark-all-read-btn:hover {
         background: #edf7f2;
-        border-color: #1e9e62;
-    }
-
-    .notification-mark-read-form {
-        flex-shrink: 0;
-        margin: 0;
-    }
-
-    .notification-mark-read-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        height: 28px;
-        padding: 0 8px;
-        border: 1px solid #c8e6d4;
-        border-radius: 6px;
-        background: #fff;
-        color: #1e9e62;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.15s;
-        font-family: inherit;
-        white-space: nowrap;
-    }
-
-    .mark-read-label {
-        line-height: 1;
-    }
-
-    .notification-mark-read-btn:hover {
-        background: #1e9e62;
-        color: #fff;
         border-color: #1e9e62;
     }
 
@@ -435,74 +453,111 @@
 </style>
 
 <script>
-(function () {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    if (!csrfToken) return;
+    (function() {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (!csrfToken) return;
 
-    function updateBellUnread(count) {
-        const badge = document.querySelector('.notification-badge');
-        const headerUnread = document.querySelector('.dropdown-header-email');
+        function updateBellUnread(count) {
+            const badge = document.querySelector('.notification-badge');
+            const headerUnread = document.querySelector('.dropdown-header-email');
 
-        if (headerUnread) {
-            headerUnread.textContent = count + ' unread';
-        }
-
-        if (count > 0) {
-            if (badge) {
-                badge.textContent = count;
-            } else {
-                const btn = document.getElementById('notificationToggle');
-                if (btn) {
-                    const span = document.createElement('span');
-                    span.className = 'notification-badge';
-                    span.textContent = count;
-                    btn.appendChild(span);
-                }
+            if (headerUnread) {
+                headerUnread.textContent = count + ' unread';
             }
-        } else {
-            badge?.remove();
-            document.querySelector('.mark-all-read-form--header')?.remove();
+
+            if (count > 0) {
+                if (badge) {
+                    badge.textContent = count;
+                } else {
+                    const btn = document.getElementById('notificationToggle');
+                    if (btn) {
+                        const span = document.createElement('span');
+                        span.className = 'notification-badge';
+                        span.textContent = count;
+                        btn.appendChild(span);
+                    }
+                }
+            } else {
+                badge?.remove();
+                document.querySelector('.mark-all-read-form--header')?.remove();
+            }
         }
-    }
 
-    async function ajaxSubmit(form) {
-        const res = await fetch(form.action, {
-            method: form.querySelector('[name="_method"]')?.value || form.method,
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        });
-        if (!res.ok) return null;
-        return res.json();
-    }
-
-    document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
-        form.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const data = await ajaxSubmit(form);
-            if (!data) return;
-
-            const item = form.closest('.notification-item');
-            item?.classList.remove('unread');
-            form.remove();
-            updateBellUnread(data.unreadCount ?? 0);
-        });
-    });
-
-    document.querySelectorAll('[data-ajax-mark-all]').forEach(form => {
-        form.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const data = await ajaxSubmit(form);
-            if (!data) return;
-
-            document.querySelectorAll('.notification-item.unread').forEach(item => {
-                item.classList.remove('unread');
-                item.querySelector('[data-ajax-mark-read]')?.remove();
+        async function ajaxSubmit(form) {
+            const res = await fetch(form.action, {
+                method: form.querySelector('[name="_method"]')?.value || form.method,
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
             });
-            updateBellUnread(0);
+            if (!res.ok) return null;
+            return res.json();
+        }
+
+        document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const data = await ajaxSubmit(form);
+                if (!data) return;
+
+                const item = form.closest('.notification-item');
+                item?.classList.remove('unread');
+                form.remove();
+                updateBellUnread(data.unreadCount ?? 0);
+            });
         });
-    });
-})();
+
+        document.querySelectorAll('.notification-link[data-mark-read-url]').forEach(link => {
+            link.addEventListener('click', async function(e) {
+                if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+                    return;
+                }
+
+                e.preventDefault();
+                const markReadUrl = link.dataset.markReadUrl;
+                const targetUrl = link.href;
+
+                try {
+                    const res = await fetch(markReadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: new URLSearchParams({
+                            _method: 'PUT'
+                        })
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        updateBellUnread(data.unreadCount ?? 0);
+                        link.closest('.notification-item')?.classList.remove('unread');
+                    }
+                } catch (error) {
+                    // Continue to navigation even if the mark-read request fails.
+                } finally {
+                    window.location = targetUrl;
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-ajax-mark-all]').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const data = await ajaxSubmit(form);
+                if (!data) return;
+
+                document.querySelectorAll('.notification-item.unread').forEach(item => {
+                    item.classList.remove('unread');
+                    item.querySelector('[data-ajax-mark-read]')?.remove();
+                });
+                updateBellUnread(0);
+            });
+        });
+    })();
 </script>

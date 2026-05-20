@@ -178,6 +178,25 @@
         font-weight: 700;
     }
 
+    .highlighted-delineation-row {
+        animation: highlightGlow 4s ease-in-out;
+        background: #ecfdf5;
+    }
+
+    @keyframes highlightGlow {
+        0% {
+            background: #f0fdf4;
+        }
+
+        50% {
+            background: #d1fae5;
+        }
+
+        100% {
+            background: #f0fdf4;
+        }
+    }
+
     .badge-rejected {
         display: inline-block;
         background: #fef2f2;
@@ -268,7 +287,7 @@
         </thead>
         <tbody>
             @foreach($pendingDelineations as $delineation)
-            <tr>
+            <tr id="pending-delineation-{{ $delineation->id }}">
                 <td>
                     <strong>{{ $delineation->user?->name ?? 'Unknown' }}</strong><br>
                     <span style="color:#7a9a7a;">{{ $delineation->user?->email }}</span>
@@ -376,22 +395,36 @@
 
 @section('scripts')
 <script>
-document.querySelectorAll('[data-reject-toggle]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-reject-toggle');
-        const form = document.getElementById('reject-form-' + id);
-        document.querySelectorAll('.reject-form.open').forEach(f => {
-            if (f !== form) f.classList.remove('open');
+    document.querySelectorAll('[data-reject-toggle]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-reject-toggle');
+            const form = document.getElementById('reject-form-' + id);
+            document.querySelectorAll('.reject-form.open').forEach(f => {
+                if (f !== form) f.classList.remove('open');
+            });
+            form?.classList.toggle('open');
         });
-        form?.classList.toggle('open');
     });
-});
 
-document.querySelectorAll('[data-reject-cancel]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-reject-cancel');
-        document.getElementById('reject-form-' + id)?.classList.remove('open');
+    document.querySelectorAll('[data-reject-cancel]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-reject-cancel');
+            document.getElementById('reject-form-' + id)?.classList.remove('open');
+        });
     });
-});
+
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get('highlight');
+    if (highlightId) {
+        const row = document.getElementById('pending-delineation-' + highlightId);
+        if (row) {
+            row.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            row.classList.add('highlighted-delineation-row');
+            setTimeout(() => row.classList.remove('highlighted-delineation-row'), 4500);
+        }
+    }
 </script>
 @endsection

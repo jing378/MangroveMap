@@ -492,6 +492,7 @@
     </header>
 
     <div class="container">
+        @unless(request()->routeIs('notifications.*'))
         <!-- End User Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-section">
@@ -522,6 +523,7 @@
                 </a>
             </div>
         </aside>
+        @endunless
 
         <div class="main-content">
             <div class="content">

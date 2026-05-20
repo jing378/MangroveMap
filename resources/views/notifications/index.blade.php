@@ -6,6 +6,15 @@
 <style>
     .notifications-page {
         max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .main-content {
+        flex: 1;
+    }
+
+    .content {
+        padding: 28px 32px;
     }
 
     .notifications-header {
@@ -49,6 +58,29 @@
     .mark-all-read-btn:hover {
         background: #edf7f2;
         border-color: #1e9e62;
+    }
+
+    .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border: 1px solid #e0e8e0;
+        border-radius: 8px;
+        background: #fff;
+        color: #4b5f56;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+
+    .back-btn:hover {
+        background: #f8fcfa;
+        border-color: #1e9e62;
+        color: #1e9e62;
     }
 
     .unread-banner {
@@ -116,6 +148,12 @@
         margin-bottom: 8px;
     }
 
+    .notification-card-detail {
+        font-size: 12px;
+        color: #4b5f56;
+        margin: 2px 0 6px;
+    }
+
     .notification-card-meta {
         font-size: 11px;
         color: #a8bfa8;
@@ -173,24 +211,76 @@
         border-color: #d04030;
     }
 
-    .notification-action-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        margin-top: 10px;
-        padding: 8px 14px;
-        background: #1e9e62;
-        color: #fff;
-        border-radius: 8px;
-        font-size: 12px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: background 0.15s;
+    .notification-card-actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
     }
 
-    .notification-action-link:hover {
-        background: #178a54;
+    .notification-card-actions form {
+        margin: 0;
+    }
+
+    .btn-approve,
+    .btn-reject,
+    .btn-mark-read,
+    .btn-delete {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+        font-family: inherit;
+        transition: all 0.15s;
+    }
+
+    .btn-approve {
+        background: #1e9e62;
         color: #fff;
+    }
+
+    .btn-approve:hover {
+        background: #178a54;
+    }
+
+    .btn-reject {
+        background: #fff;
+        color: #d04030;
+        border: 1px solid #f0d0d0;
+    }
+
+    .btn-reject:hover {
+        background: #fef2f2;
+    }
+
+    .notification-reject-form {
+        display: none;
+        background: #fff5f5;
+        padding: 12px;
+        border: 1px solid #f7d6d6;
+        border-radius: 10px;
+    }
+
+    .notification-reject-form.open {
+        display: block;
+    }
+
+    .notification-reject-form textarea {
+        width: 100%;
+        min-height: 80px;
+        margin-bottom: 10px;
+        padding: 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        resize: vertical;
+        font-family: inherit;
+        font-size: 13px;
     }
 
     .empty-state {
@@ -224,6 +314,9 @@
             </button>
         </form>
         @endif
+        <a href="{{ route('dashboard') }}" class="back-btn">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
     </div>
 
     @if(session('success'))
@@ -246,16 +339,16 @@
         $icon = $notification->data['icon'] ?? 'bi-info-circle';
         $type = $notification->data['type'] ?? 'notification';
         $colorMap = [
-            'new_user' => '#3b82f6',
-            'new_analysis' => '#10b981',
-            'analysis_failed' => '#ef4444',
-            'system_error' => '#dc2626',
-            'system_alert' => '#f59e0b',
-            'data_update' => '#06b6d4',
-            'user_action' => '#8b5cf6',
-            'analysis_completed' => '#10b981',
-            'delineation_approved' => '#10b981',
-            'delineation_rejected' => '#ef4444',
+        'new_user' => '#3b82f6',
+        'new_analysis' => '#10b981',
+        'analysis_failed' => '#ef4444',
+        'system_error' => '#dc2626',
+        'system_alert' => '#f59e0b',
+        'data_update' => '#06b6d4',
+        'user_action' => '#8b5cf6',
+        'analysis_completed' => '#10b981',
+        'delineation_approved' => '#10b981',
+        'delineation_rejected' => '#ef4444',
         ];
         $iconColor = $colorMap[$type] ?? '#1e9e62';
         @endphp
@@ -266,14 +359,34 @@
             <div class="notification-card-body">
                 <h3 class="notification-card-title">{{ $notification->data['title'] ?? 'Notification' }}</h3>
                 <p class="notification-card-message">{{ $notification->data['message'] ?? '' }}</p>
-                <p class="notification-card-meta">{{ $notification->created_at->diffForHumans() }}</p>
-                @if(!empty($notification->data['actionUrl']))
-                <a href="{{ $notification->data['actionUrl'] }}" class="notification-action-link">
-                    <i class="bi bi-arrow-right"></i> {{ $notification->data['actionLabel'] ?? 'View details' }}
-                </a>
+                @if(!empty($notification->data['delineation_name']))
+                <p class="notification-card-detail"><strong>Delineation:</strong> {{ $notification->data['delineation_name'] }}</p>
                 @endif
+                @if(!empty($notification->data['submitted_by']))
+                <p class="notification-card-detail"><strong>Submitted by:</strong> {{ $notification->data['submitted_by'] }}</p>
+                @endif
+                <p class="notification-card-meta">{{ $notification->created_at->diffForHumans() }}</p>
             </div>
             <div class="notification-card-actions">
+                @if(Auth::user()->isExpert() && ($notification->data['type'] ?? '') === 'delineation_submitted' && !empty($notification->data['delineation_id']))
+                <form action="{{ route('expert.delineations.approve', $notification->data['delineation_id']) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="btn-approve">
+                        <i class="bi bi-check2"></i> Approve
+                    </button>
+                </form>
+                <button type="button" class="btn-reject" data-reject-toggle="{{ $notification->id }}">
+                    <i class="bi bi-x-lg"></i> Reject
+                </button>
+                <form action="{{ route('expert.delineations.reject', $notification->data['delineation_id']) }}" method="POST" class="notification-reject-form" id="notification-reject-form-{{ $notification->id }}">
+                    @csrf
+                    <label for="rejection_notes_{{ $notification->id }}">Rejection notes</label>
+                    <textarea id="rejection_notes_{{ $notification->id }}" name="rejection_notes" placeholder="Enter rejection notes" required minlength="10" maxlength="2000"></textarea>
+                    <button type="submit" class="btn-reject">
+                        <i class="bi bi-send"></i> Submit rejection
+                    </button>
+                </form>
+                @endif
                 @if(!$notification->read_at)
                 <form action="{{ route('notifications.mark-as-read', $notification->id) }}" method="POST" class="mark-read-form" data-ajax-mark-read>
                     @csrf
@@ -309,68 +422,76 @@
 
 @section('scripts')
 <script>
-(function () {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    (function() {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-    function updateUnreadUi(count) {
-        const badge = document.querySelector('.notification-badge');
-        const headerUnread = document.querySelector('.dropdown-header-email');
-        const banner = document.getElementById('unreadBanner');
-        const countText = document.getElementById('unreadCountText');
-        const markAllForm = document.querySelector('[data-ajax-mark-all]');
+        function updateUnreadUi(count) {
+            const badge = document.querySelector('.notification-badge');
+            const headerUnread = document.querySelector('.dropdown-header-email');
+            const banner = document.getElementById('unreadBanner');
+            const countText = document.getElementById('unreadCountText');
+            const markAllForm = document.querySelector('[data-ajax-mark-all]');
 
-        if (countText) countText.textContent = count;
-        if (headerUnread) headerUnread.textContent = count + ' unread';
-        if (badge) {
-            if (count > 0) badge.textContent = count;
-            else badge.remove();
+            if (countText) countText.textContent = count;
+            if (headerUnread) headerUnread.textContent = count + ' unread';
+            if (badge) {
+                if (count > 0) badge.textContent = count;
+                else badge.remove();
+            }
+            if (count === 0) {
+                banner?.remove();
+                markAllForm?.remove();
+                document.querySelectorAll('[data-ajax-mark-read]').forEach(f => f.remove());
+            }
         }
-        if (count === 0) {
-            banner?.remove();
-            markAllForm?.remove();
-            document.querySelectorAll('[data-ajax-mark-read]').forEach(f => f.remove());
-        }
-    }
 
-    async function ajaxSubmit(form, onSuccess) {
-        const res = await fetch(form.action, {
-            method: form.querySelector('[name="_method"]')?.value || form.method,
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        onSuccess(data);
-    }
-
-    document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
-        form.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            await ajaxSubmit(form, (data) => {
-                const card = form.closest('[data-notification-id]');
-                card?.classList.remove('unread');
-                form.remove();
-                updateUnreadUi(data.unreadCount ?? 0);
+        async function ajaxSubmit(form, onSuccess) {
+            const res = await fetch(form.action, {
+                method: form.querySelector('[name="_method"]')?.value || form.method,
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
             });
-        });
-    });
+            if (!res.ok) return;
+            const data = await res.json();
+            onSuccess(data);
+        }
 
-    const markAllForm = document.querySelector('[data-ajax-mark-all]');
-    if (markAllForm) {
-        markAllForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            await ajaxSubmit(markAllForm, () => {
-                document.querySelectorAll('.notification-card.unread').forEach(card => {
-                    card.classList.remove('unread');
-                    card.querySelector('[data-ajax-mark-read]')?.remove();
+        document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await ajaxSubmit(form, (data) => {
+                    const card = form.closest('[data-notification-id]');
+                    card?.classList.remove('unread');
+                    form.remove();
+                    updateUnreadUi(data.unreadCount ?? 0);
                 });
-                updateUnreadUi(0);
             });
         });
-    }
-})();
+
+        const markAllForm = document.querySelector('[data-ajax-mark-all]');
+        if (markAllForm) {
+            markAllForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await ajaxSubmit(markAllForm, () => {
+                    document.querySelectorAll('.notification-card.unread').forEach(card => {
+                        card.classList.remove('unread');
+                        card.querySelector('[data-ajax-mark-read]')?.remove();
+                    });
+                    updateUnreadUi(0);
+                });
+            });
+        }
+
+        document.querySelectorAll('[data-reject-toggle]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-reject-toggle');
+                const form = document.getElementById('notification-reject-form-' + id);
+                form?.classList.toggle('open');
+            });
+        });
+    })();
 </script>
 @endsection
