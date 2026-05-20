@@ -46,11 +46,19 @@ class ExpertController extends Controller
     public function approve(Delineation $delineation)
     {
         if ($delineation->is_approved) {
-            return redirect()->route('expert.dashboard')->with('info', 'This delineation is already approved.');
+            $message = 'This delineation is already approved.';
+            if (request()->expectsJson()) {
+                return response()->json(['message' => $message, 'unreadCount' => 0], 200);
+            }
+            return redirect()->route('expert.dashboard')->with('info', $message);
         }
 
         if ($delineation->is_rejected) {
-            return redirect()->route('expert.dashboard')->with('error', 'This delineation was rejected. The resident must submit a new one.');
+            $message = 'This delineation was rejected. The resident must submit a new one.';
+            if (request()->expectsJson()) {
+                return response()->json(['message' => $message, 'unreadCount' => 0], 200);
+            }
+            return redirect()->route('expert.dashboard')->with('error', $message);
         }
 
         $delineation->update([
@@ -68,19 +76,31 @@ class ExpertController extends Controller
 
         UserActivity::recordDelineationApproved($delineation, Auth::user());
 
+        $message = 'Delineation approved. The resident has been notified.';
+        if (request()->expectsJson()) {
+            return response()->json(['message' => $message, 'unreadCount' => 0], 200);
+        }
         return redirect()
             ->route('expert.dashboard')
-            ->with('success', 'Delineation approved. The resident has been notified.');
+            ->with('success', $message);
     }
 
     public function reject(Request $request, Delineation $delineation)
     {
         if ($delineation->is_approved) {
-            return redirect()->route('expert.dashboard')->with('error', 'Cannot reject an already approved delineation.');
+            $message = 'Cannot reject an already approved delineation.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message, 'unreadCount' => 0], 200);
+            }
+            return redirect()->route('expert.dashboard')->with('error', $message);
         }
 
         if ($delineation->is_rejected) {
-            return redirect()->route('expert.dashboard')->with('info', 'This delineation is already rejected.');
+            $message = 'This delineation is already rejected.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message, 'unreadCount' => 0], 200);
+            }
+            return redirect()->route('expert.dashboard')->with('info', $message);
         }
 
         $data = $request->validate([
@@ -99,8 +119,12 @@ class ExpertController extends Controller
 
         UserActivity::recordDelineationRejected($delineation, Auth::user());
 
+        $message = 'Delineation rejected. The resident has been notified with your notes.';
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message, 'unreadCount' => 0], 200);
+        }
         return redirect()
             ->route('expert.dashboard')
-            ->with('success', 'Delineation rejected. The resident has been notified with your notes.');
+            ->with('success', $message);
     }
 }

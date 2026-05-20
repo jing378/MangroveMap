@@ -369,7 +369,7 @@
             </div>
             <div class="notification-card-actions">
                 @if(Auth::user()->isExpert() && ($notification->data['type'] ?? '') === 'delineation_submitted' && !empty($notification->data['delineation_id']))
-                <form action="{{ route('expert.delineations.approve', $notification->data['delineation_id']) }}" method="POST">
+                <form action="{{ route('expert.delineations.approve', $notification->data['delineation_id']) }}" method="POST" data-approve-form>
                     @csrf
                     <button type="submit" class="btn-approve">
                         <i class="bi bi-check2"></i> Approve
@@ -378,7 +378,7 @@
                 <button type="button" class="btn-reject" data-reject-toggle="{{ $notification->id }}">
                     <i class="bi bi-x-lg"></i> Reject
                 </button>
-                <form action="{{ route('expert.delineations.reject', $notification->data['delineation_id']) }}" method="POST" class="notification-reject-form" id="notification-reject-form-{{ $notification->id }}">
+                <form action="{{ route('expert.delineations.reject', $notification->data['delineation_id']) }}" method="POST" class="notification-reject-form" id="notification-reject-form-{{ $notification->id }}" data-reject-form>
                     @csrf
                     <label for="rejection_notes_{{ $notification->id }}">Rejection notes</label>
                     <textarea id="rejection_notes_{{ $notification->id }}" name="rejection_notes" placeholder="Enter rejection notes" required minlength="10" maxlength="2000"></textarea>
@@ -396,7 +396,7 @@
                     </button>
                 </form>
                 @endif
-                <form action="{{ route('notifications.destroy', $notification->id) }}" method="POST" onsubmit="return confirm('Delete this notification?')">
+                <form action="{{ route('notifications.destroy', $notification->id) }}" method="POST" data-delete-form>
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="btn-delete">
@@ -445,6 +445,21 @@
             }
         }
 
+        function showSuccessMessage(msg) {
+            const banner = document.createElement('div');
+            banner.className = 'unread-banner';
+            banner.style.cssText = 'background:#edf7f2;border-color:#c8e6d4;color:#1e9e62;margin-bottom:16px;';
+            banner.innerHTML = `<i class="bi bi-check-circle"></i> ${msg}`;
+
+            const container = document.querySelector('.notifications-page');
+            const header = container?.querySelector('.notifications-header');
+            if (header?.nextElementSibling) {
+                header.nextElementSibling.insertAdjacentElement('beforebegin', banner);
+            }
+
+            setTimeout(() => banner.remove(), 4000);
+        }
+
         async function ajaxSubmit(form, onSuccess) {
             const res = await fetch(form.action, {
                 method: form.querySelector('[name="_method"]')?.value || form.method,
@@ -454,7 +469,11 @@
                     'X-Requested-With': 'XMLHttpRequest',
                 },
             });
-            if (!res.ok) return;
+            if (!res.ok) {
+                const data = await res.json();
+                alert(data.message || 'Error performing action');
+                return;
+            }
             const data = await res.json();
             onSuccess(data);
         }
@@ -467,6 +486,7 @@
                     card?.classList.remove('unread');
                     form.remove();
                     updateUnreadUi(data.unreadCount ?? 0);
+                    showSuccessMessage('Marked as read');
                 });
             });
         });
@@ -481,9 +501,50 @@
                         card.querySelector('[data-ajax-mark-read]')?.remove();
                     });
                     updateUnreadUi(0);
+                    showSuccessMessage('All notifications marked as read');
                 });
             });
         }
+
+        // AJAX handler for approve button
+        document.querySelectorAll('[data-approve-form]').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await ajaxSubmit(form, (data) => {
+                    const card = form.closest('[data-notification-id]');
+                    card?.remove();
+                    showSuccessMessage(data.message || 'Delineation approved successfully');
+                    updateUnreadUi(data.unreadCount ?? 0);
+                });
+            });
+        });
+
+        // AJAX handler for reject form submission
+        document.querySelectorAll('[data-reject-form]').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await ajaxSubmit(form, (data) => {
+                    const card = form.closest('[data-notification-id]');
+                    card?.remove();
+                    showSuccessMessage(data.message || 'Delineation rejected successfully');
+                    updateUnreadUi(data.unreadCount ?? 0);
+                });
+            });
+        });
+
+        // AJAX handler for delete button
+        document.querySelectorAll('[data-delete-form]').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                if (!confirm('Delete this notification?')) return;
+                await ajaxSubmit(form, (data) => {
+                    const card = form.closest('[data-notification-id]');
+                    card?.remove();
+                    showSuccessMessage('Notification deleted');
+                    updateUnreadUi(data.unreadCount ?? 0);
+                });
+            });
+        });
 
         document.querySelectorAll('[data-reject-toggle]').forEach(btn => {
             btn.addEventListener('click', () => {

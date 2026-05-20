@@ -29,6 +29,7 @@ class NotificationController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
+                'message' => 'Notification marked as read',
                 'unreadCount' => Auth::user()->unreadNotifications()->count(),
             ]);
         }
@@ -50,12 +51,20 @@ class NotificationController extends Controller
         return back()->with('success', 'All notifications marked as read');
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $notification = Auth::user()->notifications()->find($id);
 
         if ($notification) {
             $notification->delete();
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Notification deleted',
+                'unreadCount' => Auth::user()->unreadNotifications()->count(),
+            ]);
         }
 
         return back()->with('success', 'Notification deleted');

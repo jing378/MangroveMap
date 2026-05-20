@@ -1563,6 +1563,42 @@
       padding: 24px;
       color: #9ab0a0;
     }
+
+    .input-error {
+      border-color: #dc2626 !important;
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+    }
+
+    /* Custom scrollbar for notes and narrow scrollable containers */
+    #delineationNotes {
+      scrollbar-width: thin;
+      scrollbar-color: #9ca3af #f0f4f0;
+    }
+
+    #delineationNotes::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    #delineationNotes::-webkit-scrollbar-track {
+      background: #f0f4f0;
+      border-radius: 999px;
+    }
+
+    #delineationNotes::-webkit-scrollbar-thumb {
+      background: #9ca3af;
+      border-radius: 999px;
+      border: 2px solid #f0f4f0;
+    }
+
+    #delineationNotes::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+    }
+
+    #delineationNotes::-webkit-scrollbar-button {
+      display: none;
+      height: 0;
+      width: 0;
+    }
   </style>
 </head>
 
@@ -1739,7 +1775,7 @@
             </div>
             <div style="margin-bottom:12px;">
               <label for="delineationNotes" style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Notes</label>
-              <textarea id="delineationNotes" rows="4" style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:vertical;" placeholder="Fill in information about this delineated feature"></textarea>
+              <textarea id="delineationNotes" rows="4" style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;overflow-y:auto;" placeholder="Fill in information about this delineated feature"></textarea>
             </div>
           </div>
           <button id="removeDelineationBtn" class="btn" style="width:100%;margin-top:8px;margin-bottom:14px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;" onclick="window.removeCurrentDelineation()">Remove delineation</button>
@@ -2277,7 +2313,17 @@
 
       savedDelineations.forEach(record => {
         if (Array.isArray(record.features)) {
-          record.features.forEach(feature => drawnFeatures.push(feature));
+          record.features.forEach(feature => {
+            drawnFeatures.push({
+              ...feature,
+              label: record.name,
+              notes: record.notes,
+              delineation_id: record.id,
+              is_approved: !!record.is_approved,
+              is_rejected: !!record.is_rejected,
+              is_own: true,
+            });
+          });
         }
       });
 
@@ -2289,6 +2335,8 @@
       record.features.forEach(feature => {
         drawnFeatures.push({
           ...feature,
+          label: record.name,
+          notes: record.notes,
           delineation_id: record.id,
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
@@ -2385,11 +2433,42 @@
       }
     }
 
+    function validateDelineationMeta() {
+      const labelEl = document.getElementById('delineationLabel');
+      const notesEl = document.getElementById('delineationNotes');
+      const label = labelEl?.value.trim();
+      const notes = notesEl?.value.trim();
+
+      const labelValid = Boolean(label);
+      const notesValid = Boolean(notes);
+
+      labelEl?.classList.toggle('input-error', !labelValid);
+      notesEl?.classList.toggle('input-error', !notesValid);
+
+      if (!labelValid || !notesValid) {
+        alert('Please fill in both Name / Label and Notes before saving.');
+        if (!labelValid) {
+          labelEl?.focus();
+        } else {
+          notesEl?.focus();
+        }
+        return null;
+      }
+
+      return {
+        name: label,
+        notes
+      };
+    }
+
     function saveDelineationMeta() {
       if (selectedDrawnIndex < 0) return;
+      const meta = validateDelineationMeta();
+      if (!meta) return;
+
       const feature = drawnFeatures[selectedDrawnIndex];
-      feature.label = document.getElementById('delineationLabel').value.trim();
-      feature.notes = document.getElementById('delineationNotes').value.trim();
+      feature.label = meta.name;
+      feature.notes = meta.notes;
       alert('Delineation details saved.');
     }
 
@@ -2569,6 +2648,9 @@
         return;
       }
 
+      const meta = validateDelineationMeta();
+      if (!meta) return;
+
       try {
         const response = await fetch(saveDelineationUrl, {
           method: 'POST',
@@ -2579,6 +2661,8 @@
           },
           body: JSON.stringify({
             features: drawnFeatures,
+            name: meta.name,
+            notes: meta.notes,
           })
         });
 
@@ -2793,15 +2877,24 @@
       snapRaf = requestAnimationFrame(() => {
         snapRaf = 0;
         if (!drawingMode || !lastMouseLatLng) {
-          snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+          snapMarker.setStyle({
+            opacity: 0,
+            fillOpacity: 0
+          });
           return;
         }
         const snapped = getSnappedLatLng(lastMouseLatLng);
         if (snapped) {
           snapMarker.setLatLng(snapped);
-          snapMarker.setStyle({ opacity: 1, fillOpacity: 0.35 });
+          snapMarker.setStyle({
+            opacity: 1,
+            fillOpacity: 0.35
+          });
         } else {
-          snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+          snapMarker.setStyle({
+            opacity: 0,
+            fillOpacity: 0
+          });
         }
       });
     });

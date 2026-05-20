@@ -103,8 +103,8 @@ class EndUserController extends Controller
     {
         $data = $request->validate([
             'features' => ['required', 'array'],
-            'name' => ['nullable', 'string', 'max:191'],
-            'notes' => ['nullable', 'string'],
+            'name' => ['required', 'string', 'max:191'],
+            'notes' => ['required', 'string'],
         ]);
 
         $delineation = Delineation::create([
