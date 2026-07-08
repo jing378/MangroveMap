@@ -33,19 +33,19 @@ class EndUserController extends Controller
         $failedAnalyses = $userAnalyses->where('status', 'failed')->count();
         $recentAnalyses = $userAnalyses->take(5);
 
-        $totalCoverage = MangroveData::sum('coverage_area_km2') ?? 0;
-        $genusCount = MangroveData::distinct('genus_id')->count();
-        $degradedArea = MangroveData::where('health_status', 'degraded')->sum('coverage_area_km2') ?? 0;
+            $totalCoverage = MangroveData::sum('coverage_area_km2') ?? 0;
+            $genusCount = MangroveData::distinct('genus_id')->count();
+            $degradedArea = MangroveData::where('health_status', 'degraded')->sum('coverage_area_km2') ?? 0;
 
-        $genusDistribution = MangroveData::select('genus_id', DB::raw('COUNT(*) as count'))
-            ->whereNotNull('genus_id')
-            ->groupBy('genus_id')
-            ->with('genus')
-            ->limit(10)
-            ->get();
+            $genusDistribution = MangroveData::select('genus_id', DB::raw('COUNT(*) as count'))
+                ->whereNotNull('genus_id')
+                ->groupBy('genus_id')
+                ->with('genus')
+                ->limit(10)
+                ->get();
 
-        $genusLabels = [];
-        $genusSeries = [];
+            $genusLabels = [];
+            $genusSeries = [];
         foreach ($genusDistribution as $item) {
             if ($item->genus) {
                 $genusLabels[] = $item->genus->common_name;

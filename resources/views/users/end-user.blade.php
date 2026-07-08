@@ -2543,7 +2543,7 @@
       undoBtn.style.cursor = undoBtn.disabled ? 'not-allowed' : 'pointer';
       redoBtn.style.cursor = redoBtn.disabled ? 'not-allowed' : 'pointer';
     }
-
+//script for delenation
     window.showEditMode = () => {
       const toolbar = document.getElementById('delineationToolbar');
       const drawTypeSelect = document.getElementById('drawTypeSelect');

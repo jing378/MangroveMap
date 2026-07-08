@@ -124,25 +124,6 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      border-left: 1px solid #e0e8e0;
-      padding-left: 8px;
-    }
-
-    .live {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #1e9e62;
-    }
-
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #1e9e62;
-      animation: pulse 1.4s ease infinite;
     }
 
     @keyframes pulse {
@@ -1043,9 +1024,6 @@
       <option value="classify">Classifier</option>
     </select>
     <div class="header-right">
-      <div class="live">
-        <div class="live-dot"></div><span>Live</span>
-      </div>
       <div class="user-section">
         @auth
         @include('components.notification-bell')
