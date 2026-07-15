@@ -29,15 +29,22 @@
     body {
       height: 100%;
       font-family: 'Inter', sans-serif;
-      background: #f0f4f0;
+      background: linear-gradient(180deg, #e9f6ec 0%, #d9eedf 45%, #6ddd87 100%);
+      color: #1a2e1a;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }    body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;      background: #f0f4f0;
+      background: linear-gradient(180deg, #e9f6ec 0%, #d9eedf 45%, #6ddd87 100%);
       color: #1a2e1a;
       overflow: hidden;
     }
 
     .header {
       height: 54px;
-      background: #fff;
-      border-bottom: 1px solid #e0e8e0;
+      border-bottom: 1px solid #cfe5d5;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -69,49 +76,6 @@
       justify-content: center;
       font-size: 14px;
       color: #fff;
-    }
-
-    .header-center {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      flex-shrink: 1;
-      overflow-x: auto;
-      scrollbar-width: none;
-      white-space: nowrap;
-    }
-
-    .header-center::-webkit-scrollbar {
-      display: none;
-    }
-
-    .h-tab {
-      font-size: 14px;
-      font-weight: 500;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      color: #6a8a6a;
-      transition: all .15s;
-      border: none;
-      background: none;
-      font-family: 'Inter', sans-serif;
-    }
-
-    .h-tab.active {
-      color: #1e9e62;
-      background: #edf7f2;
-      font-weight: 600;
-    }
-
-    .nav-dropdown {
-      display: none;
-      font-size: 14px;
-      padding: 5px 10px;
-      border: 1px solid #d4dfd4;
-      border-radius: 8px;
-      background: #fff;
-      cursor: pointer;
     }
 
     .header-right {
@@ -359,14 +323,6 @@
         font-size: 11px;
       }
 
-      .header-center {
-        display: none;
-      }
-
-      .nav-dropdown {
-        display: block;
-      }
-
       .stat-grid {
         grid-template-columns: repeat(4, 1fr);
         gap: 6px;
@@ -575,36 +531,86 @@
       font-weight: 600;
     }
 
-    .map-top-bar {
+    .map-layer-control {
       position: absolute;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 800;
-      display: flex;
-      gap: 3px;
+      top: 88px;
+      left: 10px;
+      z-index: 900;
+      display: inline-flex;
+      flex-direction: column;
+      background: #fff;
+      border: 1px solid #e0e8e0;
+      border-radius: 0;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .12);
+      overflow: visible;
+    }
+
+    .map-layer-control>button {
+      all: unset;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 34px;
+      border: none;
+      border-bottom: 1px solid #e0e8e0;
+      background: #fff;
+      color: #4c6b5d;
+      transition: background .15s ease;
+    }
+
+    .map-layer-control>button:last-child {
+      border-bottom: none;
+    }
+
+    .map-layer-control>button:hover {
+      background: #f7faf7;
+    }
+
+    .map-layer-control .bi {
+      font-size: 18px;
+    }
+
+    .layer-menu {
+      position: absolute;
+      top: 0;
+      left: 100%;
+      display: none;
+      flex-direction: column;
+      min-width: 120px;
+      margin-left: 4px;
       background: #fff;
       border: 1px solid #e0e8e0;
       border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .12);
       padding: 4px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, .1);
     }
 
-    .layer-btn {
+    .layer-menu.show {
+      display: flex;
+    }
+
+    .layer-option {
+      width: 100%;
+      min-width: 120px;
       font-family: 'Inter', sans-serif;
       font-size: 13px;
       font-weight: 500;
-      cursor: pointer;
-      padding: 5px 13px;
-      border-radius: 7px;
+      text-align: left;
+      color: #4c6b5d;
+      padding: 8px 10px;
+      border-radius: 9px;
       border: none;
       background: transparent;
-      color: #6a8a6a;
+      cursor: pointer;
+      transition: background .15s ease, color .15s ease;
     }
 
-    .layer-btn.active {
-      background: #1e9e62;
-      color: #fff;
+    .layer-option.active {
+      background: #edf7f2;
+      color: #1e9e62;
+      font-weight: 600;
     }
 
     .map-legend-float {
@@ -1013,16 +1019,6 @@
     <div class="logo">
       <div class="logo-mark"><i class="bi bi-leaf"></i></div>MangroveMap
     </div>
-    <div class="header-center">
-      <button class="h-tab active" onclick="show('map',this)"><i class="bi bi-map"></i> Coverage Map</button>
-      <button class="h-tab" onclick="show('planting',this)"><i class="bi bi-check-circle"></i> Suitability</button>
-      <button class="h-tab" onclick="show('classify',this)"><i class="bi bi-image-alt"></i> Classifier</button>
-    </div>
-    <select class="nav-dropdown" id="navDropdown" onchange="showFromDropdown(this)">
-      <option value="map">Coverage Map</option>
-      <option value="planting">Suitability</option>
-      <option value="classify">Classifier</option>
-    </select>
     <div class="header-right">
       <div class="user-section">
         @auth
@@ -1053,7 +1049,25 @@
       <div class="main">
         <div class="map-wrap">
           <div id="mainMap"></div>
-          <div class="map-top-bar"><button class="layer-btn active" onclick="setBase('sat',this)"><i class="bi bi-image"></i> Satellite</button><button class="layer-btn" onclick="setBase('osm',this)"><i class="bi bi-geo"></i> Street</button><button class="layer-btn" onclick="setBase('topo',this)"><i class="bi bi-map"></i> Topo</button></div>
+          <div class="map-layer-control">
+            <button id="layerToggle" type="button" onclick="toggleLayerMenu()" aria-expanded="false" title="Choose map layer" aria-label="Choose map layer">
+              <i class="bi bi-layers-fill"></i>
+            </button>
+            <button id="editModeBtn" type="button" onclick="showEditMode()" title="Edit mode" aria-label="Edit mode">
+              <i class="bi bi-pencil-square"></i>
+            </button>
+            <button id="suitabilityBtn" type="button" onclick="showSuitability()" title="Show suitability layer" aria-label="Show suitability layer">
+              <i class="bi bi-check2-square"></i>
+            </button>
+            <button id="classifyBtn" type="button" onclick="showClassify()" title="Show classification" aria-label="Show classification layer">
+              <i class="bi bi-image"></i>
+            </button>
+            <div id="layerMenu" class="layer-menu" aria-label="Base layer options">
+              <button class="layer-option active" onclick="setBase('sat', this)">Satellite</button>
+              <button class="layer-option" onclick="setBase('osm', this)">Street</button>
+              <button class="layer-option" onclick="setBase('topo', this)">Topo</button>
+            </div>
+          </div>
           <div class="map-legend-float">
             <div class="leg-title">Zone type</div>
             <div class="leg-row">
@@ -1445,33 +1459,42 @@
       plantMap.flyTo([plantSites[i].lat, plantSites[i].lng], 11);
       pMarkers[i].openPopup();
     };
+    window.toggleLayerMenu = () => {
+      const menu = document.getElementById('layerMenu');
+      const toggle = document.getElementById('layerToggle');
+      if (!menu || !toggle) return;
+      const isOpen = menu.classList.toggle('show');
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    };
+
+    window.showEditMode = () => {
+      document.querySelectorAll('.map-layer-control button[id]').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('editModeBtn');
+      if (btn) btn.classList.add('active');
+    };
+
+    window.showSuitability = () => {
+      document.querySelectorAll('.map-layer-control button[id]').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('suitabilityBtn');
+      if (btn) btn.classList.add('active');
+    };
+
+    window.showClassify = () => {
+      document.querySelectorAll('.map-layer-control button[id]').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('classifyBtn');
+      if (btn) btn.classList.add('active');
+    };
+
     window.setBase = (t, btn) => {
-      document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.layer-btn, .layer-option').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       mainMap.removeLayer(curBase);
       curBase = t === 'osm' ? osmL : t === 'topo' ? topoL : satL;
       mainMap.addLayer(curBase);
     };
-    window.show = (id, btn) => {
-      document.querySelectorAll('.h-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+    window.show = (id) => {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
       document.getElementById('v-' + id).classList.add('on');
-      document.getElementById('navDropdown').value = id;
-      setTimeout(() => {
-        if (id === 'map') mainMap.invalidateSize();
-        if (id === 'planting') plantMap.invalidateSize();
-      }, 150);
-    };
-    window.showFromDropdown = (select) => {
-      const id = select.value;
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
-      document.getElementById('v-' + id).classList.add('on');
-      let btns = document.querySelectorAll('.h-tab');
-      btns.forEach((b, i) => {
-        b.classList.remove('active');
-        if ((id === 'map' && i === 0) || (id === 'classify' && i === 2) || (id === 'planting' && i === 1)) b.classList.add('active');
-      });
       setTimeout(() => {
         if (id === 'map') mainMap.invalidateSize();
         if (id === 'planting') plantMap.invalidateSize();
