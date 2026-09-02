@@ -29,41 +29,38 @@
     body {
       height: 100%;
       font-family: 'Inter', sans-serif;
-      background: linear-gradient(180deg, #e9f6ec 0%, #d9eedf 45%, #6ddd87 100%);
-      color: #1a2e1a;
-      overflow: hidden;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }    body {
-      height: 100%;
-      font-family: 'Inter', sans-serif;      background: #f0f4f0;
-      background: linear-gradient(180deg, #e9f6ec 0%, #d9eedf 45%, #6ddd87 100%);
+      background: #f0f4f0;
       color: #1a2e1a;
       overflow: hidden;
     }
 
     .header {
       height: 54px;
-      border-bottom: 1px solid #cfe5d5;
+      border-bottom: 1px solid rgba(30, 158, 98, 0.24);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 12px;
+      padding: 0 16px;
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       z-index: 1000;
       gap: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
     }
 
     .logo {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       font-weight: 700;
       font-size: 18px;
       white-space: nowrap;
+      color: #1a3826;
     }
 
     .logo-mark {
@@ -109,9 +106,16 @@
       cursor: pointer;
       padding: 5px 10px;
       border-radius: 8px;
-      border: 1px solid #d4dfd4;
-      background: #fff;
+      border: 1px solid rgba(30, 158, 98, 0.30);
+      background: rgba(248, 252, 249, 0.72);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       transition: all .15s;
+    }
+
+    .btn i,
+    .btn .bi {
+      font-size: 13px;
     }
 
     .btn-g {
@@ -129,13 +133,14 @@
       display: flex;
       flex-direction: row;
       overflow: hidden;
+      background: transparent;
     }
 
     .left-panel,
     .right-panel {
       width: 320px;
       flex-shrink: 0;
-      background: #fff;
+      background: #ffffff;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -156,18 +161,51 @@
       flex: 0 0 0px;
       border-left: none;
       position: relative;
+      background: #ffffff;
       transition: width 0.3s ease-in-out, max-width 0.3s ease-in-out, flex-basis 0.3s ease-in-out;
+      box-shadow: -2px 0 12px rgba(0, 0, 0, 0.06);
+      z-index: 500;
     }
 
     #mapRightPanel.open {
-      width: 320px;
-      max-width: 320px;
-      flex: 0 0 320px;
+      width: 340px;
+      max-width: 340px;
+      flex: 0 0 340px;
       border-left: 1px solid #e0e8e0;
     }
 
     #mapRightPanel .scroll {
-      min-width: 320px;
+      min-width: 340px;
+      padding: 16px;
+      overflow-y: auto;
+      height: 100%;
+    }
+
+    .panel-close-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: none;
+      border: none;
+      outline: none;
+      box-shadow: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #9ab0a0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      transition: color 0.15s ease;
+    }
+
+    .panel-close-btn:hover {
+      color: #1a2e1a;
+      background: none;
+      border: none;
+      outline: none;
+      box-shadow: none;
     }
 
     .main {
@@ -235,19 +273,20 @@
         bottom: 0;
         height: 100% !important;
         max-height: 100% !important;
-        width: 85% !important;
-        max-width: 340px;
-        z-index: 1000;
+        width: 88% !important;
+        max-width: 360px;
+        z-index: 1300;
         border: none !important;
         border-left: 1px solid #e0e8e0 !important;
-        box-shadow: -2px 0 15px rgba(0, 0, 0, 0.15);
+        box-shadow: -4px 0 25px rgba(0, 0, 0, 0.2);
         transform: translateX(105%);
         transition: transform 0.3s ease-in-out;
+        background: #ffffff !important;
       }
 
       #mapRightPanel.open {
         transform: translateX(0);
-        width: 85% !important;
+        width: 88% !important;
       }
 
       #mapRightPanel .scroll {
@@ -531,16 +570,28 @@
       font-weight: 600;
     }
 
+    .leaflet-control-zoom {
+      position: absolute !important;
+      top: 16px !important;
+      left: 10px !important;
+      z-index: 1100 !important;
+      margin: 0 !important;
+      border: 1px solid #e0e8e0 !important;
+      border-radius: 8px !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .12) !important;
+      overflow: hidden;
+    }
+
     .map-layer-control {
       position: absolute;
-      top: 88px;
+      top: 96px;
       left: 10px;
-      z-index: 900;
+      z-index: 1200;
       display: inline-flex;
       flex-direction: column;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.94);
       border: 1px solid #e0e8e0;
-      border-radius: 0;
+      border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0, 0, 0, .12);
       overflow: visible;
     }
@@ -1049,25 +1100,6 @@
       <div class="main">
         <div class="map-wrap">
           <div id="mainMap"></div>
-          <div class="map-layer-control">
-            <button id="layerToggle" type="button" onclick="toggleLayerMenu()" aria-expanded="false" title="Choose map layer" aria-label="Choose map layer">
-              <i class="bi bi-layers-fill"></i>
-            </button>
-            <button id="editModeBtn" type="button" onclick="showEditMode()" title="Edit mode" aria-label="Edit mode">
-              <i class="bi bi-pencil-square"></i>
-            </button>
-            <button id="suitabilityBtn" type="button" onclick="showSuitability()" title="Show suitability layer" aria-label="Show suitability layer">
-              <i class="bi bi-check2-square"></i>
-            </button>
-            <button id="classifyBtn" type="button" onclick="showClassify()" title="Show classification" aria-label="Show classification layer">
-              <i class="bi bi-image"></i>
-            </button>
-            <div id="layerMenu" class="layer-menu" aria-label="Base layer options">
-              <button class="layer-option active" onclick="setBase('sat', this)">Satellite</button>
-              <button class="layer-option" onclick="setBase('osm', this)">Street</button>
-              <button class="layer-option" onclick="setBase('topo', this)">Topo</button>
-            </div>
-          </div>
           <div class="map-legend-float">
             <div class="leg-title">Zone type</div>
             <div class="leg-row">
@@ -1083,22 +1115,29 @@
         </div>
       </div>
       <div class="right-panel" id="mapRightPanel">
-        <button onclick="closeRightPanel()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 16px; cursor: pointer; color: #9ab0a0; z-index: 10;">
+        <button onclick="closeRightPanel()" class="panel-close-btn" title="Close Panel" aria-label="Close panel">
           <i class="bi bi-x-lg"></i>
         </button>
         <div class="scroll">
-          <div class="sec" style="padding-right: 20px;">Selected Zone</div>
+          <div class="sec" style="padding-right: 28px;">Delineated Area Details</div>
           <div id="zoneDetailsContent">
             <div class="d-card">
-              <div class="d-title" id="dName"></div>
-              <div class="d-row"><span class="d-key">Area</span><span class="d-val" id="dArea"></span></div>
-              <div class="d-row"><span class="d-key">Health (NDVI)</span><span class="d-val" id="dNDVI"></span></div>
-              <div class="d-row"><span class="d-key">Status</span><span class="d-val" id="dStatus"></span></div>
-              <div class="d-row"><span class="d-key">Dominant genus</span><span class="d-val" id="dGenus"></span></div>
-              <div class="d-row"><span class="d-key">Last scan</span><span class="d-val" id="dScan"></span></div>
+              <div class="d-title" id="dName">Saved Delineation</div>
+              <div style="margin-bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap;">
+                <span class="tag tg" id="dStatusBadge">Approved</span>
+                <span class="tag tb" id="dTypeBadge">Area</span>
+              </div>
+              <div class="d-row"><span class="d-key">Feature Type</span><span class="d-val" id="dType">Area</span></div>
+              <div class="d-row" id="dAreaRow"><span class="d-key">Estimated Area</span><span class="d-val" id="dArea">-</span></div>
+              <div class="d-row"><span class="d-key">Contributor</span><span class="d-val" id="dContributor">Community</span></div>
+              <div class="d-row"><span class="d-key">Approved Date</span><span class="d-val" id="dApprovedDate">-</span></div>
+              <div class="d-row" id="dNotesRow" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                <span class="d-key">Notes</span>
+                <span class="d-val" id="dNotes" style="font-weight: 400; font-size: 12px; color: #3a5a3a; line-height: 1.4; word-break: break-word;">-</span>
+              </div>
             </div>
             <div class="div"></div>
-            <div class="sec">Genus Distribution</div>
+            <div class="sec">Estimated Genus Distribution</div>
             <div class="cw" style="height:148px"><canvas id="pieC"></canvas></div>
             <div class="div"></div>
             <div class="sec">Coverage Trend</div>
@@ -1113,6 +1152,7 @@
       <div class="left-panel">
         <div class="scroll">
           <div class="sec">Upload Image</div>
+          <button onclick="show('map')" class="btn" style="margin-bottom:14px; display:inline-flex; align-items:center; gap:4px;"><i class="bi bi-arrow-left-short"></i> Back to Map</button>
           <div class="upload-zone" id="uploadBox" onclick="document.getElementById('fileInput').click()">
             <div class="ico">📷</div>
             <h3>Click to upload mangrove image</h3>
@@ -1286,6 +1326,7 @@
       <div class="right-panel">
         <div class="scroll">
           <div class="sec">Priority Planting Sites</div>
+          <button onclick="show('map')" class="btn" style="margin-bottom:14px; display:inline-flex; align-items:center; gap:4px;"><i class="bi bi-arrow-left-short"></i> Back to Map</button>
           <div id="plantSitesList"></div>
         </div>
       </div>
@@ -1358,6 +1399,102 @@
       pMarkers.push(m);
     });
 
+    function calculatePolygonArea(latlngs) {
+      if (!Array.isArray(latlngs) || latlngs.length < 3) return null;
+      try {
+        const R = 6378137; // Earth radius in meters
+        let ring = latlngs;
+        if (Array.isArray(latlngs[0]) && Array.isArray(latlngs[0][0])) {
+          ring = latlngs[0];
+        }
+        if (ring.length < 3) return null;
+        let area = 0;
+        for (let i = 0; i < ring.length; i++) {
+          let p1 = ring[i];
+          let p2 = ring[(i + 1) % ring.length];
+          let lat1 = Array.isArray(p1) ? p1[0] : p1.lat;
+          let lng1 = Array.isArray(p1) ? p1[1] : p1.lng;
+          let lat2 = Array.isArray(p2) ? p2[0] : p2.lat;
+          let lng2 = Array.isArray(p2) ? p2[1] : p2.lng;
+          area += (lng2 - lng1) * (Math.PI / 180) * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180));
+        }
+        area = Math.abs(area * R * R / 2.0);
+        if (area >= 10000) {
+          return (area / 10000).toFixed(2) + ' ha';
+        } else if (area > 0) {
+          return area.toFixed(1) + ' m²';
+        }
+      } catch (e) {
+        console.error('Area calculation error:', e);
+      }
+      return null;
+    }
+
+    function showDelineationDetails(record, feature, layer) {
+      document.getElementById('dName').textContent = record.name || 'Saved Delineation';
+      const featType = feature.type ? feature.type.charAt(0).toUpperCase() + feature.type.slice(1) : 'Area';
+      document.getElementById('dType').textContent = featType;
+      document.getElementById('dTypeBadge').textContent = featType;
+
+      let areaStr = record.area;
+      if (!areaStr && feature.coords && (feature.type === 'area' || (!feature.type && Array.isArray(feature.coords)))) {
+        areaStr = calculatePolygonArea(feature.coords);
+      }
+      const areaRow = document.getElementById('dAreaRow');
+      if (areaStr) {
+        document.getElementById('dArea').textContent = areaStr;
+        areaRow.style.display = 'flex';
+      } else {
+        areaRow.style.display = 'none';
+      }
+
+      const contributor = record.user?.name || record.created_by || 'Community';
+      document.getElementById('dContributor').textContent = contributor;
+
+      let approvedDate = '-';
+      if (record.approved_at) {
+        const d = new Date(record.approved_at);
+        approvedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } else if (record.created_at) {
+        const d = new Date(record.created_at);
+        approvedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+      document.getElementById('dApprovedDate').textContent = approvedDate;
+
+      const notesRow = document.getElementById('dNotesRow');
+      if (record.notes) {
+        document.getElementById('dNotes').textContent = record.notes;
+        notesRow.style.display = 'flex';
+      } else {
+        notesRow.style.display = 'none';
+      }
+
+      const panel = document.getElementById('mapRightPanel');
+      const wasOpen = panel.classList.contains('open');
+      if (!wasOpen) {
+        panel.classList.add('open');
+      }
+
+      setTimeout(() => {
+        mainMap.invalidateSize();
+        if (layer) {
+          if (layer.getBounds) {
+            mainMap.fitBounds(layer.getBounds(), {
+              padding: [60, 60],
+              maxZoom: 14,
+              animate: true,
+              duration: 0.8
+            });
+          } else if (layer.getLatLng) {
+            mainMap.flyTo(layer.getLatLng(), 13, {
+              animate: true,
+              duration: 0.8
+            });
+          }
+        }
+      }, wasOpen ? 50 : 320);
+    }
+
     function drawSavedDelineations() {
       if (!Array.isArray(savedDelineations) || savedDelineations.length === 0) {
         return;
@@ -1370,55 +1507,32 @@
 
         record.features.forEach((feature) => {
           let layer = null;
-          const popupContent = `<strong>${record.name || 'Saved Delineation'}</strong><br>${feature.type ? feature.type.toUpperCase() : 'Feature'}`;
+          const featType = feature.type ? feature.type.toUpperCase() : 'AREA';
+          const popupContent = `<strong>${record.name || 'Saved Delineation'}</strong><br><span style="font-size:12px;color:#556b56;">Type: ${featType}</span>`;
 
           if (feature.type === 'point') {
             layer = L.marker(feature.coords).addTo(mainMap);
           } else if (feature.type === 'line') {
             layer = L.polyline(feature.coords, {
-              color: '#4e7ef2'
+              color: '#1e9e62',
+              weight: 3
             }).addTo(mainMap);
-          } else if (feature.type === 'area') {
+          } else if (feature.type === 'area' || !feature.type) {
             layer = L.polygon(feature.coords, {
-              color: '#4e7ef2',
-              fillOpacity: 0.2
+              color: '#1e9e62',
+              fillColor: '#1e9e62',
+              fillOpacity: 0.25,
+              weight: 2
             }).addTo(mainMap);
           }
 
           if (layer) {
             layer.bindPopup(popupContent);
-            layer.on('click', () => {
-              // Show right panel with delineation details
-              document.getElementById('dName').textContent = record.name || 'Saved Delineation';
-              document.getElementById('dArea').textContent = record.area || 'N/A';
-              document.getElementById('dNDVI').textContent = record.ndvi || 'N/A';
-              document.getElementById('dNDVI').className = 'd-val';
-              document.getElementById('dStatus').textContent = record.status || 'N/A';
-              document.getElementById('dStatus').className = 'd-val';
-              document.getElementById('dGenus').textContent = record.genus || 'N/A';
-              document.getElementById('dScan').textContent = record.scan || 'N/A';
-
-              const panel = document.getElementById('mapRightPanel');
-              if (!panel.classList.contains('open')) {
-                panel.classList.add('open');
-                setTimeout(() => mainMap.invalidateSize(), 300);
+            layer.on('click', (e) => {
+              if (e && e.originalEvent) {
+                L.DomEvent.stopPropagation(e);
               }
-
-              // Zoom to feature location
-              if (layer.getBounds) {
-                // For polygons and polylines with getBounds method
-                const bounds = layer.getBounds();
-                mainMap.fitBounds(bounds, {
-                  padding: [50, 50],
-                  maxZoom: 13,
-                  duration: 1
-                });
-              } else if (feature.coords && feature.coords.length > 0) {
-                // For markers/points
-                mainMap.flyTo(feature.coords, 12, {
-                  duration: 1
-                });
-              }
+              showDelineationDetails(record, feature, layer);
             });
           }
         });
@@ -1429,31 +1543,42 @@
 
     function selectZone(i) {
       let z = zones[i];
+      if (!z) return;
       document.querySelectorAll('.zone-row').forEach((r, j) => r.classList.toggle('sel', j === i));
       document.getElementById('dName').textContent = z.name;
       document.getElementById('dArea').textContent = z.area;
-      document.getElementById('dNDVI').textContent = z.ndvi;
-      document.getElementById('dNDVI').className = `d-val ${z.sc}`;
-      document.getElementById('dStatus').textContent = z.status;
-      document.getElementById('dStatus').className = `d-val ${z.sc}`;
-      document.getElementById('dGenus').textContent = z.genus;
-      document.getElementById('dScan').textContent = z.scan;
+      const areaRow = document.getElementById('dAreaRow');
+      if (areaRow) areaRow.style.display = 'flex';
+      document.getElementById('dType').textContent = 'Zone';
+      document.getElementById('dTypeBadge').textContent = 'Zone';
+      document.getElementById('dContributor').textContent = 'Admin';
+      document.getElementById('dApprovedDate').textContent = z.scan || '-';
+      const notesRow = document.getElementById('dNotesRow');
+      if (notesRow) notesRow.style.display = 'none';
 
       const panel = document.getElementById('mapRightPanel');
-      if (!panel.classList.contains('open')) {
+      const wasOpen = panel.classList.contains('open');
+      if (!wasOpen) {
         panel.classList.add('open');
-        setTimeout(() => mainMap.invalidateSize(), 300);
       }
 
-      mainMap.flyTo([z.lat, z.lng], 10, {
-        duration: 1
-      });
-      polys[i].openPopup();
+      setTimeout(() => {
+        mainMap.invalidateSize();
+        if (polys[i]) {
+          mainMap.flyTo([z.lat, z.lng], 10, {
+            duration: 0.8
+          });
+          polys[i].openPopup();
+        }
+      }, wasOpen ? 50 : 320);
     }
     window.flyTo = (i) => selectZone(i);
     window.closeRightPanel = () => {
-      document.getElementById('mapRightPanel').classList.remove('open');
-      setTimeout(() => mainMap.invalidateSize(), 300);
+      const panel = document.getElementById('mapRightPanel');
+      if (panel) {
+        panel.classList.remove('open');
+        setTimeout(() => mainMap.invalidateSize(), 320);
+      }
     };
     window.flyPlant = (i) => {
       plantMap.flyTo([plantSites[i].lat, plantSites[i].lng], 11);
@@ -1468,21 +1593,15 @@
     };
 
     window.showEditMode = () => {
-      document.querySelectorAll('.map-layer-control button[id]').forEach(b => b.classList.remove('active'));
-      const btn = document.getElementById('editModeBtn');
-      if (btn) btn.classList.add('active');
+      window.location.href = "{{ Auth::check() ? route('map') : route('login') }}";
     };
 
     window.showSuitability = () => {
-      document.querySelectorAll('.map-layer-control button[id]').forEach(b => b.classList.remove('active'));
-      const btn = document.getElementById('suitabilityBtn');
-      if (btn) btn.classList.add('active');
+      show('planting');
     };
 
     window.showClassify = () => {
-      document.querySelectorAll('.map-layer-control button[id]').forEach(b => b.classList.remove('active'));
-      const btn = document.getElementById('classifyBtn');
-      if (btn) btn.classList.add('active');
+      show('classify');
     };
 
     window.setBase = (t, btn) => {
