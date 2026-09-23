@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Delineation;
+use App\Support\NotificationChannels;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -15,7 +16,7 @@ class DelineationApproved extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return NotificationChannels::databaseAndMail();
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -37,6 +38,9 @@ class DelineationApproved extends Notification
             'type' => 'delineation_approved',
             'icon' => 'bi-check-circle',
             'delineation_id' => $this->delineation->id,
+            'delineation_name' => $this->delineation->name,
+            'url' => $this->delineation->mapDashboardUrlFor($notifiable),
+            'actionLabel' => 'View on map',
         ];
     }
 }

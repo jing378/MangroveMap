@@ -28,8 +28,8 @@ class DelineationSubmittedForReview extends Notification
             'delineation_id' => $this->delineation->id,
             'delineation_name' => $this->delineation->name,
             'submitted_by' => $this->delineation->user?->name,
-            'url' => route('notifications.index'),
-            'actionLabel' => 'Open notifications',
+            'url' => $this->delineation->mapDashboardUrlFor($notifiable),
+            'actionLabel' => 'View on map',
         ];
     }
 }

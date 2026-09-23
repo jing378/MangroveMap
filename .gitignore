@@ -19,6 +19,10 @@
 /storage/*.key
 /storage/pail
 /vendor
+/ml/.venv/
+/ml/models/*.pth
+/ml/models/*.pt
+/ml/models/*.ckpt
 Homestead.json
 Homestead.yaml
 Thumbs.db

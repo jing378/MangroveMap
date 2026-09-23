@@ -226,10 +226,14 @@
                 </button>
             </form>
 
-            <a href="{{ route('dashboard') }}" class="btn btn-secondary" style="width: 100%;">
-                <i class="bi bi-arrow-left"></i>
-                Back to Dashboard
-            </a>
+            <form method="POST" action="{{ route('logout') }}" style="width: 100%;">
+                @csrf
+                <input type="hidden" name="to_login" value="1">
+                <button type="submit" class="btn btn-secondary" style="width: 100%;">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    Go to Login
+                </button>
+            </form>
         </div>
 
         <div class="verify-footer">

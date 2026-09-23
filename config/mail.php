@@ -17,6 +17,12 @@ return [
     'default' => env('MAIL_MAILER', 'log'),
 
     /*
+    | When false, notifications use the database channel only (no SMTP).
+    | Useful if mail is misconfigured but in-app alerts should still work.
+    */
+    'notifications' => env('MAIL_NOTIFICATIONS', true),
+
+    /*
     |--------------------------------------------------------------------------
     | Mailer Configurations
     |--------------------------------------------------------------------------

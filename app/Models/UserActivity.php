@@ -71,8 +71,8 @@ class UserActivity extends Model
 
         return match ($analysis->analysis_type) {
             'classification' => $analysis->species_detected
-                ? "Classification — {$analysis->species_detected}"
-                : 'Ran genus classification',
+                ? "Segmentation — {$analysis->species_detected}"
+                : 'Ran mangrove segmentation',
             'change_detection' => 'Ran change detection',
             'damage_assessment' => 'Ran damage assessment',
             default => "Ran {$type}",

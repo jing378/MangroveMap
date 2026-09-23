@@ -155,30 +155,40 @@
     }
 
     #mapRightPanel {
-      width: 0;
-      min-width: 0;
-      max-width: 0;
-      flex: 0 0 0px;
-      border-left: none;
-      position: relative;
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 340px;
+      max-width: 90vw;
+      height: 100%;
       background: #ffffff;
-      transition: width 0.3s ease-in-out, max-width 0.3s ease-in-out, flex-basis 0.3s ease-in-out;
-      box-shadow: -2px 0 12px rgba(0, 0, 0, 0.06);
-      z-index: 500;
+      border-left: 1px solid #e0e8e0;
+      box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateX(105%);
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s;
+      will-change: transform;
+      visibility: hidden;
+      pointer-events: none;
     }
 
     #mapRightPanel.open {
-      width: 340px;
-      max-width: 340px;
-      flex: 0 0 340px;
-      border-left: 1px solid #e0e8e0;
+      transform: translateX(0);
+      visibility: visible;
+      pointer-events: auto;
     }
 
     #mapRightPanel .scroll {
+      width: 100%;
       min-width: 340px;
-      padding: 16px;
+      box-sizing: border-box;
+      flex: 1;
       overflow-y: auto;
-      height: 100%;
+      padding: 16px;
     }
 
     .panel-close-btn {
@@ -267,30 +277,15 @@
       }
 
       #mapRightPanel {
-        position: absolute !important;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        height: 100% !important;
-        max-height: 100% !important;
         width: 88% !important;
         max-width: 360px;
-        z-index: 1300;
-        border: none !important;
-        border-left: 1px solid #e0e8e0 !important;
-        box-shadow: -4px 0 25px rgba(0, 0, 0, 0.2);
-        transform: translateX(105%);
-        transition: transform 0.3s ease-in-out;
-        background: #ffffff !important;
+        box-shadow: -2px 0 18px rgba(0, 0, 0, 0.18);
+        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s;
       }
 
       #mapRightPanel.open {
         transform: translateX(0);
         width: 88% !important;
-      }
-
-      #mapRightPanel .scroll {
-        min-width: 100%;
       }
 
       #v-classify {
@@ -996,15 +991,12 @@
       width: 100%;
       height: 100%;
       flex: 1;
+      position: relative;
     }
 
     @media (max-width: 780px) {
       .view.on {
         flex-direction: column;
-      }
-
-      #v-classify.on {
-        flex-direction: column !important;
       }
     }
 
@@ -1073,21 +1065,24 @@
     <div class="header-right">
       <div class="user-section">
         @auth
-        @include('components.notification-bell')
-        <div style="display: flex; align-items: center; gap: 8px; padding-left: 8px; border-left: 1px solid #e0e8e0;">
-          <span style="font-size: 13px; color: #666;">{{ Auth::user()->name }}</span>
-          <div style="width: 28px; height: 28px; border-radius: 50%; background: #1e9e62; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600;">
-            {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+          @include('components.notification-bell')
+          <div style="display: flex; align-items: center; gap: 8px; padding-left: 8px; border-left: 1px solid #e0e8e0;">
+            <span style="font-size: 13px; color: #666;">{{ Auth::user()->name }}</span>
+            <div
+              style="width: 28px; height: 28px; border-radius: 50%; background: #1e9e62; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600;">
+              {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+            </div>
+            <form method="POST" action="{{ route('logout') }}" style="display: inline;">
+              @csrf
+              <button type="submit" class="btn btn-sm"
+                style="background: #e8f1ed; color: #1e9e62; padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 13px; font-weight: 600;">
+                <i class="bi bi-box-arrow-right"></i> Logout
+              </button>
+            </form>
           </div>
-          <form method="POST" action="{{ route('logout') }}" style="display: inline;">
-            @csrf
-            <button type="submit" class="btn btn-sm" style="background: #e8f1ed; color: #1e9e62; padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 13px; font-weight: 600;">
-              <i class="bi bi-box-arrow-right"></i> Logout
-            </button>
-          </form>
-        </div>
         @else
-        <button class="btn btn-g" onclick="window.location.href='/login'"><i class="bi bi-box-arrow-in-right"></i> Login</button>
+          <button class="btn btn-g" onclick="window.location.href='/login'"><i class="bi bi-box-arrow-in-right"></i>
+            Login</button>
         @endauth
       </div>
     </div>
@@ -1128,12 +1123,16 @@
                 <span class="tag tb" id="dTypeBadge">Area</span>
               </div>
               <div class="d-row"><span class="d-key">Feature Type</span><span class="d-val" id="dType">Area</span></div>
-              <div class="d-row" id="dAreaRow"><span class="d-key">Estimated Area</span><span class="d-val" id="dArea">-</span></div>
-              <div class="d-row"><span class="d-key">Contributor</span><span class="d-val" id="dContributor">Community</span></div>
-              <div class="d-row"><span class="d-key">Approved Date</span><span class="d-val" id="dApprovedDate">-</span></div>
+              <div class="d-row" id="dAreaRow"><span class="d-key">Estimated Area</span><span class="d-val"
+                  id="dArea">-</span></div>
+              <div class="d-row"><span class="d-key">Contributor</span><span class="d-val"
+                  id="dContributor">Community</span></div>
+              <div class="d-row"><span class="d-key">Approved Date</span><span class="d-val" id="dApprovedDate">-</span>
+              </div>
               <div class="d-row" id="dNotesRow" style="flex-direction: column; align-items: flex-start; gap: 4px;">
                 <span class="d-key">Notes</span>
-                <span class="d-val" id="dNotes" style="font-weight: 400; font-size: 12px; color: #3a5a3a; line-height: 1.4; word-break: break-word;">-</span>
+                <span class="d-val" id="dNotes"
+                  style="font-weight: 400; font-size: 12px; color: #3a5a3a; line-height: 1.4; word-break: break-word;">-</span>
               </div>
             </div>
             <div class="div"></div>
@@ -1147,156 +1146,7 @@
       </div>
     </div>
 
-    <!-- CLASSIFIER VIEW - UPLOAD & AUTO CLASSIFICATION -->
-    <div class="view" id="v-classify">
-      <div class="left-panel">
-        <div class="scroll">
-          <div class="sec">Upload Image</div>
-          <button onclick="show('map')" class="btn" style="margin-bottom:14px; display:inline-flex; align-items:center; gap:4px;"><i class="bi bi-arrow-left-short"></i> Back to Map</button>
-          <div class="upload-zone" id="uploadBox" onclick="document.getElementById('fileInput').click()">
-            <div class="ico">📷</div>
-            <h3>Click to upload mangrove image</h3>
-            <p>JPG, PNG - field, drone, or satellite photo</p>
-            <input type="file" id="fileInput" accept="image/*" onchange="handleImageUpload(event)" />
-            <label class="ubtn">Choose Image</label>
-          </div>
-          <div id="classResult" style="display:none;margin-top:14px">
-            <div class="d-card">
-              <div class="d-title" style="color:#1e9e62">Rhizophora mucronata</div>
-              <div style="font-size:11px;font-style:italic;color:#7a9a7a;margin-bottom:9px">Genus: Rhizophora - Rhizophoraceae</div>
-              <div style="margin-bottom:9px"><span class="tag tg">Confidence 91%</span><span class="tag ta">Salinity: High</span><span class="tag tb">Prop-root</span></div>
-              <div class="d-row"><span class="d-key">Zone</span><span class="d-val">Mid-intertidal</span></div>
-              <div class="d-row"><span class="d-key">Salinity</span><span class="d-val">10-35 ppt</span></div>
-              <div class="d-row"><span class="d-key">Substrate</span><span class="d-val">Fine mud</span></div>
-              <div class="d-row"><span class="d-key">Carbon seq.</span><span class="d-val g">6.4 t C/ha/yr</span></div>
-            </div>
-            <div class="sec">Top Matches</div>
-            <div class="conf-row"><span class="conf-lbl">R. mucronata</span>
-              <div class="conf-track">
-                <div class="conf-fill" style="width:91%;background:#1e9e62"></div>
-              </div><span class="conf-pct">91%</span>
-            </div>
-            <div class="conf-row"><span class="conf-lbl">R. apiculata</span>
-              <div class="conf-track">
-                <div class="conf-fill" style="width:6%;background:#5ab8de"></div>
-              </div><span class="conf-pct">6%</span>
-            </div>
-            <div class="conf-row"><span class="conf-lbl">B. gymnorrhiza</span>
-              <div class="conf-track">
-                <div class="conf-fill" style="width:3%;background:#c0c8b8"></div>
-              </div><span class="conf-pct">3%</span>
-            </div>
-            <div class="div"></div>
-            <div class="sec">Features Detected</div>
-            <div style="font-size:11px;color:#5a7a5a;line-height:2.1"><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Prop / stilt root system<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Viviparous propagules<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Elliptic leaf shape<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Dense canopy structure<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Mid-intertidal position</div>
-          </div>
-        </div>
-      </div>
-      <div class="main">
-        <div class="classify-main">
-          <div id="imagePreviewArea" class="image-preview-container">
-            <div class="no-image-message">
-              <div style="font-size:48px;margin-bottom:12px;color:#c0d8c0"><i class="bi bi-tree"></i></div>
-              <p style="font-weight:500">No image loaded</p>
-              <p style="font-size:12px">Upload a mangrove photo to see AI classification</p>
-            </div>
-            <img id="imgView" src="" alt="Mangrove Preview" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
-          </div>
-        </div>
-        <div class="classify-bottom">
-          <div class="sec">Genus Reference Library</div>
-          <table class="tbl">
-            <thead>
-              <tr>
-                <th>Scientific Name</th>
-                <th>Root Type</th>
-                <th>Salinity</th>
-                <th>% Cover</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="font-style:italic">Rhizophora mucronata</td>
-                <td>Prop</td>
-                <td>High</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:80%;background:#1e9e62"></div>
-                    </div>34%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Avicennia marina</td>
-                <td>Pneumatophore</td>
-                <td>Very High</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:65%;background:#5ab8de"></div>
-                    </div>22%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Sonneratia alba</td>
-                <td>Knee/peg</td>
-                <td>Medium</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:53%;background:#f4a840"></div>
-                    </div>18%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Bruguiera gymnorrhiza</td>
-                <td>Knee</td>
-                <td>Medium</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:41%;background:#a070e0"></div>
-                    </div>14%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Ceriops tagal</td>
-                <td>Buttress</td>
-                <td>High</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:24%;background:#c0c8b8"></div>
-                    </div>8%
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="right-panel">
-        <div class="scroll">
-          <div class="sec">About the Model</div>
-          <div style="font-size:12px;color:#5a7a5a;line-height:1.8;margin-bottom:14px">ResNet-50 classifier trained on <strong>14,000</strong> labeled images across <strong>12 genera</strong>.<br>Top-1 accuracy: <strong class="g">88.6%</strong><br>Top-3 accuracy: <strong class="g">96.2%</strong></div>
-          <div class="div"></div>
-          <div class="sec">Supported Genera</div>
-          <div style="font-size:12px">
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2ed"><span>Rhizophora</span><span>Detected</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2ed"><span>Avicennia</span><span>Detected</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2ed"><span>Sonneratia</span><span>Detected</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Bruguiera</span><span>Detected</span></div>
-          </div>
-          <div class="div"></div>
-          <div class="sec">Tips for Best Results</div>
-          <div style="font-size:11px;color:#7a9a7a;line-height:2">• Shoot at low tide<br>• Include root base in frame<br>• Avoid heavy cloud shadow<br>• Resolution 1m or better</div>
-        </div>
-      </div>
-    </div>
+
 
     <!-- Mobile Install Button -->
     <button id="mobileInstallBtn" class="mobile-install-btn" title="Install App">
@@ -1326,7 +1176,9 @@
       <div class="right-panel">
         <div class="scroll">
           <div class="sec">Priority Planting Sites</div>
-          <button onclick="show('map')" class="btn" style="margin-bottom:14px; display:inline-flex; align-items:center; gap:4px;"><i class="bi bi-arrow-left-short"></i> Back to Map</button>
+          <button onclick="show('map')" class="btn"
+            style="margin-bottom:14px; display:inline-flex; align-items:center; gap:4px;"><i
+              class="bi bi-arrow-left-short"></i> Back to Map</button>
           <div id="plantSitesList"></div>
         </div>
       </div>
@@ -1344,7 +1196,7 @@
         const div = document.createElement('div');
         div.className = `zone-row`;
         div.setAttribute('onclick', `flyTo(${i})`);
-        div.innerHTML = `<div class="z-pip" style="background:${z.color}"></div><div class="z-name">${z.name}</div><div class="z-ha">${z.area.replace(/[^0-9k]/g,'')}</div><span class="z-chip ${z.status==='Healthy'?'cg':(z.status==='Degraded'?'cr':'ca')}">${z.status}</span>`;
+        div.innerHTML = `<div class="z-pip" style="background:${z.color}"></div><div class="z-name">${z.name}</div><div class="z-ha">${z.area.replace(/[^0-9k]/g, '')}</div><span class="z-chip ${z.status === 'Healthy' ? 'cg' : (z.status === 'Degraded' ? 'cr' : 'ca')}">${z.status}</span>`;
         zoneContainer.appendChild(div);
       });
     }
@@ -1362,7 +1214,7 @@
     let mainMap = L.map('mainMap', {
       zoomControl: true,
       layers: [satL]
-    }).setView([10.25, 125.00], 11);
+    }).setView([10.358, 124.973], 13);
     let polys = [];
     zones.forEach((z, i) => {
       let p = L.polygon(z.shape, {
@@ -1378,7 +1230,7 @@
     let plantMap = L.map('plantMap', {
       zoomControl: true,
       layers: [L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}')]
-    }).setView([10.25, 125.00], 11);
+    }).setView([10.358, 124.973], 13);
     zones.forEach(z => L.polygon(z.shape, {
       color: '#1e9e62',
       fillOpacity: .1,
@@ -1388,7 +1240,7 @@
     let pMarkers = [];
     plantSites.forEach((s, i) => {
       let ic = L.divIcon({
-        html: `<div style="width:30px;height:30px;border-radius:50%;background:${s.color};border:2px solid white;display:flex;align-items:center;justify-content:center;font-weight:700;color:white;">${i+1}</div>`,
+        html: `<div style="width:30px;height:30px;border-radius:50%;background:${s.color};border:2px solid white;display:flex;align-items:center;justify-content:center;font-weight:700;color:white;">${i + 1}</div>`,
         iconSize: [30, 30],
         iconAnchor: [15, 15]
       });
@@ -1476,23 +1328,25 @@
       }
 
       setTimeout(() => {
-        mainMap.invalidateSize();
-        if (layer) {
-          if (layer.getBounds) {
-            mainMap.fitBounds(layer.getBounds(), {
-              padding: [60, 60],
-              maxZoom: 14,
-              animate: true,
-              duration: 0.8
-            });
-          } else if (layer.getLatLng) {
-            mainMap.flyTo(layer.getLatLng(), 13, {
-              animate: true,
-              duration: 0.8
-            });
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize();
+          if (layer) {
+            if (layer.getBounds) {
+              mainMap.fitBounds(layer.getBounds(), {
+                padding: [60, 60],
+                maxZoom: 14,
+                animate: true,
+                duration: 0.8
+              });
+            } else if (layer.getLatLng) {
+              mainMap.flyTo(layer.getLatLng(), 13, {
+                animate: true,
+                duration: 0.8
+              });
+            }
           }
         }
-      }, wasOpen ? 50 : 320);
+      }, wasOpen ? 50 : 330);
     }
 
     function drawSavedDelineations() {
@@ -1563,21 +1417,27 @@
       }
 
       setTimeout(() => {
-        mainMap.invalidateSize();
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize();
+        }
         if (polys[i]) {
           mainMap.flyTo([z.lat, z.lng], 10, {
             duration: 0.8
           });
           polys[i].openPopup();
         }
-      }, wasOpen ? 50 : 320);
+      }, wasOpen ? 50 : 330);
     }
     window.flyTo = (i) => selectZone(i);
     window.closeRightPanel = () => {
       const panel = document.getElementById('mapRightPanel');
       if (panel) {
         panel.classList.remove('open');
-        setTimeout(() => mainMap.invalidateSize(), 320);
+        setTimeout(() => {
+          if (typeof mainMap !== 'undefined' && mainMap) {
+            mainMap.invalidateSize();
+          }
+        }, 330);
       }
     };
     window.flyPlant = (i) => {
@@ -1600,8 +1460,8 @@
       show('planting');
     };
 
-    window.showClassify = () => {
-      show('classify');
+    window.showDelineation = () => {
+      window.location.href = "{{ route('delineation.index') }}";
     };
 
     window.setBase = (t, btn) => {
@@ -1618,27 +1478,6 @@
         if (id === 'map') mainMap.invalidateSize();
         if (id === 'planting') plantMap.invalidateSize();
       }, 150);
-    };
-
-    // NEW: Handle image upload and auto-show classification
-    window.handleImageUpload = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = document.getElementById('imgView');
-        img.src = ev.target.result;
-        img.style.display = 'block';
-        // Hide placeholder message
-        const placeholderDiv = document.querySelector('#imagePreviewArea .no-image-message');
-        if (placeholderDiv) placeholderDiv.style.display = 'none';
-        // Show classification results instantly
-        document.getElementById('classResult').style.display = 'block';
-        // Optional: collapse upload zone slightly but keep visible
-        const uploadBox = document.getElementById('uploadBox');
-        uploadBox.style.marginBottom = '8px';
-      };
-      reader.readAsDataURL(file);
     };
 
     window.addEventListener('resize', () => {
@@ -1726,12 +1565,16 @@
       const card = document.createElement('div');
       card.className = 'site-card';
       card.setAttribute('onclick', `flyPlant(${i})`);
-      card.innerHTML = `<div class="sc-head"><div class="sc-rank ${s.priority==='Critical'?'rg':(s.priority==='High'?'ra':'rb')}">${i+1}</div><div class="sc-name">${s.name}</div></div><div class="sc-sp">${s.priority} priority zone</div><div class="sc-foot"><div class="sbar"><div class="strack"><div class="sfill" style="width:${s.score}%;background:${s.color}"></div></div><span style="font-size:10px;font-weight:700;color:${s.color}">${s.score}%</span></div><span class="ptag" style="background:${s.color}20;border-color:${s.color};color:${s.color}">${s.priority}</span></div>`;
+      card.innerHTML = `<div class="sc-head"><div class="sc-rank ${s.priority === 'Critical' ? 'rg' : (s.priority === 'High' ? 'ra' : 'rb')}">${i + 1}</div><div class="sc-name">${s.name}</div></div><div class="sc-sp">${s.priority} priority zone</div><div class="sc-foot"><div class="sbar"><div class="strack"><div class="sfill" style="width:${s.score}%;background:${s.color}"></div></div><span style="font-size:10px;font-weight:700;color:${s.color}">${s.score}%</span></div><span class="ptag" style="background:${s.color}20;border-color:${s.color};color:${s.color}">${s.priority}</span></div>`;
       plantListDiv.appendChild(card);
     });
+    let indexMapResizeTimer = null;
     const mapObserver = new ResizeObserver(() => {
-      mainMap.invalidateSize();
-      plantMap.invalidateSize();
+      clearTimeout(indexMapResizeTimer);
+      indexMapResizeTimer = setTimeout(() => {
+        mainMap.invalidateSize({ pan: false });
+        plantMap.invalidateSize({ pan: false });
+      }, 200);
     });
     mapObserver.observe(document.getElementById('mainMap'));
     mapObserver.observe(document.getElementById('plantMap'));
@@ -1741,18 +1584,18 @@
     const notificationDropdown = document.getElementById('notificationDropdown');
 
     if (notificationToggle && notificationDropdown) {
-      notificationToggle.addEventListener('click', function(e) {
+      notificationToggle.addEventListener('click', function (e) {
         e.stopPropagation();
         notificationDropdown.classList.toggle('active');
       });
 
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', function (e) {
         if (!notificationToggle.contains(e.target) && !notificationDropdown.contains(e.target)) {
           notificationDropdown.classList.remove('active');
         }
       });
 
-      notificationDropdown.addEventListener('click', function(e) {
+      notificationDropdown.addEventListener('click', function (e) {
         e.stopPropagation();
       });
     }

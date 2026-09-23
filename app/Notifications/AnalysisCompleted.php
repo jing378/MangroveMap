@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationChannels;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -26,7 +27,7 @@ class AnalysisCompleted extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return NotificationChannels::databaseAndMail();
     }
 
     /**

@@ -32,7 +32,7 @@
             @if($recentNotifications->count() > 0)
             @foreach($recentNotifications as $notification)
             <div class="notification-item {{ !$notification->read_at ? 'unread' : '' }}">
-                <a href="{{ $notification->data['url'] ?? route('notifications.index') }}" class="notification-link" @if(!$notification->read_at) data-mark-read-url="{{ route('notifications.mark-as-read', $notification->id) }}" @endif>
+                <a href="{{ route('notifications.index') }}" class="notification-link" @if(!$notification->read_at) data-mark-read-url="{{ route('notifications.mark-as-read', $notification->id) }}" @endif>
                     <div class="notification-icon">
                         <i class="bi {{ $notification->data['icon'] ?? 'bi-info-circle' }}"></i>
                     </div>

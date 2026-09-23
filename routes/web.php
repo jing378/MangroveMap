@@ -4,6 +4,7 @@ use App\Http\Controllers\PublicController;
 use App\Http\Controllers\EndUserController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\ClassifyController;
+use App\Http\Controllers\DelineationController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ExpertController;
 use App\Http\Controllers\ProfileController;
@@ -65,19 +66,37 @@ Route::post('/logout', [\App\Http\Controllers\Auth\AuthenticatedSessionControlle
 
 Route::middleware('auth')->group(function () {
     Route::get('/email/verify', function () {
+        $user = Auth::user();
+
+        if ($user->hasVerifiedEmail()) {
+            return redirect($user->homeRoute());
+        }
+
         return view('auth.verify-email');
     })->name('verification.notice');
-// Send email api
+
     Route::post('/email/verification-notification', function (Request $request) {
-        $request->user()->sendEmailVerificationNotification();
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return redirect($user->homeRoute());
+        }
+
+        $user->sendEmailVerificationNotification();
+
         return back()->with('message', 'Verification link sent!');
     })->middleware('throttle:6,1')->name('verification.send');
 
-// Email verification
-
     Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return redirect($user->homeRoute());
+        }
+
         $request->fulfill();
-        return redirect(Auth::user()->homeRoute())
+
+        return redirect($user->homeRoute())
             ->with('success', 'Email verified successfully!');
     })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 });
@@ -103,6 +122,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/classify', [ClassifyController::class, 'create'])->name('classify');
     Route::post('/classify', [ClassifyController::class, 'store'])->name('classify.store');
     Route::get('/classify/{analysis}', [ClassifyController::class, 'results'])->name('classify.results');
+
+    // Dedicated delineation/batch-upload page
+    Route::get('/delineation', [DelineationController::class, 'index'])->name('delineation.index');
+    Route::post('/delineation', [DelineationController::class, 'store'])->name('delineation.store');
 
     // Notification routes (accessible to all authenticated users)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');

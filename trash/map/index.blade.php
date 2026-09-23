@@ -58,8 +58,8 @@
     const map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/light-v11',
-        center: [125.00, 10.25],
-        zoom: 8
+        center: [124.973, 10.358],
+        zoom: 12
     });
 
     // Load mangrove data from API

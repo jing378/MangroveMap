@@ -221,6 +221,31 @@
         margin: 0;
     }
 
+    .btn-view-delineation {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid #c8e6d4;
+        background: #fff;
+        color: #1e9e62;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+        font-family: inherit;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+
+    .btn-view-delineation:hover {
+        background: #edf7f2;
+        border-color: #1e9e62;
+        color: #178a54;
+    }
+
     .btn-approve,
     .btn-reject,
     .btn-mark-read,
@@ -299,6 +324,75 @@
     .pagination-wrap {
         margin-top: 24px;
     }
+
+    /* Processing Modal */
+    .processing-modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+    }
+
+    .processing-modal-backdrop.active {
+        display: flex;
+        opacity: 1;
+    }
+
+    .processing-modal-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 32px 28px;
+        text-align: center;
+        max-width: 320px;
+        width: 90%;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05);
+        transform: scale(0.95);
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .processing-modal-backdrop.active .processing-modal-card {
+        transform: scale(1);
+    }
+
+    .processing-spinner {
+        width: 44px;
+        height: 44px;
+        margin: 0 auto 16px;
+        border: 3.5px solid #edf2f7;
+        border-top-color: #d04030;
+        border-radius: 50%;
+        animation: processingSpin 0.75s linear infinite;
+    }
+
+    @keyframes processingSpin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .processing-modal-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a2e1a;
+        margin-bottom: 6px;
+    }
+
+    .processing-modal-subtitle {
+        font-size: 13px;
+        color: #64748b;
+        margin: 0;
+        line-height: 1.4;
+    }
 </style>
 @endsection
 
@@ -320,7 +414,7 @@
     </div>
 
     @if(session('success'))
-    <div class="unread-banner" style="background:#edf7f2;border-color:#c8e6d4;color:#1e9e62;">
+    <div class="unread-banner" style="background:#edf7f2;border-color:#c8e6d4;color:#1e9e62;margin-bottom:16px;">
         <i class="bi bi-check-circle"></i> {{ session('success') }}
     </div>
     @endif
@@ -328,12 +422,12 @@
     @if($unreadCount > 0)
     <div class="unread-banner" id="unreadBanner">
         <i class="bi bi-info-circle"></i>
-        You have <strong id="unreadCountText">{{ $unreadCount }}</strong> unread notification(s)
+        <span>You have <strong id="unreadCountText">{{ $unreadCount }}</strong> unread notification{{ $unreadCount > 1 ? 's' : '' }}</span>
     </div>
     @endif
 
     @if($notifications->count() > 0)
-    <div id="notificationsList">
+    <div class="notifications-list">
         @foreach($notifications as $notification)
         @php
         $icon = $notification->data['icon'] ?? 'bi-info-circle';
@@ -349,7 +443,15 @@
         'analysis_completed' => '#10b981',
         'delineation_approved' => '#10b981',
         'delineation_rejected' => '#ef4444',
+        'delineation_submitted' => '#c07818',
         ];
+        $delineationId = $notification->data['delineation_id'] ?? null;
+        $viewUrl = $notification->data['url'] ?? null;
+        if (! $viewUrl && $delineationId) {
+        $viewUrl = Auth::user()->isExpert()
+        ? route('expert.dashboard', ['delineation' => $delineationId])
+        : route('dashboard', ['delineation' => $delineationId]);
+        }
         $iconColor = $colorMap[$type] ?? '#1e9e62';
         @endphp
         <div class="notification-card {{ !$notification->read_at ? 'unread' : '' }}" data-notification-id="{{ $notification->id }}">
@@ -368,6 +470,11 @@
                 <p class="notification-card-meta">{{ $notification->created_at->diffForHumans() }}</p>
             </div>
             <div class="notification-card-actions">
+                @if($delineationId && $viewUrl)
+                <a href="{{ $viewUrl }}" class="btn-view-delineation">
+                    <i class="bi bi-map"></i> View delineation
+                </a>
+                @endif
                 @if(Auth::user()->isExpert() && ($notification->data['type'] ?? '') === 'delineation_submitted' && !empty($notification->data['delineation_id']))
                 <form action="{{ route('expert.delineations.approve', $notification->data['delineation_id']) }}" method="POST" data-approve-form>
                     @csrf
@@ -381,7 +488,7 @@
                 <form action="{{ route('expert.delineations.reject', $notification->data['delineation_id']) }}" method="POST" class="notification-reject-form" id="notification-reject-form-{{ $notification->id }}" data-reject-form>
                     @csrf
                     <label for="rejection_notes_{{ $notification->id }}">Rejection notes</label>
-                    <textarea id="rejection_notes_{{ $notification->id }}" name="rejection_notes" placeholder="Enter rejection notes" required minlength="10" maxlength="2000"></textarea>
+                    <textarea id="rejection_notes_{{ $notification->id }}" name="rejection_notes" placeholder="Enter rejection notes (min 10 characters)" required minlength="10" maxlength="2000"></textarea>
                     <button type="submit" class="btn-reject">
                         <i class="bi bi-send"></i> Submit rejection
                     </button>
@@ -417,6 +524,15 @@
         <p>No notifications yet</p>
     </div>
     @endif
+
+    <!-- Processing Modal to prevent multiple clicks -->
+    <div id="processingModal" class="processing-modal-backdrop" role="dialog" aria-modal="true" aria-label="Processing request">
+        <div class="processing-modal-card">
+            <div class="processing-spinner"></div>
+            <h3 class="processing-modal-title">Processing...</h3>
+            <p class="processing-modal-subtitle">Submitting your rejection notes, please wait.</p>
+        </div>
+    </div>
 </div>
 @endsection
 
@@ -425,9 +541,25 @@
     (function() {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
+        function showProcessingModal(title = 'Processing...', subtitle = 'Submitting rejection notes, please wait.') {
+            const modal = document.getElementById('processingModal');
+            if (!modal) return;
+            const titleEl = modal.querySelector('.processing-modal-title');
+            const subEl = modal.querySelector('.processing-modal-subtitle');
+            if (titleEl) titleEl.textContent = title;
+            if (subEl) subEl.textContent = subtitle;
+            modal.classList.add('active');
+        }
+
+        function hideProcessingModal() {
+            const modal = document.getElementById('processingModal');
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
         function updateUnreadUi(count) {
             const badge = document.querySelector('.notification-badge');
-            const headerUnread = document.querySelector('.dropdown-header-email');
+            const headerUnread = document.querySelector('.notification-dropdown .dropdown-header-email');
             const banner = document.getElementById('unreadBanner');
             const countText = document.getElementById('unreadCountText');
             const markAllForm = document.querySelector('[data-ajax-mark-all]');
@@ -461,21 +593,39 @@
         }
 
         async function ajaxSubmit(form, onSuccess) {
-            const res = await fetch(form.action, {
-                method: form.querySelector('[name="_method"]')?.value || form.method,
+            const method = (form.querySelector('[name="_method"]')?.value || form.method || 'POST').toUpperCase();
+            const options = {
+                method: method,
                 headers: {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
-            });
-            if (!res.ok) {
-                const data = await res.json();
-                alert(data.message || 'Error performing action');
-                return;
+            };
+
+            if (method !== 'GET' && method !== 'HEAD') {
+                options.body = new FormData(form);
             }
-            const data = await res.json();
-            onSuccess(data);
+
+            try {
+                const res = await fetch(form.action, options);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    let errMsg = data.message || 'Error performing action';
+                    if (data.errors) {
+                        const firstKey = Object.keys(data.errors)[0];
+                        if (firstKey && Array.isArray(data.errors[firstKey]) && data.errors[firstKey].length > 0) {
+                            errMsg = data.errors[firstKey][0];
+                        }
+                    }
+                    alert(errMsg);
+                    return;
+                }
+                onSuccess(data);
+            } catch (err) {
+                console.error('AJAX error:', err);
+                alert('Network error. Please try again.');
+            }
         }
 
         document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
@@ -510,12 +660,23 @@
         document.querySelectorAll('[data-approve-form]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                await ajaxSubmit(form, (data) => {
-                    const card = form.closest('[data-notification-id]');
-                    card?.remove();
-                    showSuccessMessage(data.message || 'Delineation approved successfully');
-                    updateUnreadUi(data.unreadCount ?? 0);
-                });
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn?.disabled) return;
+                if (submitBtn) submitBtn.disabled = true;
+
+                showProcessingModal('Approving Delineation...', 'Approving and publishing delineation, please wait.');
+
+                try {
+                    await ajaxSubmit(form, (data) => {
+                        const card = form.closest('[data-notification-id]');
+                        card?.remove();
+                        showSuccessMessage(data.message || 'Delineation approved successfully');
+                        updateUnreadUi(data.unreadCount ?? 0);
+                    });
+                } finally {
+                    hideProcessingModal();
+                    if (submitBtn) submitBtn.disabled = false;
+                }
             });
         });
 
@@ -523,12 +684,32 @@
         document.querySelectorAll('[data-reject-form]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                await ajaxSubmit(form, (data) => {
-                    const card = form.closest('[data-notification-id]');
-                    card?.remove();
-                    showSuccessMessage(data.message || 'Delineation rejected successfully');
-                    updateUnreadUi(data.unreadCount ?? 0);
-                });
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const textarea = form.querySelector('textarea[name="rejection_notes"]');
+                const notes = textarea?.value?.trim() || '';
+
+                if (notes.length < 10) {
+                    alert('Please enter at least 10 characters for rejection notes.');
+                    textarea?.focus();
+                    return;
+                }
+
+                if (submitBtn?.disabled) return;
+                if (submitBtn) submitBtn.disabled = true;
+
+                showProcessingModal('Processing Rejection...', 'Submitting your rejection notes, please wait.');
+
+                try {
+                    await ajaxSubmit(form, (data) => {
+                        const card = form.closest('[data-notification-id]');
+                        card?.remove();
+                        showSuccessMessage(data.message || 'Delineation rejected successfully');
+                        updateUnreadUi(data.unreadCount ?? 0);
+                    });
+                } finally {
+                    hideProcessingModal();
+                    if (submitBtn) submitBtn.disabled = false;
+                }
             });
         });
 
@@ -551,6 +732,9 @@
                 const id = btn.getAttribute('data-reject-toggle');
                 const form = document.getElementById('notification-reject-form-' + id);
                 form?.classList.toggle('open');
+                if (form?.classList.contains('open')) {
+                    form.querySelector('textarea')?.focus();
+                }
             });
         });
     })();

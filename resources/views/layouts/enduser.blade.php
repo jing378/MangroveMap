@@ -499,13 +499,13 @@
                 <div class="sidebar-title">MAIN</div>
                 <a href="{{ auth()->user()->isExpert() ? route('expert.dashboard') : route('dashboard') }}" class="sidebar-item {{ request()->routeIs('dashboard') || request()->routeIs('expert.dashboard') ? 'active' : '' }}">
                     <i class="bi bi-speedometer2"></i>
-                    <span>{{ auth()->user()->isExpert() ? 'Review' : 'Dashboard' }}</span>
+                    <span>Dashboard</span>
                 </a>
                 <a href="{{ route('map') }}" class="sidebar-item {{ request()->routeIs('map') ? 'active' : '' }}">
                     <i class="bi bi-map"></i>
                     <span>Map</span>
                 </a>
-                <a href="{{ route('classify') }}" class="sidebar-item {{ request()->routeIs('classify*') ? 'active' : '' }}">
+                <a href="{{ route('dashboard') }}?tab=classify" class="sidebar-item {{ request()->is('dashboard') && request()->query('tab') === 'classify' ? 'active' : '' }}">
                     <i class="bi bi-images"></i>
                     <span>Classify</span>
                 </a>

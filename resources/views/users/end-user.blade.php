@@ -9,7 +9,8 @@
   <link rel="icon" type="image/png" href="/icon-192.png" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <style>
@@ -220,14 +221,37 @@
       border: 1px solid #e0e8e0;
       border-radius: 10px;
       min-width: 220px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-      display: none;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
       z-index: 999;
       overflow: hidden;
+      pointer-events: none;
     }
 
     .profile-dropdown.active {
-      display: block;
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #notificationDropdown {
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
+      pointer-events: none;
+      display: block !important;
+    }
+
+    #notificationDropdown.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      pointer-events: auto;
     }
 
     .dropdown-header {
@@ -366,24 +390,64 @@
     }
 
     #mapRightPanel {
-      width: 0;
-      min-width: 0;
-      max-width: 0;
-      flex: 0 0 0px;
-      border-left: none;
-      position: relative;
-      transition: width 0.3s ease-in-out, max-width 0.3s ease-in-out, flex-basis 0.3s ease-in-out;
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 340px;
+      max-width: 90vw;
+      height: 100%;
+      background: #ffffff;
+      border-left: 1px solid #e0e8e0;
+      box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateX(105%);
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s;
+      will-change: transform;
+      visibility: hidden;
+      pointer-events: none;
     }
 
     #mapRightPanel.open {
-      width: 320px;
-      max-width: 320px;
-      flex: 0 0 320px;
-      border-left: 1px solid #e0e8e0;
+      transform: translateX(0);
+      visibility: visible;
+      pointer-events: auto;
     }
 
     #mapRightPanel .scroll {
-      min-width: 320px;
+      width: 100%;
+      min-width: 100%;
+      box-sizing: border-box;
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+    }
+
+    .panel-close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      color: #7a9a7a;
+      z-index: 10;
+      transition: all 0.15s ease;
+    }
+
+    .panel-close-btn:hover {
+      background: #eef4ee;
+      color: #1a2e1a;
     }
 
     .main {
@@ -445,29 +509,15 @@
       }
 
       #mapRightPanel {
-        position: absolute !important;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        height: 100% !important;
-        max-height: 100% !important;
         width: 85% !important;
         max-width: 340px;
-        z-index: 1000;
-        border: none !important;
-        border-left: 1px solid #e0e8e0 !important;
-        box-shadow: -2px 0 15px rgba(0, 0, 0, 0.15);
-        transform: translateX(105%);
-        transition: transform 0.3s ease-in-out;
+        box-shadow: -2px 0 18px rgba(0, 0, 0, 0.18);
+        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s;
       }
 
       #mapRightPanel.open {
         transform: translateX(0);
         width: 85% !important;
-      }
-
-      #mapRightPanel .scroll {
-        min-width: 100%;
       }
 
       #v-classify {
@@ -1199,6 +1249,16 @@
       border-color: #1e9e62;
     }
 
+    .toolbar-save-btn:disabled,
+    .toolbar-save-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+      background: #f5f7f5;
+      color: #a0b0a5;
+      border-color: #e0e8e0;
+    }
+
     .map-legend-float {
       position: absolute;
       bottom: 20px;
@@ -1232,115 +1292,7 @@
       border-radius: 3px;
     }
 
-    .classify-main {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f7faf7;
-      overflow: hidden;
-      position: relative;
-    }
 
-    .classify-bottom {
-      background: #fff;
-      border-top: 1px solid #e0e8e0;
-      padding: 13px 18px;
-      overflow-y: auto;
-      max-height: 200px;
-      flex: 0 0 auto;
-    }
-
-    .upload-zone {
-      border: 1.5px dashed #c4d8c4;
-      border-radius: 14px;
-      padding: 36px 28px;
-      text-align: center;
-      cursor: pointer;
-      background: #fff;
-      transition: all .15s;
-    }
-
-    .upload-zone:hover {
-      border-color: #1e9e62;
-      background: #f0faf5;
-    }
-
-    .upload-zone .ico {
-      font-size: 34px;
-      margin-bottom: 10px;
-    }
-
-    .upload-zone h3 {
-      font-size: 16px;
-      font-weight: 600;
-      color: #2a4a2a;
-    }
-
-    .upload-zone p {
-      font-size: 14px;
-      color: #9ab0a0;
-    }
-
-    #fileInput {
-      display: none;
-    }
-
-    .ubtn {
-      display: inline-block;
-      margin-top: 12px;
-      padding: 7px 18px;
-      background: #1e9e62;
-      color: #fff;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-    }
-
-    #imgView {
-      display: none;
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      padding: 16px;
-    }
-
-    .conf-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 7px;
-    }
-
-    .conf-lbl {
-      font-size: 13px;
-      color: #5a7a5a;
-      width: 145px;
-      flex-shrink: 0;
-      font-style: italic;
-    }
-
-    .conf-track {
-      flex: 1;
-      height: 5px;
-      background: #e0e8e0;
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .conf-fill {
-      height: 100%;
-      border-radius: 3px;
-    }
-
-    .conf-pct {
-      font-size: 12px;
-      font-weight: 600;
-      width: 28px;
-      text-align: right;
-    }
 
     .tag {
       display: inline-block;
@@ -1531,37 +1483,18 @@
       width: 100%;
       height: 100%;
       flex: 1;
+      position: relative;
     }
 
     @media (max-width: 780px) {
       .view.on {
         flex-direction: column;
       }
-
-      #v-classify.on {
-        flex-direction: column !important;
-      }
     }
 
     .cw {
       position: relative;
       width: 100%;
-    }
-
-    /* Image preview container */
-    .image-preview-container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f7faf7;
-    }
-
-    .no-image-message {
-      text-align: center;
-      padding: 24px;
-      color: #9ab0a0;
     }
 
     .input-error {
@@ -1599,6 +1532,111 @@
       height: 0;
       width: 0;
     }
+
+    /* Processing Modal */
+    .processing-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .processing-modal-backdrop.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .processing-modal-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 32px 28px;
+      text-align: center;
+      max-width: 320px;
+      width: 90%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05);
+      transform: scale(0.95);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .processing-modal-backdrop.active .processing-modal-card {
+      transform: scale(1);
+    }
+
+    .processing-spinner {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 16px;
+      border: 3.5px solid #edf2f7;
+      border-top-color: #1e9e62;
+      border-radius: 50%;
+      animation: processingSpin 0.75s linear infinite;
+    }
+
+    @keyframes processingSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .processing-modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a2e1a;
+      margin-bottom: 6px;
+    }
+
+    .processing-modal-subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .success-icon-wrapper {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 16px;
+      background: #edf7f2;
+      border: 2px solid #c8e6d4;
+      color: #1e9e62;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+      0% {
+        transform: scale(0.6);
+        opacity: 0;
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .success-modal-btn {
+      margin-top: 18px;
+      width: 100%;
+      justify-content: center;
+      padding: 10px 16px;
+      font-weight: 700;
+      border-radius: 10px;
+    }
   </style>
 </head>
 
@@ -1609,57 +1647,59 @@
     </div>
     <div class="header-right">
       @auth
-      @include('components.notification-bell')
-      <div class="profile-dropdown-wrapper">
-        <button class="profile-toggle" id="profileToggle" type="button">
-          @if(Auth::user()->profile_image)
-          <img src="{{ asset('storage/' . Auth::user()->profile_image) }}" alt="Profile" class="profile-image">
-          @else
-          <div class="profile-image">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
-          @endif
-          <div class="profile-info">
-            <div class="profile-name">{{ Auth::user()->name }}</div>
-            <div class="profile-role">{{ Auth::user()->isExpert() ? 'Expert' : 'Resident' }}</div>
-          </div>
-        </button>
-
-        <div class="profile-dropdown" id="profileDropdown">
-          <div class="dropdown-header">
+        @include('components.notification-bell')
+        <div class="profile-dropdown-wrapper">
+          <button class="profile-toggle" id="profileToggle" type="button">
             @if(Auth::user()->profile_image)
-            <img src="{{ asset('storage/' . Auth::user()->profile_image) }}" alt="Profile" class="dropdown-header-image">
+              <img src="{{ asset('storage/' . Auth::user()->profile_image) }}" alt="Profile" class="profile-image">
             @else
-            <div class="dropdown-header-image">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
+              <div class="profile-image">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
             @endif
-            <div class="dropdown-header-text">
-              <div class="dropdown-header-name">{{ Auth::user()->name }}</div>
-              <div class="dropdown-header-email">{{ Auth::user()->email }}</div>
+            <div class="profile-info">
+              <div class="profile-name">{{ Auth::user()->name }}</div>
+              <div class="profile-role">{{ Auth::user()->isExpert() ? 'Expert' : 'Resident' }}</div>
+            </div>
+          </button>
+
+          <div class="profile-dropdown" id="profileDropdown">
+            <div class="dropdown-header">
+              @if(Auth::user()->profile_image)
+                <img src="{{ asset('storage/' . Auth::user()->profile_image) }}" alt="Profile"
+                  class="dropdown-header-image">
+              @else
+                <div class="dropdown-header-image">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
+              @endif
+              <div class="dropdown-header-text">
+                <div class="dropdown-header-name">{{ Auth::user()->name }}</div>
+                <div class="dropdown-header-email">{{ Auth::user()->email }}</div>
+              </div>
+            </div>
+            <div class="dropdown-menu">
+              <a href="{{ route('profile.show') }}" class="dropdown-item">
+                <i class="bi bi-person-circle"></i>
+                <span>View Profile</span>
+              </a>
+              <a href="#" class="dropdown-item">
+                <i class="bi bi-gear"></i>
+                <span>Settings</span>
+              </a>
+              <a href="#" class="dropdown-item">
+                <i class="bi bi-question-circle"></i>
+                <span>Help & Support</span>
+              </a>
+              <div class="dropdown-divider"></div>
+              <form method="POST" action="{{ route('logout') }}" style="width: 100%; padding: 0; margin: 0;">
+                @csrf
+                <button type="submit" class="dropdown-item danger">
+                  <i class="bi bi-box-arrow-right"></i>
+                  <span>Logout</span>
+                </button>
+              </form>
             </div>
           </div>
-          <div class="dropdown-menu">
-            <a href="{{ route('profile.show') }}" class="dropdown-item">
-              <i class="bi bi-person-circle"></i>
-              <span>View Profile</span>
-            </a>
-            <a href="#" class="dropdown-item">
-              <i class="bi bi-gear"></i>
-              <span>Settings</span>
-            </a>
-            <a href="#" class="dropdown-item">
-              <i class="bi bi-question-circle"></i>
-              <span>Help & Support</span>
-            </a>
-            <div class="dropdown-divider"></div>
-            <form method="POST" action="{{ route('logout') }}" style="width: 100%; padding: 0; margin: 0;">
-              @csrf
-              <button type="submit" class="dropdown-item danger">
-                <i class="bi bi-box-arrow-right"></i>
-                <span>Logout</span>
-              </button>
-            </form>
-          </div>
-        </div>
-        @else
-        <button class="btn btn-g" onclick="window.location.href='/login'"><i class="bi bi-box-arrow-in-right"></i> Login</button>
+      @else
+          <button class="btn btn-g" onclick="window.location.href='/login'"><i class="bi bi-box-arrow-in-right"></i>
+            Login</button>
         @endauth
       </div>
   </header>
@@ -1689,7 +1729,7 @@
             </div>
           </div>
           <div class="div"></div>
-          <div class="sec">Mangrove Zones</div>
+          <div class="sec">{{ Auth::user()->isExpert() ? 'Resident delineations' : 'Mangrove Zones' }}</div>
           <div id="zoneListContainer" class="zone-list"></div>
         </div>
       </div>
@@ -1699,9 +1739,12 @@
           <div class="delineation-toolbar" id="delineationToolbar">
             <div class="draw-select-wrapper">
               <div class="draw-mode-group" role="group" aria-label="Drawing mode">
-                <button type="button" class="draw-btn" data-mode="point"><i class="bi bi-geo-alt-fill"></i><span>Point</span></button>
-                <button type="button" class="draw-btn" data-mode="line"><i class="bi bi-slash-circle"></i><span>Line</span></button>
-                <button type="button" class="draw-btn" data-mode="area"><i class="bi bi-grid-3x3-gap"></i><span>Area</span></button>
+                <button type="button" class="draw-btn" data-mode="point"><i
+                    class="bi bi-geo-alt-fill"></i><span>Point</span></button>
+                <button type="button" class="draw-btn" data-mode="line"><i
+                    class="bi bi-slash-circle"></i><span>Line</span></button>
+                <button type="button" class="draw-btn" data-mode="area"><i
+                    class="bi bi-grid-3x3-gap"></i><span>Area</span></button>
               </div>
               <select id="drawTypeSelect" class="draw-select" aria-label="Select drawing mode" disabled>
                 <option value="" selected disabled>Select mode</option>
@@ -1716,20 +1759,23 @@
                 <button id="undoBtn" title="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
                 <button id="redoBtn" title="Redo"><i class="bi bi-arrow-clockwise"></i></button>
               </div>
-              <button id="saveBtn" class="toolbar-save-btn" title="Save draft"><i class="bi bi-download"></i></button>
+              <button id="saveBtn" class="toolbar-save-btn" title="Save"><i class="bi bi-download"></i></button>
             </div>
           </div>
           <div class="map-layer-control">
-            <button id="layerToggle" type="button" onclick="toggleLayerMenu()" aria-expanded="false" title="Choose map layer" aria-label="Choose map layer">
+            <button id="layerToggle" type="button" onclick="toggleLayerMenu()" aria-expanded="false"
+              title="Choose map layer" aria-label="Choose map layer">
               <i class="bi bi-layers-fill"></i>
             </button>
-            <button id="editModeBtn" type="button" onclick="showEditMode()" title="Edit mode" aria-label="Edit mode">
+            <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
             </button>
-            <button id="suitabilityBtn" type="button" onclick="showSuitability()" title="Show suitability layer" aria-label="Show suitability layer">
+            <button id="suitabilityBtn" type="button" onclick="showSuitability()" title="Show suitability layer"
+              aria-label="Show suitability layer">
               <i class="bi bi-check2-square"></i>
             </button>
-            <button id="classifyBtn" type="button" onclick="showClassify()" title="Show classification" aria-label="Show classification layer">
+            <button id="classifyBtn" type="button" onclick="showDelineation()" title="Upload image for delineation"
+              aria-label="Upload image for delineation">
               <i class="bi bi-image"></i>
             </button>
             <div id="layerMenu" class="layer-menu" aria-label="Base layer options">
@@ -1753,32 +1799,64 @@
         </div>
       </div>
       <div class="right-panel" id="mapRightPanel">
-        <button onclick="closeRightPanel()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 16px; cursor: pointer; color: #9ab0a0; z-index: 10;">
+        <button onclick="closeRightPanel()" class="panel-close-btn" title="Close panel" aria-label="Close panel">
           <i class="bi bi-x-lg"></i>
         </button>
         <div class="scroll">
           <div class="sec" style="padding-right: 20px;">Selected Zone</div>
           <div id="delineationInfoCard" class="d-card" style="display:none;">
             <div class="d-title">Delineated Area Info</div>
-            <div class="d-row"><span class="d-key">Type</span><span class="d-val" id="delineationFeatureType">-</span></div>
-            <div class="d-row"><span class="d-key">Coords</span><span class="d-val" id="delineationFeatureCoords">-</span></div>
-            <div class="d-row"><span class="d-key">Label</span><span class="d-val" id="delineationFeatureLabel">-</span></div>
-            <div class="d-row"><span class="d-key">Review status</span><span class="d-val" id="delineationReviewStatus">-</span></div>
+            <div class="d-row"><span class="d-key">Type</span><span class="d-val" id="delineationFeatureType">-</span>
+            </div>
+            <div class="d-row"><span class="d-key">Coords</span><span class="d-val"
+                id="delineationFeatureCoords">-</span></div>
+            <div class="d-row"><span class="d-key">Label</span><span class="d-val" id="delineationFeatureLabel">-</span>
+            </div>
+            <div class="d-row"><span class="d-key">Review status</span><span class="d-val"
+                id="delineationReviewStatus">-</span></div>
             <div id="delineationRejectionBox" class="delineation-rejection-box" style="display:none;">
               <strong>Expert feedback</strong>
               <p id="delineationRejectionNotes" style="margin:0;"></p>
             </div>
+            @if(Auth::user()->isExpert())
+            <div class="d-row" id="delineationSubmitterRow" style="display:none;"><span class="d-key">Submitted by</span><span
+                class="d-val" id="delineationSubmitter">-</span></div>
+            <div id="expertReviewActions" class="expert-review-actions" style="display:none;">
+              <div class="div"></div>
+              <div class="sec" style="padding:0;margin-bottom:8px;">Expert review</div>
+              <button type="button" id="expertApproveBtn" class="btn btn-g" style="width:100%;margin-bottom:8px;">
+                <i class="bi bi-check-circle"></i> Approve delineation
+              </button>
+              <label for="expertRejectionNotes" style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Rejection
+                notes (required to reject)</label>
+              <textarea id="expertRejectionNotes" rows="3"
+                style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
+                placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
+              <button type="button" id="expertRejectBtn" class="btn"
+                style="width:100%;margin-top:8px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
+                <i class="bi bi-x-circle"></i> Reject delineation
+              </button>
+            </div>
+            @endif
             <div class="div"></div>
             <div style="margin-bottom:12px;">
-              <label for="delineationLabel" style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Name / Label</label>
-              <input id="delineationLabel" type="text" style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;" placeholder="Enter zone name or note" />
+              <label for="delineationLabel" style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Name /
+                Label</label>
+              <input id="delineationLabel" type="text"
+                style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;"
+                placeholder="Enter zone name or note" />
             </div>
             <div style="margin-bottom:12px;">
-              <label for="delineationNotes" style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Notes</label>
-              <textarea id="delineationNotes" rows="4" style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;overflow-y:auto;" placeholder="Fill in information about this delineated feature"></textarea>
+              <label for="delineationNotes"
+                style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Notes</label>
+              <textarea id="delineationNotes" rows="4"
+                style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;overflow-y:auto;"
+                placeholder="Fill in information about this delineated feature"></textarea>
             </div>
           </div>
-          <button id="removeDelineationBtn" class="btn" style="width:100%;margin-top:8px;margin-bottom:14px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;" onclick="window.removeCurrentDelineation()">Remove delineation</button>
+          <button id="removeDelineationBtn" class="btn"
+            style="width:100%;margin-top:8px;margin-bottom:14px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;"
+            onclick="window.removeCurrentDelineation()">Remove delineation</button>
           <div id="zoneDetailsContent">
             <div class="d-card">
               <div class="d-title" id="dName"></div>
@@ -1800,156 +1878,7 @@
       </div>
     </div>
 
-    <!-- CLASSIFIER VIEW - UPLOAD & AUTO CLASSIFICATION -->
-    <div class="view" id="v-classify">
-      <div class="left-panel">
-        <div class="scroll">
-          <div class="sec">Upload Image</div>
-          <a href="{{ Auth::user()->isExpert() ? route('expert.dashboard') : route('dashboard') }}" class="btn" style="margin-bottom:14px; display:inline-flex; align-items:center;"><i class="bi bi-arrow-left-short" style="margin-right:6px;"></i> Back to Dashboard</a>
-          <div class="upload-zone" id="uploadBox" onclick="document.getElementById('fileInput').click()">
-            <div class="ico">📷</div>
-            <h3>Click to upload mangrove image</h3>
-            <p>JPG, PNG - field, drone, or satellite photo</p>
-            <input type="file" id="fileInput" accept="image/*" onchange="handleImageUpload(event)" />
-            <label class="ubtn">Choose Image</label>
-          </div>
-          <div id="classResult" style="display:none;margin-top:14px">
-            <div class="d-card">
-              <div class="d-title" style="color:#1e9e62">Rhizophora mucronata</div>
-              <div style="font-size:11px;font-style:italic;color:#7a9a7a;margin-bottom:9px">Genus: Rhizophora - Rhizophoraceae</div>
-              <div style="margin-bottom:9px"><span class="tag tg">Confidence 91%</span><span class="tag ta">Salinity: High</span><span class="tag tb">Prop-root</span></div>
-              <div class="d-row"><span class="d-key">Zone</span><span class="d-val">Mid-intertidal</span></div>
-              <div class="d-row"><span class="d-key">Salinity</span><span class="d-val">10-35 ppt</span></div>
-              <div class="d-row"><span class="d-key">Substrate</span><span class="d-val">Fine mud</span></div>
-              <div class="d-row"><span class="d-key">Carbon seq.</span><span class="d-val g">6.4 t C/ha/yr</span></div>
-            </div>
-            <div class="sec">Top Matches</div>
-            <div class="conf-row"><span class="conf-lbl">R. mucronata</span>
-              <div class="conf-track">
-                <div class="conf-fill" style="width:91%;background:#1e9e62"></div>
-              </div><span class="conf-pct">91%</span>
-            </div>
-            <div class="conf-row"><span class="conf-lbl">R. apiculata</span>
-              <div class="conf-track">
-                <div class="conf-fill" style="width:6%;background:#5ab8de"></div>
-              </div><span class="conf-pct">6%</span>
-            </div>
-            <div class="conf-row"><span class="conf-lbl">B. gymnorrhiza</span>
-              <div class="conf-track">
-                <div class="conf-fill" style="width:3%;background:#c0c8b8"></div>
-              </div><span class="conf-pct">3%</span>
-            </div>
-            <div class="div"></div>
-            <div class="sec">Features Detected</div>
-            <div style="font-size:11px;color:#5a7a5a;line-height:2.1"><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Prop / stilt root system<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Viviparous propagules<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Elliptic leaf shape<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Dense canopy structure<br><i class="bi bi-check-circle-fill" style="color:#1e9e62;margin-right:5px"></i> Mid-intertidal position</div>
-          </div>
-        </div>
-      </div>
-      <div class="main">
-        <div class="classify-main">
-          <div id="imagePreviewArea" class="image-preview-container">
-            <div class="no-image-message">
-              <div style="font-size:48px;margin-bottom:12px;color:#c0d8c0"><i class="bi bi-tree"></i></div>
-              <p style="font-weight:500">No image loaded</p>
-              <p style="font-size:12px">Upload a mangrove photo to see AI classification</p>
-            </div>
-            <img id="imgView" src="" alt="Mangrove Preview" style="display:none; max-width:100%; max-height:100%; object-fit:contain;" />
-          </div>
-        </div>
-        <div class="classify-bottom">
-          <div class="sec">Genus Reference Library</div>
-          <table class="tbl">
-            <thead>
-              <tr>
-                <th>Scientific Name</th>
-                <th>Root Type</th>
-                <th>Salinity</th>
-                <th>% Cover</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="font-style:italic">Rhizophora mucronata</td>
-                <td>Prop</td>
-                <td>High</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:80%;background:#1e9e62"></div>
-                    </div>34%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Avicennia marina</td>
-                <td>Pneumatophore</td>
-                <td>Very High</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:65%;background:#5ab8de"></div>
-                    </div>22%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Sonneratia alba</td>
-                <td>Knee/peg</td>
-                <td>Medium</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:53%;background:#f4a840"></div>
-                    </div>18%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Bruguiera gymnorrhiza</td>
-                <td>Knee</td>
-                <td>Medium</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:41%;background:#a070e0"></div>
-                    </div>14%
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-style:italic">Ceriops tagal</td>
-                <td>Buttress</td>
-                <td>High</td>
-                <td>
-                  <div class="mbar">
-                    <div class="mtrack">
-                      <div class="mfill" style="width:24%;background:#c0c8b8"></div>
-                    </div>8%
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="right-panel">
-        <div class="scroll">
-          <div class="sec">About the Model</div>
-          <div style="font-size:12px;color:#5a7a5a;line-height:1.8;margin-bottom:14px">ResNet-50 classifier trained on <strong>14,000</strong> labeled images across <strong>12 genera</strong>.<br>Top-1 accuracy: <strong class="g">88.6%</strong><br>Top-3 accuracy: <strong class="g">96.2%</strong></div>
-          <div class="div"></div>
-          <div class="sec">Supported Genera</div>
-          <div style="font-size:12px">
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2ed"><span>Rhizophora</span><span>Detected</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2ed"><span>Avicennia</span><span>Detected</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2ed"><span>Sonneratia</span><span>Detected</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Bruguiera</span><span>Detected</span></div>
-          </div>
-          <div class="div"></div>
-          <div class="sec">Tips for Best Results</div>
-          <div style="font-size:11px;color:#7a9a7a;line-height:2">• Shoot at low tide<br>• Include root base in frame<br>• Avoid heavy cloud shadow<br>• Resolution 1m or better</div>
-        </div>
-      </div>
-    </div>
+
 
     <!-- PLANTING SUITABILITY -->
     <div class="view" id="v-planting">
@@ -2031,15 +1960,88 @@
     </div>
   </div>
 
+  <!-- Processing Modal to prevent multiple clicks -->
+  <div id="processingModal" class="processing-modal-backdrop" role="dialog" aria-modal="true"
+    aria-label="Processing request">
+    <div class="processing-modal-card">
+      <div class="processing-spinner"></div>
+      <h3 class="processing-modal-title">Processing...</h3>
+      <p class="processing-modal-subtitle">Saving your delineation, please wait.</p>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div id="successModal" class="processing-modal-backdrop" role="dialog" aria-modal="true" aria-label="Success">
+    <div class="processing-modal-card">
+      <div class="success-icon-wrapper">
+        <i class="bi bi-check-lg"></i>
+      </div>
+      <h3 class="processing-modal-title" id="successModalTitle">Success!</h3>
+      <p class="processing-modal-subtitle" id="successModalMessage">Delineation saved and submitted for expert review.
+      </p>
+      <button type="button" class="btn btn-g success-modal-btn" onclick="hideSuccessModal()">Got it</button>
+    </div>
+  </div>
+
   <script>
     // DATA & MAP INITIALIZATION (same as before)
     const saveDelineationUrl = "{{ Auth::user()->isExpert() ? route('expert.delineations.store') : route('delineations.store') }}";
     const deleteDelineationBaseUrl = "{{ url('/delineations') }}";
+    const isExpertUser = {{ Auth::check() && Auth::user()->isExpert() ? 'true' : 'false' }};
     const savedDelineations = @json($delineations);
     const approvedDelineations = @json($approvedDelineationsForMap);
-    // Combine user delineations with approved delineations from all users
-    const allDelineations = [...savedDelineations, ...approvedDelineations];
+    const residentDelineations = @json($residentDelineationsForMap ?? []);
+    const focusDelineationId = @json($focusDelineationId ?? null);
+    const focusDelineationRecord = @json($focusDelineationRecord ?? null);
+    const authUserId = @json(Auth::id());
+    const expertDelineationReviewBaseUrl = @json(url('/expert/delineations'));
+
+    function showProcessingModal(title, subtitle) {
+      const modal = document.getElementById('processingModal');
+      if (!modal) return;
+      const titleEl = modal.querySelector('.processing-modal-title');
+      const subEl = modal.querySelector('.processing-modal-subtitle');
+      if (titleEl) titleEl.textContent = title || 'Processing...';
+      if (subEl) subEl.textContent = subtitle || 'Saving your delineation, please wait.';
+      modal.classList.add('active');
+    }
+
+    function hideProcessingModal() {
+      const modal = document.getElementById('processingModal');
+      if (!modal) return;
+      modal.classList.remove('active');
+    }
+
+    function showSuccessModal(message, title = 'Success!') {
+      const modal = document.getElementById('successModal');
+      if (!modal) return;
+      const titleEl = document.getElementById('successModalTitle');
+      const msgEl = document.getElementById('successModalMessage');
+      if (titleEl) titleEl.textContent = title;
+      if (msgEl) msgEl.textContent = message || 'Delineation saved and submitted for expert review.';
+      modal.classList.add('active');
+    }
+
+    function hideSuccessModal() {
+      const modal = document.getElementById('successModal');
+      if (!modal) return;
+      modal.classList.remove('active');
+    }
+    function mergeDelineationsById(...lists) {
+      const byId = new Map();
+      lists.flat().forEach(record => {
+        if (record?.id != null) {
+          byId.set(record.id, record);
+        }
+      });
+      return [...byId.values()];
+    }
+
+    const allDelineations = isExpertUser
+      ? mergeDelineationsById(savedDelineations, residentDelineations)
+      : mergeDelineationsById(savedDelineations, approvedDelineations);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
 
     function extractPoints(coords) {
       if (!coords) return [];
@@ -2049,9 +2051,35 @@
       return [];
     }
 
+    const MAX_FEATURES_PER_DELINEATION = 20;
+    const loadedGeometryKeys = new Set();
+
+    function featureGeometryKey(feature) {
+      if (!feature?.type || !feature?.coords) return '';
+      return `${feature.type}:${JSON.stringify(feature.coords)}`;
+    }
+
+    function isValidMapFeature(feature) {
+      if (!feature || typeof feature !== 'object') return false;
+      if (!['point', 'line', 'area'].includes(feature.type)) return false;
+      const coords = feature.coords;
+      if (!Array.isArray(coords) || coords.length === 0) return false;
+      if (feature.type === 'point') {
+        return coords.length >= 2 && typeof coords[0] === 'number';
+      }
+      return Array.isArray(coords[0]) && typeof coords[0][0] === 'number';
+    }
+
+    function featureForPersistence(feature) {
+      return {
+        type: feature.type,
+        coords: feature.coords,
+      };
+    }
+
     function getFeatureCenter(feature) {
       const points = extractPoints(feature?.coords);
-      if (!points.length) return [10.25, 125.00];
+      if (!points.length) return [10.358, 124.973];
       const total = points.reduce((acc, pt) => {
         acc[0] += Number(pt[0]) || 0;
         acc[1] += Number(pt[1]) || 0;
@@ -2068,9 +2096,9 @@
     }
 
     function formatDelineationScan(record) {
-      if (!record?.created_at) return 'Draft';
+      if (!record?.created_at) return 'Saved';
       const d = new Date(record.created_at);
-      return isNaN(d.getTime()) ? 'Draft' : d.toLocaleDateString();
+      return isNaN(d.getTime()) ? 'Saved' : d.toLocaleDateString();
     }
 
     function getDelineationStatus(record) {
@@ -2094,9 +2122,10 @@
       };
     }
 
-    // "Mangrove Zones" should show approved/public delineations (not the user's drafts).
-    // Drafts/pending delineations are handled separately in the edit/drawing layer.
-    const zoneRecords = Array.isArray(allDelineations) ? allDelineations.filter(r => !!r?.is_approved && !r?.is_rejected) : [];
+    // Residents: sidebar lists approved community zones. Experts: all resident submissions (incl. pending).
+    const zoneRecords = Array.isArray(allDelineations)
+      ? allDelineations.filter(r => isExpertUser ? !r?.is_rejected : (!!r?.is_approved && !r?.is_rejected))
+      : [];
 
     const zones = zoneRecords.map(record => {
       const feature = Array.isArray(record.features) ? record.features[0] : null;
@@ -2110,7 +2139,9 @@
         area: formatFeatureArea(feature),
         ndvi: review.label,
         status: review.label,
-        genus: feature?.label || 'User delineation',
+        genus: (isExpertUser && record.user?.name)
+          ? record.user.name
+          : (feature?.label || 'User delineation'),
         scan: formatDelineationScan(record),
         sc: review.sc,
         color: review.color,
@@ -2125,24 +2156,57 @@
       const div = document.createElement('div');
       div.className = `zone-row`;
       div.setAttribute('onclick', `flyTo(${i})`);
-      div.innerHTML = `<div class="z-pip" style="background:${z.color}"></div><div class="z-name">${z.name}</div><div class="z-ha">${z.area.replace(/[^0-9k]/g,'')}</div><span class="z-chip ${z.chip || 'ca'}">${z.status}</span>`;
+      div.innerHTML = `<div class="z-pip" style="background:${z.color}"></div><div class="z-name">${z.name}</div><div class="z-ha">${z.area.replace(/[^0-9k]/g, '')}</div><span class="z-chip ${z.chip || 'ca'}">${z.status}</span>`;
       zoneContainer.appendChild(div);
     });
 
-    const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 18
-    });
-    const osmL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18
-    });
+    const tileLayerOpts = {
+      maxZoom: 18,
+      updateWhenZooming: false,
+      updateWhenIdle: true,
+      keepBuffer: 2,
+    };
+    const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', tileLayerOpts);
+    const osmL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', tileLayerOpts);
     const topoL = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      maxZoom: 17
+      ...tileLayerOpts,
+      maxZoom: 17,
     });
     let curBase = satL;
     let mainMap = L.map('mainMap', {
       zoomControl: true,
-      layers: [satL]
-    }).setView([10.25, 125.00], 10);
+      preferCanvas: true,
+      layers: [satL],
+    }).setView([10.358, 124.973], 13);
+
+    let mainMapResizeTimer = null;
+    let mainMapLastSize = { w: 0, h: 0 };
+    let mainMapIsDragging = false;
+    mainMap.on('movestart', () => { mainMapIsDragging = true; });
+    mainMap.on('moveend', () => { mainMapIsDragging = false; });
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const mapContainer = document.getElementById('mainMap');
+      if (mapContainer) {
+        new ResizeObserver((entries) => {
+          const entry = entries[0];
+          if (!entry) return;
+          const { width, height } = entry.contentRect;
+          if (Math.abs(width - mainMapLastSize.w) < 1 && Math.abs(height - mainMapLastSize.h) < 1) {
+            return;
+          }
+          mainMapLastSize = { w: width, h: height };
+          if (mainMapIsDragging) return;
+          // Debounce to prevent layout thrashing and stutter during CSS panel transitions
+          clearTimeout(mainMapResizeTimer);
+          mainMapResizeTimer = setTimeout(() => {
+            if (!mainMapIsDragging) {
+              mainMap.invalidateSize({ pan: false });
+            }
+          }, 200);
+        }).observe(mapContainer);
+      }
+    }
 
     const snapPixelThreshold = 15; // pixels
     let snapMarker = L.circleMarker([0, 0], {
@@ -2210,48 +2274,66 @@
       }).addTo(zoneMarkerLayer);
 
       p.bindPopup(`<div><b>${z.name}</b><br>Area: ${z.area}<br>NDVI: ${z.ndvi}<br>Status: ${z.status}</div>`);
-      p.on('click', () => selectZone(i));
+      p.on('click', (e) => {
+        if (drawingMode) return;
+        if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+        selectZone(i);
+      });
       polys.push(p);
     });
 
-    let plantMap = L.map('plantMap', {
-      zoomControl: true,
-      layers: [L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}')]
-    }).setView([10.25, 125.00], 10);
-
-    // Removed the background boxes from the plantMap as well
-    zones.forEach(z => {
-      L.circleMarker([z.lat, z.lng], {
-        radius: 4,
-        color: '#1e9e62',
-        fillOpacity: 0.3,
-        interactive: false
-      }).addTo(plantMap);
-    });
+    let plantMap = null;
     let pMarkers = [];
-    plantSites.forEach((s, i) => {
-      let ic = L.divIcon({
-        html: `<div style="width:30px;height:30px;border-radius:50%;background:${s.color};border:2px solid white;display:flex;align-items:center;justify-content:center;font-weight:700;color:white;">${i+1}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+
+    function ensurePlantMap() {
+      if (plantMap) return plantMap;
+      plantMap = L.map('plantMap', {
+        zoomControl: true,
+        preferCanvas: true,
+        layers: [L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', tileLayerOpts)],
+      }).setView([10.358, 124.973], 13);
+      zones.forEach(z => {
+        L.circleMarker([z.lat, z.lng], {
+          radius: 4,
+          color: '#1e9e62',
+          fillOpacity: 0.3,
+          interactive: false,
+        }).addTo(plantMap);
       });
-      let m = L.marker([s.lat, s.lng], {
-        icon: ic
-      }).addTo(plantMap);
-      m.bindPopup(`<b>${s.name}</b><br>Suitability: ${s.score}%<br>Priority: ${s.priority}`);
-      pMarkers.push(m);
-    });
+      plantSites.forEach((s, i) => {
+        const ic = L.divIcon({
+          html: `<div style="width:30px;height:30px;border-radius:50%;background:${s.color};border:2px solid white;display:flex;align-items:center;justify-content:center;font-weight:700;color:white;">${i + 1}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        });
+        const m = L.marker([s.lat, s.lng], { icon: ic }).addTo(plantMap);
+        m.bindPopup(`<b>${s.name}</b><br>Suitability: ${s.score}%<br>Priority: ${s.priority}`);
+        pMarkers.push(m);
+      });
+      return plantMap;
+    }
 
     window.flyTo = (i) => selectZone(i);
     window.closeRightPanel = () => {
-      document.getElementById('mapRightPanel').classList.remove('open');
+      const panel = document.getElementById('mapRightPanel');
+      if (panel) {
+        panel.classList.remove('open');
+      }
       document.getElementById('delineationInfoCard').style.display = 'none';
       selectedDrawnIndex = -1;
-      setTimeout(() => mainMap.invalidateSize(), 300);
+      setTimeout(() => {
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize({ pan: false });
+        }
+      }, 330);
+    };
+    window.showSuitability = () => {
+      show('planting');
     };
     window.flyPlant = (i) => {
-      plantMap.flyTo([plantSites[i].lat, plantSites[i].lng], 11);
-      pMarkers[i].openPopup();
+      const map = ensurePlantMap();
+      map.flyTo([plantSites[i].lat, plantSites[i].lng], 11);
+      pMarkers[i]?.openPopup();
     };
     window.setBase = (t, btn) => {
       document.querySelectorAll('.layer-btn, .layer-option').forEach(b => b.classList.remove('active'));
@@ -2332,9 +2414,20 @@
 
     function pushDelineationFeatures(record, options = {}) {
       if (!Array.isArray(record.features)) return;
-      record.features.forEach(feature => {
+      let features = record.features.filter(isValidMapFeature);
+      if (features.length > MAX_FEATURES_PER_DELINEATION) {
+        console.warn(
+          `Delineation #${record.id} has ${features.length} features; using the last ${MAX_FEATURES_PER_DELINEATION}.`
+        );
+        features = features.slice(-MAX_FEATURES_PER_DELINEATION);
+      }
+      features.forEach(feature => {
+        const key = `${record.id}:${featureGeometryKey(feature)}`;
+        if (key && loadedGeometryKeys.has(key)) return;
+        if (key) loadedGeometryKeys.add(key);
         drawnFeatures.push({
-          ...feature,
+          type: feature.type,
+          coords: feature.coords,
           label: record.name,
           notes: record.notes,
           delineation_id: record.id,
@@ -2349,12 +2442,20 @@
 
     function loadDelineationsOnMap() {
       drawnFeatures = [];
+      loadedGeometryKeys.clear();
       if (Array.isArray(savedDelineations)) {
         savedDelineations.forEach(record => pushDelineationFeatures(record, {
           is_own: true
         }));
       }
-      if (Array.isArray(approvedDelineations)) {
+      if (isExpertUser && Array.isArray(residentDelineations)) {
+        residentDelineations.forEach(record => {
+          pushDelineationFeatures(record, {
+            is_own: false,
+            created_by: record.user?.name || 'Resident',
+          });
+        });
+      } else if (Array.isArray(approvedDelineations)) {
         approvedDelineations.forEach(record => {
           pushDelineationFeatures(record, {
             is_own: false,
@@ -2371,6 +2472,14 @@
       currentSelectedZoneIndex = i;
       let z = zones[i];
       document.querySelectorAll('.zone-row').forEach((r, j) => r.classList.toggle('sel', j === i));
+
+      if (isExpertUser && z?.id) {
+        const featureIndex = drawnFeatures.findIndex(f => f.delineation_id === z.id);
+        if (featureIndex >= 0) {
+          selectDrawnFeature(featureIndex);
+          return;
+        }
+      }
       document.getElementById('dName').textContent = z.name;
       document.getElementById('dArea').textContent = z.area;
       document.getElementById('dNDVI').textContent = z.ndvi;
@@ -2380,14 +2489,26 @@
       document.getElementById('dGenus').textContent = z.genus;
       document.getElementById('dScan').textContent = z.scan;
 
+      const removeBtn = document.getElementById('removeDelineationBtn');
+      if (removeBtn) {
+        removeBtn.style.display = 'none';
+      }
+
       const panel = document.getElementById('mapRightPanel');
-      if (!panel.classList.contains('open')) {
+      const wasOpen = panel.classList.contains('open');
+      if (!wasOpen) {
         panel.classList.add('open');
-        setTimeout(() => mainMap.invalidateSize(), 300);
+        setTimeout(() => {
+          if (typeof mainMap !== 'undefined' && mainMap) {
+            mainMap.invalidateSize({ pan: false });
+          }
+        }, 330);
       }
       selectedDrawnIndex = -1;
       document.getElementById('delineationInfoCard').style.display = 'none';
       document.getElementById('zoneDetailsContent').style.display = 'block';
+      document.getElementById('expertReviewActions')?.style.setProperty('display', 'none');
+      document.getElementById('delineationSubmitterRow')?.style.setProperty('display', 'none');
       mainMap.flyTo([z.lat, z.lng], 10, {
         duration: 1
       });
@@ -2399,13 +2520,35 @@
       if (!feature) return;
       selectedDrawnIndex = i;
 
-      document.getElementById('mapRightPanel').classList.add('open');
+      const panel = document.getElementById('mapRightPanel');
+      const wasOpen = panel.classList.contains('open');
+      if (!wasOpen) {
+        panel.classList.add('open');
+        setTimeout(() => {
+          if (typeof mainMap !== 'undefined' && mainMap) {
+            mainMap.invalidateSize({ pan: false });
+          }
+        }, 330);
+      }
+
       document.getElementById('delineationInfoCard').style.display = 'block';
       document.getElementById('zoneDetailsContent').style.display = 'none';
-      document.getElementById('delineationFeatureType').textContent = feature.type;
-      document.getElementById('delineationFeatureCoords').textContent = feature.type === 'point' ?
-        feature.coords.join(', ') :
-        feature.coords.slice(0, 3).map(c => c.join(', ')).join(' | ') + (feature.coords.length > 3 ? ' ...' : '');
+
+      const removeBtn = document.getElementById('removeDelineationBtn');
+      if (removeBtn) {
+        removeBtn.style.display = (feature.is_own && !feature.is_approved) ? 'block' : 'none';
+      }
+
+      document.getElementById('delineationFeatureType').textContent = feature.type || '-';
+      let coordsText = '-';
+      if (Array.isArray(feature.coords)) {
+        if (feature.type === 'point') {
+          coordsText = feature.coords.map(n => Number(n).toFixed(4)).join(', ');
+        } else {
+          coordsText = feature.coords.slice(0, 3).map(c => Array.isArray(c) ? c.map(n => Number(n).toFixed(4)).join(', ') : c).join(' | ') + (feature.coords.length > 3 ? ' ...' : '');
+        }
+      }
+      document.getElementById('delineationFeatureCoords').textContent = coordsText;
       document.getElementById('delineationFeatureLabel').textContent = feature.label || '-';
       document.getElementById('delineationLabel').value = feature.label || '';
       document.getElementById('delineationNotes').value = feature.notes || '';
@@ -2430,6 +2573,45 @@
       } else {
         rejectionBox.style.display = 'none';
         rejectionNotes.textContent = '';
+      }
+
+      const submitterRow = document.getElementById('delineationSubmitterRow');
+      const submitterEl = document.getElementById('delineationSubmitter');
+      if (submitterRow && submitterEl) {
+        const submitter = feature.created_by || feature.submitted_by;
+        if (isExpertUser && submitter && !feature.is_own) {
+          submitterRow.style.display = '';
+          submitterEl.textContent = submitter;
+        } else {
+          submitterRow.style.display = 'none';
+          submitterEl.textContent = '-';
+        }
+      }
+
+      const expertReview = document.getElementById('expertReviewActions');
+      if (expertReview) {
+        const canReview = isExpertUser && feature.delineation_id && !feature.is_own
+          && !feature.is_approved && !feature.is_rejected;
+        expertReview.style.display = canReview ? 'block' : 'none';
+        expertReview.dataset.delineationId = canReview ? String(feature.delineation_id) : '';
+      }
+
+      // Fly/fit to the clicked delineated feature
+      if (typeof mainMap !== 'undefined' && mainMap && Array.isArray(feature.coords) && feature.coords.length > 0) {
+        if (feature.type === 'point') {
+          mainMap.flyTo([feature.coords[0], feature.coords[1]], Math.max(mainMap.getZoom(), 14), { duration: 0.8 });
+        } else {
+          // For lines and polygons, fit the map to the bounding box of all coordinates
+          try {
+            const latLngs = feature.coords.map(c => Array.isArray(c) ? L.latLng(c[0], c[1]) : null).filter(Boolean);
+            if (latLngs.length > 0) {
+              const bounds = L.latLngBounds(latLngs);
+              mainMap.flyToBounds(bounds, { padding: [50, 50], maxZoom: 17, duration: 0.8 });
+            }
+          } catch (err) {
+            console.warn('flyToBounds error:', err);
+          }
+        }
       }
     }
 
@@ -2472,16 +2654,16 @@
       alert('Delineation details saved.');
     }
 
-    window.removeCurrentDelineation = async function() {
+    window.removeCurrentDelineation = async function () {
       if (selectedDrawnIndex < 0) return;
 
       const feature = drawnFeatures[selectedDrawnIndex];
       const delineationId = feature?.delineation_id;
 
-      // If this feature came from a saved draft delineation record, deleting it must happen server-side.
+      // If this feature came from a saved delineation record, deleting it must happen server-side.
       // Otherwise it will reappear on refresh (because it is loaded again from the DB).
       if (delineationId && feature?.is_own && !feature?.is_approved) {
-        const ok = confirm('Remove this draft delineation? This will permanently delete it.');
+        const ok = confirm('Remove this delineation? This will permanently delete it.');
         if (!ok) return;
 
         try {
@@ -2516,6 +2698,11 @@
       redrawFeatures();
       document.getElementById('delineationInfoCard').style.display = 'none';
       document.getElementById('mapRightPanel').classList.remove('open');
+      setTimeout(() => {
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize({ pan: false });
+        }
+      }, 330);
     };
 
     function saveDrawingStateToHistory() {
@@ -2531,6 +2718,16 @@
       updateHistoryButtons();
     }
 
+    function updateSaveButtonState() {
+      const saveBtn = document.getElementById('saveBtn');
+      if (!saveBtn) return;
+      const hasUnsaved = Array.isArray(drawnFeatures) && drawnFeatures.some(f => !f.delineation_id);
+      saveBtn.disabled = !hasUnsaved;
+      saveBtn.style.opacity = !hasUnsaved ? '0.4' : '1';
+      saveBtn.style.cursor = !hasUnsaved ? 'not-allowed' : 'pointer';
+      saveBtn.classList.toggle('disabled', !hasUnsaved);
+    }
+
     function updateHistoryButtons() {
       const undoBtn = document.getElementById('undoBtn');
       const redoBtn = document.getElementById('redoBtn');
@@ -2542,8 +2739,10 @@
       redoBtn.style.opacity = redoBtn.disabled ? '0.5' : '1';
       undoBtn.style.cursor = undoBtn.disabled ? 'not-allowed' : 'pointer';
       redoBtn.style.cursor = redoBtn.disabled ? 'not-allowed' : 'pointer';
+
+      updateSaveButtonState();
     }
-//script for delenation
+    //script for delenation
     window.showEditMode = () => {
       const toolbar = document.getElementById('delineationToolbar');
       const drawTypeSelect = document.getElementById('drawTypeSelect');
@@ -2578,11 +2777,10 @@
           document.querySelectorAll('.layer-btn, .layer-option').forEach(b => b.classList.remove('active'));
         }
 
-        // Zoom to Southern Leyte region with satellite view
-        mainMap.flyTo([10.35, 124.75], 12, {
-          duration: 0.8
-        });
         updateHistoryButtons();
+        updateSaveButtonState();
+        setTimeout(() => mainMap.invalidateSize(), 50);
+        setTimeout(() => mainMap.invalidateSize(), 250);
       } else {
         drawingMode = null;
         const drawTypeSelect = document.getElementById('drawTypeSelect');
@@ -2590,6 +2788,8 @@
         const leftPanel = document.querySelector('.left-panel');
         if (leftPanel) leftPanel.classList.remove('hide');
         mainMap.dragging.enable();
+        setTimeout(() => mainMap.invalidateSize(), 50);
+        setTimeout(() => mainMap.invalidateSize(), 250);
       }
     };
 
@@ -2597,7 +2797,7 @@
     const drawModeButtons = document.querySelectorAll('.draw-btn');
 
     drawModeButtons.forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         const mode = this.dataset.mode;
         if (!mode) return;
         const isAlreadyActive = this.classList.contains('active');
@@ -2615,7 +2815,7 @@
       });
     });
 
-    drawTypeSelect?.addEventListener('change', function() {
+    drawTypeSelect?.addEventListener('change', function () {
       drawingMode = this.value;
       drawModeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === drawingMode));
     });
@@ -2643,13 +2843,33 @@
     });
 
     async function persistDelineation() {
-      if (!drawnFeatures.length) {
-        alert('No delineation features to save.');
+      const hasUnsaved = Array.isArray(drawnFeatures) && drawnFeatures.some(f => !f.delineation_id);
+      if (!drawnFeatures.length || !hasUnsaved) {
+        alert('No new delineation made to save. Please draw a feature on the map first.');
         return;
       }
 
       const meta = validateDelineationMeta();
       if (!meta) return;
+
+      const saveBtn = document.getElementById('saveBtn');
+      if (saveBtn?.disabled) return;
+      if (saveBtn) saveBtn.disabled = true;
+
+      const modalTitle = 'Saving Delineation...';
+      const modalSubtitle = isExpertUser ?
+        'Saving and publishing delineation to the map, please wait.' :
+        'Saving and submitting delineation for expert review, please wait.';
+
+      showProcessingModal(modalTitle, modalSubtitle);
+
+      const newFeatures = drawnFeatures.filter(f => !f.delineation_id && isValidMapFeature(f));
+      if (!newFeatures.length) {
+        alert('No new delineation made to save. Please draw a feature on the map first.');
+        if (saveBtn) saveBtn.disabled = false;
+        hideProcessingModal();
+        return;
+      }
 
       try {
         const response = await fetch(saveDelineationUrl, {
@@ -2660,7 +2880,7 @@
             'X-CSRF-TOKEN': csrfToken,
           },
           body: JSON.stringify({
-            features: drawnFeatures,
+            features: newFeatures.map(featureForPersistence),
             name: meta.name,
             notes: meta.notes,
           })
@@ -2671,10 +2891,25 @@
           throw new Error(payload.message || 'Unable to save delineation.');
         }
 
-        alert(payload.message || 'Delineation draft saved successfully.');
+        if (payload.delineation) {
+          newFeatures.forEach(feature => {
+            feature.delineation_id = payload.delineation.id;
+            feature.is_approved = !!payload.delineation.is_approved;
+            feature.is_rejected = !!payload.delineation.is_rejected;
+            feature.label = payload.delineation.name;
+            feature.notes = payload.delineation.notes;
+          });
+          redrawFeatures();
+        }
+
+        hideProcessingModal();
+        showSuccessModal(payload.message || 'Delineation saved and submitted for expert review.');
       } catch (error) {
+        hideProcessingModal();
         console.error('Delineation save failed:', error);
-        alert('Unable to save delineation. Please try again.');
+        alert(error.message || 'Unable to save delineation. Please try again.');
+      } finally {
+        updateSaveButtonState();
       }
     }
 
@@ -2689,6 +2924,79 @@
       });
     }
 
+    function applyReviewToDelineationFeatures(delineationId, patch) {
+      drawnFeatures.forEach(f => {
+        if (f.delineation_id === delineationId) {
+          Object.assign(f, patch);
+        }
+      });
+      redrawFeatures();
+    }
+
+    async function submitExpertReview(action) {
+      const expertReview = document.getElementById('expertReviewActions');
+      const delineationId = Number(expertReview?.dataset.delineationId);
+      if (!delineationId) return;
+
+      let rejectionNotes = '';
+      if (action === 'reject') {
+        rejectionNotes = document.getElementById('expertRejectionNotes')?.value.trim() || '';
+        if (rejectionNotes.length < 10) {
+          alert('Please enter at least 10 characters for rejection notes.');
+          return;
+        }
+      }
+
+      const url = `${expertDelineationReviewBaseUrl}/${delineationId}/${action}`;
+      showProcessingModal(
+        action === 'approve' ? 'Approving delineation...' : 'Rejecting delineation...',
+        'Please wait.'
+      );
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: action === 'reject' ? JSON.stringify({ rejection_notes: rejectionNotes }) : '{}',
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.message || 'Unable to complete review.');
+        }
+
+        if (action === 'approve') {
+          applyReviewToDelineationFeatures(delineationId, {
+            is_approved: true,
+            is_rejected: false,
+            rejection_notes: null,
+          });
+        } else {
+          applyReviewToDelineationFeatures(delineationId, {
+            is_approved: false,
+            is_rejected: true,
+            rejection_notes: rejectionNotes,
+          });
+        }
+
+        hideProcessingModal();
+        showSuccessModal(payload.message || 'Review saved.');
+        if (selectedDrawnIndex >= 0) {
+          selectDrawnFeature(selectedDrawnIndex);
+        }
+      } catch (error) {
+        hideProcessingModal();
+        alert(error.message || 'Unable to complete review.');
+      }
+    }
+
+    document.getElementById('expertApproveBtn')?.addEventListener('click', () => submitExpertReview('approve'));
+    document.getElementById('expertRejectBtn')?.addEventListener('click', () => submitExpertReview('reject'));
+
     function redrawFeatures() {
       // Clear only our overlay layers; keep the base tiles + controls intact.
       delineationLayer.clearLayers();
@@ -2697,7 +3005,7 @@
       function getFeatureColor(f) {
         if (f.is_rejected) return '#d04030';
         if (f.is_approved) return '#1e9e62';
-        if (f.is_own) return '#c07818';
+        if (!f.is_approved && !f.is_rejected) return '#c07818';
         return '#4ecdc4';
       }
 
@@ -2711,13 +3019,21 @@
             fillColor: color,
             fillOpacity: 0.85,
           }).addTo(delineationLayer);
-          marker.on('click', () => selectDrawnFeature(i));
+          marker.on('click', (e) => {
+            if (drawingMode) return;
+            if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+            selectDrawnFeature(i);
+          });
         } else if (f.type === 'line') {
           const line = L.polyline(f.coords, {
             color,
             weight: 3,
           }).addTo(delineationLayer);
-          line.on('click', () => selectDrawnFeature(i));
+          line.on('click', (e) => {
+            if (drawingMode) return;
+            if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+            selectDrawnFeature(i);
+          });
           // Vertex markers are visually nice but expensive; only render them in edit mode.
           if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
@@ -2736,7 +3052,11 @@
             fillOpacity: 0.45,
             weight: 2,
           }).addTo(delineationLayer);
-          polygon.on('click', () => selectDrawnFeature(i));
+          polygon.on('click', (e) => {
+            if (drawingMode) return;
+            if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+            selectDrawnFeature(i);
+          });
           if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
               radius: 3,
@@ -2795,6 +3115,8 @@
           }).addTo(vertexLayer));
         }
       }
+
+      updateSaveButtonState();
     }
 
     mainMap.on('click', (e) => {
@@ -2872,28 +3194,23 @@
     let snapRaf = 0;
     let lastMouseLatLng = null;
     mainMap.on('mousemove', (e) => {
+      if (!drawingMode) return;
       lastMouseLatLng = e.latlng;
       if (snapRaf) return;
       snapRaf = requestAnimationFrame(() => {
         snapRaf = 0;
-        if (!drawingMode || !lastMouseLatLng) {
-          snapMarker.setStyle({
-            opacity: 0,
-            fillOpacity: 0
-          });
-          return;
-        }
+        if (!drawingMode || !lastMouseLatLng) return;
         const snapped = getSnappedLatLng(lastMouseLatLng);
         if (snapped) {
           snapMarker.setLatLng(snapped);
           snapMarker.setStyle({
             opacity: 1,
-            fillOpacity: 0.35
+            fillOpacity: 0.35,
           });
         } else {
           snapMarker.setStyle({
             opacity: 0,
-            fillOpacity: 0
+            fillOpacity: 0,
           });
         }
       });
@@ -2924,26 +3241,20 @@
       document.getElementById('v-' + id).classList.add('on');
       const navDropdown = document.getElementById('navDropdown');
       if (navDropdown) navDropdown.value = id;
+      // Keep the URL in sync with the active tab
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', id);
+      history.replaceState(null, '', url.toString());
       setTimeout(() => {
         if (id === 'map') mainMap.invalidateSize();
-        if (id === 'planting') plantMap.invalidateSize();
+        if (id === 'planting') {
+          ensurePlantMap().invalidateSize();
+        }
       }, 150);
     };
 
-    window.showClassify = () => {
-      const classifyTab = Array.from(document.querySelectorAll('.h-tab')).find(b => {
-        const onclick = b.getAttribute('onclick') || '';
-        return onclick.includes("show('classify'");
-      });
-      if (classifyTab) {
-        show('classify', classifyTab);
-      } else {
-        show('classify');
-      }
-      const fileInput = document.getElementById('fileInput');
-      if (fileInput) {
-        fileInput.click();
-      }
+    window.showDelineation = () => {
+      window.location.href = @json(route('delineation.index'));
     };
 
     window.showFromDropdown = (select) => {
@@ -2953,122 +3264,230 @@
       let btns = document.querySelectorAll('.h-tab');
       btns.forEach((b, i) => {
         b.classList.remove('active');
-        if ((id === 'map' && i === 0) || (id === 'classify' && i === 2) || (id === 'planting' && i === 1)) b.classList.add('active');
+        if ((id === 'map' && i === 0) || (id === 'planting' && i === 1)) b.classList.add('active');
       });
       setTimeout(() => {
         if (id === 'map') mainMap.invalidateSize();
-        if (id === 'planting') plantMap.invalidateSize();
+        if (id === 'planting') {
+          ensurePlantMap().invalidateSize();
+        }
       }, 150);
     };
 
-    // NEW: Handle image upload and auto-show classification
-    window.handleImageUpload = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = document.getElementById('imgView');
-        img.src = ev.target.result;
-        img.style.display = 'block';
-        // Hide placeholder message
-        const placeholderDiv = document.querySelector('#imagePreviewArea .no-image-message');
-        if (placeholderDiv) placeholderDiv.style.display = 'none';
-        // Show classification results instantly
-        document.getElementById('classResult').style.display = 'block';
-        // Optional: collapse upload zone slightly but keep visible
-        const uploadBox = document.getElementById('uploadBox');
-        uploadBox.style.marginBottom = '8px';
-      };
-      reader.readAsDataURL(file);
-    };
+
+
+
+
+
 
     window.addEventListener('resize', () => {
       setTimeout(() => {
         mainMap.invalidateSize();
-        plantMap.invalidateSize();
+        if (plantMap) plantMap.invalidateSize();
       }, 100);
     });
-    new Chart(document.getElementById('pieC'), {
-      type: 'doughnut',
-      data: {
-        labels: ['Rhizophora', 'Avicennia', 'Sonneratia', 'Bruguiera', 'Others'],
-        datasets: [{
-          data: [34, 22, 18, 14, 12],
-          backgroundColor: ['#1e9e62', '#5ab8de', '#f4a840', '#a070e0', '#c0c8b8'],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '64%'
+
+    function findDelineationRecordById(delineationId) {
+      const pools = [focusDelineationRecord, ...savedDelineations, ...residentDelineations, ...approvedDelineations];
+      return pools.find(r => r && Number(r.id) === Number(delineationId)) || null;
+    }
+
+    function injectFocusDelineationIfNeeded(delineationId) {
+      if (!delineationId) return;
+      if (drawnFeatures.some(f => Number(f.delineation_id) === Number(delineationId))) return;
+
+      const record = findDelineationRecordById(delineationId);
+      if (!record || !Array.isArray(record.features) || !record.features.length) return;
+
+      const isOwn = Number(record.user_id) === Number(authUserId);
+      pushDelineationFeatures(record, {
+        is_own: isOwn,
+        created_by: record.user?.name || (isExpertUser ? 'Resident' : 'Community'),
+      });
+      redrawFeatures();
+    }
+
+    function flyToDelineationRecord(record) {
+      if (!record || typeof mainMap === 'undefined' || !mainMap) return;
+      const features = Array.isArray(record.features) ? record.features.filter(isValidMapFeature) : [];
+      if (!features.length) return;
+
+      const points = [];
+      features.forEach(f => extractPoints(f.coords).forEach(pt => points.push(pt)));
+      if (!points.length) return;
+
+      if (points.length === 1 || features[0]?.type === 'point') {
+        const [lat, lng] = points[0];
+        mainMap.flyTo([lat, lng], Math.max(mainMap.getZoom(), 15), { duration: 0.85 });
+        return;
       }
-    });
-    new Chart(document.getElementById('trendC'), {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [{
-          data: [],
-          borderColor: '#1e9e62',
-          backgroundColor: 'rgba(30,158,98,.1)',
-          fill: true,
-          tension: .4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            ticks: {
-              callback: v => (v / 1000).toFixed(0) + 'k'
-            },
-            min: 45000
-          }
+
+      const latLngs = points.map(c => L.latLng(c[0], c[1]));
+      mainMap.flyToBounds(L.latLngBounds(latLngs), {
+        padding: [60, 60],
+        maxZoom: 17,
+        duration: 0.85,
+      });
+    }
+
+    function openDelineationFromQueryParam() {
+      const params = new URLSearchParams(window.location.search);
+      const delineationId = Number(focusDelineationId || params.get('delineation'));
+      if (!delineationId) return;
+
+      if (typeof show === 'function') {
+        show('map');
+      }
+
+      const finishOpen = () => {
+        injectFocusDelineationIfNeeded(delineationId);
+
+        const featureIndex = drawnFeatures.findIndex(f => Number(f.delineation_id) === delineationId);
+        if (featureIndex >= 0) {
+          selectDrawnFeature(featureIndex);
+          return;
         }
+
+        const zoneIndex = zones.findIndex(z => Number(z.id) === delineationId);
+        if (zoneIndex >= 0) {
+          selectZone(zoneIndex);
+          return;
+        }
+
+        const record = findDelineationRecordById(delineationId);
+        if (record) {
+          flyToDelineationRecord(record);
+        }
+      };
+
+      const run = (attempt = 0) => {
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize({ pan: false });
+          finishOpen();
+          return;
+        }
+        if (attempt < 12) {
+          setTimeout(() => run(attempt + 1), 100);
+        }
+      };
+
+      setTimeout(() => run(), 250);
+    }
+
+    openDelineationFromQueryParam();
+    try {
+      const pieCanvas = document.getElementById('pieC');
+      if (pieCanvas && typeof Chart !== 'undefined') {
+        new Chart(pieCanvas, {
+          type: 'doughnut',
+          data: {
+            labels: ['Rhizophora', 'Avicennia', 'Sonneratia', 'Bruguiera', 'Others'],
+            datasets: [{
+              data: [34, 22, 18, 14, 12],
+              backgroundColor: ['#1e9e62', '#5ab8de', '#f4a840', '#a070e0', '#c0c8b8'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '64%'
+          }
+        });
       }
-    });
-    new Chart(document.getElementById('plantTrendC'), {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [{
-          data: [],
-          borderColor: '#1e9e62',
-          backgroundColor: 'rgba(30,158,98,.1)',
-          fill: true
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            ticks: {
-              callback: v => (v / 1000).toFixed(0) + 'k'
+    } catch (e) {
+      console.warn('pieC chart init error:', e);
+    }
+
+    try {
+      const trendCanvas = document.getElementById('trendC');
+      if (trendCanvas && typeof Chart !== 'undefined') {
+        new Chart(trendCanvas, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              data: [],
+              borderColor: '#1e9e62',
+              backgroundColor: 'rgba(30,158,98,.1)',
+              fill: true,
+              tension: .4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                ticks: {
+                  callback: v => (v / 1000).toFixed(0) + 'k'
+                },
+                min: 45000
+              }
             }
           }
-        }
+        });
       }
-    });
+    } catch (e) {
+      console.warn('trendC chart init error:', e);
+    }
+
+    try {
+      const plantTrendCanvas = document.getElementById('plantTrendC');
+      if (plantTrendCanvas && typeof Chart !== 'undefined') {
+        new Chart(plantTrendCanvas, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              data: [],
+              borderColor: '#1e9e62',
+              backgroundColor: 'rgba(30,158,98,.1)',
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                ticks: {
+                  callback: v => (v / 1000).toFixed(0) + 'k'
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('plantTrendC chart init error:', e);
+    }
+
     const plantListDiv = document.getElementById('plantSitesList');
     plantSites.forEach((s, i) => {
       const card = document.createElement('div');
       card.className = 'site-card';
       card.setAttribute('onclick', `flyPlant(${i})`);
-      card.innerHTML = `<div class="sc-head"><div class="sc-rank ${s.priority==='Critical'?'rg':(s.priority==='High'?'ra':'rb')}">${i+1}</div><div class="sc-name">${s.name}</div></div><div class="sc-sp">${s.priority} priority zone</div><div class="sc-foot"><div class="sbar"><div class="strack"><div class="sfill" style="width:${s.score}%;background:${s.color}"></div></div><span style="font-size:10px;font-weight:700;color:${s.color}">${s.score}%</span></div><span class="ptag" style="background:${s.color}20;border-color:${s.color};color:${s.color}">${s.priority}</span></div>`;
+      card.innerHTML = `<div class="sc-head"><div class="sc-rank ${s.priority === 'Critical' ? 'rg' : (s.priority === 'High' ? 'ra' : 'rb')}">${i + 1}</div><div class="sc-name">${s.name}</div></div><div class="sc-sp">${s.priority} priority zone</div><div class="sc-foot"><div class="sbar"><div class="strack"><div class="sfill" style="width:${s.score}%;background:${s.color}"></div></div><span style="font-size:10px;font-weight:700;color:${s.color}">${s.score}%</span></div><span class="ptag" style="background:${s.color}20;border-color:${s.color};color:${s.color}">${s.priority}</span></div>`;
       plantListDiv.appendChild(card);
     });
-    // Avoid ResizeObserver -> invalidateSize() feedback loops (can cause constant reflow).
-    // We already invalidate on tab switches / panel open-close / window resize.
+
+    // Clean transitionend handler on right panel: single map resize when sliding animation finishes
+    const rightPanelEl = document.getElementById('mapRightPanel');
+    if (rightPanelEl) {
+      rightPanelEl.addEventListener('transitionend', (e) => {
+        if (e.target === rightPanelEl && (e.propertyName === 'width' || e.propertyName === 'transform')) {
+          mainMap.invalidateSize({ pan: false });
+        }
+      });
+    }
 
     // Notification dropdown toggle
     const notificationToggle = document.getElementById('notificationToggle');
     const notificationDropdown = document.getElementById('notificationDropdown');
 
     if (notificationToggle && notificationDropdown) {
-      notificationToggle.addEventListener('click', function(e) {
+      notificationToggle.addEventListener('click', function (e) {
         e.stopPropagation();
         notificationDropdown.classList.toggle('active');
         if (typeof profileDropdown !== 'undefined' && profileDropdown) {
@@ -3076,13 +3495,13 @@
         }
       });
 
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', function (e) {
         if (!notificationToggle.contains(e.target) && !notificationDropdown.contains(e.target)) {
           notificationDropdown.classList.remove('active');
         }
       });
 
-      notificationDropdown.addEventListener('click', function(e) {
+      notificationDropdown.addEventListener('click', function (e) {
         e.stopPropagation();
       });
     }
@@ -3091,19 +3510,19 @@
     const profileDropdown = document.getElementById('profileDropdown');
 
     if (profileToggle && profileDropdown) {
-      profileToggle.addEventListener('click', function(e) {
+      profileToggle.addEventListener('click', function (e) {
         e.stopPropagation();
         profileDropdown.classList.toggle('active');
         notificationDropdown?.classList.remove('active');
       });
 
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', function (e) {
         if (!profileToggle.contains(e.target) && !profileDropdown.contains(e.target)) {
           profileDropdown.classList.remove('active');
         }
       });
 
-      profileDropdown.addEventListener('click', function(e) {
+      profileDropdown.addEventListener('click', function (e) {
         e.stopPropagation();
       });
     }
