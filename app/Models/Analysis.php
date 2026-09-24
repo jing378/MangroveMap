@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class Analysis extends Model
 {
@@ -35,5 +36,32 @@ class Analysis extends Model
     public function mangroveData(): BelongsTo
     {
         return $this->belongsTo(MangroveData::class);
+    }
+
+    public function deleteStoredFiles(): void
+    {
+        $urls = array_filter([
+            $this->image_url,
+            $this->results['overlay_url'] ?? null,
+        ]);
+
+        foreach ($urls as $url) {
+            $relative = $this->storagePathFromUrl((string) $url);
+            if ($relative && Storage::disk('public')->exists($relative)) {
+                Storage::disk('public')->delete($relative);
+            }
+        }
+    }
+
+    private function storagePathFromUrl(string $url): ?string
+    {
+        $path = parse_url($url, PHP_URL_PATH) ?: $url;
+        $marker = '/storage/';
+        $idx = strpos($path, $marker);
+        if ($idx !== false) {
+            return ltrim(substr($path, $idx + strlen($marker)), '/');
+        }
+
+        return ltrim($path, '/') ?: null;
     }
 }

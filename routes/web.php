@@ -126,6 +126,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Dedicated delineation/batch-upload page
     Route::get('/delineation', [DelineationController::class, 'index'])->name('delineation.index');
     Route::post('/delineation', [DelineationController::class, 'store'])->name('delineation.store');
+    Route::delete('/delineation/analyses', [DelineationController::class, 'destroyAll'])->name('delineation.destroyAll');
+    Route::delete('/delineation/analyses/{analysis}', [DelineationController::class, 'destroy'])->name('delineation.destroy');
 
     // Notification routes (accessible to all authenticated users)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');

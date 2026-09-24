@@ -194,6 +194,18 @@
       text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
     }
     .view-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-l); }
+    .hist-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    .tbl th:last-child, .tbl td:last-child { white-space: nowrap; min-width: 168px; }
+    .del-btn { color: var(--danger); }
+    .del-btn:hover { border-color: var(--danger); color: var(--danger); background: #fdf0ee; }
+    .btn-danger {
+      padding: 10px 14px; font-size: 13px; font-weight: 600;
+      background: #fff; color: var(--danger); border: 1px solid #f0c8c0;
+      border-radius: 10px; cursor: pointer; transition: all .15s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-danger:hover { background: #fdf0ee; border-color: var(--danger); }
+    .hist-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .empty-hist { text-align: center; padding: 32px; color: var(--muted); font-size: 14px; }
   </style>
 </head>
@@ -296,9 +308,16 @@
   <div class="card" style="margin-top: 24px;">
     <div class="hist-header">
       <div class="card-title" style="margin-bottom:0">Past Analyses</div>
-      <button class="btn-secondary" onclick="exportCSV()" title="Export as CSV">
-        <i class="bi bi-download"></i> Export CSV
-      </button>
+      <div class="hist-header-actions">
+        @if($analyses->isNotEmpty())
+        <button class="btn-danger" id="deleteAllBtn" onclick="deleteAllHistory()" title="Delete all past analyses">
+          <i class="bi bi-trash"></i> Delete All
+        </button>
+        @endif
+        <button class="btn-secondary" onclick="exportCSV()" title="Export as CSV">
+          <i class="bi bi-download"></i> Export CSV
+        </button>
+      </div>
     </div>
     @if($analyses->isEmpty())
       <div class="empty-hist">
@@ -337,11 +356,16 @@
             <span class="st-badge st-{{ $a->status }}">{{ ucfirst($a->status) }}</span>
           </td>
           <td>
-            @if($a->status === 'completed')
-              <button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))">
-                <i class="bi bi-eye"></i> View
+            <div class="hist-actions">
+              @if($a->status === 'completed')
+                <button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))">
+                  <i class="bi bi-eye"></i>
+                </button>
+              @endif
+              <button class="view-btn del-btn" onclick="deleteHistoryRow(this.closest('tr'))" title="Delete this analysis">
+                <i class="bi bi-trash"></i>
               </button>
-            @endif
+            </div>
           </td>
         </tr>
         @endforeach
@@ -352,8 +376,10 @@
 </main>
 
 <script>
-  const uploadUrl  = @json(route('delineation.store'));
-  const csrfToken  = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+  const uploadUrl     = @json(route('delineation.store'));
+  const destroyAllUrl = @json(route('delineation.destroyAll'));
+  const destroyUrlTpl = @json(url('/delineation/analyses'));
+  const csrfToken     = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
   // ── State ──
   let queue        = [];  // { file, thumb, originalUrl, overlayUrl, result, status }
@@ -560,6 +586,7 @@
     const conf = Math.round(Number(data.mean_confidence || 0) * 100);
     const now  = new Date().toLocaleString('en-PH', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const tr = document.createElement('tr');
+    tr.dataset.id       = data.analysis_id || '';
     tr.dataset.original = data.image_url || '';
     tr.dataset.overlay  = data.overlay_url || '';
     tr.dataset.label    = data.label || '—';
@@ -572,7 +599,12 @@
       <td style="font-weight:700">${cov}%</td>
       <td style="font-weight:700">${conf}%</td>
       <td><span class="st-badge st-completed">Completed</span></td>
-      <td><button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))"><i class="bi bi-eye"></i> View</button></td>`;
+      <td>
+        <div class="hist-actions">
+          <button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))"><i class="bi bi-eye"></i> View</button>
+          <button class="view-btn del-btn" onclick="deleteHistoryRow(this.closest('tr'))" title="Delete this analysis"><i class="bi bi-trash"></i> Delete</button>
+        </div>
+      </td>`;
     tbody.insertAdjacentElement('afterbegin', tr);
     // Remove empty-hist message if present
     const empty = document.querySelector('.empty-hist');
@@ -599,6 +631,59 @@
     a.href     = URL.createObjectURL(blob);
     a.download = 'delineation_results.csv';
     a.click();
+  }
+
+  async function deleteHistoryRow(tr) {
+    const id = tr?.dataset?.id;
+    if (!id) return;
+    if (!confirm('Delete this analysis? This cannot be undone.')) return;
+
+    try {
+      const res = await fetch(`${destroyUrlTpl}/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.message || 'Unable to delete analysis.');
+      tr.remove();
+      if (!document.querySelector('#histTable tbody tr')) showEmptyHistory();
+    } catch (err) {
+      alert(err.message || 'Unable to delete analysis. Please try again.');
+    }
+  }
+
+  async function deleteAllHistory() {
+    if (!confirm('Delete all past analyses? This cannot be undone.')) return;
+
+    const btn = document.getElementById('deleteAllBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch(destroyAllUrl, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.message || 'Unable to delete analyses.');
+      document.querySelectorAll('#histTable tbody tr').forEach(row => row.remove());
+      showEmptyHistory();
+    } catch (err) {
+      alert(err.message || 'Unable to delete analyses. Please try again.');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function showEmptyHistory() {
+    const table = document.getElementById('histTable');
+    const card  = table ? table.closest('.card') : null;
+    table?.remove();
+    document.getElementById('deleteAllBtn')?.remove();
+    if (card && !card.querySelector('.empty-hist')) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-hist';
+      empty.innerHTML = '<i class="bi bi-inbox" style="font-size:36px;display:block;margin-bottom:10px"></i>No analyses yet. Upload images above to get started.';
+      card.appendChild(empty);
+    }
   }
 </script>
 </body>

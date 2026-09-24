@@ -1782,6 +1782,7 @@
               <button class="layer-option active" onclick="setBase('sat', this)">Satellite</button>
               <button class="layer-option" onclick="setBase('osm', this)">Street</button>
               <button class="layer-option" onclick="setBase('topo', this)">Topo</button>
+              <button class="layer-option" onclick="setBase('mangrove', this)" title="High-resolution view for identifying mangrove areas">Mangrove 400-ft View</button>
             </div>
           </div>
           <div class="map-legend-float">
@@ -1819,24 +1820,25 @@
               <p id="delineationRejectionNotes" style="margin:0;"></p>
             </div>
             @if(Auth::user()->isExpert())
-            <div class="d-row" id="delineationSubmitterRow" style="display:none;"><span class="d-key">Submitted by</span><span
-                class="d-val" id="delineationSubmitter">-</span></div>
-            <div id="expertReviewActions" class="expert-review-actions" style="display:none;">
-              <div class="div"></div>
-              <div class="sec" style="padding:0;margin-bottom:8px;">Expert review</div>
-              <button type="button" id="expertApproveBtn" class="btn btn-g" style="width:100%;margin-bottom:8px;">
-                <i class="bi bi-check-circle"></i> Approve delineation
-              </button>
-              <label for="expertRejectionNotes" style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Rejection
-                notes (required to reject)</label>
-              <textarea id="expertRejectionNotes" rows="3"
-                style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
-                placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
-              <button type="button" id="expertRejectBtn" class="btn"
-                style="width:100%;margin-top:8px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
-                <i class="bi bi-x-circle"></i> Reject delineation
-              </button>
-            </div>
+              <div class="d-row" id="delineationSubmitterRow" style="display:none;"><span class="d-key">Submitted
+                  by</span><span class="d-val" id="delineationSubmitter">-</span></div>
+              <div id="expertReviewActions" class="expert-review-actions" style="display:none;">
+                <div class="div"></div>
+                <div class="sec" style="padding:0;margin-bottom:8px;">Expert review</div>
+                <button type="button" id="expertApproveBtn" class="btn btn-g" style="width:100%;margin-bottom:8px;">
+                  <i class="bi bi-check-circle"></i> Approve delineation
+                </button>
+                <label for="expertRejectionNotes"
+                  style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Rejection
+                  notes (required to reject)</label>
+                <textarea id="expertRejectionNotes" rows="3"
+                  style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
+                  placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
+                <button type="button" id="expertRejectBtn" class="btn"
+                  style="width:100%;margin-top:8px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
+                  <i class="bi bi-x-circle"></i> Reject delineation
+                </button>
+              </div>
             @endif
             <div class="div"></div>
             <div style="margin-bottom:12px;">
@@ -2166,12 +2168,34 @@
       updateWhenIdle: true,
       keepBuffer: 2,
     };
+    // Viewing height for mangrove identification. Change this value to adjust later.
+    const MANGROVE_VIEW_HEIGHT_FT = 400;
+    const FEET_TO_METERS = 0.3048;
+    const EARTH_CIRCUMFERENCE_M = 40075016.686;
+
+    function zoomForViewHeightFt(heightFt, lat) {
+      const heightM = Math.max(Number(heightFt) * FEET_TO_METERS, 1);
+      const latRad = (Number(lat) || 0) * Math.PI / 180;
+      return Math.log2((EARTH_CIRCUMFERENCE_M * Math.cos(latRad)) / heightM);
+    }
+
     const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', tileLayerOpts);
     const osmL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', tileLayerOpts);
     const topoL = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
       ...tileLayerOpts,
       maxZoom: 17,
     });
+    const mangroveL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      ...tileLayerOpts,
+      maxZoom: 21,
+      maxNativeZoom: 19,
+    });
+    const baseLayers = {
+      sat: satL,
+      osm: osmL,
+      topo: topoL,
+      mangrove: mangroveL,
+    };
     let curBase = satL;
     let mainMap = L.map('mainMap', {
       zoomControl: true,
@@ -2339,9 +2363,14 @@
       document.querySelectorAll('.layer-btn, .layer-option').forEach(b => b.classList.remove('active'));
       if (btn) btn.classList.add('active');
       document.getElementById('layerMenu')?.classList.remove('show');
+      document.getElementById('layerToggle')?.setAttribute('aria-expanded', 'false');
       mainMap.removeLayer(curBase);
-      curBase = t === 'osm' ? osmL : t === 'topo' ? topoL : satL;
+      curBase = baseLayers[t] || satL;
       mainMap.addLayer(curBase);
+      if (t === 'mangrove') {
+        const targetZoom = zoomForViewHeightFt(MANGROVE_VIEW_HEIGHT_FT, mainMap.getCenter().lat);
+        mainMap.flyTo(mainMap.getCenter(), targetZoom, { duration: 0.7 });
+      }
     };
 
     function collectVertexCoords() {

@@ -107,6 +107,30 @@ class DelineationController extends Controller
         ]);
     }
 
+    public function destroy(Analysis $analysis)
+    {
+        abort_unless($analysis->user_id === Auth::id() && $analysis->analysis_type === 'classification', 403);
+
+        $analysis->deleteStoredFiles();
+        $analysis->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function destroyAll()
+    {
+        $analyses = Analysis::where('user_id', Auth::id())
+            ->where('analysis_type', 'classification')
+            ->get();
+
+        foreach ($analyses as $analysis) {
+            $analysis->deleteStoredFiles();
+            $analysis->delete();
+        }
+
+        return response()->json(['ok' => true, 'deleted' => $analyses->count()]);
+    }
+
     private function recommendation(float $coverage): string
     {
         if ($coverage < 1) {
