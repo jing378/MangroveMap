@@ -742,7 +742,7 @@
       overflow: hidden;
     }
 
-    #mainMap, #plantMap {
+    #mainMap {
       width: 100%;
       height: 100%;
       background: #d8e5db;
@@ -1033,103 +1033,6 @@
     .cw {
       position: relative;
       width: 100%;
-    }
-
-    /* Planting Suitability View Components */
-    .site-card {
-      background: #f8fbf8;
-      border: 1px solid #dfeae2;
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .site-card:hover {
-      border-color: var(--primary-green);
-      background: #eef7f2;
-    }
-
-    .sc-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .sc-rank {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    .rg {
-      background: #edf7f2;
-      color: #1e9e62;
-      border: 1px solid #b0e0c0;
-    }
-
-    .ra {
-      background: #fdf5e8;
-      color: #c07818;
-      border: 1px solid #e8cc98;
-    }
-
-    .rb {
-      background: #eef4ff;
-      color: #3060b0;
-      border: 1px solid #b0c8f0;
-    }
-
-    .sc-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--primary-forest);
-    }
-
-    .sc-sp {
-      font-size: 11.5px;
-      color: #6a8c79;
-      margin-bottom: 6px;
-    }
-
-    .sc-foot {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .sbar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .strack {
-      width: 56px;
-      height: 4px;
-      background: #dfeae2;
-      border-radius: 2px;
-    }
-
-    .sfill {
-      height: 100%;
-      border-radius: 2px;
-    }
-
-    .ptag {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 100px;
-      border: 1px solid;
     }
 
     /* Environmental Impact / Purpose Callout Section */
@@ -1554,12 +1457,11 @@
         </div>
         <h3 class="feature-title">Mangrove Monitoring</h3>
         <p class="feature-desc">
-          Continuous monitoring of mangrove areas, tracking species distributions such as Rhizophora, Avicennia, and Sonneratia, while supporting data-driven analysis and planting suitability prioritization.
+          Continuous monitoring of mangrove areas, tracking species distributions such as Rhizophora, Avicennia, and Sonneratia, while supporting data-driven analysis and restoration planning.
         </p>
         <ul class="feature-points">
           <li><i class="bi bi-check-circle-fill"></i> Historical coverage trend charting &amp; analytics</li>
           <li><i class="bi bi-check-circle-fill"></i> Species &amp; genus composition breakdown</li>
-          <li><i class="bi bi-check-circle-fill"></i> Planting suitability site scoring &amp; ranking</li>
         </ul>
       </div>
     </div>
@@ -1583,21 +1485,7 @@
         <!-- Frame Toolbar Header -->
         <div class="map-frame-toolbar">
           <div class="toolbar-left">
-            <span class="live-status-pill">
-              <span class="indicator-dot"></span>
-              Live GIS Satellite View
-            </span>
-            <span class="map-frame-heading">Coverage &amp; Suitability Viewer</span>
-          </div>
 
-          <div class="toolbar-center">
-            <button class="view-switch-btn active" id="btnViewMap" onclick="switchGisView('map')">
-              <i class="bi bi-map"></i> Coverage Map
-            </button>
-            <button class="view-switch-btn" id="btnViewPlanting" onclick="switchGisView('planting')">
-              <i class="bi bi-tree"></i> Planting Suitability
-            </button>
-          </div>
 
           <div class="toolbar-right">
             <button class="map-action-btn" onclick="toggleLayerMenu()" title="Switch Satellite / Street Base Layers">
@@ -1697,35 +1585,6 @@
             </div>
           </div>
 
-          <!-- PLANTING SUITABILITY VIEW -->
-          <div class="view" id="v-planting">
-            <div class="main">
-              <div class="map-wrap">
-                <div id="plantMap"></div>
-                <div class="map-legend-float">
-                  <div class="leg-title">Restoration Priority</div>
-                  <div class="leg-row">
-                    <div class="leg-dot" style="background:#1e9e62"></div> Critical Priority
-                  </div>
-                  <div class="leg-row">
-                    <div class="leg-dot" style="background:#c07818"></div> High Priority
-                  </div>
-                  <div class="leg-row">
-                    <div class="leg-dot" style="background:#5ab8de"></div> Medium Priority
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="right-panel" style="width: 320px; background: #ffffff; border-left: 1px solid #d5e5d8; display: flex; flex-direction: column; overflow: hidden;">
-              <div class="scroll" style="padding: 16px; overflow-y: auto;">
-                <div class="sec">Priority Planting Sites</div>
-                <button onclick="switchGisView('map')" class="view-switch-btn" style="margin-bottom: 14px; width: 100%; justify-content: center;">
-                  <i class="bi bi-arrow-left-short"></i> Back to Coverage Map
-                </button>
-                <div id="plantSitesList"></div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1797,7 +1656,6 @@
   <script>
     const savedDelineations = @json($delineations ?? []);
     const zones = [];
-    const plantSites = [];
 
     // Smooth Scroll Helper
     function scrollToMap(e) {
@@ -1826,19 +1684,6 @@
         mobileMenuDrawer.classList.remove('open');
       }
     }
-
-    // View Switching between Coverage Map & Planting Suitability
-    window.switchGisView = function(viewName) {
-      const btnMap = document.getElementById('btnViewMap');
-      const btnPlanting = document.getElementById('btnViewPlanting');
-      
-      if (btnMap && btnPlanting) {
-        btnMap.classList.toggle('active', viewName === 'map');
-        btnPlanting.classList.toggle('active', viewName === 'planting');
-      }
-
-      window.show(viewName);
-    };
 
     // GIS Basemap Tile Layers
     const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -1871,32 +1716,6 @@
       p.bindPopup(`<div><b>${z.name}</b><br>Area: ${z.area}<br>NDVI: ${z.ndvi}<br>Status: ${z.status}</div>`);
       p.on('click', () => selectZone(i));
       polys.push(p);
-    });
-
-    let plantMap = L.map('plantMap', {
-      zoomControl: true,
-      layers: [L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}')]
-    }).setView([10.358, 124.973], 13);
-
-    zones.forEach(z => L.polygon(z.shape, {
-      color: '#1e9e62',
-      fillOpacity: .1,
-      weight: 1,
-      dashArray: '5,4'
-    }).addTo(plantMap));
-
-    let pMarkers = [];
-    plantSites.forEach((s, i) => {
-      let ic = L.divIcon({
-        html: `<div style="width:30px;height:30px;border-radius:50%;background:${s.color};border:2px solid white;display:flex;align-items:center;justify-content:center;font-weight:700;color:white;">${i + 1}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
-      });
-      let m = L.marker([s.lat, s.lng], {
-        icon: ic
-      }).addTo(plantMap);
-      m.bindPopup(`<b>${s.name}</b><br>Suitability: ${s.score}%<br>Priority: ${s.priority}`);
-      pMarkers.push(m);
     });
 
     // Area Calculation Utility
@@ -2095,11 +1914,6 @@
       }
     };
 
-    window.flyPlant = (i) => {
-      plantMap.flyTo([plantSites[i].lat, plantSites[i].lng], 11);
-      pMarkers[i].openPopup();
-    };
-
     window.toggleLayerMenu = () => {
       const menu = document.getElementById('layerMenu');
       const toggle = document.getElementById('layerToggle');
@@ -2110,10 +1924,6 @@
 
     window.showEditMode = () => {
       window.location.href = "{{ Auth::check() ? route('map') : route('login') }}";
-    };
-
-    window.showSuitability = () => {
-      switchGisView('planting');
     };
 
     window.showDelineation = () => {
@@ -2136,14 +1946,12 @@
       if (activeView) activeView.classList.add('on');
       setTimeout(() => {
         if (id === 'map' && mainMap) mainMap.invalidateSize();
-        if (id === 'planting' && plantMap) plantMap.invalidateSize();
       }, 150);
     };
 
     window.addEventListener('resize', () => {
       setTimeout(() => {
         if (mainMap) mainMap.invalidateSize();
-        if (plantMap) plantMap.invalidateSize();
       }, 120);
     });
 
@@ -2214,32 +2022,17 @@
       });
     }
 
-    // Populate Planting Sites if any
-    const plantListDiv = document.getElementById('plantSitesList');
-    if (plantListDiv) {
-      plantSites.forEach((s, i) => {
-        const card = document.createElement('div');
-        card.className = 'site-card';
-        card.setAttribute('onclick', `flyPlant(${i})`);
-        card.innerHTML = `<div class="sc-head"><div class="sc-rank ${s.priority === 'Critical' ? 'rg' : (s.priority === 'High' ? 'ra' : 'rb')}">${i + 1}</div><div class="sc-name">${s.name}</div></div><div class="sc-sp">${s.priority} priority zone</div><div class="sc-foot"><div class="sbar"><div class="strack"><div class="sfill" style="width:${s.score}%;background:${s.color}"></div></div><span style="font-size:10px;font-weight:700;color:${s.color}">${s.score}%</span></div><span class="ptag" style="background:${s.color}20;border-color:${s.color};color:${s.color}">${s.priority}</span></div>`;
-        plantListDiv.appendChild(card);
-      });
-    }
-
     // Auto-Resize Map on DOM observation
     let indexMapResizeTimer = null;
     const mainMapEl = document.getElementById('mainMap');
-    const plantMapEl = document.getElementById('plantMap');
     if (typeof ResizeObserver !== 'undefined') {
       const mapObserver = new ResizeObserver(() => {
         clearTimeout(indexMapResizeTimer);
         indexMapResizeTimer = setTimeout(() => {
           if (mainMap) mainMap.invalidateSize({ pan: false });
-          if (plantMap) plantMap.invalidateSize({ pan: false });
         }, 180);
       });
       if (mainMapEl) mapObserver.observe(mainMapEl);
-      if (plantMapEl) mapObserver.observe(plantMapEl);
     }
 
     // Notification dropdown handling

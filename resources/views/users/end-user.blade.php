@@ -450,6 +450,42 @@
       color: #1a2e1a;
     }
 
+    /* Mobile bottom sheet backdrop */
+    .panel-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.38);
+      z-index: 1199;
+      opacity: 0;
+      transition: opacity 0.28s ease;
+      pointer-events: none;
+    }
+
+    .panel-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @media (max-width: 780px) {
+      .panel-backdrop {
+        display: block;
+      }
+    }
+
+    /* Desktop: header container takes 0 height so close button sits at top-right without taking layout space */
+    .panel-header {
+      position: relative;
+      height: 0;
+      overflow: visible;
+      padding: 0;
+      border: none;
+    }
+    .panel-drag-bar,
+    .panel-header-info {
+      display: none;
+    }
+
     .main {
       flex: 1;
       display: flex;
@@ -509,15 +545,155 @@
       }
 
       #mapRightPanel {
-        width: 85% !important;
-        max-width: 340px;
-        box-shadow: -2px 0 18px rgba(0, 0, 0, 0.18);
-        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s;
+        /* Bottom sheet on mobile — fixed to bottom of screen, around 2 inches initial height */
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto;
+        max-height: 85dvh;
+        max-height: 85vh; /* fallback */
+        border-left: none;
+        border-top: 1px solid #d4dfd4;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.14);
+        transform: translateY(105%);
+        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s, box-shadow 0.32s;
+        z-index: 1200;
+        flex-direction: column;
+        display: flex;
+        visibility: hidden;
+        pointer-events: none;
       }
 
-      #mapRightPanel.open {
-        transform: translateX(0);
-        width: 85% !important;
+      /* Hide any residual ::before drag handle */
+      #mapRightPanel::before {
+        display: none;
+      }
+
+      /* Mobile: Initial peek popup — adjusted a little higher (~250px from the bottom) */
+      #mapRightPanel.open.peek,
+      #mapRightPanel.open:not(.expanded) {
+        transform: translateY(calc(100% - 355px));
+        visibility: visible;
+        pointer-events: auto;
+        box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.16);
+      }
+
+      /* Mobile: Expanded state — only when adjusted upwards */
+      #mapRightPanel.open.expanded {
+        transform: translateY(0);
+        visibility: visible;
+        pointer-events: auto;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.22);
+      }
+
+      #mapRightPanel .panel-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 16px 6px;
+        flex-shrink: 0;
+        position: relative;
+        min-height: 48px;
+        height: 48px;
+        box-sizing: border-box;
+        border-bottom: 1px solid #edf2ed;
+        background: #ffffff;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: pan-y;
+      }
+
+      #mapRightPanel .panel-drag-bar {
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: #c5d5c5;
+        border-radius: 2px;
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        transition: background 0.2s, transform 0.2s;
+      }
+
+      #mapRightPanel .panel-header:active .panel-drag-bar {
+        background: #7a9a7a;
+        transform: translateX(-50%) scale(1.08);
+      }
+
+      #mapRightPanel .panel-header-info {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex: 1;
+        min-width: 0;
+        margin-top: 4px;
+      }
+
+      #mapRightPanel .panel-header-title {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #1b2e1b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.25;
+      }
+
+      #mapRightPanel .panel-header-sub {
+        font-size: 11px;
+        font-weight: 600;
+        color: #2e6b3c;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 2px;
+        line-height: 1.2;
+      }
+
+      #mapRightPanel .panel-header-sub i {
+        font-size: 11px;
+        transition: transform 0.25s ease;
+      }
+
+      #mapRightPanel.expanded .panel-header-sub i {
+        transform: rotate(180deg);
+      }
+
+      #mapRightPanel .panel-close-btn {
+        position: static;
+        margin-left: auto;
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        background: #f0f4f0;
+        border-radius: 50%;
+        color: #496349;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        border: none;
+        cursor: pointer;
+      }
+
+      #mapRightPanel .panel-close-btn:active {
+        background: #e2ebe2;
+        color: #182918;
+      }
+
+      #mapRightPanel .scroll {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        padding: 10px 14px 20px;
       }
 
       #v-classify {
@@ -616,16 +792,16 @@
       }
 
       .stat-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 6px;
       }
 
       .stat-box {
-        padding: 6px;
+        padding: 8px 10px;
       }
 
       .stat-num {
-        font-size: 20px;
+        font-size: 22px;
       }
     }
 
@@ -693,6 +869,23 @@
       .toolbar-save-btn {
         padding: 8px 6px;
       }
+
+      .stat-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 5px;
+      }
+
+      .stat-box {
+        padding: 7px 8px;
+      }
+
+      .stat-num {
+        font-size: 19px;
+      }
+
+      .stat-lbl {
+        font-size: 10px;
+      }
     }
 
     .sec {
@@ -706,6 +899,7 @@
 
     .stat-grid {
       display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       gap: 7px;
       margin-bottom: 16px;
     }
@@ -1716,14 +1910,6 @@
               <div class="stat-lbl">Total area (ha)</div>
             </div>
             <div class="stat-box">
-              <div class="stat-num r">0</div>
-              <div class="stat-lbl">Degraded (ha)</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-num a">0</div>
-              <div class="stat-lbl">Net gain (ha)</div>
-            </div>
-            <div class="stat-box">
               <div class="stat-num">0</div>
               <div class="stat-lbl">Genus found</div>
             </div>
@@ -1770,10 +1956,6 @@
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
             </button>
-            <button id="suitabilityBtn" type="button" onclick="showSuitability()" title="Show suitability layer"
-              aria-label="Show suitability layer">
-              <i class="bi bi-check2-square"></i>
-            </button>
             <button id="classifyBtn" type="button" onclick="showDelineation()" title="Upload image for delineation"
               aria-label="Upload image for delineation">
               <i class="bi bi-image"></i>
@@ -1799,10 +1981,18 @@
           </div>
         </div>
       </div>
+      <div class="panel-backdrop" id="panelBackdrop" onclick="collapseOrClosePanel()"></div>
       <div class="right-panel" id="mapRightPanel">
-        <button onclick="closeRightPanel()" class="panel-close-btn" title="Close panel" aria-label="Close panel">
-          <i class="bi bi-x-lg"></i>
-        </button>
+        <div class="panel-header" id="panelHeader">
+          <div class="panel-drag-bar"></div>
+          <div class="panel-header-info">
+            <div class="panel-header-title" id="panelHeaderTitle">Selected Area</div>
+            <div class="panel-header-sub" id="panelHeaderSub"><span>Adjust upwards for details</span> <i class="bi bi-chevron-up"></i></div>
+          </div>
+          <button type="button" onclick="closeRightPanel(event)" class="panel-close-btn" title="Close panel" aria-label="Close panel">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
         <div class="scroll">
           <div class="sec" style="padding-right: 20px;">Selected Zone</div>
           <div id="delineationInfoCard" class="d-card" style="display:none;">
@@ -2338,19 +2528,6 @@
     }
 
     window.flyTo = (i) => selectZone(i);
-    window.closeRightPanel = () => {
-      const panel = document.getElementById('mapRightPanel');
-      if (panel) {
-        panel.classList.remove('open');
-      }
-      document.getElementById('delineationInfoCard').style.display = 'none';
-      selectedDrawnIndex = -1;
-      setTimeout(() => {
-        if (typeof mainMap !== 'undefined' && mainMap) {
-          mainMap.invalidateSize({ pan: false });
-        }
-      }, 330);
-    };
     window.showSuitability = () => {
       show('planting');
     };
@@ -2497,6 +2674,187 @@
 
     loadDelineationsOnMap();
 
+    function openRightPanel(titleText) {
+      const panel = document.getElementById('mapRightPanel');
+      const backdrop = document.getElementById('panelBackdrop');
+      const headerTitle = document.getElementById('panelHeaderTitle');
+      const headerSub = document.getElementById('panelHeaderSub');
+
+      if (titleText && headerTitle) {
+        headerTitle.textContent = titleText;
+      }
+
+      if (window.innerWidth <= 780) {
+        // Mobile: Open in PEEK state by default — map is NOT covered automatically
+        panel.classList.remove('expanded');
+        panel.classList.add('open', 'peek');
+        if (backdrop) backdrop.classList.remove('show');
+        if (headerSub) {
+          headerSub.innerHTML = '<span>Adjust upwards for details</span> <i class="bi bi-chevron-up"></i>';
+        }
+      } else {
+        // Desktop: Open side drawer normally
+        panel.classList.remove('peek', 'expanded');
+        panel.classList.add('open');
+      }
+
+      setTimeout(() => {
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize({ pan: false });
+        }
+      }, 330);
+    }
+
+    function expandRightPanel() {
+      const panel = document.getElementById('mapRightPanel');
+      const backdrop = document.getElementById('panelBackdrop');
+      const headerSub = document.getElementById('panelHeaderSub');
+
+      if (!panel || !panel.classList.contains('open')) return;
+
+      panel.classList.remove('peek');
+      panel.classList.add('expanded');
+      if (backdrop) backdrop.classList.add('show');
+      if (headerSub) {
+        headerSub.innerHTML = '<span>Swipe down to collapse</span> <i class="bi bi-chevron-down"></i>';
+      }
+
+      setTimeout(() => {
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize({ pan: false });
+        }
+      }, 330);
+    }
+
+    function collapseRightPanel() {
+      const panel = document.getElementById('mapRightPanel');
+      const backdrop = document.getElementById('panelBackdrop');
+      const headerSub = document.getElementById('panelHeaderSub');
+
+      if (!panel || !panel.classList.contains('open')) return;
+
+      panel.classList.remove('expanded');
+      panel.classList.add('peek');
+      if (backdrop) backdrop.classList.remove('show');
+      if (headerSub) {
+        headerSub.innerHTML = '<span>Adjust upwards for details</span> <i class="bi bi-chevron-up"></i>';
+      }
+
+      setTimeout(() => {
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize({ pan: false });
+        }
+      }, 330);
+    }
+
+    window.closeRightPanel = function (event) {
+      if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+      }
+      const panel = document.getElementById('mapRightPanel');
+      const backdrop = document.getElementById('panelBackdrop');
+      if (panel) {
+        panel.classList.remove('open', 'peek', 'expanded');
+      }
+      if (backdrop) backdrop.classList.remove('show');
+
+      const infoCard = document.getElementById('delineationInfoCard');
+      if (infoCard) infoCard.style.display = 'none';
+      selectedDrawnIndex = -1;
+
+      setTimeout(() => {
+        if (typeof mainMap !== 'undefined' && mainMap) {
+          mainMap.invalidateSize({ pan: false });
+        }
+      }, 330);
+    };
+
+    window.collapseOrClosePanel = function () {
+      const panel = document.getElementById('mapRightPanel');
+      if (panel && panel.classList.contains('expanded')) {
+        collapseRightPanel();
+      } else {
+        closeRightPanel();
+      }
+    };
+
+    function initBottomSheetGestures() {
+      const panel = document.getElementById('mapRightPanel');
+      const header = document.getElementById('panelHeader');
+      if (!panel || !header) return;
+
+      let startY = 0;
+      let currentY = 0;
+      let isTouching = false;
+      let startTime = 0;
+
+      // Handle swipe anywhere on the panel during peek state, or on header during expanded state
+      panel.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.panel-close-btn') || e.target.closest('input') || e.target.closest('textarea')) return;
+        // In expanded mode, touches on scroll content should do normal scrolling unless on header
+        if (panel.classList.contains('expanded') && !e.target.closest('.panel-header')) return;
+        startY = e.touches[0].clientY;
+        currentY = startY;
+        isTouching = true;
+        startTime = Date.now();
+      }, { passive: true });
+
+      panel.addEventListener('touchmove', (e) => {
+        if (!isTouching) return;
+        currentY = e.touches[0].clientY;
+      }, { passive: true });
+
+      panel.addEventListener('touchend', (e) => {
+        if (!isTouching) return;
+        isTouching = false;
+        const deltaY = currentY - startY;
+        const elapsed = Date.now() - startTime;
+
+        // Swiped UP (adjust upwards)
+        if (deltaY < -20 || (deltaY < -8 && elapsed < 250)) {
+          expandRightPanel();
+        }
+        // Swiped DOWN (adjust downwards)
+        else if (deltaY > 20 || (deltaY > 8 && elapsed < 250)) {
+          if (panel.classList.contains('expanded')) {
+            collapseRightPanel();
+          } else {
+            closeRightPanel();
+          }
+        }
+      }, { passive: true });
+
+      // Tap on header toggles peek <-> expanded
+      header.addEventListener('click', (e) => {
+        if (e.target.closest('.panel-close-btn')) return;
+        if (window.innerWidth <= 780) {
+          if (panel.classList.contains('expanded')) {
+            collapseRightPanel();
+          } else {
+            expandRightPanel();
+          }
+        }
+      });
+
+      // Also allow pulling down on the top of scroll container when expanded
+      const scrollEl = panel.querySelector('.scroll');
+      if (scrollEl) {
+        let scrollStartY = 0;
+        scrollEl.addEventListener('touchstart', (e) => {
+          scrollStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        scrollEl.addEventListener('touchend', (e) => {
+          const deltaY = e.changedTouches[0].clientY - scrollStartY;
+          if (scrollEl.scrollTop <= 2 && deltaY > 45 && panel.classList.contains('expanded')) {
+            collapseRightPanel();
+          }
+        }, { passive: true });
+      }
+    }
+
+    initBottomSheetGestures();
+
     function selectZone(i) {
       currentSelectedZoneIndex = i;
       let z = zones[i];
@@ -2523,16 +2881,7 @@
         removeBtn.style.display = 'none';
       }
 
-      const panel = document.getElementById('mapRightPanel');
-      const wasOpen = panel.classList.contains('open');
-      if (!wasOpen) {
-        panel.classList.add('open');
-        setTimeout(() => {
-          if (typeof mainMap !== 'undefined' && mainMap) {
-            mainMap.invalidateSize({ pan: false });
-          }
-        }, 330);
-      }
+      openRightPanel(z.name ? `Zone: ${z.name}` : 'Selected Zone');
       selectedDrawnIndex = -1;
       document.getElementById('delineationInfoCard').style.display = 'none';
       document.getElementById('zoneDetailsContent').style.display = 'block';
@@ -2549,16 +2898,7 @@
       if (!feature) return;
       selectedDrawnIndex = i;
 
-      const panel = document.getElementById('mapRightPanel');
-      const wasOpen = panel.classList.contains('open');
-      if (!wasOpen) {
-        panel.classList.add('open');
-        setTimeout(() => {
-          if (typeof mainMap !== 'undefined' && mainMap) {
-            mainMap.invalidateSize({ pan: false });
-          }
-        }, 330);
-      }
+      openRightPanel(feature.label ? `Area: ${feature.label}` : 'Delineated Area');
 
       document.getElementById('delineationInfoCard').style.display = 'block';
       document.getElementById('zoneDetailsContent').style.display = 'none';
@@ -2726,12 +3066,7 @@
       saveDrawingStateToHistory();
       redrawFeatures();
       document.getElementById('delineationInfoCard').style.display = 'none';
-      document.getElementById('mapRightPanel').classList.remove('open');
-      setTimeout(() => {
-        if (typeof mainMap !== 'undefined' && mainMap) {
-          mainMap.invalidateSize({ pan: false });
-        }
-      }, 330);
+      closeRightPanel();
     };
 
     function saveDrawingStateToHistory() {
