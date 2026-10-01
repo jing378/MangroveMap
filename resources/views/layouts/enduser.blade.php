@@ -308,6 +308,29 @@
             justify-content: center;
         }
 
+        .sidebar-notification-icon {
+            position: relative;
+        }
+
+        .sidebar-notification-badge {
+            position: absolute;
+            top: -7px;
+            right: -10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 17px;
+            height: 17px;
+            padding: 0 4px;
+            border: 2px solid #fff;
+            border-radius: 9px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
         .sidebar-item:hover {
             background: #f5f7f6;
             color: #1a2e1a;
@@ -318,6 +341,32 @@
             color: #1e9e62;
             border-left-color: #1e9e62;
             font-weight: 600;
+        }
+
+        .sidebar-item.has-unread {
+            font-weight: 800;
+        }
+
+        .sidebar-logout {
+            width: calc(100% - 16px);
+            border: 0;
+            background: transparent;
+            font-family: inherit;
+            text-align: left;
+            cursor: pointer;
+            color: #b83828;
+        }
+
+        .sidebar-logout-form {
+            margin-top: auto !important;
+            padding-top: 16px;
+            border-top: 1px solid #f0d8d4;
+        }
+
+        .sidebar-logout:hover {
+            background: #fdf0ee;
+            color: #a52f21;
+            border-left-color: #d04030;
         }
 
         .main-content {
@@ -444,65 +493,6 @@
         </div>
 
         <div class="header-right">
-            @include('components.notification-bell')
-
-            <div class="profile-dropdown-wrapper">
-                <button class="profile-toggle" id="profileToggle">
-                    @if(auth()->user()->profile_image)
-                        <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile"
-                            class="profile-image">
-                    @else
-                        <div class="profile-image"
-                            style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">
-                            {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
-                        </div>
-                    @endif
-                    <div class="admin-profile">
-                        <div class="admin-name">{{ auth()->user()->name ?? 'User' }}</div>
-                        <div class="admin-role">{{ auth()->user()->isExpert() ? 'Expert' : 'End User' }}</div>
-                    </div>
-                </button>
-
-                <div class="profile-dropdown" id="profileDropdown">
-                    <div class="dropdown-header">
-                        @if(auth()->user()->profile_image)
-                            <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile"
-                                class="dropdown-header-image">
-                        @else
-                            <div class="dropdown-header-image"
-                                style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
-                                {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
-                            </div>
-                        @endif
-                        <div class="dropdown-header-text">
-                            <div class="dropdown-header-name">{{ auth()->user()->name ?? 'User' }}</div>
-                            <div class="dropdown-header-email">{{ auth()->user()->email ?? 'user@example.com' }}</div>
-                        </div>
-                    </div>
-                    <div class="dropdown-menu">
-                        <a href="{{ route('profile.show') }}" class="dropdown-item">
-                            <i class="bi bi-person-circle"></i>
-                            <span>View Profile</span>
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="bi bi-gear"></i>
-                            <span>Settings</span>
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="bi bi-question-circle"></i>
-                            <span>Help & Support</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <form method="POST" action="{{ route('logout') }}" style="width: 100%; padding: 0;">
-                            @csrf
-                            <button type="submit" class="dropdown-item danger">
-                                <i class="bi bi-box-arrow-right"></i>
-                                <span>Logout</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
         </div>
     </header>
 
@@ -540,12 +530,26 @@
                     <i class="bi bi-person"></i>
                     <span>My Profile</span>
                 </a>
+                @php($unreadNotificationCount = auth()->user()->unreadNotifications()->count())
                 <a href="{{ route('notifications.index') }}"
-                    class="sidebar-item {{ request()->routeIs('notifications.*') ? 'active' : '' }}">
-                    <i class="bi bi-bell"></i>
+                    id="sidebarNotificationsLink"
+                    class="sidebar-item {{ request()->routeIs('notifications.*') ? 'active' : '' }} {{ $unreadNotificationCount > 0 ? 'has-unread' : '' }}">
+                    <span class="sidebar-notification-icon">
+                        <i class="bi bi-bell"></i>
+                        @if($unreadNotificationCount > 0)
+                            <span class="sidebar-notification-badge" aria-label="{{ $unreadNotificationCount }} unread notifications">{{ $unreadNotificationCount }}</span>
+                        @endif
+                    </span>
                     <span>Notifications</span>
                 </a>
             </div>
+            <form method="POST" action="{{ route('logout') }}" class="sidebar-logout-form">
+                @csrf
+                <button type="submit" class="sidebar-item sidebar-logout">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Logout</span>
+                </button>
+            </form>
         </aside>
 
         <div class="main-content">

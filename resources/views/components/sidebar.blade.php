@@ -21,5 +21,14 @@
             <i class="bi bi-people"></i>
             <span>Users</span>
         </a>
+
     </div>
+
+    <form method="POST" action="{{ route('logout') }}" class="sidebar-logout-form">
+            @csrf
+            <button type="submit" class="sidebar-item sidebar-logout">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Logout</span>
+            </button>
+    </form>
 </aside>

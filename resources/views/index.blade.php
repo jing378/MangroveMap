@@ -1229,6 +1229,10 @@
         display: none;
       }
 
+      .nav-btn-login {
+        display: none;
+      }
+
       .nav-mobile-toggle {
         display: block;
       }
@@ -1311,29 +1315,11 @@
         <i class="bi bi-map-fill"></i> Explore Map
       </a>
 
-      @auth
-        @include('components.notification-bell')
-        <div style="display: flex; align-items: center; gap: 8px; padding-left: 8px; border-left: 1px solid #d5e5d8;">
-          <a href="{{ Auth::user()->homeRoute() }}" title="Go to Dashboard" style="text-decoration: none; display: flex; align-items: center; gap: 7px;">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: #144a2b; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 700; box-shadow: 0 2px 6px rgba(20, 74, 43, 0.25);">
-              {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
-            </div>
-            <span style="font-size: 13px; font-weight: 600; color: #1e382b; display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              {{ Auth::user()->name }}
-            </span>
-          </a>
-          <form method="POST" action="{{ route('logout') }}" style="display: inline;">
-            @csrf
-            <button type="submit" class="nav-btn-login" style="padding: 6px 10px; font-size: 12.5px;" title="Logout">
-              <i class="bi bi-box-arrow-right"></i>
-            </button>
-          </form>
-        </div>
-      @else
+      @guest
         <a href="/login" class="nav-btn-login">
           <i class="bi bi-box-arrow-in-right"></i> Login
         </a>
-      @endauth
+      @endguest
 
       <!-- Mobile Hamburger Toggle -->
       <button class="nav-mobile-toggle" id="mobileMenuBtn" aria-label="Toggle navigation menu">

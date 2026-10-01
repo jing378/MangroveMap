@@ -570,6 +570,8 @@ if ($currentUser && $currentUser->role === 'admin') {
 
         function updateUnreadUi(count) {
             const badge = document.querySelector('.notification-badge');
+            const sidebarLink = document.getElementById('sidebarNotificationsLink');
+            let sidebarBadge = sidebarLink?.querySelector('.sidebar-notification-badge');
             const headerUnread = document.querySelector('.notification-dropdown .dropdown-header-email');
             const banner = document.getElementById('unreadBanner');
             const countText = document.getElementById('unreadCountText');
@@ -577,6 +579,20 @@ if ($currentUser && $currentUser->role === 'admin') {
 
             if (countText) countText.textContent = count;
             if (headerUnread) headerUnread.textContent = count + ' unread';
+            sidebarLink?.classList.toggle('has-unread', count > 0);
+            if (sidebarLink && count > 0) {
+                if (!sidebarBadge) {
+                    sidebarBadge = document.createElement('span');
+                    sidebarBadge.className = 'sidebar-notification-badge';
+                    sidebarLink.querySelector('.sidebar-notification-icon')?.appendChild(sidebarBadge);
+                }
+                if (sidebarBadge) {
+                    sidebarBadge.textContent = count;
+                    sidebarBadge.setAttribute('aria-label', count + ' unread notifications');
+                }
+            } else {
+                sidebarBadge?.remove();
+            }
             if (badge) {
                 if (count > 0) badge.textContent = count;
                 else badge.remove();

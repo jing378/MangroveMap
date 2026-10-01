@@ -2459,61 +2459,10 @@
       </div>
     </div>
     <div class="header-right">
-      @auth
-        @include('components.notification-bell')
-        <div class="profile-dropdown-wrapper">
-          <button class="profile-toggle" id="profileToggle" type="button">
-            @if(Auth::user()->profile_image)
-              <img src="{{ asset('storage/' . Auth::user()->profile_image) }}" alt="Profile" class="profile-image">
-            @else
-              <div class="profile-image">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
-            @endif
-            <div class="profile-info">
-              <div class="profile-name">{{ Auth::user()->name }}</div>
-              <div class="profile-role">{{ Auth::user()->isExpert() ? 'Expert' : 'Resident' }}</div>
-            </div>
-          </button>
-
-          <div class="profile-dropdown" id="profileDropdown">
-            <div class="dropdown-header">
-              @if(Auth::user()->profile_image)
-                <img src="{{ asset('storage/' . Auth::user()->profile_image) }}" alt="Profile"
-                  class="dropdown-header-image">
-              @else
-                <div class="dropdown-header-image">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
-              @endif
-              <div class="dropdown-header-text">
-                <div class="dropdown-header-name">{{ Auth::user()->name }}</div>
-                <div class="dropdown-header-email">{{ Auth::user()->email }}</div>
-              </div>
-            </div>
-            <div class="dropdown-menu">
-              <a href="{{ route('profile.show') }}" class="dropdown-item">
-                <i class="bi bi-person-circle"></i>
-                <span>View Profile</span>
-              </a>
-              <a href="#" class="dropdown-item">
-                <i class="bi bi-gear"></i>
-                <span>Settings</span>
-              </a>
-              <a href="#" class="dropdown-item">
-                <i class="bi bi-question-circle"></i>
-                <span>Help & Support</span>
-              </a>
-              <div class="dropdown-divider"></div>
-              <form method="POST" action="{{ route('logout') }}" style="width: 100%; padding: 0; margin: 0;">
-                @csrf
-                <button type="submit" class="dropdown-item danger">
-                  <i class="bi bi-box-arrow-right"></i>
-                  <span>Logout</span>
-                </button>
-              </form>
-            </div>
-          </div>
-      @else
+      @guest
           <button class="btn btn-g" onclick="window.location.href='/login'"><i class="bi bi-box-arrow-in-right"></i>
             Login</button>
-        @endauth
+      @endguest
       </div>
   </header>
 
