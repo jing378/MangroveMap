@@ -19,11 +19,6 @@ if ($currentUser && $currentUser->role === 'admin') {
 <div id="profile-section">
     <div class="page-header">
         <div class="page-title">My Profile</div>
-        @if($layoutToUse === 'layouts.enduser')
-        <a href="{{ $currentUser->homeRoute() }}" class="btn btn-secondary back-to-dashboard">
-            <i class="bi bi-arrow-left"></i> <span>Back</span>
-        </a>
-        @endif
     </div>
 
     @if ($message = Session::get('success'))
@@ -234,18 +229,7 @@ if ($currentUser && $currentUser->role === 'admin') {
 
 @section('styles')
 <style>
-    @if($layoutToUse ==='layouts.enduser')
-
-    /* Hide sidebar and menu toggle for end-user profile */
-    .sidebar {
-        display: none !important;
-    }
-
-    .mobile-menu-btn {
-        display: none !important;
-    }
-
-    @endif .page-header {
+    .page-header {
         display: flex;
         align-items: center;
         justify-content: space-between;

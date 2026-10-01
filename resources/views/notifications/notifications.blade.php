@@ -1,4 +1,12 @@
-@extends('layouts.enduser')
+@php
+$currentUser = auth()->user();
+$layoutToUse = 'layouts.enduser';
+if ($currentUser && $currentUser->role === 'admin') {
+    $layoutToUse = 'layouts.admin';
+}
+@endphp
+
+@extends($layoutToUse)
 
 @section('title', 'Notifications - MangroveMap')
 
@@ -15,6 +23,12 @@
 
     .content {
         padding: 28px 32px;
+    }
+
+    @media (max-width: 768px) {
+        .content {
+            padding: 20px 16px;
+        }
     }
 
     .notifications-header {
@@ -408,9 +422,6 @@
             </button>
         </form>
         @endif
-        <a href="{{ route('dashboard') }}" class="back-btn">
-            <i class="bi bi-arrow-left"></i> Back
-        </a>
     </div>
 
     @if(session('success'))

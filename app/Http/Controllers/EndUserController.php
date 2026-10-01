@@ -18,7 +18,23 @@ class EndUserController extends Controller
 
     public function dashboard()
     {
-        return view('users.end-user', $this->buildDashboardData());
+        $data = $this->buildDashboardData();
+        $data['page'] = 'dashboard';
+        return view('users.dashboard', $data);
+    }
+
+    public function map()
+    {
+        $data = $this->buildDashboardData();
+        $data['page'] = 'map';
+        return view('users.map', $data);
+    }
+
+    public function delineate()
+    {
+        $data = $this->buildDashboardData();
+        $data['page'] = 'delineate';
+        return view('users.delineate', $data);
     }
 
     /**

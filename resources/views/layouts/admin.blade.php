@@ -453,26 +453,31 @@
             <div class="profile-dropdown-wrapper">
                 <button class="profile-toggle" id="profileToggle">
                     @if(auth()->user()->profile_image)
-                    <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile" class="profile-image">
+                        <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile"
+                            class="profile-image">
                     @else
-                    <div class="profile-image" style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">
-                        {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
-                    </div>
+                        <div class="profile-image"
+                            style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">
+                            {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
+                        </div>
                     @endif
                     <div class="admin-profile">
                         <div class="admin-name">{{ auth()->user()->name ?? 'Admin User' }}</div>
-                        <div class="admin-role">{{ ucfirst(str_replace('_', ' ', auth()->user()->role ?? 'User')) }}</div>
+                        <div class="admin-role">{{ ucfirst(str_replace('_', ' ', auth()->user()->role ?? 'User')) }}
+                        </div>
                     </div>
                 </button>
 
                 <div class="profile-dropdown" id="profileDropdown">
                     <div class="dropdown-header">
                         @if(auth()->user()->profile_image)
-                        <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile" class="dropdown-header-image">
+                            <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile"
+                                class="dropdown-header-image">
                         @else
-                        <div class="dropdown-header-image" style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
-                            {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
-                        </div>
+                            <div class="dropdown-header-image"
+                                style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
+                                {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
+                            </div>
                         @endif
                         <div class="dropdown-header-text">
                             <div class="dropdown-header-name">{{ auth()->user()->name ?? 'Admin User' }}</div>
@@ -531,19 +536,19 @@
         const notificationDropdown = document.getElementById('notificationDropdown');
 
         if (notificationToggle && notificationDropdown) {
-            notificationToggle.addEventListener('click', function(e) {
+            notificationToggle.addEventListener('click', function (e) {
                 e.stopPropagation();
                 notificationDropdown.classList.toggle('active');
                 profileDropdown?.classList.remove('active');
             });
 
-            document.addEventListener('click', function(e) {
+            document.addEventListener('click', function (e) {
                 if (!notificationToggle.contains(e.target) && !notificationDropdown.contains(e.target)) {
                     notificationDropdown.classList.remove('active');
                 }
             });
 
-            notificationDropdown.addEventListener('click', function(e) {
+            notificationDropdown.addEventListener('click', function (e) {
                 e.stopPropagation();
             });
         }
@@ -553,19 +558,19 @@
         const profileDropdown = document.getElementById('profileDropdown');
 
         if (profileToggle && profileDropdown) {
-            profileToggle.addEventListener('click', function(e) {
+            profileToggle.addEventListener('click', function (e) {
                 e.stopPropagation();
                 profileDropdown.classList.toggle('active');
                 notificationDropdown?.classList.remove('active');
             });
 
-            document.addEventListener('click', function(e) {
+            document.addEventListener('click', function (e) {
                 if (!profileToggle.contains(e.target) && !profileDropdown.contains(e.target)) {
                     profileDropdown.classList.remove('active');
                 }
             });
 
-            profileDropdown.addEventListener('click', function(e) {
+            profileDropdown.addEventListener('click', function (e) {
                 e.stopPropagation();
             });
         }
@@ -574,13 +579,13 @@
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 
         if (mobileMenuBtn && sidebar) {
-            mobileMenuBtn.addEventListener('click', function(e) {
+            mobileMenuBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 sidebar.classList.toggle('active');
             });
 
             // Close sidebar when clicking outside
-            document.addEventListener('click', function(e) {
+            document.addEventListener('click', function (e) {
                 if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
                     sidebar.classList.remove('active');
                 }
@@ -590,7 +595,7 @@
         // Close sidebar when a navigation link is clicked
         const sidebarItems = document.querySelectorAll('.sidebar-item');
         sidebarItems.forEach(item => {
-            item.addEventListener('click', function(e) {
+            item.addEventListener('click', function (e) {
                 // Sidebar will close due to navigation or explicit removal
                 if (sidebar) {
                     sidebar.classList.remove('active');
@@ -599,7 +604,7 @@
         });
 
         // Handle window resize - close sidebar if resizing to desktop
-        window.addEventListener('resize', function() {
+        window.addEventListener('resize', function () {
             if (window.innerWidth > 768 && sidebar) {
                 sidebar.classList.remove('active');
             }

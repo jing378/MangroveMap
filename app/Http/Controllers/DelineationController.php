@@ -21,7 +21,7 @@ class DelineationController extends Controller
             ->take(50)
             ->get();
 
-        return view('delineation.delineation', compact('analyses'));
+        return view('users.upload_image', compact('analyses'));
     }
 
     public function store(Request $request, MangroveSegmentationService $segmentation)

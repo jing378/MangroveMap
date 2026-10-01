@@ -19,6 +19,16 @@ class ExpertController extends Controller
         return app(EndUserController::class)->dashboard();
     }
 
+    public function map()
+    {
+        return app(EndUserController::class)->map();
+    }
+
+    public function delineate()
+    {
+        return app(EndUserController::class)->delineate();
+    }
+
     public function storeDelineation(Request $request)
     {
         $data = $request->validate([

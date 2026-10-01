@@ -115,8 +115,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.updatePassword');
 
-    // Map viewer (accessible to all authenticated users)
-    Route::get('/map', [MapController::class, 'show'])->name('map');
+    // Map viewer & Delineate studio (accessible to authenticated users)
+    Route::get('/map', [EndUserController::class, 'map'])->name('map');
+    Route::get('/delineate', [EndUserController::class, 'delineate'])->name('delineate');
 
     // Image classification (accessible to all authenticated users)
     Route::get('/classify', [ClassifyController::class, 'create'])->name('classify');
@@ -124,10 +125,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/classify/{analysis}', [ClassifyController::class, 'results'])->name('classify.results');
 
     // Dedicated delineation/batch-upload page
-    Route::get('/delineation', [DelineationController::class, 'index'])->name('delineation.index');
-    Route::post('/delineation', [DelineationController::class, 'store'])->name('delineation.store');
-    Route::delete('/delineation/analyses', [DelineationController::class, 'destroyAll'])->name('delineation.destroyAll');
-    Route::delete('/delineation/analyses/{analysis}', [DelineationController::class, 'destroy'])->name('delineation.destroy');
+    Route::get('/upload_image', [DelineationController::class, 'index'])->name('delineation.index');
+    Route::post('/upload_image', [DelineationController::class, 'store'])->name('delineation.store');
+    Route::delete('/upload_image/analyses', [DelineationController::class, 'destroyAll'])->name('delineation.destroyAll');
+    Route::delete('/upload_image/analyses/{analysis}', [DelineationController::class, 'destroy'])->name('delineation.destroy');
 
     // Notification routes (accessible to all authenticated users)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -143,6 +144,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Expert routes - review and approve resident delineations
     Route::middleware('expert')->prefix('expert')->group(function () {
         Route::get('/dashboard', [ExpertController::class, 'dashboard'])->name('expert.dashboard');
+        Route::get('/map', [ExpertController::class, 'map'])->name('expert.map');
+        Route::get('/delineate', [ExpertController::class, 'delineate'])->name('expert.delineate');
         Route::post('/delineations', [ExpertController::class, 'storeDelineation'])->name('expert.delineations.store');
         Route::post('/delineations/{delineation}/approve', [ExpertController::class, 'approve'])->name('expert.delineations.approve');
         Route::post('/delineations/{delineation}/reject', [ExpertController::class, 'reject'])->name('expert.delineations.reject');

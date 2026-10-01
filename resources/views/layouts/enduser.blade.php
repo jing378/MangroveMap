@@ -8,6 +8,9 @@
     <title>@yield('title', 'Dashboard - MangroveMap')</title>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
     <style>
         * {
@@ -37,7 +40,7 @@
             top: 0;
             left: 0;
             right: 0;
-            z-index: 1000;
+            z-index: 2000;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
@@ -330,6 +333,14 @@
             padding: 28px 32px;
         }
 
+        .content.content-flush {
+            padding: 0 !important;
+            overflow: hidden !important;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
         .content::-webkit-scrollbar {
             width: 6px;
         }
@@ -400,7 +411,7 @@
                 top: 56px;
                 bottom: 0;
                 width: 260px;
-                z-index: 999;
+                z-index: 1900;
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
                 box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
@@ -423,7 +434,7 @@
 <body>
     <header class="header">
         <div class="header-left">
-            <button class="mobile-menu-btn" id="mobileMenuBtn" style="display: none;">
+            <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation menu">
                 <i class="bi bi-list"></i>
             </button>
             <div class="logo">
@@ -438,11 +449,13 @@
             <div class="profile-dropdown-wrapper">
                 <button class="profile-toggle" id="profileToggle">
                     @if(auth()->user()->profile_image)
-                    <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile" class="profile-image">
+                        <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile"
+                            class="profile-image">
                     @else
-                    <div class="profile-image" style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">
-                        {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
-                    </div>
+                        <div class="profile-image"
+                            style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 16px;">
+                            {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
+                        </div>
                     @endif
                     <div class="admin-profile">
                         <div class="admin-name">{{ auth()->user()->name ?? 'User' }}</div>
@@ -453,11 +466,13 @@
                 <div class="profile-dropdown" id="profileDropdown">
                     <div class="dropdown-header">
                         @if(auth()->user()->profile_image)
-                        <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile" class="dropdown-header-image">
+                            <img src="{{ asset('storage/' . auth()->user()->profile_image) }}" alt="Profile"
+                                class="dropdown-header-image">
                         @else
-                        <div class="dropdown-header-image" style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
-                            {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
-                        </div>
+                            <div class="dropdown-header-image"
+                                style="background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
+                                {{ substr(auth()->user()->name ?? 'A', 0, 1) }}
+                            </div>
                         @endif
                         <div class="dropdown-header-text">
                             <div class="dropdown-header-name">{{ auth()->user()->name ?? 'User' }}</div>
@@ -492,41 +507,49 @@
     </header>
 
     <div class="container">
-        @unless(request()->routeIs('notifications.*'))
         <!-- End User Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-section">
                 <div class="sidebar-title">MAIN</div>
-                <a href="{{ auth()->user()->isExpert() ? route('expert.dashboard') : route('dashboard') }}" class="sidebar-item {{ request()->routeIs('dashboard') || request()->routeIs('expert.dashboard') ? 'active' : '' }}">
+                <a href="{{ auth()->user()->isExpert() ? route('expert.dashboard') : route('dashboard') }}"
+                    class="sidebar-item {{ request()->routeIs('dashboard') || request()->routeIs('expert.dashboard') ? 'active' : '' }}">
                     <i class="bi bi-speedometer2"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="{{ route('map') }}" class="sidebar-item {{ request()->routeIs('map') ? 'active' : '' }}">
+                <a href="{{ auth()->user()->isExpert() ? route('expert.map') : route('map') }}"
+                    class="sidebar-item {{ request()->routeIs('map') || request()->routeIs('expert.map') ? 'active' : '' }}">
                     <i class="bi bi-map"></i>
                     <span>Map</span>
                 </a>
-                <a href="{{ route('dashboard') }}?tab=classify" class="sidebar-item {{ request()->is('dashboard') && request()->query('tab') === 'classify' ? 'active' : '' }}">
-                    <i class="bi bi-images"></i>
-                    <span>Classify</span>
+                <a href="{{ auth()->user()->isExpert() ? route('expert.delineate') : route('delineate') }}"
+                    class="sidebar-item {{ request()->routeIs('delineate') || request()->routeIs('expert.delineate') || request()->routeIs('delineations.*') ? 'active' : '' }}">
+                    <i class="bi bi-pencil-square"></i>
+                    <span>Delineate</span>
+                </a>
+                <a href="{{ route('delineation.index') }}"
+                    class="sidebar-item {{ request()->routeIs('delineation.*') ? 'active' : '' }}">
+                    <i class="bi bi-cloud-arrow-up"></i>
+                    <span>Upload Image</span>
                 </a>
             </div>
 
             <div class="sidebar-section">
                 <div class="sidebar-title">ACCOUNT</div>
-                <a href="{{ route('profile.show') }}" class="sidebar-item {{ request()->routeIs('profile.*') ? 'active' : '' }}">
+                <a href="{{ route('profile.show') }}"
+                    class="sidebar-item {{ request()->routeIs('profile.*') ? 'active' : '' }}">
                     <i class="bi bi-person"></i>
                     <span>My Profile</span>
                 </a>
-                <a href="{{ route('notifications.index') }}" class="sidebar-item {{ request()->routeIs('notifications.*') ? 'active' : '' }}">
+                <a href="{{ route('notifications.index') }}"
+                    class="sidebar-item {{ request()->routeIs('notifications.*') ? 'active' : '' }}">
                     <i class="bi bi-bell"></i>
                     <span>Notifications</span>
                 </a>
             </div>
         </aside>
-        @endunless
 
         <div class="main-content">
-            <div class="content">
+            <div class="content @yield('content-class')">
                 @yield('content')
             </div>
         </div>
@@ -536,94 +559,84 @@
     @stack('scripts')
 
     <script>
-        // Initialize sidebar - ensure it's closed on page load
-        const sidebar = document.querySelector('.sidebar');
-        if (sidebar) {
-            sidebar.classList.remove('active');
-        }
-
-        // Notification dropdown toggle
-        const notificationToggle = document.getElementById('notificationToggle');
-        const notificationDropdown = document.getElementById('notificationDropdown');
-
-        if (notificationToggle && notificationDropdown) {
-            notificationToggle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                notificationDropdown.classList.toggle('active');
-                if (typeof profileDropdown !== 'undefined' && profileDropdown) {
-                    profileDropdown.classList.remove('active');
-                }
-            });
-
-            document.addEventListener('click', function(e) {
-                if (!notificationToggle.contains(e.target) && !notificationDropdown.contains(e.target)) {
-                    notificationDropdown.classList.remove('active');
-                }
-            });
-
-            notificationDropdown.addEventListener('click', function(e) {
-                e.stopPropagation();
-            });
-        }
-
-        // Profile dropdown toggle
-        const profileToggle = document.getElementById('profileToggle');
-        const profileDropdown = document.getElementById('profileDropdown');
-
-        if (profileToggle && profileDropdown) {
-            profileToggle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                profileDropdown.classList.toggle('active');
-                if (typeof notificationDropdown !== 'undefined' && notificationDropdown) {
-                    notificationDropdown.classList.remove('active');
-                }
-            });
-
-            document.addEventListener('click', function(e) {
-                if (!profileToggle.contains(e.target) && !profileDropdown.contains(e.target)) {
-                    profileDropdown.classList.remove('active');
-                }
-            });
-
-            profileDropdown.addEventListener('click', function(e) {
-                e.stopPropagation();
-            });
-        }
-
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-
-        if (mobileMenuBtn && sidebar) {
-            mobileMenuBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                sidebar.classList.toggle('active');
-            });
-
-            // Close sidebar when clicking outside
-            document.addEventListener('click', function(e) {
-                if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
-                    sidebar.classList.remove('active');
-                }
-            });
-        }
-
-        // Close sidebar when a navigation link is clicked
-        const sidebarItems = document.querySelectorAll('.sidebar-item');
-        sidebarItems.forEach(item => {
-            item.addEventListener('click', function(e) {
-                // Sidebar will close due to navigation or explicit removal
-                if (sidebar) {
-                    sidebar.classList.remove('active');
-                }
-            });
-        });
-
-        // Handle window resize - close sidebar if resizing to desktop
-        window.addEventListener('resize', function() {
-            if (window.innerWidth > 768 && sidebar) {
+        (function () {
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
                 sidebar.classList.remove('active');
             }
-        });
+
+            const notificationToggle = document.getElementById('notificationToggle');
+            const notificationDropdown = document.getElementById('notificationDropdown');
+            const profileToggle = document.getElementById('profileToggle');
+            const profileDropdown = document.getElementById('profileDropdown');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+            if (notificationToggle && notificationDropdown) {
+                notificationToggle.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    notificationDropdown.classList.toggle('active');
+                    profileDropdown?.classList.remove('active');
+                    sidebar?.classList.remove('active');
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!notificationToggle.contains(e.target) && !notificationDropdown.contains(e.target)) {
+                        notificationDropdown.classList.remove('active');
+                    }
+                });
+
+                notificationDropdown.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+            }
+
+            if (profileToggle && profileDropdown) {
+                profileToggle.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    profileDropdown.classList.toggle('active');
+                    notificationDropdown?.classList.remove('active');
+                    sidebar?.classList.remove('active');
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!profileToggle.contains(e.target) && !profileDropdown.contains(e.target)) {
+                        profileDropdown.classList.remove('active');
+                    }
+                });
+
+                profileDropdown.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+            }
+
+            if (mobileMenuBtn && sidebar) {
+                mobileMenuBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    sidebar.classList.toggle('active');
+                    notificationDropdown?.classList.remove('active');
+                    profileDropdown?.classList.remove('active');
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+                        sidebar.classList.remove('active');
+                    }
+                });
+            }
+
+            document.querySelectorAll('.sidebar-item').forEach(function (item) {
+                item.addEventListener('click', function () {
+                    sidebar?.classList.remove('active');
+                });
+            });
+
+            window.addEventListener('resize', function () {
+                if (window.innerWidth > 768) {
+                    sidebar?.classList.remove('active');
+                }
+            });
+        })();
     </script>
 </body>
 
