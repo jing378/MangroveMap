@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Notifications\DelineationSubmittedForReview;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 class Delineation extends Model
@@ -22,6 +23,7 @@ class Delineation extends Model
         'user_id',
         'name',
         'notes',
+        'planting_recommendation',
         'features',
         'is_approved',
         'approved_at',
@@ -50,6 +52,11 @@ class Delineation extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function annualObservations(): HasMany
+    {
+        return $this->hasMany(DelineationAnnualObservation::class);
+    }
+
     public function rejectedBy()
     {
         return $this->belongsTo(User::class, 'rejected_by');
@@ -60,8 +67,8 @@ class Delineation extends Model
         $params = ['delineation' => $this->id];
 
         return $user->isExpert()
-            ? route('expert.dashboard', $params)
-            : route('dashboard', $params);
+            ? route('expert.map', $params)
+            : route('map', $params);
     }
 
     public function scopeApproved($query)

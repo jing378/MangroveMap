@@ -65,7 +65,7 @@ class EndUserController extends Controller
                 continue;
             }
 
-            $key = $type.':'.json_encode($coords);
+            $key = $type . ':' . json_encode($coords);
             if (isset($seen[$key])) {
                 continue;
             }
@@ -85,9 +85,18 @@ class EndUserController extends Controller
 
     private function delineationPayloadForMap(Delineation $delineation, array $extra = []): array
     {
-        return array_merge($delineation->toArray(), $extra, [
+        $payload = array_merge($delineation->toArray(), $extra, [
             'features' => self::sanitizeFeaturesForMap($delineation->features),
+            'user_name' => $delineation->user?->name ?? null,
+            'created_by' => $delineation->user?->name ?? null,
+            'approved_by_name' => $delineation->approvedBy?->name ?? $delineation->approved_by_name ?? null,
         ]);
+
+        if ($delineation->relationLoaded('user') || $delineation->user !== null) {
+            $payload['user'] = $delineation->user?->only(['id', 'name', 'role']);
+        }
+
+        return $payload;
     }
 
     private function userCanViewDelineationOnMap(User $user, Delineation $delineation): bool
@@ -109,7 +118,7 @@ class EndUserController extends Controller
     {
         $collection = collect($records);
 
-        if ($collection->contains(fn (array $row) => (int) ($row['id'] ?? 0) === (int) $payload['id'])) {
+        if ($collection->contains(fn(array $row) => (int) ($row['id'] ?? 0) === (int) $payload['id'])) {
             return $collection->values();
         }
 
@@ -130,7 +139,7 @@ class EndUserController extends Controller
             return [$delineations, $approvedDelineationsForMap, $residentDelineationsForMap, null, null];
         }
 
-        $focus = Delineation::with('user:id,name,role')->find($focusId);
+        $focus = Delineation::with(['user:id,name,role', 'approvedBy:id,name'])->find($focusId);
         if (! $focus || ! $this->userCanViewDelineationOnMap($user, $focus)) {
             return [$delineations, $approvedDelineationsForMap, $residentDelineationsForMap, null, $focusId];
         }
@@ -170,19 +179,19 @@ class EndUserController extends Controller
         $failedAnalyses = $userAnalyses->where('status', 'failed')->count();
         $recentAnalyses = $userAnalyses->take(5);
 
-            $totalCoverage = MangroveData::sum('coverage_area_km2') ?? 0;
-            $genusCount = MangroveData::distinct('genus_id')->count();
-            $degradedArea = MangroveData::where('health_status', 'degraded')->sum('coverage_area_km2') ?? 0;
+        $totalCoverage = MangroveData::sum('coverage_area_km2') ?? 0;
+        $genusCount = MangroveData::distinct('genus_id')->count();
+        $degradedArea = MangroveData::where('health_status', 'degraded')->sum('coverage_area_km2') ?? 0;
 
-            $genusDistribution = MangroveData::select('genus_id', DB::raw('COUNT(*) as count'))
-                ->whereNotNull('genus_id')
-                ->groupBy('genus_id')
-                ->with('genus')
-                ->limit(10)
-                ->get();
+        $genusDistribution = MangroveData::select('genus_id', DB::raw('COUNT(*) as count'))
+            ->whereNotNull('genus_id')
+            ->groupBy('genus_id')
+            ->with('genus')
+            ->limit(10)
+            ->get();
 
-            $genusLabels = [];
-            $genusSeries = [];
+        $genusLabels = [];
+        $genusSeries = [];
         foreach ($genusDistribution as $item) {
             if ($item->genus) {
                 $genusLabels[] = $item->genus->common_name;
@@ -202,22 +211,22 @@ class EndUserController extends Controller
         $trendValues = $coverageTrends->pluck('total')->toArray();
 
         $delineationModels = Delineation::fetchForMap(
-            $user->delineations(),
+            $user->delineations()->with(['user:id,name,role', 'approvedBy:id,name']),
             Delineation::MAP_QUERY_LIMIT_OWN
         );
         $delineations = $delineationModels
-            ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d))
+            ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d))
             ->values();
 
         $approvedForMapModels = Delineation::fetchForMap(
-            Delineation::approved()->where('user_id', '!=', $user->id),
+            Delineation::approved()->where('user_id', '!=', $user->id)->with(['user:id,name,role', 'approvedBy:id,name']),
             Delineation::MAP_QUERY_LIMIT
         );
 
         $approvedDelineations = $approvedForMapModels;
 
         $approvedDelineationsForMap = $approvedForMapModels
-            ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d, [
+            ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d, [
                 'is_system' => true,
                 'approved' => true,
                 'is_approved' => true,
@@ -227,7 +236,8 @@ class EndUserController extends Controller
         $residentDelineationsForMap = collect();
         if ($user->isExpert()) {
             $residentDelineationsForMap = Delineation::fetchResidentDelineationsForExpertMap()
-                ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d))
+                ->load(['user:id,name,role', 'approvedBy:id,name'])
+                ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d))
                 ->values();
         }
 

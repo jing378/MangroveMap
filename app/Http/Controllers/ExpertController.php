@@ -64,7 +64,7 @@ class ExpertController extends Controller
         ]);
     }
 
-    public function approve(Delineation $delineation)
+    public function approve(Request $request, Delineation $delineation)
     {
         if ($delineation->is_approved) {
             $message = 'This delineation is already approved.';
@@ -88,6 +88,10 @@ class ExpertController extends Controller
             return redirect()->route('expert.dashboard')->with('error', $message);
         }
 
+        $data = $request->validate([
+            'planting_recommendation' => ['nullable', 'string', 'max:5000'],
+        ]);
+
         $delineation->update([
             'is_approved' => true,
             'approved_at' => now(),
@@ -96,6 +100,7 @@ class ExpertController extends Controller
             'rejected_at' => null,
             'rejected_by' => null,
             'rejection_notes' => null,
+            'planting_recommendation' => trim((string) ($data['planting_recommendation'] ?? '')) ?: null,
         ]);
 
         $delineation->load('user');

@@ -4,6 +4,7 @@
     // DATA & MAP INITIALIZATION (same as before)
     const saveDelineationUrl = "{{ Auth::user()->isExpert() ? route('expert.delineations.store') : route('delineations.store') }}";
     const deleteDelineationBaseUrl = "{{ url('/delineations') }}";
+    const annualObservationBaseUrl = @json(url('/delineations'));
     const isExpertUser = {{ Auth::check() && Auth::user()->isExpert() ? 'true' : 'false' }};
     const savedDelineations = @json($delineations);
     const approvedDelineations = @json($approvedDelineationsForMap);
@@ -11,6 +12,7 @@
     const focusDelineationId = @json($focusDelineationId ?? null);
     const focusDelineationRecord = @json($focusDelineationRecord ?? null);
     const authUserId = @json(Auth::id());
+    const authUserName = @json(Auth::user()?->name ?? '');
     const expertDelineationReviewBaseUrl = @json(url('/expert/delineations'));
 
     function showProcessingModal(title, subtitle) {
@@ -110,6 +112,32 @@
       if (!points.length) return 'N/A';
       if (feature?.type === 'point') return '1 pt';
       return `${points.length} pts`;
+    }
+
+    function calculateFeatureAreaHectares(feature) {
+      if (feature?.type !== 'area' || !Array.isArray(feature.coords) || feature.coords.length < 3) {
+        return null;
+      }
+
+      const earthRadiusMeters = 6371008.8;
+      const points = feature.coords.map(([lat, lng]) => [
+        Number(lat) * Math.PI / 180,
+        Number(lng) * Math.PI / 180,
+      ]);
+      let area = 0;
+
+      for (let i = 0; i < points.length; i++) {
+        const [lat1, lng1] = points[i];
+        const [lat2, lng2] = points[(i + 1) % points.length];
+        area += (lng2 - lng1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+      }
+
+      return Math.abs(area * earthRadiusMeters ** 2 / 2) / 10000;
+    }
+
+    function formatFeatureAreaHectares(feature) {
+      const areaHectares = calculateFeatureAreaHectares(feature);
+      return areaHectares === null ? 'N/A' : `${areaHectares.toFixed(2)} ha`;
     }
 
     function formatDelineationScan(record) {
@@ -419,6 +447,7 @@
     }
 
     let drawingMode = null;
+    const lineOnlyDelineation = document.body.dataset.page === 'delineate';
     let isDrawing = false;
     let currentFeature = null;
     let drawnFeatures = [];
@@ -439,6 +468,8 @@
               ...feature,
               label: record.name,
               notes: record.notes,
+              planting_recommendation: record.planting_recommendation || null,
+              approved_by_name: record.approved_by_name || null,
               delineation_id: record.id,
               is_approved: !!record.is_approved,
               is_rejected: !!record.is_rejected,
@@ -469,12 +500,14 @@
           coords: feature.coords,
           label: record.name,
           notes: record.notes,
+          planting_recommendation: record.planting_recommendation || null,
+          approved_by_name: record.approved_by_name || null,
           delineation_id: record.id,
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
           rejection_notes: record.rejection_notes || null,
           is_own: !!options.is_own,
-          created_by: options.created_by || null,
+          created_by: options.created_by || record.user?.name || authUserName || 'Unknown user',
         });
       });
     }
@@ -526,15 +559,10 @@
     }
     window.addEventListener('resize', syncTimelineMobilePosition);
 
-    function openRightPanel(titleText) {
+    function openRightPanel() {
       const panel = document.getElementById('mapRightPanel');
       const backdrop = document.getElementById('panelBackdrop');
-      const headerTitle = document.getElementById('panelHeaderTitle');
       const headerSub = document.getElementById('panelHeaderSub');
-
-      if (titleText && headerTitle) {
-        headerTitle.textContent = titleText;
-      }
 
       if (window.innerWidth <= 780) {
         // Mobile: Open in PEEK state by default — map is NOT covered automatically
@@ -739,13 +767,14 @@
       document.getElementById('dStatus').className = `d-val ${z.sc}`;
       document.getElementById('dGenus').textContent = z.genus;
       document.getElementById('dScan').textContent = z.scan;
+      loadAnnualObservationCharts(z.id);
 
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
         removeBtn.style.display = 'none';
       }
 
-      openRightPanel(z.name ? `Zone: ${z.name}` : 'Selected Zone');
+      openRightPanel();
       selectedDrawnIndex = -1;
       document.getElementById('delineationInfoCard').style.display = 'none';
       document.getElementById('zoneDetailsContent').style.display = 'block';
@@ -762,7 +791,8 @@
       if (!feature) return;
       selectedDrawnIndex = i;
 
-      openRightPanel(feature.label ? `Area: ${feature.label}` : 'Delineated Area');
+      openRightPanel();
+      loadAnnualObservationCharts(feature.delineation_id);
 
       document.getElementById('delineationInfoCard').style.display = 'block';
       document.getElementById('zoneDetailsContent').style.display = 'none';
@@ -773,33 +803,53 @@
       }
 
       document.getElementById('delineationFeatureType').textContent = feature.type || '-';
-      let coordsText = '-';
-      if (Array.isArray(feature.coords)) {
-        if (feature.type === 'point') {
-          coordsText = feature.coords.map(n => Number(n).toFixed(4)).join(', ');
-        } else {
-          coordsText = feature.coords.slice(0, 3).map(c => Array.isArray(c) ? c.map(n => Number(n).toFixed(4)).join(', ') : c).join(' | ') + (feature.coords.length > 3 ? ' ...' : '');
-        }
-      }
-      document.getElementById('delineationFeatureCoords').textContent = coordsText;
+      document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
       document.getElementById('delineationFeatureLabel').textContent = feature.label || '-';
       document.getElementById('delineationLabel').value = feature.label || '';
       document.getElementById('delineationNotes').value = feature.notes || '';
 
+      const recommendationSection = document.getElementById('plantingRecommendationSection');
+      const recommendationInput = document.getElementById('plantingRecommendation');
+      const canEditRecommendation = isExpertUser && feature.delineation_id;
+      if (recommendationSection && recommendationInput) {
+        recommendationSection.style.display = canEditRecommendation ? 'block' : 'none';
+        recommendationInput.value = feature.planting_recommendation || '';
+        recommendationSection.dataset.delineationId = canEditRecommendation
+          ? String(feature.delineation_id)
+          : '';
+      }
+
+      const createdByEl = document.getElementById('delineationCreatedBy');
       const statusEl = document.getElementById('delineationReviewStatus');
       const rejectionBox = document.getElementById('delineationRejectionBox');
       const rejectionNotes = document.getElementById('delineationRejectionNotes');
+
+      const delineatedBy = feature.created_by || feature.submitted_by || feature.user?.name || authUserName || 'Unknown user';
+      if (createdByEl) {
+        createdByEl.textContent = delineatedBy;
+      }
+
       let statusLabel = 'Pending review';
       let statusClass = 'ca';
       if (feature.is_rejected) {
         statusLabel = 'Rejected';
         statusClass = 'cr';
       } else if (feature.is_approved) {
-        statusLabel = feature.is_own ? 'Approved' : 'Approved (community)';
+        const approverName = feature.approved_by_name || feature.approved_by || feature.created_by || feature.submitted_by;
+        statusLabel = feature.is_own ? 'Approved' : (approverName ? `Approved (${approverName})` : 'Approved');
         statusClass = 'cg';
       }
       statusEl.textContent = statusLabel;
       statusEl.className = `d-val ${statusClass}`;
+
+      const approvedRecommendationSection = document.getElementById('approvedPlantingRecommendationSection');
+      const approvedRecommendation = document.getElementById('approvedPlantingRecommendation');
+      const recommendation = feature.planting_recommendation?.trim() || '';
+      if (approvedRecommendationSection && approvedRecommendation) {
+        approvedRecommendationSection.style.display = feature.is_approved && recommendation ? 'flex' : 'none';
+        approvedRecommendation.textContent = recommendation || '-';
+      }
+
       if (feature.is_rejected && feature.rejection_notes) {
         rejectionBox.style.display = 'block';
         rejectionNotes.textContent = feature.rejection_notes;
@@ -984,9 +1034,11 @@
         if (leftPanel) leftPanel.classList.add('hide');
         if (drawTypeSelect) {
           drawTypeSelect.disabled = false;
-          drawTypeSelect.value = '';
-          drawingMode = null;
+          drawTypeSelect.value = lineOnlyDelineation ? 'line' : '';
+          drawingMode = lineOnlyDelineation ? 'line' : null;
           drawModeButtons.forEach(btn => btn.classList.remove('active'));
+        } else {
+          drawingMode = lineOnlyDelineation ? 'line' : null;
         }
         // Initialize history with empty state including the current drawing context
         if (featureHistory.length === 0) {
@@ -1141,7 +1193,7 @@
       }
     }
 
-    document.getElementById('saveBtn').addEventListener('click', () => {
+    document.getElementById('saveBtn')?.addEventListener('click', () => {
       persistDelineation();
     });
 
@@ -1176,6 +1228,7 @@
       }
 
       const url = `${expertDelineationReviewBaseUrl}/${delineationId}/${action}`;
+      const plantingRecommendation = document.getElementById('plantingRecommendation')?.value.trim() || '';
       showProcessingModal(
         action === 'approve' ? 'Approving delineation...' : 'Rejecting delineation...',
         'Please wait.'
@@ -1190,7 +1243,9 @@
             'X-CSRF-TOKEN': csrfToken,
             'X-Requested-With': 'XMLHttpRequest',
           },
-          body: action === 'reject' ? JSON.stringify({ rejection_notes: rejectionNotes }) : '{}',
+          body: JSON.stringify(action === 'reject'
+            ? { rejection_notes: rejectionNotes }
+            : { planting_recommendation: plantingRecommendation }),
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -1202,6 +1257,7 @@
             is_approved: true,
             is_rejected: false,
             rejection_notes: null,
+            planting_recommendation: plantingRecommendation || null,
           });
         } else {
           applyReviewToDelineationFeatures(delineationId, {
@@ -1248,7 +1304,7 @@
             fillOpacity: 0.85,
           }).addTo(delineationLayer);
           marker.on('click', (e) => {
-            if (drawingMode) return;
+            if (drawingMode && !lineOnlyDelineation) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeature(i);
           });
@@ -1258,7 +1314,7 @@
             weight: 3,
           }).addTo(delineationLayer);
           line.on('click', (e) => {
-            if (drawingMode) return;
+            if (drawingMode && !lineOnlyDelineation) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeature(i);
           });
@@ -1281,7 +1337,7 @@
             weight: 2,
           }).addTo(delineationLayer);
           polygon.on('click', (e) => {
-            if (drawingMode) return;
+            if (drawingMode && !lineOnlyDelineation) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeature(i);
           });
@@ -1381,9 +1437,13 @@
             drawnFeatures.push(currentFeature);
             currentFeature = null;
             saveDrawingStateToHistory();
-            drawingMode = null; // Exit drawing mode
-            mainMap.dragging.enable();
-            document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+            if (lineOnlyDelineation) {
+              drawingMode = 'line';
+            } else {
+              drawingMode = null;
+              mainMap.dragging.enable();
+              document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+            }
             redrawFeatures();
             selectDrawnFeature(drawnFeatures.length - 1);
             return;
@@ -1603,16 +1663,17 @@
     }
 
     openDelineationFromQueryParam();
+    let genusDistributionChart = null;
     try {
       const pieCanvas = document.getElementById('pieC');
       if (pieCanvas && typeof Chart !== 'undefined') {
-        new Chart(pieCanvas, {
+        genusDistributionChart = new Chart(pieCanvas, {
           type: 'doughnut',
           data: {
-            labels: ['Rhizophora', 'Avicennia', 'Sonneratia', 'Bruguiera', 'Others'],
+            labels: [],
             datasets: [{
-              data: [34, 22, 18, 14, 12],
-              backgroundColor: ['#1e9e62', '#5ab8de', '#f4a840', '#a070e0', '#c0c8b8'],
+              data: [],
+              backgroundColor: ['#1e9e62', '#5ab8de', '#f4a840', '#a070e0', '#c0c8b8', '#d96c5f', '#80a84b'],
               borderWidth: 0
             }]
           },
@@ -1627,22 +1688,22 @@
       console.warn('pieC chart init error:', e);
     }
 
-    let temporalTrendChart = null;
+    let annualCoverageChart = null;
     try {
       const trendCanvas = document.getElementById('trendC');
       if (trendCanvas && typeof Chart !== 'undefined') {
-        temporalTrendChart = new Chart(trendCanvas, {
+        annualCoverageChart = new Chart(trendCanvas, {
           type: 'line',
           data: {
-            labels: ['2021', '2022', '2023', '2024', '2025', '2026'],
+            labels: [],
             datasets: [{
-              data: [46178, 45900, 46360, 46820, 47100, 47382],
+              data: [],
               borderColor: '#1e9e62',
               backgroundColor: 'rgba(30,158,98,.12)',
               fill: true,
               tension: .35,
-              pointRadius: [3, 3, 3, 3, 3, 5],
-              pointBackgroundColor: ['#1e9e62', '#d04030', '#1e9e62', '#1e9e62', '#1e9e62', '#1e9e62'],
+              pointRadius: 3,
+              pointBackgroundColor: '#1e9e62',
               pointBorderColor: '#fff',
               pointBorderWidth: 2
             }]
@@ -1657,9 +1718,8 @@
               y: {
                 ticks: {
                   font: { size: 9 },
-                  callback: v => (v / 1000).toFixed(0) + 'k'
-                },
-                min: 45000
+                  callback: v => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(v)
+                }
               },
               x: {
                 ticks: { font: { size: 9 } }
@@ -1670,6 +1730,91 @@
       }
     } catch (e) {
       console.warn('trendC chart init error:', e);
+    }
+
+    let annualObservationRequest = null;
+    function setAnnualObservationEmptyState(message) {
+      const genusEmpty = document.getElementById('genusDistributionEmpty');
+      const coverageEmpty = document.getElementById('coverageTrendEmpty');
+      const title = document.getElementById('genusDistributionTitle');
+      if (title) title.textContent = 'Genus Distribution';
+      if (genusEmpty) {
+        genusEmpty.textContent = message || 'No verified genus data for this zone.';
+        genusEmpty.style.display = 'block';
+      }
+      if (coverageEmpty) {
+        coverageEmpty.textContent = message || 'No annual measurements for this zone.';
+        coverageEmpty.style.display = 'block';
+      }
+      if (genusDistributionChart) {
+        genusDistributionChart.data.labels = [];
+        genusDistributionChart.data.datasets[0].data = [];
+        genusDistributionChart.update();
+      }
+      if (annualCoverageChart) {
+        annualCoverageChart.data.labels = [];
+        annualCoverageChart.data.datasets[0].data = [];
+        annualCoverageChart.update();
+      }
+    }
+
+    function loadAnnualObservationCharts(delineationId) {
+      annualObservationRequest?.abort();
+      setAnnualObservationEmptyState(delineationId ? 'Loading verified observations...' : null);
+      if (!delineationId) return;
+
+      annualObservationRequest = new AbortController();
+      fetch(`${annualObservationBaseUrl}/${encodeURIComponent(delineationId)}/annual-observations`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+        signal: annualObservationRequest.signal
+      })
+        .then(response => {
+          if (!response.ok) throw new Error('Unable to load annual observations.');
+          return response.json();
+        })
+        .then(data => {
+          const coverage = Array.isArray(data.coverage) ? data.coverage : [];
+          const genusDistribution = Array.isArray(data.genusDistribution) ? data.genusDistribution : [];
+          const genusEmpty = document.getElementById('genusDistributionEmpty');
+          const coverageEmpty = document.getElementById('coverageTrendEmpty');
+          const title = document.getElementById('genusDistributionTitle');
+
+          if (annualCoverageChart) {
+            annualCoverageChart.data.labels = coverage.map(item => String(item.year));
+            annualCoverageChart.data.datasets[0].data = coverage.map(item => Number(item.coverageAreaHa));
+            annualCoverageChart.update();
+          }
+          if (coverageEmpty) {
+            coverageEmpty.textContent = coverage.length
+              ? ''
+              : 'No annual measurements have been entered for this zone.';
+            coverageEmpty.style.display = coverage.length ? 'none' : 'block';
+          }
+
+          if (genusDistributionChart) {
+            genusDistributionChart.data.labels = genusDistribution.map(item => item.label);
+            genusDistributionChart.data.datasets[0].data = genusDistribution.map(item => Number(item.share));
+            genusDistributionChart.update();
+          }
+          if (title) {
+            title.textContent = data.genusYear
+              ? `Genus Distribution (${data.genusYear})`
+              : 'Genus Distribution';
+          }
+          if (genusEmpty) {
+            genusEmpty.textContent = genusDistribution.length
+              ? ''
+              : 'No verified genus breakdown has been entered for this zone.';
+            genusEmpty.style.display = genusDistribution.length ? 'none' : 'block';
+          }
+        })
+        .catch(error => {
+          if (error.name !== 'AbortError') {
+            console.error(error);
+            setAnnualObservationEmptyState('Annual observations could not be loaded.');
+          }
+        });
     }
 
     try {
@@ -1855,13 +2000,6 @@
       const summaryAreaEl = document.getElementById('summaryTotalArea');
       if (summaryAreaEl) {
         summaryAreaEl.textContent = item.summaryArea;
-      }
-
-      // Sync Chart Point Highlight if available
-      if (temporalTrendChart && temporalTrendChart.data?.datasets?.[0]) {
-        const dataset = temporalTrendChart.data.datasets[0];
-        dataset.pointRadius = temporalData.map((_, i) => (i === index ? 6 : 2.5));
-        temporalTrendChart.update('none');
       }
 
       // Map Visual Feedback: animate/pulse existing zone markers to reflect temporal state
@@ -2078,7 +2216,7 @@
       document.getElementById('temporalZoneRow')?.classList.add('sel');
 
       const epoch = sampleTemporalEpochs[currentTimelineIndex];
-      openRightPanel('Zone: Silago Bay Reforestation');
+      openRightPanel();
 
       document.getElementById('delineationInfoCard').style.display = 'none';
       document.getElementById('zoneDetailsContent').style.display = 'block';

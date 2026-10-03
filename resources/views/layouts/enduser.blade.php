@@ -369,6 +369,99 @@
             border-left-color: #d04030;
         }
 
+        .sidebar-profile-footer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: auto;
+            padding: 16px 12px 0;
+            border-top: 1px solid #e0e8e0;
+        }
+
+        .sidebar-profile-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
+            padding: 8px;
+            color: inherit;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+
+        .sidebar-profile-link:hover {
+            background: #f5f7f6;
+        }
+
+        .sidebar-profile-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+            overflow: hidden;
+            border-radius: 50%;
+            background: #edf7f2;
+            color: #1e9e62;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .sidebar-profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .sidebar-profile-details {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .sidebar-profile-name,
+        .sidebar-profile-email {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sidebar-profile-name {
+            color: #1a2e1a;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .sidebar-profile-email,
+        .sidebar-profile-type {
+            margin-top: 2px;
+            color: #7a9a7a;
+            font-size: 10px;
+        }
+
+        .sidebar-profile-logout {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            flex: 0 0 36px;
+            padding: 0;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: #b83828;
+            cursor: pointer;
+            font-size: 17px;
+        }
+
+        .sidebar-profile-logout:hover {
+            background: #fdf0ee;
+            color: #a52f21;
+        }
+
         .main-content {
             flex: 1;
             display: flex;
@@ -543,13 +636,29 @@
                     <span>Notifications</span>
                 </a>
             </div>
-            <form method="POST" action="{{ route('logout') }}" class="sidebar-logout-form">
-                @csrf
-                <button type="submit" class="sidebar-item sidebar-logout">
-                    <i class="bi bi-box-arrow-right"></i>
-                    <span>Logout</span>
-                </button>
-            </form>
+            @php($currentUser = auth()->user())
+            <div class="sidebar-profile-footer">
+                <a href="{{ route('profile.show') }}" class="sidebar-profile-link" aria-label="View profile for {{ $currentUser->name }}">
+                    <span class="sidebar-profile-avatar">
+                        @if($currentUser->profile_image)
+                            <img src="{{ asset('storage/' . $currentUser->profile_image) }}" alt="{{ $currentUser->name }}'s profile photo">
+                        @else
+                            {{ strtoupper(substr($currentUser->name, 0, 1)) }}
+                        @endif
+                    </span>
+                    <span class="sidebar-profile-details">
+                        <span class="sidebar-profile-name">{{ $currentUser->name }}</span>
+                        <span class="sidebar-profile-type">{{ $currentUser->isResident() ? 'Resident' : ucfirst($currentUser->role) }}</span>
+                        <span class="sidebar-profile-email">{{ $currentUser->email }}</span>
+                    </span>
+                </a>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="sidebar-profile-logout" title="Logout" aria-label="Logout">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </button>
+                </form>
+            </div>
         </aside>
 
         <div class="main-content">

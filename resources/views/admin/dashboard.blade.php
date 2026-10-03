@@ -4,7 +4,7 @@
 
 @section('content')
 <div id="dashboard-section">
-    <div class="page-title">Dashboard</div>
+    <div class="page-title">Welcome back, {{ Auth::user()->name }}</div>
 
     <div class="grid cols-4">
         <div class="stat-card">

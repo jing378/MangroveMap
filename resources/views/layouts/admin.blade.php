@@ -353,6 +353,99 @@
             border-left-color: #d04030;
         }
 
+        .sidebar-profile-footer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: auto;
+            padding: 16px 12px 0;
+            border-top: 1px solid #e0e8e0;
+        }
+
+        .sidebar-profile-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
+            padding: 8px;
+            color: inherit;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+
+        .sidebar-profile-link:hover {
+            background: #f5f7f6;
+        }
+
+        .sidebar-profile-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+            overflow: hidden;
+            border-radius: 50%;
+            background: #edf7f2;
+            color: #1e9e62;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .sidebar-profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .sidebar-profile-details {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .sidebar-profile-name,
+        .sidebar-profile-email {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sidebar-profile-name {
+            color: #1a2e1a;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .sidebar-profile-email,
+        .sidebar-profile-type {
+            margin-top: 2px;
+            color: #7a9a7a;
+            font-size: 10px;
+        }
+
+        .sidebar-profile-logout {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            flex: 0 0 36px;
+            padding: 0;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: #b83828;
+            cursor: pointer;
+            font-size: 17px;
+        }
+
+        .sidebar-profile-logout:hover {
+            background: #fdf0ee;
+            color: #a52f21;
+        }
+
         .main-content {
             flex: 1;
             display: flex;
@@ -447,7 +540,7 @@
             }
 
             .content {
-                padding: 20px 16px;
+                padding: 20px 16px; 
             }
         }
     </style>

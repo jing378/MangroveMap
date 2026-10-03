@@ -24,20 +24,26 @@
           <div id="mainMap"></div>
           <div class="delineation-toolbar" id="delineationToolbar">
             <div class="draw-select-wrapper">
-              <div class="draw-mode-group" role="group" aria-label="Drawing mode">
-                <button type="button" class="draw-btn" data-mode="point"><i
-                    class="bi bi-geo-alt-fill"></i><span>Point</span></button>
-                <button type="button" class="draw-btn" data-mode="line"><i
-                    class="bi bi-slash-circle"></i><span>Line</span></button>
-                <button type="button" class="draw-btn" data-mode="area"><i
-                    class="bi bi-grid-3x3-gap"></i><span>Area</span></button>
-              </div>
-              <select id="drawTypeSelect" class="draw-select" aria-label="Select drawing mode" disabled>
-                <option value="" selected disabled>Select mode</option>
-                <option value="point">Point</option>
-                <option value="line">Line</option>
-                <option value="area">Area</option>
-              </select>
+              @if (request()->routeIs('delineate', 'expert.delineate'))
+                <div class="draw-mode-group" aria-label="Drawing mode">
+                  <span class="draw-btn active"><i class="bi bi-slash-circle"></i><span>Line</span></span>
+                </div>
+              @else
+                <div class="draw-mode-group" role="group" aria-label="Drawing mode">
+                  <button type="button" class="draw-btn" data-mode="point"><i
+                      class="bi bi-geo-alt-fill"></i><span>Point</span></button>
+                  <button type="button" class="draw-btn" data-mode="line"><i
+                      class="bi bi-slash-circle"></i><span>Line</span></button>
+                  <button type="button" class="draw-btn" data-mode="area"><i
+                      class="bi bi-grid-3x3-gap"></i><span>Area</span></button>
+                </div>
+                <select id="drawTypeSelect" class="draw-select" aria-label="Select drawing mode" disabled>
+                  <option value="" selected disabled>Select mode</option>
+                  <option value="point">Point</option>
+                  <option value="line">Line</option>
+                  <option value="area">Area</option>
+                </select>
+              @endif
             </div>
             <div class="delineation-separator"></div>
             <div class="toolbar-right">
@@ -45,7 +51,9 @@
                 <button id="undoBtn" title="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
                 <button id="redoBtn" title="Redo"><i class="bi bi-arrow-clockwise"></i></button>
               </div>
-              <button id="saveBtn" class="toolbar-save-btn" title="Save"><i class="bi bi-download"></i></button>
+              @unless (request()->routeIs('delineate', 'expert.delineate'))
+                <button id="saveBtn" class="toolbar-save-btn" title="Save"><i class="bi bi-download"></i></button>
+              @endunless
             </div>
           </div>
           <div class="map-layer-control">
@@ -134,7 +142,7 @@
         <div class="panel-header" id="panelHeader">
           <div class="panel-drag-bar"></div>
           <div class="panel-header-info">
-            <div class="panel-header-title" id="panelHeaderTitle">Selected Area</div>
+            <div class="panel-header-title" id="panelHeaderTitle">Selected Zone</div>
             <div class="panel-header-sub" id="panelHeaderSub"><span>Adjust upwards for details</span> <i
                 class="bi bi-chevron-up"></i></div>
           </div>
@@ -144,17 +152,22 @@
           </button>
         </div>
         <div class="scroll">
-          <div class="sec" style="padding-right: 20px;">Selected Zone</div>
           <div id="delineationInfoCard" class="d-card" style="display:none;">
             <div class="d-title">Delineated Area Info</div>
             <div class="d-row"><span class="d-key">Type</span><span class="d-val" id="delineationFeatureType">-</span>
             </div>
-            <div class="d-row"><span class="d-key">Coords</span><span class="d-val"
-                id="delineationFeatureCoords">-</span></div>
+            <div class="d-row"><span class="d-key">Area (ha)</span><span class="d-val"
+              id="delineationFeatureArea">-</span></div>
             <div class="d-row"><span class="d-key">Label</span><span class="d-val" id="delineationFeatureLabel">-</span>
             </div>
+            <div class="d-row"><span class="d-key">Delineated by</span><span class="d-val"
+                id="delineationCreatedBy">-</span></div>
             <div class="d-row"><span class="d-key">Review status</span><span class="d-val"
                 id="delineationReviewStatus">-</span></div>
+            <div id="approvedPlantingRecommendationSection" class="d-row" style="display:none;">
+              <span class="d-key">Planting Recommendation</span>
+              <span class="d-val" id="approvedPlantingRecommendation">-</span>
+            </div>
             <div id="delineationRejectionBox" class="delineation-rejection-box" style="display:none;">
               <strong>Expert feedback</strong>
               <p id="delineationRejectionNotes" style="margin:0;"></p>
@@ -162,23 +175,6 @@
             @if(Auth::user()->isExpert())
               <div class="d-row" id="delineationSubmitterRow" style="display:none;"><span class="d-key">Submitted
                   by</span><span class="d-val" id="delineationSubmitter">-</span></div>
-              <div id="expertReviewActions" class="expert-review-actions" style="display:none;">
-                <div class="div"></div>
-                <div class="sec" style="padding:0;margin-bottom:8px;">Expert review</div>
-                <button type="button" id="expertApproveBtn" class="btn btn-g" style="width:100%;margin-bottom:8px;">
-                  <i class="bi bi-check-circle"></i> Approve delineation
-                </button>
-                <label for="expertRejectionNotes"
-                  style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Rejection
-                  notes (required to reject)</label>
-                <textarea id="expertRejectionNotes" rows="3"
-                  style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
-                  placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
-                <button type="button" id="expertRejectBtn" class="btn"
-                  style="width:100%;margin-top:8px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
-                  <i class="bi bi-x-circle"></i> Reject delineation
-                </button>
-              </div>
             @endif
             <div class="div"></div>
             <div style="margin-bottom:12px;">
@@ -195,6 +191,36 @@
                 style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;overflow-y:auto;"
                 placeholder="Fill in information about this delineated feature"></textarea>
             </div>
+            @if(Auth::user()->isExpert())
+              <div id="expertReviewActions" class="expert-review-actions" style="display:none;">
+                <div class="div"></div>
+                <div class="sec" style="padding:0;margin-bottom:8px;">Expert review</div>
+                <div id="plantingRecommendationSection" style="display:none;margin-bottom:12px;">
+                  <label for="plantingRecommendation"
+                    style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Planting Recommendation</label>
+                  <textarea id="plantingRecommendation" rows="4"
+                    style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;overflow-y:auto;"
+                    placeholder="Add planting guidance before approving this delineation"></textarea>
+                </div>
+                <button type="button" id="expertApproveBtn" class="btn btn-g" style="width:100%;margin-bottom:8px;">
+                  <i class="bi bi-check-circle"></i> Approve delineation
+                </button>
+                <label for="expertRejectionNotes"
+                  style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Rejection
+                  notes (required to reject)</label>
+                <textarea id="expertRejectionNotes" rows="3"
+                  style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
+                  placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
+                <button type="button" id="expertRejectBtn" class="btn"
+                  style="width:100%;margin-top:8px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
+                  <i class="bi bi-x-circle"></i> Reject delineation
+                </button>
+              </div>
+            @elseif (request()->routeIs('delineate'))
+              <button id="saveBtn" type="button" class="btn btn-g delineation-save-btn" style="width:100%;">
+                <i class="bi bi-save"></i> Save delineation
+              </button>
+            @endif
           </div>
           <button id="removeDelineationBtn" class="btn"
             style="width:100%;margin-top:8px;margin-bottom:14px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;"
@@ -209,11 +235,13 @@
               <div class="d-row"><span class="d-key">Last scan</span><span class="d-val" id="dScan"></span></div>
             </div>
             <div class="div"></div>
-            <div class="sec">Genus Distribution</div>
+            <div class="sec" id="genusDistributionTitle">Genus Distribution</div>
+            <div id="genusDistributionEmpty" style="font-size:11px;color:#6a8a6a;margin-bottom:8px;">No verified genus data for this zone.</div>
             <div class="cw" style="height:148px"><canvas id="pieC"></canvas></div>
             <div class="div"></div>
             <div class="div"></div>
-            <div class="sec">Coverage Trend</div>
+            <div class="sec">Coverage Trend (ha)</div>
+            <div id="coverageTrendEmpty" style="font-size:11px;color:#6a8a6a;margin-bottom:8px;">No annual measurements for this zone.</div>
             <div class="cw" style="height:108px"><canvas id="trendC"></canvas></div>
             <div id="temporalZoneBreakdown" style="display:none;margin-top:14px;">
               <div class="div"></div>

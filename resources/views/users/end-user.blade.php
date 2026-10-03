@@ -2617,8 +2617,8 @@
             <div class="d-title">Delineated Area Info</div>
             <div class="d-row"><span class="d-key">Type</span><span class="d-val" id="delineationFeatureType">-</span>
             </div>
-            <div class="d-row"><span class="d-key">Coords</span><span class="d-val"
-                id="delineationFeatureCoords">-</span></div>
+            <div class="d-row"><span class="d-key">Area (ha)</span><span class="d-val"
+              id="delineationFeatureArea">-</span></div>
             <div class="d-row"><span class="d-key">Label</span><span class="d-val" id="delineationFeatureLabel">-</span>
             </div>
             <div class="d-row"><span class="d-key">Review status</span><span class="d-val"
@@ -2910,6 +2910,32 @@
       if (!points.length) return 'N/A';
       if (feature?.type === 'point') return '1 pt';
       return `${points.length} pts`;
+    }
+
+    function calculateFeatureAreaHectares(feature) {
+      if (feature?.type !== 'area' || !Array.isArray(feature.coords) || feature.coords.length < 3) {
+        return null;
+      }
+
+      const earthRadiusMeters = 6371008.8;
+      const points = feature.coords.map(([lat, lng]) => [
+        Number(lat) * Math.PI / 180,
+        Number(lng) * Math.PI / 180,
+      ]);
+      let area = 0;
+
+      for (let i = 0; i < points.length; i++) {
+        const [lat1, lng1] = points[i];
+        const [lat2, lng2] = points[(i + 1) % points.length];
+        area += (lng2 - lng1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+      }
+
+      return Math.abs(area * earthRadiusMeters ** 2 / 2) / 10000;
+    }
+
+    function formatFeatureAreaHectares(feature) {
+      const areaHectares = calculateFeatureAreaHectares(feature);
+      return areaHectares === null ? 'N/A' : `${areaHectares.toFixed(2)} ha`;
     }
 
     function formatDelineationScan(record) {
@@ -3573,15 +3599,7 @@
       }
 
       document.getElementById('delineationFeatureType').textContent = feature.type || '-';
-      let coordsText = '-';
-      if (Array.isArray(feature.coords)) {
-        if (feature.type === 'point') {
-          coordsText = feature.coords.map(n => Number(n).toFixed(4)).join(', ');
-        } else {
-          coordsText = feature.coords.slice(0, 3).map(c => Array.isArray(c) ? c.map(n => Number(n).toFixed(4)).join(', ') : c).join(' | ') + (feature.coords.length > 3 ? ' ...' : '');
-        }
-      }
-      document.getElementById('delineationFeatureCoords').textContent = coordsText;
+      document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
       document.getElementById('delineationFeatureLabel').textContent = feature.label || '-';
       document.getElementById('delineationLabel').value = feature.label || '';
       document.getElementById('delineationNotes').value = feature.notes || '';

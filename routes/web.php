@@ -9,6 +9,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ExpertController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\DelineationAnnualObservationController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
@@ -140,6 +141,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('end_user')->get('/dashboard', [EndUserController::class, 'dashboard'])->name('dashboard');
     Route::middleware('end_user')->post('/delineations', [EndUserController::class, 'storeDelineation'])->name('delineations.store');
     Route::middleware('end_user')->delete('/delineations/{delineation}', [EndUserController::class, 'destroyDelineation'])->name('delineations.destroy');
+    Route::get('/delineations/{delineation}/annual-observations', [DelineationAnnualObservationController::class, 'index'])
+        ->name('delineations.annual-observations.index');
 
     // Expert routes - review and approve resident delineations
     Route::middleware('expert')->prefix('expert')->group(function () {
@@ -155,6 +158,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('admin')->prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
         Route::get('/datasets', [AdminController::class, 'datasets'])->name('admin.datasets');
+        Route::get('/annual-observations', [DelineationAnnualObservationController::class, 'create'])
+            ->name('admin.annual-observations.create');
+        Route::post('/annual-observations', [DelineationAnnualObservationController::class, 'store'])
+            ->name('admin.annual-observations.store');
         Route::get('/models', [AdminController::class, 'models'])->name('admin.models');
         Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
         Route::get('/users/{user}', [AdminController::class, 'show'])->name('admin.users.show');

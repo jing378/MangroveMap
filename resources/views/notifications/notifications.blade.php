@@ -458,10 +458,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         ];
         $delineationId = $notification->data['delineation_id'] ?? null;
         $viewUrl = $notification->data['url'] ?? null;
-        if (! $viewUrl && $delineationId) {
+        if ($delineationId) {
         $viewUrl = Auth::user()->isExpert()
-        ? route('expert.dashboard', ['delineation' => $delineationId])
-        : route('dashboard', ['delineation' => $delineationId]);
+        ? route('expert.map', ['delineation' => $delineationId])
+        : route('map', ['delineation' => $delineationId]);
         }
         $iconColor = $colorMap[$type] ?? '#1e9e62';
         @endphp
@@ -482,37 +482,9 @@ if ($currentUser && $currentUser->role === 'admin') {
             </div>
             <div class="notification-card-actions">
                 @if($delineationId && $viewUrl)
-                <a href="{{ $viewUrl }}" class="btn-view-delineation">
-                    <i class="bi bi-map"></i> View delineation
+                <a href="{{ $viewUrl }}" class="btn-view-delineation" @if(!$notification->read_at) data-mark-read-url="{{ route('notifications.mark-as-read', $notification->id) }}" @endif>
+                    <i class="bi bi-map"></i> View
                 </a>
-                @endif
-                @if(Auth::user()->isExpert() && ($notification->data['type'] ?? '') === 'delineation_submitted' && !empty($notification->data['delineation_id']))
-                <form action="{{ route('expert.delineations.approve', $notification->data['delineation_id']) }}" method="POST" data-approve-form>
-                    @csrf
-                    <button type="submit" class="btn-approve">
-                        <i class="bi bi-check2"></i> Approve
-                    </button>
-                </form>
-                <button type="button" class="btn-reject" data-reject-toggle="{{ $notification->id }}">
-                    <i class="bi bi-x-lg"></i> Reject
-                </button>
-                <form action="{{ route('expert.delineations.reject', $notification->data['delineation_id']) }}" method="POST" class="notification-reject-form" id="notification-reject-form-{{ $notification->id }}" data-reject-form>
-                    @csrf
-                    <label for="rejection_notes_{{ $notification->id }}">Rejection notes</label>
-                    <textarea id="rejection_notes_{{ $notification->id }}" name="rejection_notes" placeholder="Enter rejection notes (min 10 characters)" required minlength="10" maxlength="2000"></textarea>
-                    <button type="submit" class="btn-reject">
-                        <i class="bi bi-send"></i> Submit rejection
-                    </button>
-                </form>
-                @endif
-                @if(!$notification->read_at)
-                <form action="{{ route('notifications.mark-as-read', $notification->id) }}" method="POST" class="mark-read-form" data-ajax-mark-read>
-                    @csrf
-                    @method('PUT')
-                    <button type="submit" class="btn-mark-read" title="Mark as read">
-                        <i class="bi bi-check2"></i> Mark as read
-                    </button>
-                </form>
                 @endif
                 <form action="{{ route('notifications.destroy', $notification->id) }}" method="POST" data-delete-form>
                     @csrf
@@ -665,6 +637,46 @@ if ($currentUser && $currentUser->role === 'admin') {
                     updateUnreadUi(data.unreadCount ?? 0);
                     showSuccessMessage('Marked as read');
                 });
+            });
+        });
+
+        document.querySelectorAll('.btn-view-delineation[data-mark-read-url]').forEach(link => {
+            link.addEventListener('click', async function(e) {
+                if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+                    return;
+                }
+
+                e.preventDefault();
+                const markReadUrl = link.dataset.markReadUrl;
+                const targetUrl = link.href;
+
+                try {
+                    const res = await fetch(markReadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: new URLSearchParams({
+                            _method: 'PUT'
+                        })
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        const card = link.closest('[data-notification-id]');
+                        card?.classList.remove('unread');
+                        const unreadForm = card?.querySelector('[data-ajax-mark-read]');
+                        unreadForm?.remove();
+                        updateUnreadUi(data.unreadCount ?? 0);
+                    }
+                } catch (error) {
+                    console.warn('Could not mark notification as read before navigation.', error);
+                } finally {
+                    window.location.href = targetUrl;
+                }
             });
         });
 

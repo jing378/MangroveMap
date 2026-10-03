@@ -405,10 +405,22 @@
   #mapRightPanel .scroll {
     width: 100%;
     min-width: 100%;
+    min-height: 0;
     box-sizing: border-box;
     flex: 1;
     overflow-y: auto;
     padding: 14px;
+    scrollbar-width: thin;
+    scrollbar-color: #d4e0d4 transparent;
+  }
+
+  #mapRightPanel .scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  #mapRightPanel .scroll::-webkit-scrollbar-thumb {
+    background: #d4e0d4;
+    border-radius: 3px;
   }
 
   .panel-close-btn {
@@ -420,19 +432,20 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: none;
+    background: #fff1f0;
+    border: 1px solid #f2c2bd;
     border-radius: 6px;
     font-size: 14px;
     cursor: pointer;
-    color: #7a9a7a;
+    color: #c0392b;
     z-index: 10;
     transition: all 0.15s ease;
   }
 
   .panel-close-btn:hover {
-    background: #eef4ee;
-    color: #1a2e1a;
+    background: #d04030;
+    border-color: #d04030;
+    color: #ffffff;
   }
 
   /* Mobile bottom sheet backdrop */
@@ -458,17 +471,40 @@
     }
   }
 
-  /* Desktop: header container takes 0 height so close button sits at top-right without taking layout space */
   .panel-header {
     position: relative;
-    height: 0;
-    overflow: visible;
-    padding: 0;
-    border: none;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 56px;
+    box-sizing: border-box;
+    padding: 12px 52px 12px 16px;
+    border-bottom: 1px solid #edf2ed;
+    background: #ffffff;
   }
 
-  .panel-drag-bar,
+  .panel-drag-bar {
+    display: none;
+  }
+
   .panel-header-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .panel-header-title {
+    overflow: hidden;
+    color: #1b2e1b;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .panel-header-sub {
     display: none;
   }
 
@@ -663,20 +699,21 @@
       flex-shrink: 0;
       width: 32px;
       height: 32px;
-      background: #f0f4f0;
+      background: #fff1f0;
       border-radius: 50%;
-      color: #496349;
+      color: #c0392b;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: 13px;
-      border: none;
+      border: 1px solid #f2c2bd;
       cursor: pointer;
     }
 
     #mapRightPanel .panel-close-btn:active {
-      background: #e2ebe2;
-      color: #182918;
+      background: #d04030;
+      border-color: #d04030;
+      color: #ffffff;
     }
 
     #mapRightPanel .scroll {
@@ -685,6 +722,16 @@
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       padding: 10px 14px 20px;
+    }
+
+    #mapRightPanel .delineation-save-btn {
+      position: sticky;
+      bottom: -10px;
+      z-index: 2;
+      margin-top: 8px;
+      padding: 10px;
+      background: #1e9e62;
+      box-shadow: 0 -6px 12px rgba(247, 250, 247, 0.95);
     }
 
     #v-classify {
