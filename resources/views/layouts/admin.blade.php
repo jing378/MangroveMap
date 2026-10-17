@@ -325,10 +325,15 @@
         }
 
         .sidebar-item.active {
-            background: #edf7f2;
-            color: #1e9e62;
-            border-left-color: #1e9e62;
-            font-weight: 600;
+            background: #1d593d;
+            color: #fff;
+            border-left-color: #a9e3bf;
+            font-weight: 700;
+            box-shadow: 0 3px 9px rgba(29, 89, 61, 0.18);
+        }
+
+        .sidebar-item.active i {
+            color: #bcebd0;
         }
 
         .sidebar-logout {

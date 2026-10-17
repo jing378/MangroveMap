@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AIModel;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
@@ -14,22 +15,22 @@ class MangroveSegmentationService
     {
         $python = config('ml.python');
         $script = config('ml.predict_script');
-        $weights = config('ml.model_path');
+        $weights = $this->activeWeightsPath() ?? config('ml.model_path');
 
         if (! is_file((string) $python) && $python !== 'python' && $python !== 'python3') {
             throw new RuntimeException('Python interpreter not found. Create ml/.venv and install ml/requirements.txt.');
         }
 
         if (! is_file((string) $script)) {
-            throw new RuntimeException('Prediction script is missing: '.$script);
+            throw new RuntimeException('Prediction script is missing: ' . $script);
         }
 
         if (! is_file((string) $weights)) {
-            throw new RuntimeException('Model weights are missing: '.$weights);
+            throw new RuntimeException('Model weights are missing: ' . $weights);
         }
 
         if (! is_file($imageAbsolutePath)) {
-            throw new RuntimeException('Image not found: '.$imageAbsolutePath);
+            throw new RuntimeException('Image not found: ' . $imageAbsolutePath);
         }
 
         $env = $this->pythonProcessEnvironment();
@@ -77,6 +78,59 @@ class MangroveSegmentationService
         return $payload;
     }
 
+    public function validateWeights(string $weightsPath): void
+    {
+        $python = config('ml.python');
+        $script = config('ml.predict_script');
+
+        if (! is_file((string) $python) && $python !== 'python' && $python !== 'python3') {
+            throw new RuntimeException('Python interpreter not found. Create ml/.venv and install ml/requirements.txt.');
+        }
+
+        if (! is_file((string) $script)) {
+            throw new RuntimeException('Prediction script is missing: ' . $script);
+        }
+
+        if (! is_file($weightsPath)) {
+            throw new RuntimeException('Uploaded checkpoint could not be read.');
+        }
+
+        $env = $this->pythonProcessEnvironment();
+        $this->exposeWindowsSocketEnv($env);
+
+        $pending = Process::timeout((int) config('ml.timeout', 180))->env($env);
+        if (PHP_OS_FAMILY === 'Windows') {
+            $pending = $pending->options(['create_process_group' => true]);
+        }
+
+        $result = $pending->run([
+            (string) $python,
+            (string) $script,
+            '--weights',
+            $weightsPath,
+            '--validate-weights',
+        ]);
+
+        $payload = json_decode(trim($result->output()), true);
+        if (! $result->successful() || ! is_array($payload) || empty($payload['ok'])) {
+            $error = is_array($payload) ? ($payload['error'] ?? null) : null;
+            throw new RuntimeException($error ?: 'Checkpoint is not compatible with the supported U-Net segmentation model.');
+        }
+    }
+
+    private function activeWeightsPath(): ?string
+    {
+        return AIModel::query()
+            ->where('model_type', 'segmentation')
+            ->where('is_active', true)
+            ->whereNotNull('model_path')
+            ->orderByDesc('id')
+            ->pluck('model_path')
+            ->first(fn($path) => is_string($path)
+                && strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'pth'
+                && is_file($path));
+    }
+
     /**
      * Apache/PHP on Windows often starts child processes without SystemRoot.
      * Python then fails importing asyncio/_overlapped with WinError 10106.
@@ -93,10 +147,10 @@ class MangroveSegmentationService
         }
 
         $systemRoot = $env['SystemRoot'] ?? $env['SYSTEMROOT'] ?? 'C:\\Windows';
-        $system32 = $systemRoot.'\\System32';
+        $system32 = $systemRoot . '\\System32';
         $path = $env['PATH'] ?? $env['Path'] ?? '';
         if (stripos($path, $system32) === false) {
-            $path = $system32.';'.$systemRoot.';'.$system32.'\\Wbem;'.$path;
+            $path = $system32 . ';' . $systemRoot . ';' . $system32 . '\\Wbem;' . $path;
         }
 
         $env['SYSTEMROOT'] = $systemRoot;
@@ -106,7 +160,7 @@ class MangroveSegmentationService
         $env['PATH'] = $path;
         $env['Path'] = $path;
         $env['PATHEXT'] = $env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD;.VBS';
-        $env['COMSPEC'] = $env['COMSPEC'] ?? $system32.'\\cmd.exe';
+        $env['COMSPEC'] = $env['COMSPEC'] ?? $system32 . '\\cmd.exe';
         $env['TEMP'] = $env['TEMP'] ?? sys_get_temp_dir();
         $env['TMP'] = $env['TMP'] ?? sys_get_temp_dir();
         $env['PYTHONUNBUFFERED'] = '1';
@@ -131,7 +185,7 @@ class MangroveSegmentationService
             if (empty($env[$key])) {
                 continue;
             }
-            putenv($key.'='.$env[$key]);
+            putenv($key . '=' . $env[$key]);
             $_ENV[$key] = $env[$key];
             $_SERVER[$key] = $env[$key];
         }

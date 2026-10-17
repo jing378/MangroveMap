@@ -93,6 +93,8 @@
       return {
         type: feature.type,
         coords: feature.coords,
+        location: feature.detected_location || null,
+        genera: Array.isArray(feature.genera) ? feature.genera : (currentSelectedGenera || []),
       };
     }
 
@@ -106,6 +108,239 @@
       }, [0, 0]);
       return [total[0] / points.length, total[1] / points.length];
     }
+
+    const locationCache = new Map();
+
+    const knownCoastalRegions = [
+      { name: 'Sogod, Southern Leyte', latMin: 10.36, latMax: 10.45, lngMin: 124.96, lngMax: 125.04 },
+      { name: 'Bontoc, Southern Leyte', latMin: 10.30, latMax: 10.36, lngMin: 124.93, lngMax: 125.00 },
+      { name: 'Tomas Oppus, Southern Leyte', latMin: 10.22, latMax: 10.30, lngMin: 124.95, lngMax: 125.02 },
+      { name: 'Malitbog, Southern Leyte', latMin: 10.12, latMax: 10.22, lngMin: 124.97, lngMax: 125.05 },
+      { name: 'Padre Burgos, Southern Leyte', latMin: 10.05, latMax: 10.12, lngMin: 124.99, lngMax: 125.07 },
+      { name: 'Libagon, Southern Leyte', latMin: 10.24, latMax: 10.35, lngMin: 125.02, lngMax: 125.09 },
+      { name: 'Liloan, Southern Leyte', latMin: 10.13, latMax: 10.22, lngMin: 125.10, lngMax: 125.18 },
+      { name: 'San Francisco, Southern Leyte', latMin: 10.00, latMax: 10.13, lngMin: 125.12, lngMax: 125.24 },
+      { name: 'Pintuyan, Southern Leyte', latMin: 9.92, latMax: 10.00, lngMin: 125.18, lngMax: 125.28 },
+      { name: 'San Ricardo, Southern Leyte', latMin: 9.87, latMax: 9.96, lngMin: 125.26, lngMax: 125.33 },
+      { name: 'Limasawa, Southern Leyte', latMin: 9.89, latMax: 9.95, lngMin: 125.05, lngMax: 125.09 },
+      { name: 'Saint Bernard, Southern Leyte', latMin: 10.27, latMax: 10.36, lngMin: 125.11, lngMax: 125.21 },
+      { name: 'San Juan, Southern Leyte', latMin: 10.22, latMax: 10.31, lngMin: 125.15, lngMax: 125.23 },
+      { name: 'Anahawan, Southern Leyte', latMin: 10.32, latMax: 10.39, lngMin: 125.21, lngMax: 125.29 },
+      { name: 'Hinundayan, Southern Leyte', latMin: 10.33, latMax: 10.40, lngMin: 125.23, lngMax: 125.30 },
+      { name: 'Hinunangan, Southern Leyte', latMin: 10.38, latMax: 10.48, lngMin: 125.17, lngMax: 125.26 },
+      { name: 'Silago, Southern Leyte', latMin: 10.48, latMax: 10.60, lngMin: 125.12, lngMax: 125.23 },
+      { name: 'Macrohon, Southern Leyte', latMin: 10.03, latMax: 10.12, lngMin: 124.90, lngMax: 124.98 },
+      { name: 'Maasin City, Southern Leyte', latMin: 10.10, latMax: 10.22, lngMin: 124.80, lngMax: 124.92 },
+      { name: 'Sogod Bay, Southern Leyte', latMin: 10.05, latMax: 10.42, lngMin: 124.95, lngMax: 125.08 },
+    ];
+
+    function getKnownLocalRegion(lat, lng) {
+      for (const region of knownCoastalRegions) {
+        if (lat >= region.latMin && lat <= region.latMax && lng >= region.lngMin && lng <= region.lngMax) {
+          return region.name;
+        }
+      }
+      return null;
+    }
+
+    async function detectGeographicLocation(lat, lng) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return 'Unknown location';
+      }
+
+      const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+      if (locationCache.has(cacheKey)) {
+        return locationCache.get(cacheKey);
+      }
+
+      const fallbackName = getKnownLocalRegion(lat, lng) || `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=14&addressdetails=1`;
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const addr = data.address || {};
+          const local = addr.village || addr.suburb || addr.neighbourhood || addr.quarter || addr.hamlet || addr.isolated_dwelling || addr.bay || addr.beach || addr.island || addr.natural;
+          const municipality = addr.municipality || addr.town || addr.city || addr.city_district || addr.county || addr.district;
+          const province = addr.state || addr.province || addr.region;
+          const country = addr.country;
+
+          const parts = [];
+          if (local) parts.push(local);
+          if (municipality && municipality !== local) parts.push(municipality);
+          if (province && province !== municipality) parts.push(province);
+          else if (!province && country) parts.push(country);
+
+          let resolved = parts.join(', ');
+          if (!resolved && data.display_name) {
+            resolved = data.display_name.split(',').slice(0, 3).map(s => s.trim()).join(', ');
+          }
+
+          if (resolved) {
+            locationCache.set(cacheKey, resolved);
+            return resolved;
+          }
+        }
+      } catch (e) {
+        // Fallback on network timeout / offline / CORS
+      }
+
+      locationCache.set(cacheKey, fallbackName);
+      return fallbackName;
+    }
+
+    let activeLocationDetectionToken = 0;
+
+    async function updateFeatureLocationDisplay(feature, featureIndex) {
+      const locationEl = document.getElementById('delineationFeatureLocation') || document.getElementById('delineationFeatureLabel');
+      if (!locationEl) return;
+
+      const [lat, lng] = getFeatureCenter(feature);
+      const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+      if (feature.detected_location) {
+        locationEl.textContent = feature.detected_location;
+        return;
+      }
+
+      if (locationCache.has(cacheKey)) {
+        feature.detected_location = locationCache.get(cacheKey);
+        locationEl.textContent = feature.detected_location;
+        return;
+      }
+
+      const immediate = getKnownLocalRegion(lat, lng) || 'Detecting location...';
+      locationEl.textContent = immediate;
+
+      const token = ++activeLocationDetectionToken;
+      const detected = await detectGeographicLocation(lat, lng);
+
+      if (token !== activeLocationDetectionToken) return;
+
+      feature.detected_location = detected;
+      if (selectedDrawnIndex === featureIndex) {
+        locationEl.textContent = detected;
+        const labelInput = document.getElementById('delineationLabel');
+        if (labelInput && !labelInput.value.trim() && !feature.delineation_id) {
+          labelInput.value = detected;
+          feature.label = detected;
+        }
+      }
+    }
+
+    let currentSelectedGenera = [];
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Local/common names for Philippine mangrove genera
+    const genusLocalNames = {
+      'Rhizophora': 'Bakawan',
+      'Avicennia': 'Bungalon',
+      'Sonneratia': 'Pagatpat',
+      'Bruguiera': 'Miapi',
+      'Ceriops': 'Tungog',
+      'Xylocarpus': 'Tabigi',
+    };
+
+    function getGenusDisplayLabel(genus) {
+      const local = genusLocalNames[genus];
+      return local ? `${genus} <span class="genus-local-name">(${local})</span>` : escapeHtml(genus);
+    }
+
+    function getGenusPlainLabel(genus) {
+      const local = genusLocalNames[genus];
+      return local ? `${genus} (${local})` : genus;
+    }
+
+    function renderDelineationGenera(genera) {
+      currentSelectedGenera = Array.isArray(genera) ? [...genera] : [];
+      const displayEl = document.getElementById('delineationFeatureGenera');
+      if (displayEl) {
+        if (!currentSelectedGenera.length) {
+          displayEl.innerHTML = '<span style="color:#9ab0a0;font-weight:400;font-style:italic;">None recorded</span>';
+        } else {
+          displayEl.innerHTML = currentSelectedGenera
+            .map(g => `<span class="genus-tag">${getGenusDisplayLabel(g)}</span>`)
+            .join(' ');
+        }
+      }
+
+      // Update quick selection buttons
+      document.querySelectorAll('#genusQuickSelector .genus-pill-btn').forEach(btn => {
+        const genus = btn.dataset.genus;
+        const isActive = currentSelectedGenera.includes(genus);
+        btn.classList.toggle('active', isActive);
+        btn.innerHTML = `<i class="bi ${isActive ? 'bi-check2' : 'bi-plus'}"></i> ${getGenusDisplayLabel(genus)}`;
+      });
+
+      // Update selected tags with remove button
+      const container = document.getElementById('delineationSelectedGeneraContainer');
+      if (container) {
+        container.innerHTML = currentSelectedGenera.map(genus => `
+          <span class="genus-tag">
+            ${getGenusDisplayLabel(genus)}
+            <span class="genus-tag-remove" onclick="removeGenusSelection('${escapeHtml(genus)}')" title="Remove">&times;</span>
+          </span>
+        `).join('');
+      }
+    }
+
+    window.toggleGenusSelection = function (genus) {
+      if (!genus) return;
+      const idx = currentSelectedGenera.indexOf(genus);
+      if (idx >= 0) {
+        currentSelectedGenera.splice(idx, 1);
+      } else {
+        currentSelectedGenera.push(genus);
+      }
+      if (selectedDrawnIndex >= 0 && drawnFeatures[selectedDrawnIndex]) {
+        drawnFeatures[selectedDrawnIndex].genera = [...currentSelectedGenera];
+      }
+      renderDelineationGenera(currentSelectedGenera);
+    };
+
+    window.removeGenusSelection = function (genus) {
+      window.toggleGenusSelection(genus);
+    };
+
+    window.addCustomGenusFromInput = function () {
+      const input = document.getElementById('delineationCustomGenusInput');
+      if (!input) return;
+      const raw = input.value.trim();
+      if (!raw) return;
+      const formatted = raw.charAt(0).toUpperCase() + raw.slice(1);
+      if (!currentSelectedGenera.includes(formatted)) {
+        currentSelectedGenera.push(formatted);
+        if (selectedDrawnIndex >= 0 && drawnFeatures[selectedDrawnIndex]) {
+          drawnFeatures[selectedDrawnIndex].genera = [...currentSelectedGenera];
+        }
+        renderDelineationGenera(currentSelectedGenera);
+      }
+      input.value = '';
+    };
+
+    document.getElementById('delineationCustomGenusInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        window.addCustomGenusFromInput();
+      }
+    });
 
     function formatFeatureArea(feature) {
       const points = extractPoints(feature?.coords);
@@ -179,6 +414,7 @@
       return {
         id: record.id,
         name: record.name || `Delineation ${record.id}`,
+        feature,
         lat,
         lng,
         area: formatFeatureArea(feature),
@@ -197,14 +433,6 @@
     const plantSites = [];
 
     const zoneContainer = document.getElementById('zoneListContainer');
-    // Sample multi-year temporal zone
-    const tempZoneDiv = document.createElement('div');
-    tempZoneDiv.className = `zone-row`;
-    tempZoneDiv.id = 'temporalZoneRow';
-    tempZoneDiv.setAttribute('onclick', `selectTemporalZone()`);
-    tempZoneDiv.innerHTML = `<div class="z-pip" style="background:#1e9e62"></div><div class="z-name">Silago Reforestation</div><div class="z-ha" id="temporalZoneHa">19.4ha</div><span class="z-chip cg">Temporal 🕒</span>`;
-    zoneContainer.appendChild(tempZoneDiv);
-
     zones.forEach((z, i) => {
       const div = document.createElement('div');
       div.className = `zone-row`;
@@ -212,6 +440,68 @@
       div.innerHTML = `<div class="z-pip" style="background:${z.color}"></div><div class="z-name">${z.name}</div><div class="z-ha">${z.area.replace(/[^0-9k]/g, '')}</div><span class="z-chip ${z.chip || 'ca'}">${z.status}</span>`;
       zoneContainer.appendChild(div);
     });
+
+    const quickJumpInput = document.getElementById('quickJumpInput');
+    const quickJumpResults = document.getElementById('quickJumpResults');
+
+    function renderQuickJumpResults(query = '') {
+      if (!quickJumpResults) return;
+      const normalizedQuery = query.trim().toLocaleLowerCase();
+      const matches = zones
+        .map((zone, index) => ({ zone, index }))
+        .filter(({ zone }) => !normalizedQuery || `${zone.name} ${zone.genus} ${zone.status}`.toLocaleLowerCase().includes(normalizedQuery));
+
+      quickJumpResults.replaceChildren();
+      if (matches.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'quick-jump-empty';
+        emptyMessage.textContent = zones.length ? 'No matching saved areas' : 'No saved areas available';
+        quickJumpResults.appendChild(emptyMessage);
+      } else {
+        matches.slice(0, 8).forEach(({ zone, index }) => {
+          const result = document.createElement('button');
+          result.type = 'button';
+          result.className = 'quick-jump-result';
+
+          const name = document.createElement('span');
+          name.className = 'quick-jump-result-name';
+          name.textContent = zone.name;
+          const meta = document.createElement('span');
+          meta.className = 'quick-jump-result-meta';
+          meta.textContent = `${zone.status} · ${zone.area}`;
+
+          result.append(name, meta);
+          result.addEventListener('click', () => {
+            selectZone(index);
+            quickJumpInput.value = zone.name;
+            quickJumpResults.hidden = true;
+            quickJumpInput.setAttribute('aria-expanded', 'false');
+          });
+          quickJumpResults.appendChild(result);
+        });
+      }
+      quickJumpResults.hidden = false;
+      quickJumpInput?.setAttribute('aria-expanded', 'true');
+    }
+
+    if (quickJumpInput && quickJumpResults) {
+      quickJumpInput.placeholder = zones.length ? 'Search saved areas' : 'No saved areas available';
+      quickJumpInput.disabled = zones.length === 0;
+      quickJumpInput.addEventListener('focus', () => renderQuickJumpResults(quickJumpInput.value));
+      quickJumpInput.addEventListener('input', () => renderQuickJumpResults(quickJumpInput.value));
+      quickJumpInput.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+          quickJumpResults.hidden = true;
+          quickJumpInput.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('click', event => {
+        if (!event.target.closest('#mapQuickJump')) {
+          quickJumpResults.hidden = true;
+          quickJumpInput.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
 
     const tileLayerOpts = {
       maxZoom: 18,
@@ -466,6 +756,8 @@
           record.features.forEach(feature => {
             drawnFeatures.push({
               ...feature,
+              detected_location: feature.location || null,
+              genera: Array.isArray(feature.genera) ? feature.genera : [],
               label: record.name,
               notes: record.notes,
               planting_recommendation: record.planting_recommendation || null,
@@ -498,6 +790,8 @@
         drawnFeatures.push({
           type: feature.type,
           coords: feature.coords,
+          detected_location: feature.location || null,
+          genera: Array.isArray(feature.genera) ? feature.genera : [],
           label: record.name,
           notes: record.notes,
           planting_recommendation: record.planting_recommendation || null,
@@ -540,25 +834,6 @@
 
     loadDelineationsOnMap();
 
-    function syncTimelineMobilePosition() {
-      const timeline = document.getElementById('mapTimelineControl');
-      const panel = document.getElementById('mapRightPanel');
-      if (!timeline) return;
-
-      if (window.innerWidth <= 780 && panel && panel.classList.contains('open')) {
-        if (panel.classList.contains('expanded')) {
-          timeline.classList.remove('above-peek');
-          timeline.classList.add('hidden-expanded');
-        } else {
-          timeline.classList.add('above-peek');
-          timeline.classList.remove('hidden-expanded');
-        }
-      } else {
-        timeline.classList.remove('above-peek', 'hidden-expanded');
-      }
-    }
-    window.addEventListener('resize', syncTimelineMobilePosition);
-
     function openRightPanel() {
       const panel = document.getElementById('mapRightPanel');
       const backdrop = document.getElementById('panelBackdrop');
@@ -577,8 +852,6 @@
         panel.classList.remove('peek', 'expanded');
         panel.classList.add('open');
       }
-
-      syncTimelineMobilePosition();
 
       setTimeout(() => {
         if (typeof mainMap !== 'undefined' && mainMap) {
@@ -601,8 +874,6 @@
         headerSub.innerHTML = '<span>Swipe down to collapse</span> <i class="bi bi-chevron-down"></i>';
       }
 
-      syncTimelineMobilePosition();
-
       setTimeout(() => {
         if (typeof mainMap !== 'undefined' && mainMap) {
           mainMap.invalidateSize({ pan: false });
@@ -624,8 +895,6 @@
         headerSub.innerHTML = '<span>Adjust upwards for details</span> <i class="bi bi-chevron-up"></i>';
       }
 
-      syncTimelineMobilePosition();
-
       setTimeout(() => {
         if (typeof mainMap !== 'undefined' && mainMap) {
           mainMap.invalidateSize({ pan: false });
@@ -643,8 +912,6 @@
         panel.classList.remove('open', 'peek', 'expanded');
       }
       if (backdrop) backdrop.classList.remove('show');
-
-      syncTimelineMobilePosition();
 
       const infoCard = document.getElementById('delineationInfoCard');
       if (infoCard) infoCard.style.display = 'none';
@@ -744,12 +1011,9 @@
     initBottomSheetGestures();
 
     function selectZone(i) {
-      isTemporalZoneSelected = false;
-      document.getElementById('temporalZoneRow')?.classList.remove('sel');
-      document.getElementById('temporalZoneBreakdown')?.style.setProperty('display', 'none');
-
       currentSelectedZoneIndex = i;
       let z = zones[i];
+      if (quickJumpInput && z) quickJumpInput.value = z.name;
       document.querySelectorAll('.zone-row').forEach((r, j) => r.classList.toggle('sel', j === i));
 
       if (isExpertUser && z?.id) {
@@ -767,7 +1031,7 @@
       document.getElementById('dStatus').className = `d-val ${z.sc}`;
       document.getElementById('dGenus').textContent = z.genus;
       document.getElementById('dScan').textContent = z.scan;
-      loadAnnualObservationCharts(z.id);
+      loadAnnualObservationCharts(z.id, z.name);
 
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
@@ -780,9 +1044,19 @@
       document.getElementById('zoneDetailsContent').style.display = 'block';
       document.getElementById('expertReviewActions')?.style.setProperty('display', 'none');
       document.getElementById('delineationSubmitterRow')?.style.setProperty('display', 'none');
-      mainMap.flyTo([z.lat, z.lng], 10, {
-        duration: 1
-      });
+      const feature = z.feature;
+      if (feature?.type === 'point' && Array.isArray(feature.coords)) {
+        mainMap.flyTo([z.lat, z.lng], Math.max(mainMap.getZoom(), 16), { duration: 0.8 });
+      } else {
+        const points = extractPoints(feature?.coords)
+          .filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+        if (points.length > 0) {
+          const bounds = L.latLngBounds(points.map(point => L.latLng(point[0], point[1])));
+          mainMap.flyToBounds(bounds, { padding: [50, 50], maxZoom: 17, duration: 0.8 });
+        } else {
+          mainMap.flyTo([z.lat, z.lng], Math.max(mainMap.getZoom(), 14), { duration: 0.8 });
+        }
+      }
       polys[i].openPopup();
     }
 
@@ -792,7 +1066,8 @@
       selectedDrawnIndex = i;
 
       openRightPanel();
-      loadAnnualObservationCharts(feature.delineation_id);
+      const selectedZone = zones.find(zone => zone.id === feature.delineation_id);
+      loadAnnualObservationCharts(feature.delineation_id, selectedZone?.name || feature.label || 'Selected area');
 
       document.getElementById('delineationInfoCard').style.display = 'block';
       document.getElementById('zoneDetailsContent').style.display = 'none';
@@ -804,9 +1079,20 @@
 
       document.getElementById('delineationFeatureType').textContent = feature.type || '-';
       document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
-      document.getElementById('delineationFeatureLabel').textContent = feature.label || '-';
+      const locationEl = document.getElementById('delineationFeatureLocation');
+      if (locationEl) {
+        updateFeatureLocationDisplay(feature, i);
+      }
+      const labelField = document.getElementById('delineationFeatureLabel');
+      if (labelField) {
+        labelField.textContent = feature.label || '-';
+      }
       document.getElementById('delineationLabel').value = feature.label || '';
       document.getElementById('delineationNotes').value = feature.notes || '';
+
+      // Mangrove Genus Present
+      currentSelectedGenera = Array.isArray(feature.genera) ? [...feature.genera] : [];
+      renderDelineationGenera(currentSelectedGenera);
 
       const recommendationSection = document.getElementById('plantingRecommendationSection');
       const recommendationInput = document.getElementById('plantingRecommendation');
@@ -922,7 +1208,8 @@
 
       return {
         name: label,
-        notes
+        notes,
+        genera: [...currentSelectedGenera]
       };
     }
 
@@ -934,6 +1221,8 @@
       const feature = drawnFeatures[selectedDrawnIndex];
       feature.label = meta.name;
       feature.notes = meta.notes;
+      feature.genera = meta.genera;
+      renderDelineationGenera(meta.genera);
       alert('Delineation details saved.');
     }
 
@@ -1108,6 +1397,16 @@
         currentFeature = state.currentFeature ? JSON.parse(JSON.stringify(state.currentFeature)) : null;
         redrawFeatures();
         updateHistoryButtons();
+        if (selectedDrawnIndex >= 0) {
+          if (selectedDrawnIndex < drawnFeatures.length) {
+            selectDrawnFeature(selectedDrawnIndex);
+          } else if (drawnFeatures.length > 0) {
+            selectDrawnFeature(drawnFeatures.length - 1);
+          } else {
+            selectedDrawnIndex = -1;
+            document.getElementById('delineationInfoCard').style.display = 'none';
+          }
+        }
       }
     });
 
@@ -1119,6 +1418,13 @@
         currentFeature = state.currentFeature ? JSON.parse(JSON.stringify(state.currentFeature)) : null;
         redrawFeatures();
         updateHistoryButtons();
+        if (selectedDrawnIndex >= 0) {
+          if (selectedDrawnIndex < drawnFeatures.length) {
+            selectDrawnFeature(selectedDrawnIndex);
+          } else if (drawnFeatures.length > 0) {
+            selectDrawnFeature(drawnFeatures.length - 1);
+          }
+        }
       }
     });
 
@@ -1163,6 +1469,7 @@
             features: newFeatures.map(featureForPersistence),
             name: meta.name,
             notes: meta.notes,
+            genera: meta.genera,
           })
         });
 
@@ -1178,6 +1485,7 @@
             feature.is_rejected = !!payload.delineation.is_rejected;
             feature.label = payload.delineation.name;
             feature.notes = payload.delineation.notes;
+            feature.genera = meta.genera;
           });
           redrawFeatures();
         }
@@ -1295,7 +1603,10 @@
 
       // Draw completed features
       drawnFeatures.forEach((f, i) => {
-        const color = getFeatureColor(f);
+        const isSelected = i === selectedDrawnIndex;
+        const color = isSelected ? '#1a73e8' : getFeatureColor(f);
+        const isSelectedEditable = (isSelected && !f.delineation_id && document.getElementById('delineationToolbar')?.classList.contains('active'));
+
         if (f.type === 'point') {
           const marker = L.circleMarker(f.coords, {
             radius: 7,
@@ -1308,18 +1619,60 @@
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeature(i);
           });
+          if (isSelectedEditable) {
+            const handle = L.marker(f.coords, {
+              draggable: true,
+              icon: L.divIcon({
+                className: 'delineation-vertex-handle',
+                html: '<div style="width:14px;height:14px;background:#1a73e8;border:2px solid #ffffff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:grab;"></div>',
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+              })
+            }).addTo(vertexLayer);
+            handle.on('drag', (e) => {
+              f.coords = [e.latlng.lat, e.latlng.lng];
+              marker.setLatLng(f.coords);
+            });
+            handle.on('dragend', () => {
+              delete f.detected_location;
+              saveDrawingStateToHistory();
+              redrawFeatures();
+              updateFeatureLocationDisplay(f, i);
+            });
+          }
         } else if (f.type === 'line') {
           const line = L.polyline(f.coords, {
             color,
-            weight: 3,
+            weight: isSelected ? 4 : 3,
           }).addTo(delineationLayer);
           line.on('click', (e) => {
             if (drawingMode && !lineOnlyDelineation) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeature(i);
           });
-          // Vertex markers are visually nice but expensive; only render them in edit mode.
-          if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
+          if (isSelectedEditable) {
+            f.coords.forEach((coord, vIdx) => {
+              const handle = L.marker(coord, {
+                draggable: true,
+                icon: L.divIcon({
+                  className: 'delineation-vertex-handle',
+                  html: '<div style="width:12px;height:12px;background:#1a73e8;border:2px solid #ffffff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:grab;"></div>',
+                  iconSize: [12, 12],
+                  iconAnchor: [6, 6]
+                })
+              }).addTo(vertexLayer);
+              handle.on('drag', (e) => {
+                f.coords[vIdx] = [e.latlng.lat, e.latlng.lng];
+                line.setLatLngs(f.coords);
+              });
+              handle.on('dragend', () => {
+                delete f.detected_location;
+                saveDrawingStateToHistory();
+                redrawFeatures();
+                updateFeatureLocationDisplay(f, i);
+              });
+            });
+          } else if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
               radius: 3,
               color,
@@ -1333,15 +1686,43 @@
           const polygon = L.polygon(f.coords, {
             color,
             fillColor: color,
-            fillOpacity: 0.45,
-            weight: 2,
+            fillOpacity: isSelected ? 0.55 : 0.45,
+            weight: isSelected ? 3 : 2,
           }).addTo(delineationLayer);
           polygon.on('click', (e) => {
             if (drawingMode && !lineOnlyDelineation) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeature(i);
           });
-          if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
+          if (isSelectedEditable) {
+            f.coords.forEach((coord, vIdx) => {
+              const handle = L.marker(coord, {
+                draggable: true,
+                icon: L.divIcon({
+                  className: 'delineation-vertex-handle',
+                  html: '<div style="width:12px;height:12px;background:#1a73e8;border:2px solid #ffffff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:grab;"></div>',
+                  iconSize: [12, 12],
+                  iconAnchor: [6, 6]
+                })
+              }).addTo(vertexLayer);
+              handle.on('drag', (e) => {
+                const newPos = [e.latlng.lat, e.latlng.lng];
+                f.coords[vIdx] = newPos;
+                if (vIdx === 0 || vIdx === f.coords.length - 1) {
+                  f.coords[0] = newPos;
+                  f.coords[f.coords.length - 1] = newPos;
+                }
+                polygon.setLatLngs(f.coords);
+                document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(f);
+              });
+              handle.on('dragend', () => {
+                delete f.detected_location;
+                saveDrawingStateToHistory();
+                redrawFeatures();
+                updateFeatureLocationDisplay(f, i);
+              });
+            });
+          } else if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
               radius: 3,
               color,
@@ -1758,10 +2139,15 @@
       }
     }
 
-    function loadAnnualObservationCharts(delineationId) {
+    function loadAnnualObservationCharts(delineationId, delineationName = 'Selected area') {
       annualObservationRequest?.abort();
+      if (!delineationId) {
+        setTemporalHistory([], delineationName, 'empty');
+        setAnnualObservationEmptyState(null);
+        return;
+      }
+      setTemporalHistory([], delineationName, 'loading');
       setAnnualObservationEmptyState(delineationId ? 'Loading verified observations...' : null);
-      if (!delineationId) return;
 
       annualObservationRequest = new AbortController();
       fetch(`${annualObservationBaseUrl}/${encodeURIComponent(delineationId)}/annual-observations`, {
@@ -1775,6 +2161,7 @@
         })
         .then(data => {
           const coverage = Array.isArray(data.coverage) ? data.coverage : [];
+          setTemporalHistory(coverage, delineationName);
           const genusDistribution = Array.isArray(data.genusDistribution) ? data.genusDistribution : [];
           const genusEmpty = document.getElementById('genusDistributionEmpty');
           const coverageEmpty = document.getElementById('coverageTrendEmpty');
@@ -1813,6 +2200,7 @@
           if (error.name !== 'AbortError') {
             console.error(error);
             setAnnualObservationEmptyState('Annual observations could not be loaded.');
+            setTemporalHistory([], delineationName, 'error');
           }
         });
     }
@@ -1870,7 +2258,7 @@
     // =========================================================
     // TEMPORAL MONITORING (CHANGES OVER TIME) TIMELINE CONTROLLER
     // =========================================================
-    const temporalData = [
+    const sampleTemporalData = [
       {
         year: '2021',
         label: '2021 (Baseline)',
@@ -1951,30 +2339,15 @@
       }
     ];
 
-    let currentTimelineIndex = 5;
-    let timelinePlayInterval = null;
+    let temporalData = [];
+    let currentTimelineIndex = 0;
+    let temporalDelineationGroup = null;
 
-    function applyTimelineEpoch(index, animate = false) {
+    function applyTimelineEpoch(index) {
       const item = temporalData[index];
       if (!item) return;
 
       currentTimelineIndex = index;
-
-      // Update Slider Input
-      const slider = document.getElementById('timelineRangeInput');
-      if (slider && Number(slider.value) !== index) {
-        slider.value = index;
-      }
-
-      // Update Marks
-      const marks = document.querySelectorAll('#timelineMarks .timeline-mark');
-      marks.forEach((m, i) => {
-        if (i === index) {
-          m.classList.add('active');
-        } else {
-          m.classList.remove('active');
-        }
-      });
 
       // Update Badges & Text
       const badgeEl = document.getElementById('timelineChangeBadge');
@@ -1993,33 +2366,114 @@
       const areaEl = document.getElementById('timelineAreaStat');
       if (areaEl) areaEl.textContent = item.areaFormatted;
 
-      const ndviEl = document.getElementById('timelineNdviStat');
-      if (ndviEl) ndviEl.textContent = item.ndviText;
+      const sourceEl = document.getElementById('timelineSourceStat');
+      if (sourceEl) sourceEl.textContent = item.sourceText;
 
-      // Sync Left Panel Summary Stat
-      const summaryAreaEl = document.getElementById('summaryTotalArea');
-      if (summaryAreaEl) {
-        summaryAreaEl.textContent = item.summaryArea;
+      renderTemporalObservation(item);
+      updateTemporalEpochList();
+    }
+
+    function setTemporalHistory(observations, areaName, state = 'ready') {
+      const timelineControl = document.getElementById('mapTimelineControl');
+      const hasSelectedArea = state !== 'idle';
+      if (timelineControl) timelineControl.style.display = hasSelectedArea ? 'block' : 'none';
+
+      temporalData = observations.map((observation, index) => {
+        const coverage = Number(observation.coverageAreaHa);
+        const previousCoverage = index > 0 ? Number(observations[index - 1].coverageAreaHa) : null;
+        const change = previousCoverage > 0 ? ((coverage - previousCoverage) / previousCoverage) * 100 : null;
+        const changeText = change === null
+          ? 'First recorded observation'
+          : `${change > 0 ? '+' : ''}${change.toFixed(1)}% since ${observations[index - 1].year}`;
+
+        return {
+          year: String(observation.year),
+          label: `${observation.year} observation`,
+          areaFormatted: `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(coverage)} ha`,
+          sourceText: observation.source || 'Not recorded',
+          changeBadge: changeText,
+          isNegative: change !== null && change < 0,
+          features: Array.isArray(observation.features) ? observation.features : [],
+        };
+      });
+      currentTimelineIndex = Math.max(temporalData.length - 1, 0);
+
+      const areaNameEl = document.getElementById('timelineAreaName');
+      if (areaNameEl) areaNameEl.textContent = areaName || 'No area selected';
+
+      if (temporalData.length) {
+        applyTimelineEpoch(currentTimelineIndex);
+      } else {
+        const badge = document.getElementById('timelineChangeBadge');
+        const year = document.getElementById('timelineSelectedYear');
+        const area = document.getElementById('timelineAreaStat');
+        const source = document.getElementById('timelineSourceStat');
+        if (badge) {
+          badge.textContent = state === 'restricted'
+            ? 'Expert history only'
+            : state === 'loading' ? 'Loading history'
+              : state === 'idle' ? 'Select an area'
+                : state === 'error' ? 'History unavailable' : 'No annual history';
+          badge.classList.remove('badge-negative');
+        }
+        if (year) year.textContent = state === 'loading'
+          ? 'Loading...'
+          : state === 'idle' ? 'Select an area'
+            : state === 'error' ? 'Unable to load' : 'No observations';
+        if (area) area.textContent = '-';
+        if (source) source.textContent = '-';
+        const epochList = document.getElementById('temporalEpochList');
+        if (epochList) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'timeline-empty';
+          emptyState.textContent = state === 'restricted'
+            ? 'Annual observation history is available to experts only.'
+            : state === 'loading' ? 'Loading annual observations...'
+              : state === 'error' ? 'Annual observations could not be loaded.'
+                : 'No annual observations have been recorded for this area.';
+          epochList.replaceChildren(emptyState);
+        }
+        temporalDelineationGroup?.clearLayers();
       }
+    }
 
-      // Map Visual Feedback: animate/pulse existing zone markers to reflect temporal state
-      if (typeof polys !== 'undefined' && Array.isArray(polys) && polys.length > 0) {
-        polys.forEach((p) => {
-          if (p && typeof p.setStyle === 'function') {
-            const baseRadius = 8;
-            p.setStyle({
-              fillOpacity: item.markerOpacity * 0.85,
-              opacity: item.markerOpacity
-            });
-            if (typeof p.setRadius === 'function') {
-              p.setRadius(Math.round(baseRadius * item.markerScale));
-            }
-          }
-        });
+    function renderTemporalObservation(item) {
+      if (typeof mainMap === 'undefined' || !mainMap) return;
+      if (!temporalDelineationGroup) {
+        temporalDelineationGroup = L.layerGroup().addTo(mainMap);
       }
+      temporalDelineationGroup.clearLayers();
+      const boundsPoints = [];
 
-      // Render Sample Temporal Delineation Polygon for this active epoch
-      renderSampleTemporalDelineation(index);
+      item.features.forEach(feature => {
+        const points = extractPoints(feature.coords)
+          .filter(point => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+        if (points.length === 0) return;
+
+        let layer;
+        if (feature.type === 'point') {
+          layer = L.circleMarker(points[0], {
+            radius: 8,
+            color: '#fff',
+            weight: 2,
+            fillColor: '#1e9e62',
+            fillOpacity: 0.9,
+          });
+        } else if (feature.type === 'line') {
+          layer = L.polyline(points, { color: '#1e9e62', weight: 4 });
+        } else if (feature.type === 'area') {
+          layer = L.polygon(points, { color: '#1e9e62', weight: 2, fillOpacity: 0.3 });
+        }
+        if (!layer) return;
+        layer.addTo(temporalDelineationGroup);
+        boundsPoints.push(...points);
+      });
+
+      if (boundsPoints.length === 1) {
+        mainMap.flyTo(boundsPoints[0], Math.max(mainMap.getZoom(), 16), { duration: 0.6 });
+      } else if (boundsPoints.length > 1) {
+        mainMap.flyToBounds(L.latLngBounds(boundsPoints), { padding: [50, 50], maxZoom: 17, duration: 0.6 });
+      }
     }
 
     // =========================================================
@@ -2124,7 +2578,6 @@
       }
     ];
 
-    let temporalDelineationGroup = null;
     let sampleActivePolygon = null;
     let isTemporalZoneSelected = false;
 
@@ -2233,8 +2686,6 @@
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) removeBtn.style.display = 'none';
 
-      const breakdownEl = document.getElementById('temporalZoneBreakdown');
-      if (breakdownEl) breakdownEl.style.display = 'block';
       updateTemporalEpochList();
 
       if (sampleActivePolygon && mainMap) {
@@ -2250,52 +2701,43 @@
     function updateTemporalEpochList() {
       const container = document.getElementById('temporalEpochList');
       if (!container) return;
-      container.innerHTML = sampleTemporalEpochs.map((ep, idx) => `
-        <div class="temporal-epoch-row ${idx === currentTimelineIndex ? 'active' : ''}" onclick="setTimelineYearIndex(${idx})">
-          <div class="epoch-year-badge">${ep.year}</div>
-          <div class="epoch-content">
-            <div class="epoch-headline">
-              <span>${ep.status}</span>
-              <span style="color:${ep.color};font-weight:700;">${ep.areaFormatted}</span>
-            </div>
-            <div class="epoch-sub">${ep.notes}</div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    window.onTimelineSliderChange = function (val) {
-      applyTimelineEpoch(parseInt(val, 10));
-    };
-
-    window.setTimelineYearIndex = function (index) {
-      applyTimelineEpoch(index);
-    };
-
-    window.toggleTimelinePlayback = function () {
-      const playBtn = document.getElementById('timelinePlayBtn');
-      const icon = document.getElementById('timelinePlayIcon');
-
-      if (timelinePlayInterval) {
-        // Stop playback
-        clearInterval(timelinePlayInterval);
-        timelinePlayInterval = null;
-        if (playBtn) playBtn.classList.remove('playing');
-        if (icon) icon.className = 'bi bi-play-fill';
-      } else {
-        // Start playback
-        if (playBtn) playBtn.classList.add('playing');
-        if (icon) icon.className = 'bi bi-pause-fill';
-
-        timelinePlayInterval = setInterval(() => {
-          let nextIndex = currentTimelineIndex + 1;
-          if (nextIndex >= temporalData.length) {
-            nextIndex = 0;
+      container.replaceChildren();
+      temporalData.forEach((item, index) => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = `temporal-epoch-row ${index === currentTimelineIndex ? 'active' : ''}`;
+        row.setAttribute('aria-pressed', String(index === currentTimelineIndex));
+        row.addEventListener('click', () => applyTimelineEpoch(index));
+        row.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            applyTimelineEpoch(index);
           }
-          applyTimelineEpoch(nextIndex, true);
-        }, 1600);
-      }
-    };
+        });
+
+        const year = document.createElement('span');
+        year.className = 'epoch-year-badge';
+        year.textContent = item.year;
+        const content = document.createElement('span');
+        content.className = 'epoch-content';
+        const headline = document.createElement('span');
+        headline.className = 'epoch-headline';
+        const source = document.createElement('span');
+        source.className = 'epoch-source';
+        source.textContent = item.sourceText;
+        const area = document.createElement('span');
+        area.className = 'epoch-area';
+        area.textContent = item.areaFormatted;
+        const detail = document.createElement('span');
+        detail.className = 'epoch-sub';
+        detail.textContent = item.changeBadge;
+
+        headline.append(source, area);
+        content.append(headline, detail);
+        row.append(year, content);
+        container.appendChild(row);
+      });
+    }
 
     window.toggleTimelineCollapse = function (e) {
       if (e) e.stopPropagation();
@@ -2312,28 +2754,7 @@
       }
     };
 
-    window.toggleTimelineControl = function () {
-      const control = document.getElementById('mapTimelineControl');
-      const btn = document.getElementById('timelineToggleBtn');
-      if (!control) return;
-
-      if (control.style.display === 'none') {
-        control.style.display = 'block';
-        if (btn) btn.classList.add('active-toggle');
-      } else {
-        control.style.display = 'none';
-        if (btn) btn.classList.remove('active-toggle');
-      }
-    };
-
-    // Initialize timeline to current epoch
-    document.addEventListener('DOMContentLoaded', () => {
-      applyTimelineEpoch(5);
-    });
-    // In case DOM is already ready
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      applyTimelineEpoch(5);
-    }
+    setTemporalHistory([], '', 'idle');
 
 
     if (APP_PAGE === 'delineate') {

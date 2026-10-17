@@ -2445,6 +2445,71 @@
       font-weight: 700;
       border-radius: 10px;
     }
+
+    .genus-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 100px;
+      background: #edf7f2;
+      border: 1px solid #b0e0c0;
+      color: #1e9e62;
+      line-height: 1.2;
+      margin: 2px 1px;
+    }
+
+    .genus-local-name {
+      font-weight: 400;
+      opacity: 0.75;
+      font-style: italic;
+      font-size: 0.92em;
+    }
+
+    .genus-tag-remove {
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 2px;
+      opacity: 0.7;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .genus-tag-remove:hover {
+      opacity: 1;
+      color: #d04030;
+    }
+
+    .genus-pill-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 100px;
+      border: 1px solid #d4dfd4;
+      background: #f8faf7;
+      color: #445944;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .genus-pill-btn:hover {
+      border-color: #1e9e62;
+      background: #f0f7f2;
+      color: #1e9e62;
+    }
+
+    .genus-pill-btn.active {
+      background: #1e9e62;
+      border-color: #1e9e62;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(30, 158, 98, 0.25);
+    }
   </style>
 </head>
 
@@ -2619,7 +2684,9 @@
             </div>
             <div class="d-row"><span class="d-key">Area (ha)</span><span class="d-val"
               id="delineationFeatureArea">-</span></div>
-            <div class="d-row"><span class="d-key">Label</span><span class="d-val" id="delineationFeatureLabel">-</span>
+            <div class="d-row"><span class="d-key">Location</span><span class="d-val" id="delineationFeatureLocation">-</span>
+            </div>
+            <div class="d-row"><span class="d-key">Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span>
             </div>
             <div class="d-row"><span class="d-key">Review status</span><span class="d-val"
                 id="delineationReviewStatus">-</span></div>
@@ -2655,6 +2722,26 @@
               <input id="delineationLabel" type="text"
                 style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;"
                 placeholder="Enter zone name or note" />
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Mangrove Genus Present</label>
+              <div id="genusQuickSelector" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                <button type="button" class="genus-pill-btn" data-genus="Rhizophora" onclick="toggleGenusSelection('Rhizophora')"><i class="bi bi-plus"></i> Rhizophora <span class="genus-local-name">(Bakawan)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Avicennia" onclick="toggleGenusSelection('Avicennia')"><i class="bi bi-plus"></i> Avicennia <span class="genus-local-name">(Bungalon)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Sonneratia" onclick="toggleGenusSelection('Sonneratia')"><i class="bi bi-plus"></i> Sonneratia <span class="genus-local-name">(Pagatpat)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Bruguiera" onclick="toggleGenusSelection('Bruguiera')"><i class="bi bi-plus"></i> Bruguiera <span class="genus-local-name">(Miapi)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Ceriops" onclick="toggleGenusSelection('Ceriops')"><i class="bi bi-plus"></i> Ceriops <span class="genus-local-name">(Tungog)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Xylocarpus" onclick="toggleGenusSelection('Xylocarpus')"><i class="bi bi-plus"></i> Xylocarpus <span class="genus-local-name">(Tabigi)</span></button>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <input id="delineationCustomGenusInput" type="text"
+                  style="flex:1;padding:8px 10px;border:1px solid #d4dfd4;border-radius:8px;background:#f8faf7;color:#182918;font-size:12px;"
+                  placeholder="Or type other genus and press Enter..." />
+                <button type="button" id="addCustomGenusBtn" onclick="addCustomGenusFromInput()" class="btn btn-g" style="padding:7px 12px;font-size:12px;border-radius:8px;white-space:nowrap;">
+                  <i class="bi bi-plus-lg"></i> Add
+                </button>
+              </div>
+              <div id="delineationSelectedGeneraContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
             </div>
             <div style="margin-bottom:12px;">
               <label for="delineationNotes"
@@ -2891,6 +2978,8 @@
       return {
         type: feature.type,
         coords: feature.coords,
+        location: feature.detected_location || null,
+        genera: Array.isArray(feature.genera) ? feature.genera : (currentSelectedGenera || []),
       };
     }
 
@@ -2904,6 +2993,239 @@
       }, [0, 0]);
       return [total[0] / points.length, total[1] / points.length];
     }
+
+    const locationCache = new Map();
+
+    const knownCoastalRegions = [
+      { name: 'Sogod, Southern Leyte', latMin: 10.36, latMax: 10.45, lngMin: 124.96, lngMax: 125.04 },
+      { name: 'Bontoc, Southern Leyte', latMin: 10.30, latMax: 10.36, lngMin: 124.93, lngMax: 125.00 },
+      { name: 'Tomas Oppus, Southern Leyte', latMin: 10.22, latMax: 10.30, lngMin: 124.95, lngMax: 125.02 },
+      { name: 'Malitbog, Southern Leyte', latMin: 10.12, latMax: 10.22, lngMin: 124.97, lngMax: 125.05 },
+      { name: 'Padre Burgos, Southern Leyte', latMin: 10.05, latMax: 10.12, lngMin: 124.99, lngMax: 125.07 },
+      { name: 'Libagon, Southern Leyte', latMin: 10.24, latMax: 10.35, lngMin: 125.02, lngMax: 125.09 },
+      { name: 'Liloan, Southern Leyte', latMin: 10.13, latMax: 10.22, lngMin: 125.10, lngMax: 125.18 },
+      { name: 'San Francisco, Southern Leyte', latMin: 10.00, latMax: 10.13, lngMin: 125.12, lngMax: 125.24 },
+      { name: 'Pintuyan, Southern Leyte', latMin: 9.92, latMax: 10.00, lngMin: 125.18, lngMax: 125.28 },
+      { name: 'San Ricardo, Southern Leyte', latMin: 9.87, latMax: 9.96, lngMin: 125.26, lngMax: 125.33 },
+      { name: 'Limasawa, Southern Leyte', latMin: 9.89, latMax: 9.95, lngMin: 125.05, lngMax: 125.09 },
+      { name: 'Saint Bernard, Southern Leyte', latMin: 10.27, latMax: 10.36, lngMin: 125.11, lngMax: 125.21 },
+      { name: 'San Juan, Southern Leyte', latMin: 10.22, latMax: 10.31, lngMin: 125.15, lngMax: 125.23 },
+      { name: 'Anahawan, Southern Leyte', latMin: 10.32, latMax: 10.39, lngMin: 125.21, lngMax: 125.29 },
+      { name: 'Hinundayan, Southern Leyte', latMin: 10.33, latMax: 10.40, lngMin: 125.23, lngMax: 125.30 },
+      { name: 'Hinunangan, Southern Leyte', latMin: 10.38, latMax: 10.48, lngMin: 125.17, lngMax: 125.26 },
+      { name: 'Silago, Southern Leyte', latMin: 10.48, latMax: 10.60, lngMin: 125.12, lngMax: 125.23 },
+      { name: 'Macrohon, Southern Leyte', latMin: 10.03, latMax: 10.12, lngMin: 124.90, lngMax: 124.98 },
+      { name: 'Maasin City, Southern Leyte', latMin: 10.10, latMax: 10.22, lngMin: 124.80, lngMax: 124.92 },
+      { name: 'Sogod Bay, Southern Leyte', latMin: 10.05, latMax: 10.42, lngMin: 124.95, lngMax: 125.08 },
+    ];
+
+    function getKnownLocalRegion(lat, lng) {
+      for (const region of knownCoastalRegions) {
+        if (lat >= region.latMin && lat <= region.latMax && lng >= region.lngMin && lng <= region.lngMax) {
+          return region.name;
+        }
+      }
+      return null;
+    }
+
+    async function detectGeographicLocation(lat, lng) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return 'Unknown location';
+      }
+
+      const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+      if (locationCache.has(cacheKey)) {
+        return locationCache.get(cacheKey);
+      }
+
+      const fallbackName = getKnownLocalRegion(lat, lng) || `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=14&addressdetails=1`;
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const addr = data.address || {};
+          const local = addr.village || addr.suburb || addr.neighbourhood || addr.quarter || addr.hamlet || addr.isolated_dwelling || addr.bay || addr.beach || addr.island || addr.natural;
+          const municipality = addr.municipality || addr.town || addr.city || addr.city_district || addr.county || addr.district;
+          const province = addr.state || addr.province || addr.region;
+          const country = addr.country;
+
+          const parts = [];
+          if (local) parts.push(local);
+          if (municipality && municipality !== local) parts.push(municipality);
+          if (province && province !== municipality) parts.push(province);
+          else if (!province && country) parts.push(country);
+
+          let resolved = parts.join(', ');
+          if (!resolved && data.display_name) {
+            resolved = data.display_name.split(',').slice(0, 3).map(s => s.trim()).join(', ');
+          }
+
+          if (resolved) {
+            locationCache.set(cacheKey, resolved);
+            return resolved;
+          }
+        }
+      } catch (e) {
+        // Fallback on network timeout / offline / CORS
+      }
+
+      locationCache.set(cacheKey, fallbackName);
+      return fallbackName;
+    }
+
+    let activeLocationDetectionToken = 0;
+
+    async function updateFeatureLocationDisplay(feature, featureIndex) {
+      const locationEl = document.getElementById('delineationFeatureLocation') || document.getElementById('delineationFeatureLabel');
+      if (!locationEl) return;
+
+      const [lat, lng] = getFeatureCenter(feature);
+      const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+      if (feature.detected_location) {
+        locationEl.textContent = feature.detected_location;
+        return;
+      }
+
+      if (locationCache.has(cacheKey)) {
+        feature.detected_location = locationCache.get(cacheKey);
+        locationEl.textContent = feature.detected_location;
+        return;
+      }
+
+      const immediate = getKnownLocalRegion(lat, lng) || 'Detecting location...';
+      locationEl.textContent = immediate;
+
+      const token = ++activeLocationDetectionToken;
+      const detected = await detectGeographicLocation(lat, lng);
+
+      if (token !== activeLocationDetectionToken) return;
+
+      feature.detected_location = detected;
+      if (selectedDrawnIndex === featureIndex) {
+        locationEl.textContent = detected;
+        const labelInput = document.getElementById('delineationLabel');
+        if (labelInput && !labelInput.value.trim() && !feature.delineation_id) {
+          labelInput.value = detected;
+          feature.label = detected;
+        }
+      }
+    }
+
+    let currentSelectedGenera = [];
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Local/common names for Philippine mangrove genera
+    const genusLocalNames = {
+      'Rhizophora': 'Bakawan',
+      'Avicennia': 'Bungalon',
+      'Sonneratia': 'Pagatpat',
+      'Bruguiera': 'Miapi',
+      'Ceriops': 'Tungog',
+      'Xylocarpus': 'Tabigi',
+    };
+
+    function getGenusDisplayLabel(genus) {
+      const local = genusLocalNames[genus];
+      return local ? `${genus} <span class="genus-local-name">(${local})</span>` : escapeHtml(genus);
+    }
+
+    function getGenusPlainLabel(genus) {
+      const local = genusLocalNames[genus];
+      return local ? `${genus} (${local})` : genus;
+    }
+
+    function renderDelineationGenera(genera) {
+      currentSelectedGenera = Array.isArray(genera) ? [...genera] : [];
+      const displayEl = document.getElementById('delineationFeatureGenera');
+      if (displayEl) {
+        if (!currentSelectedGenera.length) {
+          displayEl.innerHTML = '<span style="color:#9ab0a0;font-weight:400;font-style:italic;">None recorded</span>';
+        } else {
+          displayEl.innerHTML = currentSelectedGenera
+            .map(g => `<span class="genus-tag">${getGenusDisplayLabel(g)}</span>`)
+            .join(' ');
+        }
+      }
+
+      // Update quick selection buttons
+      document.querySelectorAll('#genusQuickSelector .genus-pill-btn').forEach(btn => {
+        const genus = btn.dataset.genus;
+        const isActive = currentSelectedGenera.includes(genus);
+        btn.classList.toggle('active', isActive);
+        btn.innerHTML = `<i class="bi ${isActive ? 'bi-check2' : 'bi-plus'}"></i> ${getGenusDisplayLabel(genus)}`;
+      });
+
+      // Update selected tags with remove button
+      const container = document.getElementById('delineationSelectedGeneraContainer');
+      if (container) {
+        container.innerHTML = currentSelectedGenera.map(genus => `
+          <span class="genus-tag">
+            ${getGenusDisplayLabel(genus)}
+            <span class="genus-tag-remove" onclick="removeGenusSelection('${escapeHtml(genus)}')" title="Remove">&times;</span>
+          </span>
+        `).join('');
+      }
+    }
+
+    window.toggleGenusSelection = function (genus) {
+      if (!genus) return;
+      const idx = currentSelectedGenera.indexOf(genus);
+      if (idx >= 0) {
+        currentSelectedGenera.splice(idx, 1);
+      } else {
+        currentSelectedGenera.push(genus);
+      }
+      if (selectedDrawnIndex >= 0 && drawnFeatures[selectedDrawnIndex]) {
+        drawnFeatures[selectedDrawnIndex].genera = [...currentSelectedGenera];
+      }
+      renderDelineationGenera(currentSelectedGenera);
+    };
+
+    window.removeGenusSelection = function (genus) {
+      window.toggleGenusSelection(genus);
+    };
+
+    window.addCustomGenusFromInput = function () {
+      const input = document.getElementById('delineationCustomGenusInput');
+      if (!input) return;
+      const raw = input.value.trim();
+      if (!raw) return;
+      const formatted = raw.charAt(0).toUpperCase() + raw.slice(1);
+      if (!currentSelectedGenera.includes(formatted)) {
+        currentSelectedGenera.push(formatted);
+        if (selectedDrawnIndex >= 0 && drawnFeatures[selectedDrawnIndex]) {
+          drawnFeatures[selectedDrawnIndex].genera = [...currentSelectedGenera];
+        }
+        renderDelineationGenera(currentSelectedGenera);
+      }
+      input.value = '';
+    };
+
+    document.getElementById('delineationCustomGenusInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        window.addCustomGenusFromInput();
+      }
+    });
 
     function formatFeatureArea(feature) {
       const points = extractPoints(feature?.coords);
@@ -3263,6 +3585,8 @@
           record.features.forEach(feature => {
             drawnFeatures.push({
               ...feature,
+              detected_location: feature.location || null,
+              genera: Array.isArray(feature.genera) ? feature.genera : [],
               label: record.name,
               notes: record.notes,
               delineation_id: record.id,
@@ -3293,6 +3617,8 @@
         drawnFeatures.push({
           type: feature.type,
           coords: feature.coords,
+          detected_location: feature.location || null,
+          genera: Array.isArray(feature.genera) ? feature.genera : [],
           label: record.name,
           notes: record.notes,
           delineation_id: record.id,
@@ -3600,9 +3926,20 @@
 
       document.getElementById('delineationFeatureType').textContent = feature.type || '-';
       document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
-      document.getElementById('delineationFeatureLabel').textContent = feature.label || '-';
+      const locationEl = document.getElementById('delineationFeatureLocation');
+      if (locationEl) {
+        updateFeatureLocationDisplay(feature, i);
+      }
+      const labelField = document.getElementById('delineationFeatureLabel');
+      if (labelField) {
+        labelField.textContent = feature.label || '-';
+      }
       document.getElementById('delineationLabel').value = feature.label || '';
       document.getElementById('delineationNotes').value = feature.notes || '';
+
+      // Mangrove Genus Present
+      currentSelectedGenera = Array.isArray(feature.genera) ? [...feature.genera] : [];
+      renderDelineationGenera(currentSelectedGenera);
 
       const statusEl = document.getElementById('delineationReviewStatus');
       const rejectionBox = document.getElementById('delineationRejectionBox');
@@ -3690,7 +4027,8 @@
 
       return {
         name: label,
-        notes
+        notes,
+        genera: [...currentSelectedGenera]
       };
     }
 
@@ -3702,6 +4040,8 @@
       const feature = drawnFeatures[selectedDrawnIndex];
       feature.label = meta.name;
       feature.notes = meta.notes;
+      feature.genera = meta.genera;
+      renderDelineationGenera(meta.genera);
       alert('Delineation details saved.');
     }
 
@@ -3929,6 +4269,7 @@
             features: newFeatures.map(featureForPersistence),
             name: meta.name,
             notes: meta.notes,
+            genera: meta.genera,
           })
         });
 
@@ -3944,6 +4285,7 @@
             feature.is_rejected = !!payload.delineation.is_rejected;
             feature.label = payload.delineation.name;
             feature.notes = payload.delineation.notes;
+            feature.genera = meta.genera;
           });
           redrawFeatures();
         }

@@ -54,7 +54,7 @@ def letterbox(image: Image.Image, size: int) -> tuple[Image.Image, dict]:
 
 
 def load_state_dict(path: Path, device: torch.device) -> dict:
-    ckpt = torch.load(path, map_location=device, weights_only=False)
+    ckpt = torch.load(path, map_location=device, weights_only=True)
     if isinstance(ckpt, dict):
         for key in ("state_dict", "model_state_dict", "model"):
             inner = ckpt.get(key)
@@ -223,19 +223,25 @@ def predict(image_path: Path, weights_path: Path, overlay_path: Path | None, siz
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mangrove U-Net segmentation")
-    parser.add_argument("--image", required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--image")
+    mode.add_argument("--validate-weights", action="store_true")
     parser.add_argument("--weights", required=True)
     parser.add_argument("--overlay", default=None)
     parser.add_argument("--size", type=int, default=512)
     args = parser.parse_args()
 
     try:
-        result = predict(
-            Path(args.image),
-            Path(args.weights),
-            Path(args.overlay) if args.overlay else None,
-            args.size,
-        )
+        if args.validate_weights:
+            load_model(Path(args.weights), torch.device("cpu"))
+            result = {"ok": True}
+        else:
+            result = predict(
+                Path(args.image),
+                Path(args.weights),
+                Path(args.overlay) if args.overlay else None,
+                args.size,
+            )
     except Exception as exc:
         print(json.dumps({"ok": False, "error": str(exc)}), flush=True)
         return 1

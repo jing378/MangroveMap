@@ -137,12 +137,12 @@
                   <td>
                     <div class="hist-actions">
                       @if($a->status === 'completed')
-                        <button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))">
+                        <button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))" title="View analysis" aria-label="View analysis">
                           <i class="bi bi-eye"></i>
                         </button>
                       @endif
                       <button class="view-btn del-btn" onclick="deleteHistoryRow(this.closest('tr'))"
-                        title="Delete this analysis">
+                        title="Delete this analysis" aria-label="Delete this analysis">
                         <i class="bi bi-trash"></i>
                       </button>
                     </div>

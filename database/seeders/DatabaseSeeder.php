@@ -55,7 +55,6 @@ class DatabaseSeeder extends Seeder
         $this->call([
             GenusSeeder::class,
             MangroveDataSeeder::class,
-            DelineationSeeder::class,
             AnalysisSeeder::class,
             AIModelSeeder::class,
             UserActivitySeeder::class,

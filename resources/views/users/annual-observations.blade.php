@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends('layouts.enduser')
 
 @section('title', 'Annual Mangrove Observations')
 
@@ -53,7 +53,7 @@
 
         <section class="observation-form">
             <h2>{{ $editingObservation ? 'Edit annual measurement' : 'Add annual measurement' }}</h2>
-            <form method="POST" action="{{ route('admin.annual-observations.store') }}">
+            <form method="POST" action="{{ route('expert.annual-observations.store') }}">
                 @csrf
                 @if ($editingObservation)
                     <input type="hidden" name="observation_id" value="{{ $editingObservation->id }}">
@@ -112,7 +112,7 @@
                 <div class="observation-actions">
                     <button class="observation-button" type="submit"><i class="bi bi-save"></i> Save measurement</button>
                     @if ($editingObservation)
-                        <a class="observation-button secondary" href="{{ route('admin.annual-observations.create') }}">Cancel</a>
+                        <a class="observation-button secondary" href="{{ route('expert.annual-observations.create') }}">Cancel</a>
                     @endif
                 </div>
             </form>
@@ -133,7 +133,7 @@
                                 <td>{{ $observation->observation_date->format('Y-m-d') }}</td>
                                 <td>{{ number_format($observation->coverage_area_ha, 2) }} ha</td>
                                 <td>{{ $observation->source }}</td>
-                                <td><a class="observation-edit" href="{{ route('admin.annual-observations.create', ['observation' => $observation->id]) }}">Edit</a></td>
+                                <td><a class="observation-edit" href="{{ route('expert.annual-observations.create', ['observation' => $observation->id]) }}">Edit</a></td>
                             </tr>
                         @endforeach
                     </tbody>

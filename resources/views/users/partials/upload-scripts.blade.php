@@ -1,7 +1,7 @@
   <script>
     const uploadUrl = @json(route('delineation.store'));
     const destroyAllUrl = @json(route('delineation.destroyAll'));
-    const destroyUrlTpl = @json(url('/delineation/analyses'));
+    const destroyUrlTpl = @json(route('delineation.destroy', ['analysis' => '__ANALYSIS_ID__']));
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     // ── State ──
@@ -260,8 +260,8 @@
       <td><span class="st-badge st-completed">Completed</span></td>
       <td>
         <div class="hist-actions">
-          <button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))"><i class="bi bi-eye"></i> View</button>
-          <button class="view-btn del-btn" onclick="deleteHistoryRow(this.closest('tr'))" title="Delete this analysis"><i class="bi bi-trash"></i> Delete</button>
+          <button class="view-btn" onclick="viewHistoryRow(this.closest('tr'))" title="View analysis" aria-label="View analysis"><i class="bi bi-eye"></i></button>
+          <button class="view-btn del-btn" onclick="deleteHistoryRow(this.closest('tr'))" title="Delete this analysis" aria-label="Delete this analysis"><i class="bi bi-trash"></i></button>
         </div>
       </td>`;
       tbody.insertAdjacentElement('afterbegin', tr);
@@ -295,7 +295,7 @@
       if (!confirm('Delete this analysis? This cannot be undone.')) return;
 
       try {
-        const res = await fetch(`${destroyUrlTpl}/${id}`, {
+        const res = await fetch(destroyUrlTpl.replace('__ANALYSIS_ID__', encodeURIComponent(id)), {
           method: 'DELETE',
           headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         });

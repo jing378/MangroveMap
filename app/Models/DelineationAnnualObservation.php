@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DelineationAnnualObservation extends Model
 {
@@ -31,5 +32,11 @@ class DelineationAnnualObservation extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function boundaryRevisions(): HasMany
+    {
+        return $this->hasMany(DelineationAnnualObservationBoundaryRevision::class, 'annual_observation_id')
+            ->orderBy('version');
     }
 }

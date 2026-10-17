@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Login - Web-based Mangrove Extent Mapping and Genus Classification and Data Driven Planting Suitability Recommendation</title>
+    <title>Login - Web-Based Mangrove Extent Mapping, Genus Classification, and Expert-Based Planting Suitability Recommendation System</title>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <style>
@@ -461,12 +461,12 @@
             <div class="hero-photo" aria-hidden="true"></div>
             <div class="hero-copy" role="note" aria-label="Project overview">
                 <div class="hero-title">
-                    Web-based Mangrove Extent Mapping, Genus Classification,<br>
-                    and Data-driven Planting Suitability Recommendations
+                    Web-Based Mangrove Extent Mapping, Genus Classification,<br>
+                    and Expert-Based Planting Suitability Recommendation System
                 </div>
                 <div class="hero-sub">
-                    A single platform for mapping mangrove extent, classifying genus from imagery, and recommending
-                    planting sites using data-driven suitability analysis.
+                    A single platform for mapping mangrove extent, classifying genus, and providing expert-based
+                    planting suitability recommendations.
                 </div>
                 <div class="hero-meta" aria-label="Key modules">
                     <span class="chip">Extent mapping</span>

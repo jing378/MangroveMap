@@ -7,10 +7,16 @@ use App\Models\AIModel;
 use App\Models\MangroveData;
 use App\Models\Analysis;
 use App\Models\UserActivity;
+use App\Services\MangroveSegmentationService;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
 
 class AdminController extends Controller
 {
@@ -86,30 +92,115 @@ class AdminController extends Controller
     {
         abort_if(Auth::user()->role !== 'admin', 403);
 
-        $models = AIModel::orderByDesc('training_date')->get();
-        $activeModels = $models->where('is_active', true)->count();
-        $completedModels = $models->where('status', 'completed');
-        $avgAccuracy = $completedModels->isNotEmpty()
-            ? round($completedModels->avg('accuracy') * 100, 1)
-            : 0;
-        $trainingModels = $models->where('status', 'training')->count();
-        $queuedModels = $models->whereNotIn('status', ['completed', 'training', 'failed'])->count();
+        $models = AIModel::orderByDesc('created_at')->get()->map(function (AIModel $model) {
+            $artifactPath = $this->resolveModelArtifactPath($model->model_path);
+            $model->setAttribute('artifact_path', $artifactPath);
+            $model->setAttribute('artifact_available', $artifactPath !== null);
+
+            return $model;
+        });
+
+        $activeModel = $models->first(fn(AIModel $model) => $model->model_type === 'segmentation'
+            && $model->is_active
+            && $model->artifact_available
+            && strtolower(pathinfo($model->artifact_path, PATHINFO_EXTENSION)) === 'pth');
+
+        $runtimeModelPath = $activeModel?->artifact_path;
+        $runtimeModelSource = 'Active registry model';
+        if ($runtimeModelPath === null && is_file((string) config('ml.model_path'))) {
+            $runtimeModelPath = config('ml.model_path');
+            $runtimeModelSource = 'Configured default checkpoint';
+        }
+
+        $availableModels = $models->where('artifact_available', true);
+        $completedModels = $availableModels->where('status', 'completed');
+        $modelsWithAccuracy = $availableModels->filter(fn(AIModel $model) => $model->accuracy !== null)->count();
+        $runtimeModelIsRegistered = $runtimeModelPath !== null
+            && $availableModels->contains(fn(AIModel $model) => $model->artifact_path === $runtimeModelPath);
+        $availableModelCount = $availableModels->count() + ($runtimeModelPath !== null && ! $runtimeModelIsRegistered ? 1 : 0);
 
         $accuracyChart = $completedModels
-            ->sortBy('training_date')
+            ->filter(fn(AIModel $model) => $model->accuracy !== null)
+            ->sortBy('created_at')
             ->values()
-            ->map(fn ($m) => round(($m->accuracy ?? 0) * 100, 1));
+            ->map(fn(AIModel $model) => $model);
 
         return view('admin.model-training', [
             'models' => $models,
-            'activeModels' => $activeModels,
-            'avgAccuracy' => $avgAccuracy,
-            'trainingModels' => $trainingModels,
-            'queuedModels' => $queuedModels,
-            'accuracyChartLabels' => $accuracyChart->keys()->map(fn ($i) => 'Model ' . ($i + 1))->values()->all(),
-            'accuracyChartValues' => $accuracyChart->values()->all(),
-            'completedModels' => $completedModels->sortByDesc('training_date')->take(5),
+            'availableModelCount' => $availableModelCount,
+            'modelsWithAccuracy' => $modelsWithAccuracy,
+            'inferenceReady' => $runtimeModelPath !== null,
+            'accuracyChartLabels' => $accuracyChart->map(fn(AIModel $model) => $model->name)->all(),
+            'accuracyChartValues' => $accuracyChart->map(fn(AIModel $model) => round($model->accuracy * 100, 1))->all(),
+            'completedModels' => $completedModels->sortByDesc('created_at')->take(5),
         ]);
+    }
+
+    private function resolveModelArtifactPath(?string $path): ?string
+    {
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        if (is_file($path)) {
+            return $path;
+        }
+
+        $privatePath = Storage::disk('local')->path($path);
+
+        return is_file($privatePath) ? $privatePath : null;
+    }
+
+    public function uploadModel(Request $request, MangroveSegmentationService $segmentation): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:ai_models,name',
+            'version' => 'required|string|max:50',
+            'model_type' => 'required|in:segmentation',
+            'model_file' => 'required|file|extensions:pth|max:524288',
+        ]);
+
+        $checkpoint = $request->file('model_file');
+
+        try {
+            $segmentation->validateWeights($checkpoint->getPathname());
+        } catch (RuntimeException) {
+            return back()->withErrors([
+                'model_file' => 'This checkpoint is invalid or incompatible. Upload a PyTorch U-Net with a ResNet34 encoder, 3 input channels, and 2 output classes.',
+            ])->withInput();
+        }
+
+        $relativePath = $checkpoint->storeAs('models', Str::uuid() . '.pth', 'local');
+        if (! is_string($relativePath)) {
+            return back()->withErrors(['model_file' => 'The checkpoint could not be stored.'])->withInput();
+        }
+
+        try {
+            DB::transaction(function () use ($validated, $relativePath): void {
+                AIModel::query()
+                    ->where('model_type', 'segmentation')
+                    ->where('is_active', true)
+                    ->update(['is_active' => false]);
+
+                AIModel::create([
+                    'name' => $validated['name'],
+                    'model_type' => $validated['model_type'],
+                    'version' => $validated['version'],
+                    'accuracy' => null,
+                    'training_date' => null,
+                    'dataset_size' => null,
+                    'status' => 'completed',
+                    'description' => 'Uploaded and validated PyTorch U-Net checkpoint.',
+                    'model_path' => Storage::disk('local')->path($relativePath),
+                    'is_active' => true,
+                ]);
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($relativePath);
+            throw $exception;
+        }
+
+        return redirect()->route('admin.models')->with('status', 'Model uploaded, validated, and activated for segmentation.');
     }
 
     private function weeklyGrowthChartData(): array

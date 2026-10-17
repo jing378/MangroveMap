@@ -73,6 +73,8 @@ class EndUserController extends Controller
             $out[] = [
                 'type' => $type,
                 'coords' => $coords,
+                'location' => $feature['location'] ?? null,
+                'genera' => is_array($feature['genera'] ?? null) ? $feature['genera'] : [],
             ];
 
             if (count($out) >= self::MAP_FEATURES_PER_DELINEATION) {
@@ -179,8 +181,8 @@ class EndUserController extends Controller
         $failedAnalyses = $userAnalyses->where('status', 'failed')->count();
         $recentAnalyses = $userAnalyses->take(5);
 
-        $totalCoverage = MangroveData::sum('coverage_area_km2') ?? 0;
-        $genusCount = MangroveData::distinct('genus_id')->count();
+        $totalCoverage = (MangroveData::sum('coverage_area_km2') ?? 0) * 100;
+        $genusCount = MangroveData::whereNotNull('genus_id')->distinct()->count('genus_id');
         $degradedArea = MangroveData::where('health_status', 'degraded')->sum('coverage_area_km2') ?? 0;
 
         $genusDistribution = MangroveData::select('genus_id', DB::raw('COUNT(*) as count'))
@@ -283,14 +285,21 @@ class EndUserController extends Controller
             'features' => ['required', 'array', 'min:1', 'max:20'],
             'features.*.type' => ['required', 'string', 'in:point,line,area'],
             'features.*.coords' => ['required', 'array', 'min:1'],
+            'features.*.location' => ['nullable', 'string', 'max:255'],
+            'features.*.genera' => ['nullable', 'array'],
+            'features.*.genera.*' => ['string', 'max:100'],
             'name' => ['required', 'string', 'max:191'],
             'notes' => ['required', 'string'],
+            'genera' => ['nullable', 'array'],
+            'genera.*' => ['string', 'max:100'],
         ]);
 
-        $features = collect($data['features'])->map(function ($feature) {
+        $features = collect($data['features'])->map(function ($feature) use ($data) {
             return [
                 'type' => $feature['type'],
                 'coords' => $feature['coords'],
+                'location' => $feature['location'] ?? null,
+                'genera' => $feature['genera'] ?? $data['genera'] ?? [],
             ];
         })->values()->all();
 

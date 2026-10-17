@@ -522,6 +522,126 @@
     overflow: hidden;
   }
 
+  .map-quick-jump {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    z-index: 1000;
+    width: min(390px, calc(100% - 24px));
+    transform: translateX(-50%);
+    font-family: 'Manrope', sans-serif;
+  }
+
+  @media (max-width: 780px) {
+    .map-quick-jump {
+      right: auto;
+      left: calc(50% + 24px);
+      width: min(320px, calc(100% - 76px));
+      transform: translateX(-50%);
+    }
+
+    .map-quick-jump .quick-jump-field {
+      gap: 8px;
+      min-height: 40px;
+      padding: 0 11px;
+    }
+
+    .map-quick-jump .quick-jump-field > i {
+      font-size: 15px;
+    }
+
+    .map-quick-jump .quick-jump-field input {
+      padding: 7px 0;
+      font-size: 12px;
+    }
+  }
+
+  .quick-jump-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid #d4dfd4;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .14);
+  }
+
+  .quick-jump-field > i {
+    color: #4c6b5d;
+    font-size: 16px;
+  }
+
+  .quick-jump-field input {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #182918;
+    font: inherit;
+    font-size: 13px;
+  }
+
+  .quick-jump-field input::placeholder {
+    color: #718271;
+  }
+
+  .quick-jump-results {
+    max-height: min(320px, 50vh);
+    margin-top: 6px;
+    overflow-y: auto;
+    border: 1px solid #d4dfd4;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .16);
+  }
+
+  .quick-jump-result {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border: 0;
+    border-bottom: 1px solid #edf1ed;
+    background: #fff;
+    color: #182918;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+  }
+
+  .quick-jump-result:last-child {
+    border-bottom: 0;
+  }
+
+  .quick-jump-result:hover,
+  .quick-jump-result:focus-visible {
+    outline: 0;
+    background: #f1f7f2;
+  }
+
+  .quick-jump-result-name {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .quick-jump-result-meta,
+  .quick-jump-empty {
+    color: #718271;
+    font-size: 11px;
+  }
+
+  .quick-jump-empty {
+    padding: 12px 14px;
+  }
+
   #mainMap,
   #plantMap {
     width: 100%;
@@ -1092,6 +1212,8 @@
   .d-row {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
     font-size: 13px;
     padding: 5px 0;
     border-bottom: 1px solid #edf2ed;
@@ -1099,10 +1221,78 @@
 
   .d-key {
     color: #9ab0a0;
+    flex-shrink: 0;
   }
 
   .d-val {
     font-weight: 600;
+    text-align: right;
+    word-break: break-word;
+  }
+
+  .genus-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 100px;
+    background: #edf7f2;
+    border: 1px solid #b0e0c0;
+    color: #1e9e62;
+    line-height: 1.2;
+    margin: 2px 1px;
+  }
+
+  .genus-local-name {
+    font-weight: 400;
+    opacity: 0.75;
+    font-style: italic;
+    font-size: 0.92em;
+  }
+
+  .genus-tag-remove {
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 2px;
+    opacity: 0.7;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .genus-tag-remove:hover {
+    opacity: 1;
+    color: #d04030;
+  }
+
+  .genus-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 9px;
+    border-radius: 100px;
+    border: 1px solid #d4dfd4;
+    background: #f8faf7;
+    color: #445944;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+
+  .genus-pill-btn:hover {
+    border-color: #1e9e62;
+    background: #f0f7f2;
+    color: #1e9e62;
+  }
+
+  .genus-pill-btn.active {
+    background: #1e9e62;
+    border-color: #1e9e62;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(30, 158, 98, 0.25);
   }
 
   .map-top-bar {
@@ -1526,29 +1716,25 @@
 
   /* Map Temporal Timeline Slider */
   .map-timeline-control {
-    position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 850;
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(212, 223, 212, 0.9);
-    border-radius: 16px;
-    box-shadow: 0 14px 35px rgba(15, 30, 20, 0.16), 0 2px 8px rgba(0, 0, 0, 0.05);
-    padding: 12px 18px;
-    min-width: 520px;
-    max-width: 92vw;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin-top: 14px;
+    padding: 12px;
+    transform: none;
+    border: 1px solid #e0e8e0;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: none;
     user-select: none;
   }
 
   .map-timeline-control.collapsed {
-    min-width: auto;
-    padding: 7px 16px;
-    border-radius: 999px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    box-shadow: none;
     cursor: pointer;
   }
 
@@ -1588,6 +1774,29 @@
     font-weight: 700;
     color: #1a2e1a;
     letter-spacing: -0.2px;
+  }
+
+  .timeline-area-name {
+    max-width: 100%;
+    margin: 4px 0 10px;
+    overflow: hidden;
+    color: #4c6b5d;
+    font-size: 11px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timeline-history-caption {
+    margin: 0 0 8px;
+    color: #6a8a6a;
+    font-size: 11px;
+  }
+
+  .timeline-empty {
+    padding: 8px 0;
+    color: #6a8a6a;
+    font-size: 12px;
   }
 
   .timeline-badge {
@@ -1633,118 +1842,6 @@
     font-size: 13px;
   }
 
-  .timeline-controls {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 10px;
-  }
-
-  .timeline-play-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: none;
-    background: #1e9e62;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(30, 158, 98, 0.35);
-    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-    flex-shrink: 0;
-  }
-
-  .timeline-play-btn:hover {
-    background: #168652;
-    transform: scale(1.06);
-    box-shadow: 0 6px 14px rgba(30, 158, 98, 0.45);
-  }
-
-  .timeline-play-btn.playing {
-    background: #c07818;
-    box-shadow: 0 4px 12px rgba(192, 120, 24, 0.4);
-  }
-
-  .timeline-slider-track-wrap {
-    flex: 1;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .timeline-range-input {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 6px;
-    border-radius: 999px;
-    background: #d4dfd4;
-    outline: none;
-    margin: 8px 0 6px 0;
-    position: relative;
-    z-index: 2;
-    cursor: pointer;
-  }
-
-  .timeline-range-input::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #1e9e62;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
-  }
-
-  .timeline-range-input::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
-    box-shadow: 0 3px 10px rgba(30, 158, 98, 0.45);
-  }
-
-  .timeline-range-input::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #1e9e62;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-    cursor: pointer;
-  }
-
-  .timeline-marks {
-    display: flex;
-    justify-content: space-between;
-    position: relative;
-    margin-top: 2px;
-    padding: 0 2px;
-  }
-
-  .timeline-mark {
-    font-size: 11px;
-    font-weight: 600;
-    color: #7a9a7a;
-    cursor: pointer;
-    transition: color 0.15s ease, transform 0.15s ease;
-    position: relative;
-  }
-
-  .timeline-mark:hover {
-    color: #1e9e62;
-    transform: translateY(-1px);
-  }
-
-  .timeline-mark.active {
-    color: #1e9e62;
-    font-weight: 800;
-  }
-
   .timeline-info-row {
     display: flex;
     align-items: center;
@@ -1755,6 +1852,30 @@
     gap: 12px;
     font-size: 11px;
     color: #556b56;
+  }
+
+  .map-timeline-control .timeline-info-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+    gap: 8px;
+    padding: 8px 0 0;
+    border-top: 1px solid #edf1ed;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .map-timeline-control .timeline-stat {
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    white-space: normal;
+  }
+
+  .map-timeline-control .timeline-stat strong {
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   .timeline-stat {
@@ -1809,52 +1930,6 @@
       height: 10px;
     }
 
-    /* Mobile Timeline Slider Control */
-    .map-timeline-control {
-      min-width: unset;
-      width: calc(100% - 20px);
-      left: 10px;
-      transform: none;
-      bottom: 14px;
-      padding: 10px 12px;
-      border-radius: 14px;
-      box-shadow: 0 8px 24px rgba(15, 30, 20, 0.18);
-      transition: bottom 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.32s, opacity 0.25s, visibility 0.25s, width 0.3s ease, left 0.3s ease, padding 0.3s ease, border-radius 0.3s ease;
-    }
-
-    /* Sleek Floating Pill when Collapsed on Mobile */
-    .map-timeline-control.collapsed {
-      width: auto !important;
-      max-width: calc(100vw - 32px) !important;
-      left: 50% !important;
-      transform: translateX(-50%) !important;
-      bottom: 14px !important;
-      padding: 6px 14px !important;
-      border-radius: 999px !important;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
-      overflow: hidden;
-    }
-
-    .map-timeline-control.collapsed .timeline-title-wrap {
-      flex-wrap: nowrap !important;
-      overflow: hidden;
-    }
-
-    .map-timeline-control.collapsed .timeline-title {
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    .map-timeline-control.collapsed .timeline-badge {
-      font-size: 10px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .map-timeline-control.collapsed .timeline-zone-focus-btn {
-      display: none !important;
-    }
-
     .timeline-header {
       margin-bottom: 6px;
       gap: 6px;
@@ -1888,83 +1963,6 @@
     .timeline-collapse-btn {
       width: 26px;
       height: 26px;
-    }
-
-    .timeline-controls {
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-
-    .timeline-play-btn {
-      width: 34px;
-      height: 34px;
-      font-size: 15px;
-      flex-shrink: 0;
-    }
-
-    .timeline-range-input {
-      height: 8px;
-      margin: 6px 0 4px 0;
-      touch-action: pan-x;
-    }
-
-    .timeline-range-input::-webkit-slider-thumb {
-      width: 20px;
-      height: 20px;
-    }
-
-    .timeline-range-input::-moz-range-thumb {
-      width: 20px;
-      height: 20px;
-    }
-
-    .timeline-marks {
-      padding: 0;
-      margin-top: 2px;
-    }
-
-    .timeline-mark {
-      font-size: 10px;
-      padding: 2px 3px;
-      touch-action: manipulation;
-    }
-
-    /* Compact single-row info bar on mobile to preserve vertical map height */
-    .timeline-info-row {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-      padding: 5px 8px;
-      font-size: 10px;
-      gap: 4px;
-      border-radius: 8px;
-    }
-
-    .timeline-stat {
-      gap: 3px;
-      font-size: 10px;
-      white-space: nowrap;
-    }
-
-    .timeline-stat strong {
-      font-size: 11px;
-    }
-
-    /* When bottom sheet is opened in peek mode (~355px), lift timeline cleanly above sheet */
-    .map-timeline-control.above-peek {
-      bottom: 365px !important;
-    }
-
-    .map-timeline-control.above-peek.collapsed {
-      bottom: 365px !important;
-    }
-
-    /* When bottom sheet is expanded to full height, hide timeline so it doesn't obstruct */
-    .map-timeline-control.hidden-expanded {
-      opacity: 0 !important;
-      pointer-events: none !important;
-      visibility: hidden !important;
     }
 
     /* Temporal breakdown stepper cards inside mobile drawer */
@@ -2007,27 +2005,6 @@
       font-size: 9px;
     }
 
-    .timeline-mark {
-      font-size: 9px;
-      padding: 1px 2px;
-    }
-
-    .timeline-info-row {
-      font-size: 9px;
-      padding: 4px 6px;
-    }
-
-    .timeline-stat strong {
-      font-size: 10px;
-    }
-
-    .map-timeline-control.collapsed .timeline-badge {
-      display: none !important;
-    }
-
-    .map-timeline-control.collapsed .timeline-title {
-      font-size: 11px;
-    }
   }
 
   .timeline-zone-focus-btn {
@@ -2062,11 +2039,15 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 100%;
     padding: 8px 10px;
     border-radius: 8px;
     background: #f8faf8;
     border: 1px solid #e0e8e0;
     cursor: pointer;
+    color: #1a2e1a;
+    font: inherit;
+    text-align: left;
     transition: all 0.15s ease;
   }
 
@@ -2099,18 +2080,34 @@
   .epoch-content {
     flex: 1;
     min-width: 0;
+    display: block;
   }
 
   .epoch-headline {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     font-size: 12px;
     font-weight: 700;
     color: #1a2e1a;
   }
 
+  .epoch-area {
+    flex-shrink: 0;
+    color: #1e9e62;
+    white-space: nowrap;
+  }
+
+  .epoch-source {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .epoch-sub {
+    display: block;
     font-size: 11px;
     color: #6a8a6a;
     margin-top: 2px;
@@ -2485,7 +2482,6 @@
   }
 
   body[data-page='delineate'] #mapTimelineControl,
-  body[data-page='delineate'] #timelineToggleBtn,
   body[data-page='delineate'] #classifyBtn,
   body[data-page='delineate'] #editModeBtn,
   body[data-page='delineate'] .left-panel {

@@ -7,16 +7,6 @@
             <span>Dashboard</span>
         </a>
 
-        <a href="{{ route('admin.datasets') }}" class="sidebar-item {{ request()->routeIs('admin.datasets') ? 'active' : '' }}">
-            <i class="bi bi-folder-check"></i>
-            <span>Dataset Management</span>
-        </a>
-
-        <a href="{{ route('admin.annual-observations.create') }}" class="sidebar-item {{ request()->routeIs('admin.annual-observations.*') ? 'active' : '' }}">
-            <i class="bi bi-calendar2-check"></i>
-            <span>Annual Observations</span>
-        </a>
-
         <a href="{{ route('admin.models') }}" class="sidebar-item {{ request()->routeIs('admin.models') ? 'active' : '' }}">
             <i class="bi bi-robot"></i>
             <span>Model Training</span>

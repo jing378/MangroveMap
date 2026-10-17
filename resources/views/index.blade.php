@@ -1353,7 +1353,7 @@
 
       <h1 class="hero-title">
         Mangrove Mapping &amp; <br />
-        <span class="hero-title-highlight">Monitoring System</span>
+        <span class="hero-title-highlight">Classification System</span>
       </h1>
 
       <p class="hero-description">

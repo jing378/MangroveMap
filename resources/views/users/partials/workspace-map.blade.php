@@ -6,11 +6,11 @@
           <div class="sec">Summary</div>
           <div class="stat-grid">
             <div class="stat-box">
-              <div class="stat-num g" id="summaryTotalArea">47,382</div>
+              <div class="stat-num g" id="summaryTotalArea">{{ number_format($totalCoverage ?? 0, 0) }}</div>
               <div class="stat-lbl">Total area (ha)</div>
             </div>
             <div class="stat-box">
-              <div class="stat-num" id="summaryGenusCount">4</div>
+              <div class="stat-num" id="summaryGenusCount">{{ number_format($genusCount ?? 0) }}</div>
               <div class="stat-lbl">Genus found</div>
             </div>
           </div>
@@ -22,6 +22,16 @@
       <div class="main">
         <div class="map-wrap">
           <div id="mainMap"></div>
+          @unless (request()->routeIs('delineate', 'expert.delineate'))
+          <div class="map-quick-jump" id="mapQuickJump">
+            <div class="quick-jump-field">
+              <i class="bi bi-search" aria-hidden="true"></i>
+              <input id="quickJumpInput" type="search" autocomplete="off" aria-label="Search saved delineated areas"
+                aria-controls="quickJumpResults" aria-expanded="false" placeholder="Search saved areas">
+            </div>
+            <div class="quick-jump-results" id="quickJumpResults" role="group" aria-label="Saved areas" hidden></div>
+          </div>
+          @endunless
           <div class="delineation-toolbar" id="delineationToolbar">
             <div class="draw-select-wrapper">
               @if (request()->routeIs('delineate', 'expert.delineate'))
@@ -61,10 +71,6 @@
               title="Choose map layer" aria-label="Choose map layer">
               <i class="bi bi-layers-fill"></i>
             </button>
-            <button id="timelineToggleBtn" type="button" class="active-toggle" onclick="toggleTimelineControl()"
-              title="Toggle Changes over time" aria-label="Toggle Changes over time">
-              <i class="bi bi-clock-history"></i>
-            </button>
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
             </button>
@@ -81,60 +87,6 @@
             </div>
           </div>
 
-          <!-- FLOATING CHANGES OVER TIME TIMELINE -->
-          <div class="map-timeline-control" id="mapTimelineControl">
-            <div class="timeline-header" onclick="handleTimelineHeaderClick(event)">
-              <div class="timeline-title-wrap">
-                <i class="bi bi-clock-history"></i>
-                <span class="timeline-title">Changes over time</span>
-                <span class="timeline-badge" id="timelineChangeBadge">+3.2% net recovery</span>
-                <button type="button" class="timeline-zone-focus-btn" onclick="focusTemporalSampleZone(event)"
-                  title="Focus on sample temporal delineation">
-                  <i class="bi bi-crosshair2"></i> Sample Site
-                </button>
-              </div>
-              <button type="button" class="timeline-collapse-btn" id="timelineCollapseBtn"
-                onclick="toggleTimelineCollapse(event)" title="Minimize / Expand timeline"
-                aria-label="Toggle timeline collapse">
-                <i class="bi bi-chevron-down"></i>
-              </button>
-            </div>
-            <div class="timeline-body">
-              <div class="timeline-controls">
-                <button type="button" class="timeline-play-btn" id="timelinePlayBtn" onclick="toggleTimelinePlayback()"
-                  title="Play / Pause timelapse">
-                  <i class="bi bi-play-fill" id="timelinePlayIcon"></i>
-                </button>
-                <div class="timeline-slider-track-wrap">
-                  <input type="range" class="timeline-range-input" id="timelineRangeInput" min="0" max="5" step="1"
-                    value="5" oninput="onTimelineSliderChange(this.value)"
-                    aria-label="Select year for temporal change analysis">
-                  <div class="timeline-marks" id="timelineMarks">
-                    <span class="timeline-mark" data-index="0" onclick="setTimelineYearIndex(0)">2021</span>
-                    <span class="timeline-mark" data-index="1" onclick="setTimelineYearIndex(1)">2022</span>
-                    <span class="timeline-mark" data-index="2" onclick="setTimelineYearIndex(2)">2023</span>
-                    <span class="timeline-mark" data-index="3" onclick="setTimelineYearIndex(3)">2024</span>
-                    <span class="timeline-mark" data-index="4" onclick="setTimelineYearIndex(4)">2025</span>
-                    <span class="timeline-mark active" data-index="5" onclick="setTimelineYearIndex(5)">2026</span>
-                  </div>
-                </div>
-              </div>
-              <div class="timeline-info-row">
-                <div class="timeline-stat">
-                  <span>Year:</span>
-                  <strong id="timelineSelectedYear">2026 (Current)</strong>
-                </div>
-                <div class="timeline-stat">
-                  <span>Area:</span>
-                  <strong class="text-green" id="timelineAreaStat">47,382 ha</strong>
-                </div>
-                <div class="timeline-stat">
-                  <span>Health:</span>
-                  <strong id="timelineNdviStat">0.78 (Optimal)</strong>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       <div class="panel-backdrop" id="panelBackdrop" onclick="collapseOrClosePanel()"></div>
@@ -158,7 +110,9 @@
             </div>
             <div class="d-row"><span class="d-key">Area (ha)</span><span class="d-val"
               id="delineationFeatureArea">-</span></div>
-            <div class="d-row"><span class="d-key">Label</span><span class="d-val" id="delineationFeatureLabel">-</span>
+            <div class="d-row"><span class="d-key">Location</span><span class="d-val" id="delineationFeatureLocation">-</span>
+            </div>
+            <div class="d-row"><span class="d-key">Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span>
             </div>
             <div class="d-row"><span class="d-key">Delineated by</span><span class="d-val"
                 id="delineationCreatedBy">-</span></div>
@@ -183,6 +137,26 @@
               <input id="delineationLabel" type="text"
                 style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;"
                 placeholder="Enter zone name or note" />
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Mangrove Genus Present</label>
+              <div id="genusQuickSelector" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                <button type="button" class="genus-pill-btn" data-genus="Rhizophora" onclick="toggleGenusSelection('Rhizophora')"><i class="bi bi-plus"></i> Rhizophora <span class="genus-local-name">(Bakawan)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Avicennia" onclick="toggleGenusSelection('Avicennia')"><i class="bi bi-plus"></i> Avicennia <span class="genus-local-name">(Bungalon)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Sonneratia" onclick="toggleGenusSelection('Sonneratia')"><i class="bi bi-plus"></i> Sonneratia <span class="genus-local-name">(Pagatpat)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Bruguiera" onclick="toggleGenusSelection('Bruguiera')"><i class="bi bi-plus"></i> Bruguiera <span class="genus-local-name">(Miapi)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Ceriops" onclick="toggleGenusSelection('Ceriops')"><i class="bi bi-plus"></i> Ceriops <span class="genus-local-name">(Tungog)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Xylocarpus" onclick="toggleGenusSelection('Xylocarpus')"><i class="bi bi-plus"></i> Xylocarpus <span class="genus-local-name">(Tabigi)</span></button>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <input id="delineationCustomGenusInput" type="text"
+                  style="flex:1;padding:8px 10px;border:1px solid #d4dfd4;border-radius:8px;background:#f8faf7;color:#182918;font-size:12px;"
+                  placeholder="Or type other genus and press Enter..." />
+                <button type="button" id="addCustomGenusBtn" onclick="addCustomGenusFromInput()" class="btn btn-g" style="padding:7px 12px;font-size:12px;border-radius:8px;white-space:nowrap;">
+                  <i class="bi bi-plus-lg"></i> Add
+                </button>
+              </div>
+              <div id="delineationSelectedGeneraContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
             </div>
             <div style="margin-bottom:12px;">
               <label for="delineationNotes"
@@ -234,6 +208,7 @@
               <div class="d-row"><span class="d-key">Dominant genus</span><span class="d-val" id="dGenus"></span></div>
               <div class="d-row"><span class="d-key">Last scan</span><span class="d-val" id="dScan"></span></div>
             </div>
+            @if (Auth::user()->isExpert())
             <div class="div"></div>
             <div class="sec" id="genusDistributionTitle">Genus Distribution</div>
             <div id="genusDistributionEmpty" style="font-size:11px;color:#6a8a6a;margin-bottom:8px;">No verified genus data for this zone.</div>
@@ -243,14 +218,44 @@
             <div class="sec">Coverage Trend (ha)</div>
             <div id="coverageTrendEmpty" style="font-size:11px;color:#6a8a6a;margin-bottom:8px;">No annual measurements for this zone.</div>
             <div class="cw" style="height:108px"><canvas id="trendC"></canvas></div>
-            <div id="temporalZoneBreakdown" style="display:none;margin-top:14px;">
+            @endif
+          </div>
+          <section class="map-timeline-control" id="mapTimelineControl" style="display:none;"
+            aria-label="Changes over time for selected area">
+            <div class="timeline-header" onclick="handleTimelineHeaderClick(event)">
+              <div class="timeline-title-wrap">
+                <i class="bi bi-clock-history" aria-hidden="true"></i>
+                <span class="timeline-title">Changes over time</span>
+                <span class="timeline-badge" id="timelineChangeBadge">Select an area</span>
+              </div>
+              <button type="button" class="timeline-collapse-btn" id="timelineCollapseBtn"
+                onclick="toggleTimelineCollapse(event)" title="Minimize / Expand timeline"
+                aria-label="Toggle timeline collapse">
+                <i class="bi bi-chevron-down"></i>
+              </button>
+            </div>
+            <div class="timeline-area-name" id="timelineAreaName">No area selected</div>
+            <div class="timeline-body">
+              <div class="timeline-info-row">
+                <div class="timeline-stat">
+                  <span>Year:</span>
+                  <strong id="timelineSelectedYear">Select an area</strong>
+                </div>
+                <div class="timeline-stat">
+                  <span>Area:</span>
+                  <strong class="text-green" id="timelineAreaStat">-</strong>
+                </div>
+                <div class="timeline-stat">
+                  <span>Source:</span>
+                  <strong id="timelineSourceStat">-</strong>
+                </div>
+              </div>
               <div class="div"></div>
-              <div class="sec">Temporal Progression (2021–2026)</div>
-              <p style="font-size:11px;color:#6a8a6a;margin-bottom:8px;">Multi-year boundary expansion &amp; canopy
-                recovery over time. Click any epoch to jump.</p>
+              <div class="sec">Annual observations</div>
+              <p class="timeline-history-caption">Recorded history for this delineated area.</p>
               <div class="temporal-epoch-list" id="temporalEpochList"></div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>

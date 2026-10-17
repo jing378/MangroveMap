@@ -35,14 +35,21 @@ class ExpertController extends Controller
             'features' => ['required', 'array', 'min:1', 'max:20'],
             'features.*.type' => ['required', 'string', 'in:point,line,area'],
             'features.*.coords' => ['required', 'array', 'min:1'],
+            'features.*.location' => ['nullable', 'string', 'max:255'],
+            'features.*.genera' => ['nullable', 'array'],
+            'features.*.genera.*' => ['string', 'max:100'],
             'name' => ['nullable', 'string', 'max:191'],
             'notes' => ['nullable', 'string'],
+            'genera' => ['nullable', 'array'],
+            'genera.*' => ['string', 'max:100'],
         ]);
 
-        $features = collect($data['features'])->map(function ($feature) {
+        $features = collect($data['features'])->map(function ($feature) use ($data) {
             return [
                 'type' => $feature['type'],
                 'coords' => $feature['coords'],
+                'location' => $feature['location'] ?? null,
+                'genera' => $feature['genera'] ?? $data['genera'] ?? [],
             ];
         })->values()->all();
 

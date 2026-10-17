@@ -1,41 +1,98 @@
 @extends('layouts.admin')
 
-@section('title', 'AI Model Training - MangroveMap')
+@section('title', 'AI Model Management - MangroveMap')
 
 @section('content')
 <div id="model-training-section">
-    <div class="page-title">AI Model Training</div>
+    <div class="page-title">AI Model Management</div>
 
     <div class="grid cols-4">
         <div class="stat-card">
-            <div class="stat-label">Active Models</div>
-            <div class="stat-value">{{ $activeModels }}</div>
-            <div class="stat-change positive">Deployed for inference</div>
+            <div class="stat-label">Registry Records</div>
+            <div class="stat-value">{{ $models->count() }}</div>
+            <div class="stat-change">Database entries</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Avg. Accuracy</div>
-            <div class="stat-value green">{{ $avgAccuracy }}%</div>
-            <div class="stat-change positive">Completed models</div>
+            <div class="stat-label">Available Checkpoints</div>
+            <div class="stat-value green">{{ $availableModelCount }}</div>
+            <div class="stat-change">Model files found on disk</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Training Now</div>
-            <div class="stat-value">{{ $trainingModels }}</div>
-            <div class="stat-change">In progress</div>
+            <div class="stat-label">Ready for Image Analysis</div>
+            <div class="stat-value">{{ $inferenceReady ? 1 : 0 }}</div>
+            <div class="stat-change">A usable model file is {{ $inferenceReady ? 'available' : 'missing' }}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">In Queue</div>
-            <div class="stat-value">{{ $queuedModels }}</div>
-            <div class="stat-change">Waiting to train</div>
+            <div class="stat-label">With Accuracy Data</div>
+            <div class="stat-value">{{ $modelsWithAccuracy }}</div>
+            <div class="stat-change">Records include accuracy</div>
         </div>
     </div>
 
     <div class="section">
         <div class="section-title-with-actions">
-            <div><i class="bi bi-robot"></i> Model Training Queue</div>
+            <div><i class="bi bi-robot"></i> Model Registry</div>
             <div class="section-actions">
-                <button class="btn-primary"><i class="bi bi-plus-lg"></i> Train New Model</button>
+                <button class="btn-primary" id="openModelUpload" type="button">
+                    <i class="bi bi-upload"></i> Upload Model
+                </button>
             </div>
         </div>
+
+        @if(session('status'))
+        <div class="upload-status" role="status">{{ session('status') }}</div>
+        @endif
+
+        <dialog class="model-upload-dialog" id="modelUploadDialog" aria-labelledby="modelUploadTitle">
+            <div class="dialog-heading">
+                <div>
+                    <h2 id="modelUploadTitle">Upload Model</h2>
+                    <p>Upload a compatible PyTorch checkpoint and activate it for image analysis.</p>
+                </div>
+                <button class="dialog-close" type="button" data-close-upload aria-label="Close upload dialog">&times;</button>
+            </div>
+
+            <form method="POST" action="{{ route('admin.models.upload') }}" enctype="multipart/form-data">
+                @csrf
+                <div class="model-upload-meta">
+                    <label class="upload-field">
+                        Model Name
+                        <input type="text" name="name" value="{{ old('name') }}" maxlength="255" required>
+                        @error('name')<span class="upload-error">{{ $message }}</span>@enderror
+                    </label>
+                    <label class="upload-field">
+                        Version
+                        <input type="text" name="version" value="{{ old('version', '1.0.0') }}" maxlength="50" required>
+                        @error('version')<span class="upload-error">{{ $message }}</span>@enderror
+                    </label>
+                </div>
+                <label class="upload-field">
+                    Model Type
+                    <span class="model-type-select">
+                        <select id="modelTypeSelect" name="model_type" required>
+                            <option value="segmentation" @selected(old('model_type', 'segmentation') === 'segmentation')>Mangrove Segmentation</option>
+                            <option value="classification" @selected(old('model_type') === 'classification')>Mangrove Classification (Coming Soon)</option>
+                        </select>
+                        <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    </span>
+                </label>
+                <div class="upload-field">
+                    <span>PyTorch Checkpoint (.pth, max 512 MB)</span>
+                    <div class="model-file-picker">
+                        <input id="modelCheckpointInput" type="file" name="model_file" accept=".pth" required>
+                        <label class="choose-file-button" for="modelCheckpointInput"><i class="bi bi-folder2-open"></i> Choose a file</label>
+                        <span id="selectedModelFile" aria-live="polite">No file selected</span>
+                    </div>
+                    @error('model_file')<span class="upload-error">{{ $message }}</span>@enderror
+                </div>
+                <p class="upload-help" id="segmentationUploadHelp">Requires U-Net with a ResNet34 encoder, 3 input channels, and 2 output classes.</p>
+                <p class="upload-notice" id="classificationUploadNotice" hidden>Classification checkpoint upload is not available yet. The classifier needs its own architecture and prediction pipeline.</p>
+                <div class="dialog-actions">
+                    <button class="btn-secondary" type="button" data-close-upload>Cancel</button>
+                    <button class="btn-primary" id="uploadModelSubmit" type="submit"><i class="bi bi-upload"></i> Upload &amp; Activate</button>
+                </div>
+            </form>
+        </dialog>
 
         <div class="table-container">
             <table class="table">
@@ -44,28 +101,22 @@
                         <th>Model Name</th>
                         <th>Type</th>
                         <th>Status</th>
-                        <th>Progress</th>
+                        <th>Checkpoint</th>
                         <th>Accuracy</th>
-                        <th>Started</th>
+                        <th>Date Added</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($models as $model)
                     @php
-                        $progress = match ($model->status) {
-                            'completed' => 100,
-                            'training' => 68,
-                            'failed' => 23,
-                            default => 0,
-                        };
-                        $statusClass = match ($model->status) {
+                        $statusClass = $model->artifact_available ? match ($model->status) {
                             'completed' => 'success',
                             'training' => 'warning',
                             'failed' => 'danger',
                             default => 'secondary',
-                        };
-                        $accuracy = $model->accuracy ? round($model->accuracy * 100, 1) : null;
+                        } : 'danger';
+                        $accuracy = $model->artifact_available && $model->accuracy !== null ? round($model->accuracy * 100, 1) : null;
                         $accClass = $accuracy === null ? 'pending' : ($accuracy >= 90 ? 'excellent' : ($accuracy >= 85 ? 'good' : 'fair'));
                         $typeClass = match ($model->model_type) {
                             'classification' => 'cnn',
@@ -77,29 +128,31 @@
                     <tr>
                         <td>{{ $model->name }}</td>
                         <td><span class="type-badge {{ $typeClass }}">{{ ucwords(str_replace('_', ' ', $model->model_type)) }}</span></td>
-                        <td><span class="badge {{ $statusClass }}">{{ ucfirst($model->status) }}</span></td>
+                        <td><span class="badge {{ $statusClass }}">{{ $model->artifact_available ? ucfirst($model->status) : 'Unavailable' }}</span></td>
                         <td>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: {{ $progress }}%"></div>
-                            </div>
+                            @if($model->artifact_available)
+                            <span class="badge success">Available</span>
+                            @else
+                            <span class="badge danger">Missing</span>
+                            @endif
                         </td>
                         <td>
                             @if($accuracy !== null)
                             <span class="accuracy-badge {{ $accClass }}">{{ $accuracy }}%</span>
                             @else
-                            <span class="accuracy-badge pending">Pending</span>
+                            <span class="accuracy-badge pending">Not available</span>
                             @endif
                         </td>
-                        <td>{{ $model->training_date?->format('M j, Y') ?? '—' }}</td>
+                        <td>{{ $model->created_at?->format('M j, Y') ?? '—' }}</td>
                         <td class="actions-cell">
-                            @if($model->is_active)
+                            @if($model->is_active && $model->artifact_available && $model->model_type === 'segmentation')
                             <span class="badge success">Active</span>
                             @endif
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7">No models. Run <code>php artisan db:seed</code>.</td>
+                        <td colspan="7">No model records are registered.</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -107,78 +160,52 @@
         </div>
     </div>
 
-    <div class="grid cols-2">
-        <div class="section">
-            <div class="section-title"><i class="bi bi-graph-up"></i> Training Performance</div>
-            <div class="chart-container">
-                <canvas id="performanceChart"></canvas>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title"><i class="bi bi-gear"></i> Model Parameters</div>
-            <div class="params-list">
-                <div class="param-item">
-                    <div class="param-label">Learning Rate</div>
-                    <div class="param-value">0.001</div>
-                </div>
-                <div class="param-item">
-                    <div class="param-label">Batch Size</div>
-                    <div class="param-value">32</div>
-                </div>
-                <div class="param-item">
-                    <div class="param-label">Epochs</div>
-                    <div class="param-value">100</div>
-                </div>
-                <div class="param-item">
-                    <div class="param-label">Validation Split</div>
-                    <div class="param-value">0.2</div>
-                </div>
-                <div class="param-item">
-                    <div class="param-label">Optimizer</div>
-                    <div class="param-value">Adam</div>
-                </div>
-                <div class="param-item">
-                    <div class="param-label">GPU Memory</div>
-                    <div class="param-value">8GB VRAM</div>
-                </div>
-            </div>
+    <div class="section">
+        <div class="section-title"><i class="bi bi-graph-up"></i> Completed Model Accuracy</div>
+        <div class="chart-container">
+            @if(count($accuracyChartValues))
+            <canvas id="performanceChart"></canvas>
+            @else
+            <p class="chart-empty">No measured accuracy is available for checkpoints currently on disk.</p>
+            @endif
         </div>
     </div>
 
     <div class="section">
-        <div class="section-title"><i class="bi bi-clock-history"></i> Training History</div>
+        <div class="section-title"><i class="bi bi-clock-history"></i> Recently Completed Models</div>
         <div class="table-container">
             <table class="table">
                 <thead>
                     <tr>
                         <th>Model Name</th>
                         <th>Version</th>
-                        <th>Status</th>
-                        <th>Final Accuracy</th>
-                        <th>Training Time</th>
-                        <th>Trained By</th>
-                        <th>Date</th>
+                        <th>Accuracy</th>
+                        <th>Dataset Size</th>
+                        <th>Date Added</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($completedModels as $model)
                     @php
-                        $accuracy = $model->accuracy ? round($model->accuracy * 100, 1) : 0;
-                        $accClass = $accuracy >= 90 ? 'excellent' : 'good';
+                        $accuracy = $model->accuracy !== null ? round($model->accuracy * 100, 1) : null;
+                        $accClass = $accuracy === null ? 'pending' : ($accuracy >= 90 ? 'excellent' : 'good');
                     @endphp
                     <tr>
                         <td>{{ $model->name }}</td>
                         <td>v{{ $model->version }}</td>
-                        <td><span class="badge success">Completed</span></td>
-                        <td><span class="accuracy-badge {{ $accClass }}">{{ $accuracy }}%</span></td>
-                        <td>{{ number_format($model->dataset_size) }} samples</td>
-                        <td>System</td>
-                        <td>{{ $model->training_date?->format('M j, Y') ?? '—' }}</td>
+                        <td>
+                            @if($accuracy !== null)
+                            <span class="accuracy-badge {{ $accClass }}">{{ $accuracy }}%</span>
+                            @else
+                            <span class="accuracy-badge pending">Not provided</span>
+                            @endif
+                        </td>
+                        <td>{{ $model->dataset_size !== null ? number_format($model->dataset_size).' samples' : '—' }}</td>
+                        <td>{{ $model->created_at?->format('M j, Y') ?? '—' }}</td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7">No completed training runs yet.</td>
+                        <td colspan="5">No completed model records yet.</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -510,6 +537,234 @@
         margin-top: 16px;
     }
 
+    .chart-empty {
+        display: grid;
+        min-height: 100%;
+        place-items: center;
+        color: #6a8a6a;
+        font-size: 13px;
+        text-align: center;
+    }
+
+    .model-upload-dialog {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: min(520px, calc(100vw - 32px));
+        max-height: calc(100dvh - 32px);
+        margin: 0;
+        overflow-y: auto;
+        padding: 24px;
+        border: 1px solid #d4e0d4;
+        border-radius: 10px;
+        color: #1a2e1a;
+        box-shadow: 0 20px 60px rgba(15, 35, 25, 0.25);
+        transform: translate(-50%, -50%);
+    }
+
+    .model-upload-dialog::backdrop {
+        background: rgba(15, 35, 25, 0.58);
+    }
+
+    .dialog-heading,
+    .dialog-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    .dialog-heading {
+        margin-bottom: 20px;
+    }
+
+    .dialog-heading h2 {
+        margin: 0 0 6px;
+        font-size: 18px;
+        color: #1a2e1a;
+    }
+
+    .dialog-heading p,
+    .upload-help {
+        margin: 0;
+        color: #6a8a6a;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .upload-notice {
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid #e8cc98;
+        border-radius: 6px;
+        background: #fdf5e8;
+        color: #925a12;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .upload-notice[hidden] {
+        display: none;
+    }
+
+    .dialog-close {
+        flex: 0 0 34px;
+        width: 34px;
+        height: 34px;
+        border: 1px solid #d4e0d4;
+        border-radius: 6px;
+        background: #fff;
+        color: #3a5a3a;
+        font-size: 22px;
+        cursor: pointer;
+    }
+
+    .upload-field {
+        display: grid;
+        gap: 7px;
+        margin-bottom: 16px;
+        color: #3a5a3a;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .model-upload-meta {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(110px, 0.45fr);
+        gap: 14px;
+    }
+
+    .upload-field input:not([type="file"]),
+    .upload-field select {
+        width: 100%;
+        min-width: 0;
+        min-height: 42px;
+        padding: 9px 10px;
+        border: 1px solid #d4e0d4;
+        border-radius: 6px;
+        background-color: #fff;
+        color: #1a2e1a;
+        font: inherit;
+    }
+
+    .upload-field input:focus,
+    .upload-field select:focus {
+        border-color: #1e9e62;
+        outline: 3px solid rgba(30, 158, 98, 0.16);
+    }
+
+    .upload-field select {
+        appearance: none;
+        padding-right: 38px;
+        cursor: pointer;
+    }
+
+    .model-type-select {
+        position: relative;
+        display: block;
+    }
+
+    .model-type-select i {
+        position: absolute;
+        top: 50%;
+        right: 14px;
+        color: #6a8a6a;
+        font-size: 12px;
+        pointer-events: none;
+        transform: translateY(-50%);
+    }
+
+    .model-file-picker {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        padding: 8px;
+        border: 1px dashed #9ab0a0;
+        border-radius: 6px;
+        background: #f5f7f6;
+    }
+
+    .model-file-picker input[type="file"] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .choose-file-button {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 7px;
+        min-height: 36px;
+        padding: 8px 12px;
+        border: 1px solid #168250;
+        border-radius: 5px;
+        background: #1e9e62;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .choose-file-button:hover {
+        background: #168250;
+    }
+
+    .model-file-picker input:focus-visible + .choose-file-button {
+        outline: 3px solid rgba(30, 158, 98, 0.28);
+        outline-offset: 2px;
+    }
+
+    #selectedModelFile {
+        min-width: 0;
+        overflow: hidden;
+        color: #6a8a6a;
+        font-size: 11px;
+        font-weight: 500;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .upload-error {
+        color: #b73318;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .upload-status {
+        margin-bottom: 16px;
+        padding: 10px 12px;
+        border: 1px solid #b0e0c0;
+        border-radius: 6px;
+        background: #edf7f2;
+        color: #176d46;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .dialog-actions {
+        justify-content: flex-end;
+        margin-top: 22px;
+    }
+
+    .btn-secondary {
+        min-height: 40px;
+        padding: 9px 16px;
+        border: 1px solid #d4e0d4;
+        border-radius: 6px;
+        background: #fff;
+        color: #3a5a3a;
+        font: inherit;
+        cursor: pointer;
+    }
+
     .btn-primary {
         padding: 10px 20px;
         background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%);
@@ -526,6 +781,13 @@
     .btn-primary:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(30, 158, 98, 0.3);
+    }
+
+    .btn-primary:disabled {
+        background: #9ab0a0;
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
     }
 
     @media (max-width: 1024px) {
@@ -553,6 +815,11 @@
     }
 
     @media (max-width: 768px) {
+        .model-upload-meta {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+
         .page-title {
             font-size: 22px;
             margin-bottom: 16px;
@@ -600,6 +867,40 @@
 @section('scripts')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
+    const modelUploadDialog = document.getElementById('modelUploadDialog');
+    const openModelUpload = document.getElementById('openModelUpload');
+    const modelCheckpointInput = document.getElementById('modelCheckpointInput');
+    const selectedModelFile = document.getElementById('selectedModelFile');
+    const modelTypeSelect = document.getElementById('modelTypeSelect');
+    const uploadModelSubmit = document.getElementById('uploadModelSubmit');
+    const segmentationUploadHelp = document.getElementById('segmentationUploadHelp');
+    const classificationUploadNotice = document.getElementById('classificationUploadNotice');
+
+    function updateModelUploadType() {
+        const isClassification = modelTypeSelect.value === 'classification';
+        uploadModelSubmit.disabled = isClassification;
+        segmentationUploadHelp.hidden = isClassification;
+        classificationUploadNotice.hidden = !isClassification;
+    }
+
+    modelCheckpointInput.addEventListener('change', () => {
+        selectedModelFile.textContent = modelCheckpointInput.files[0]?.name ?? 'No file selected';
+    });
+    modelTypeSelect.addEventListener('change', updateModelUploadType);
+    updateModelUploadType();
+
+    openModelUpload.addEventListener('click', () => modelUploadDialog.showModal());
+    modelUploadDialog.querySelectorAll('[data-close-upload]').forEach(button => {
+        button.addEventListener('click', () => modelUploadDialog.close());
+    });
+    modelUploadDialog.addEventListener('click', event => {
+        if (event.target === modelUploadDialog) modelUploadDialog.close();
+    });
+
+    @if($errors->any())
+    modelUploadDialog.showModal();
+    @endif
+
     const performanceChartOpts = {
         responsive: true,
         maintainAspectRatio: false,
@@ -615,7 +916,8 @@
     };
 
     // Performance Chart
-    new Chart(document.getElementById('performanceChart'), {
+    const performanceCanvas = document.getElementById('performanceChart');
+    if (performanceCanvas) new Chart(performanceCanvas, {
         type: 'line',
         data: {
             labels: @json($accuracyChartLabels),
@@ -624,15 +926,6 @@
                     data: @json($accuracyChartValues),
                     borderColor: '#1e9e62',
                     backgroundColor: 'rgba(30,158,98,.1)',
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 2
-                },
-                {
-                    label: 'Training Loss',
-                    data: [0.45, 0.38, 0.28, 0.18],
-                    borderColor: '#d04030',
-                    backgroundColor: 'rgba(208,64,48,.1)',
                     fill: true,
                     tension: 0.4,
                     borderWidth: 2
