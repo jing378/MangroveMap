@@ -1219,6 +1219,18 @@
     border-bottom: 1px solid #edf2ed;
   }
 
+  .d-row-genera {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .d-row-genera .d-val {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    text-align: left;
+  }
+
   .d-key {
     color: #9ab0a0;
     flex-shrink: 0;

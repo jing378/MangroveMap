@@ -112,7 +112,7 @@
               id="delineationFeatureArea">-</span></div>
             <div class="d-row"><span class="d-key">Location</span><span class="d-val" id="delineationFeatureLocation">-</span>
             </div>
-            <div class="d-row"><span class="d-key">Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span>
+            <div class="d-row d-row-genera"><span class="d-key">Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span>
             </div>
             <div class="d-row"><span class="d-key">Delineated by</span><span class="d-val"
                 id="delineationCreatedBy">-</span></div>
