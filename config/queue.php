@@ -44,6 +44,15 @@ return [
             'after_commit' => false,
         ],
 
+        'drone_imagery' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'drone-imagery',
+            'retry_after' => (int) env('GDAL_QUEUE_RETRY_AFTER', 7260),
+            'after_commit' => true,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

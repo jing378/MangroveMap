@@ -2732,6 +2732,7 @@
                 <button type="button" class="genus-pill-btn" data-genus="Bruguiera" onclick="toggleGenusSelection('Bruguiera')"><i class="bi bi-plus"></i> Bruguiera <span class="genus-local-name">(Miapi)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Ceriops" onclick="toggleGenusSelection('Ceriops')"><i class="bi bi-plus"></i> Ceriops <span class="genus-local-name">(Tungog)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Xylocarpus" onclick="toggleGenusSelection('Xylocarpus')"><i class="bi bi-plus"></i> Xylocarpus <span class="genus-local-name">(Tabigi)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Nypa" onclick="toggleGenusSelection('Nypa')"><i class="bi bi-plus"></i> Nypa <span class="genus-local-name">(Nipa/Sasa)</span></button>
               </div>
               <div style="display:flex;gap:6px;">
                 <input id="delineationCustomGenusInput" type="text"
@@ -3141,6 +3142,7 @@
       'Bruguiera': 'Miapi',
       'Ceriops': 'Tungog',
       'Xylocarpus': 'Tabigi',
+      'Nypa': 'Nipa/Sasa',
     };
 
     function getGenusDisplayLabel(genus) {

@@ -1,22 +1,24 @@
 <?php
 
-use App\Http\Controllers\PublicController;
-use App\Http\Controllers\EndUserController;
-use App\Http\Controllers\MapController;
-use App\Http\Controllers\ClassifyController;
-use App\Http\Controllers\DelineationController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\ExpertController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\DelineationAnnualObservationController;
-use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\ClassifyController;
+use App\Http\Controllers\DelineationAnnualObservationController;
+use App\Http\Controllers\DelineationController;
+use App\Http\Controllers\DroneImageryController;
+use App\Http\Controllers\EndUserController;
+use App\Http\Controllers\ExpertController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 
 // Authentication Routes
 Route::middleware('guest')->group(function () {
@@ -24,7 +26,7 @@ Route::middleware('guest')->group(function () {
         return view('auth.login');
     })->name('login');
 
-    Route::post('/login', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'store']);
+    Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 
     Route::get('/register', function () {
         // Debug: Check authentication status
@@ -41,7 +43,7 @@ Route::middleware('guest')->group(function () {
         return view('auth.register');
     })->name('register');
 
-    Route::post('/register', [\App\Http\Controllers\Auth\RegisteredUserController::class, 'store']);
+    Route::post('/register', [RegisteredUserController::class, 'store']);
 
     Route::get('/forgot-password', function () {
         return view('auth.forgot-password');
@@ -61,7 +63,7 @@ Route::middleware('guest')->group(function () {
         ->name('password.update');
 });
 
-Route::post('/logout', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'destroy'])->middleware('auth')->name('logout');
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('auth')->name('logout');
 
 // Email Verification Routes
 
@@ -107,10 +109,23 @@ Route::get('/', function () {
     if (Auth::check()) {
         return redirect(Auth::user()->homeRoute());
     }
+
     return app(PublicController::class)->index();
 })->name('index');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/drone-imagery', [DroneImageryController::class, 'index'])
+        ->name('drone-imagery.index');
+    Route::post('/drone-imagery', [DroneImageryController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('drone-imagery.store');
+    Route::get('/drone-imagery/{layerId}/tiles/{z}/{x}/{y}', [DroneImageryController::class, 'tile'])
+        ->whereNumber(['layerId', 'z', 'x', 'y'])
+        ->name('drone-imagery.tile');
+    Route::get('/drone-imagery/{layerId}', [DroneImageryController::class, 'show'])
+        ->whereNumber('layerId')
+        ->name('drone-imagery.show');
+
     // Profile routes (accessible to all authenticated users)
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -121,6 +136,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/delineate', [EndUserController::class, 'delineate'])->name('delineate');
     Route::get('/delineations/{delineation}/annual-observations', [DelineationAnnualObservationController::class, 'index'])
         ->name('delineations.annual-observations.index');
+    Route::post('/delineations/location-preview', [EndUserController::class, 'previewDelineationLocation'])
+        ->middleware('throttle:60,1')
+        ->name('delineations.location-preview');
+    // Edit the boundary of an existing saved delineation (experts: resident/own records; residents: own pending records)
+    Route::put('/delineations/{delineation}/boundary', [EndUserController::class, 'updateDelineationBoundary'])
+        ->name('delineations.boundary.update');
 
     // Image classification (accessible to all authenticated users)
     Route::get('/classify', [ClassifyController::class, 'create'])->name('classify');
@@ -142,6 +163,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Resident dashboard - RESTRICTED TO END_USER ROLE ONLY
     Route::middleware('end_user')->get('/dashboard', [EndUserController::class, 'dashboard'])->name('dashboard');
     Route::middleware('end_user')->post('/delineations', [EndUserController::class, 'storeDelineation'])->name('delineations.store');
+    Route::middleware('end_user')->put('/delineations/{delineation}/revision', [EndUserController::class, 'reviseRejectedDelineation'])->name('delineations.revise');
     Route::middleware('end_user')->delete('/delineations/{delineation}', [EndUserController::class, 'destroyDelineation'])->name('delineations.destroy');
 
     // Expert routes - review and approve resident delineations

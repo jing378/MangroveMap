@@ -103,6 +103,17 @@ class UserActivity extends Model
         );
     }
 
+    public static function recordDelineationResubmitted(Delineation $delineation): self
+    {
+        return static::record(
+            $delineation->user_id,
+            'Resubmitted revised delineation: ' . $delineation->name,
+            'Map Delineation',
+            'pending',
+            $delineation,
+        );
+    }
+
     public static function recordDelineationApproved(Delineation $delineation, User $expert): self
     {
         return static::record(

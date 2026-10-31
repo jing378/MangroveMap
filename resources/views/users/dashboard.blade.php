@@ -403,6 +403,7 @@
 
     @php
         $myDelineations = collect($delineations ?? []);
+        $recentDelineations = collect($dashboardDelineations ?? $delineations ?? []);
         $totalDels = $myDelineations->count();
         $approvedDels = $myDelineations->filter(fn($d) => !empty($d['is_approved']))->count();
         $pendingDels = $myDelineations->filter(fn($d) => empty($d['is_approved']) && empty($d['is_rejected']))->count();
@@ -478,10 +479,10 @@
             </a>
         </div>
 
-        @if($myDelineations->isEmpty())
+        @if($recentDelineations->isEmpty())
             <div style="text-align: center; padding: 40px 20px; color: #7a9a7a;">
                 <i class="bi bi-bounding-box" style="font-size: 36px; display: block; margin-bottom: 10px; color: #b8d9c6;"></i>
-                <p style="margin: 0; font-size: 14px;">You haven't submitted any zone delineations yet.</p>
+                <p style="margin: 0; font-size: 14px;">{{ auth()->user()->isExpert() ? 'No resident delineations are available to review yet.' : "You haven't submitted any zone delineations yet." }}</p>
                 <a href="{{ auth()->user()->isExpert() ? route('expert.delineate') : route('delineate') }}" style="display: inline-block; margin-top: 12px; color: #1e9e62; font-weight: 700; text-decoration: none;">
                     Start drawing your first boundary &rarr;
                 </a>
@@ -499,7 +500,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($myDelineations->take(8) as $d)
+                        @foreach($recentDelineations->take(8) as $d)
                             @php
                                 $isApp = !empty($d['is_approved']);
                                 $isRej = !empty($d['is_rejected']);

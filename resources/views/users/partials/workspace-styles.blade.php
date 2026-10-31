@@ -632,6 +632,19 @@
     white-space: nowrap;
   }
 
+  .quick-jump-result-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .quick-jump-result-heading > i {
+    flex: 0 0 auto;
+    color: #36835b;
+    font-size: 13px;
+  }
+
   .quick-jump-result-meta,
   .quick-jump-empty {
     color: #718271;
@@ -1407,7 +1420,10 @@
     flex-direction: column;
     gap: 4px;
     width: max-content;
-    min-width: 130px;
+    min-width: 260px;
+    max-width: min(340px, calc(100vw - 80px));
+    max-height: min(70vh, 560px);
+    overflow-y: auto;
     padding: 8px;
     background: #fff;
     border: 1px solid #e0e8e0;
@@ -1417,6 +1433,142 @@
 
   .layer-menu.show {
     display: flex;
+  }
+
+  .drone-imagery-menu {
+    top: 38px;
+  }
+
+  .drone-imagery-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 2px 2px;
+    color: #4c6b5d;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .drone-imagery-panel h3 {
+    margin: 0;
+    color: #1a2e1a;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .drone-imagery-panel form {
+    display: grid;
+    gap: 6px;
+  }
+
+  .drone-imagery-panel label {
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .drone-imagery-panel input[type="text"],
+  .drone-imagery-panel input[type="file"] {
+    width: 100%;
+    min-width: 0;
+    padding: 7px;
+    border: 1px solid #d4dfd4;
+    border-radius: 7px;
+    background: #fff;
+    color: #334b3c;
+    font: 12px 'Manrope', sans-serif;
+  }
+
+  .drone-imagery-panel input[type="file"] {
+    font-size: 11px;
+  }
+
+  .drone-imagery-upload-button {
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: #1e9e62;
+    color: #fff;
+    font: 600 12px 'Manrope', sans-serif;
+    cursor: pointer;
+  }
+
+  .drone-imagery-upload-button:disabled {
+    opacity: .6;
+    cursor: wait;
+  }
+
+  .drone-imagery-upload-progress {
+    display: grid;
+    gap: 5px;
+  }
+
+  .drone-imagery-upload-progress[hidden] {
+    display: none;
+  }
+
+  .drone-imagery-upload-progress-label {
+    display: flex;
+    justify-content: space-between;
+    color: #4c6b5d;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .drone-imagery-upload-progress-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5eee7;
+  }
+
+  .drone-imagery-upload-progress-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: #1e9e62;
+    transition: width .15s ease;
+  }
+
+  .drone-imagery-message {
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .drone-imagery-message:empty {
+    display: none;
+  }
+
+  .drone-imagery-layer {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 7px 0;
+    border-top: 1px solid #edf1ed;
+    font-size: 11px;
+  }
+
+  .drone-imagery-layer input {
+    margin: 2px 0 0;
+    accent-color: #1e9e62;
+  }
+
+  .drone-imagery-layer-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .drone-imagery-layer-name {
+    color: #263d2e;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .drone-imagery-layer-state {
+    color: #73877a;
+    overflow-wrap: anywhere;
   }
 
   .layer-option {
@@ -1786,17 +1938,6 @@
     font-weight: 700;
     color: #1a2e1a;
     letter-spacing: -0.2px;
-  }
-
-  .timeline-area-name {
-    max-width: 100%;
-    margin: 4px 0 10px;
-    overflow: hidden;
-    color: #4c6b5d;
-    font-size: 11px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .timeline-history-caption {
@@ -2503,4 +2644,12 @@
   body[data-page='delineate'] #delineationToolbar {
     display: flex !important;
   }
+
+  /* Saved-delineation boundary editing */
+  .boundary-edit-actions { margin-bottom: 12px; }
+  .boundary-edit-hint { font-size: 11px; color: #3c5a3c; background: #eef6ee; border: 1px solid #cfe3cf; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+  .boundary-edit-hint ul { margin: 4px 0 0; padding-left: 16px; }
+  .boundary-edit-hint kbd { font-size: 10px; padding: 0 4px; border: 1px solid #b8c8b8; border-radius: 3px; background: #fff; }
+  .delineation-vertex-handle.is-selected div { background: #ff9800 !important; transform: scale(1.25); }
+  .delineation-midpoint-handle div { cursor: copy; }
 </style>

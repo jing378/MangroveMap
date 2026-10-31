@@ -21,6 +21,30 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Drone imagery processing
+
+TIFF uploads are processed asynchronously with the QGIS GDAL installation. Set
+`GDAL_QGIS_ENV` in `.env` to the QGIS `o4w_env.bat` path if it differs from the
+default `C:\Program Files\QGIS 3.44.12\bin\o4w_env.bat`. Raster originals and
+generated tiles are kept on Laravel's private local disk.
+
+Start a worker for the dedicated imagery queue in a separate terminal:
+
+```powershell
+php artisan queue:work drone_imagery --queue=drone-imagery --timeout=7200 --tries=1
+```
+
+The queue connection's `GDAL_QUEUE_RETRY_AFTER` (default 7260 seconds) must
+remain longer than the job timeout. `GDAL_PROCESS_TIMEOUT` (default 7000
+seconds) limits each GDAL command. `GDAL_TILE_ZOOM` defaults to `12-20` to
+bound tile-generation cost; tune it for the imagery resolution and available
+storage.
+
+On the authenticated map, open the layer menu to upload one GeoTIFF or a
+multi-file survey batch and toggle completed imagery overlays. Layer metadata
+and XYZ tiles are served through owner-authorized routes; generated imagery
+is not made publicly accessible through the storage symlink.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.

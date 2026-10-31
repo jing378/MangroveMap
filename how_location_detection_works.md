@@ -1,81 +1,53 @@
-# How Delineation Location Detection Works
+# Delineation Location Resolution
 
-When you draw or edit a mangrove delineation on the map, the system automatically detects the real-world place name in **5 simple steps**.
+Locations are assigned by the Laravel server from the geometry and the Southern Leyte barangay boundary dataset. When a shape is completed or edited, the browser requests a preview from the server and displays the result before saving. Save runs the same resolver again, so the browser does not choose the saved location.
 
----
+The preview uses the authenticated `POST /delineations/location-preview` route. It returns a location status and, when matched, the barangay, municipality, province, dataset version, and overlap details.
 
-## 1. Finding the Center Point (The "Pin Drop")
+## Dataset
 
-When you draw a polygon area, a line, or click a point:
-- The map collects all the latitude and longitude coordinates along the boundary.
-- The system calculates the **geometric center (centroid)** of the shape by taking the average of all the points.
+The importer reads `storage/app/geo/southern_leyte_barangay_boundaries.geojson`. It expects GeoJSON `MultiPolygon` features with these properties:
 
-> **Analogy:** If you cut out your drawn mangrove shape from a piece of cardboard, the center point is the exact spot where it would balance on the tip of your finger.
+- `adm4_name` and `adm4_pcode`: barangay
+- `adm3_name` and `adm3_pcode`: municipality
+- `adm2_name` and `adm2_pcode`: province
+- `version` and `valid_on`: dataset provenance
 
+The supplied dataset identifies itself as version `v03`, valid on `2025-02-13`. GeoJSON coordinates are longitude, latitude; map features are stored latitude, longitude and are converted by `BoundaryResolver`.
+
+## Import
+
+Run the migration and importer after the GeoJSON has been checked:
+
+```powershell
+php artisan migrate --force
+php artisan boundaries:import --path=storage/app/geo/southern_leyte_barangay_boundaries_qgis_fixed.geojson --accept-qgis-valid
 ```
-       [Point 1] -------- [Point 2]
-           \                  /
-            \     ★ Center   /
-             \   (Lat, Lng) /
-          [Point 4] ------ [Point 3]
+
+To import a repaired export without replacing the original source file:
+
+```powershell
+php artisan boundaries:import --path=storage/app/geo/southern_leyte_barangay_boundaries_fixed.geojson
 ```
 
----
+The importer validates every polygon and runs in a transaction. Any invalid geometry or missing required field aborts the import and preserves previously imported rows.
 
-## 2. Asking the Map Directory (Reverse Geocoding)
+The current dataset has five polygons MySQL flags invalid even though QGIS **Check validity** reports zero invalid features. After verifying the file in QGIS, `--accept-qgis-valid` explicitly trusts the QGIS GEOS result for those geometries.
 
-Once the center coordinate `(Latitude, Longitude)` is calculated, the system asks an online global map directory (**OpenStreetMap Nominatim**):
+## Matching Rules
 
-> *"What barangay, municipality, and province is located at these coordinates?"*
+- Points are assigned to a containing barangay. A point exactly on a shared boundary is assigned to the lowest barangay code for deterministic results.
+- Lines are assigned by greatest overlapping length.
+- Areas are assigned by greatest overlapping area.
+- All intersecting boundaries with positive overlap are saved in `location_details.matches`; the dominant boundary supplies `location`.
+- Features with no match get `location_status: outside_boundaries`. Invalid or zero-length/zero-area geometries are rejected.
 
-The map directory inspects the coordinates and returns the administrative hierarchy:
-1. **Local Area / Barangay / Bay:** (e.g., *San Ramon* or *Sogod Bay*)
-2. **Municipality / City:** (e.g., *Bontoc* or *Sogod*)
-3. **Province:** (e.g., *Southern Leyte*)
+Length and area are measured in projected CRS EPSG:32651. Names, codes, overlap percentages, dataset version, and validity date are persisted with the feature in the existing JSON column.
 
-The system formats these into a clean, readable name:
-> **Location:** `San Ramon, Bontoc, Southern Leyte`
+## Geometry Engine Compatibility
 
----
+MySQL 8.0.39 reports five polygons invalid, while QGIS 3.44.12 Check validity reports all 500 features valid. QGIS Fix geometries leaves those shapes unchanged. The verified QGIS output was imported with the explicit `--accept-qgis-valid` option. Representative MySQL containment and overlap operations succeeded on all five; Tuba-on also passed an area-resolution test.
 
-## 3. Instant & Offline Backup (Zero-Lag Fallback)
+The imported table contains 500 unique barangay codes from dataset `v03`, valid on `2025-02-13`. A live resolver check matched a known point to Amagusan, Anahawan and a sample area to Tuba-on, Silago.
 
-What happens if the internet connection is slow or drops?
-
-The system has a **built-in local map directory** containing coordinate boundaries for all municipalities and coastal bays across Southern Leyte (such as *Sogod Bay*, *Bontoc*, *Sogod*, *Malitbog*, *Padre Burgos*, *Libagon*, *Liloan*, etc.):
-
-- If you are online, it fetches the precise barangay name from OpenStreetMap.
-- If offline or while loading, it instantly identifies the municipality or bay using the built-in boundary boxes.
-- You never see an error or empty field—there is always an accurate location displayed immediately.
-
----
-
-## 4. Live Updates When You Edit or Adjust
-
-When you modify the delineation:
-- **Dragging Vertices:** In edit mode, dots (handles) appear on each corner of your shape. Dragging any dot updates the shape in real time.
-- **On Release (Drag End):** As soon as you let go of a point, the system recalculates the new center point and updates the detected location automatically.
-- **Undo / Redo:** Clicking Undo or Redo restores the previous shape and immediately updates both the **Area (ha)** and **Location**.
-
----
-
-## 5. Smart Caching (Fast & Efficient)
-
-- Once a location is detected for a coordinate area, the system remembers it (**caches** it).
-- If you click between different saved zones on the map, the location appears **instantly** without waiting for network requests.
-- When you click **Save**, the detected location is saved directly with your delineation so it reloads immediately next time.
-
----
-
-## Quick Summary Flow
-
-```mermaid
-flowchart LR
-    A[Draw or Edit Shape] --> B[Calculate Center Lat/Lng]
-    B --> C{Check In-Memory Cache}
-    C -- Cached --> F[Display Location in Right Panel]
-    C -- Not Cached --> D[Instant Local Region Fallback]
-    D --> E[Reverse Geocode via OpenStreetMap]
-    E --> F
-    F --> G[Auto-suggest Zone Name]
-```
+The assigned barangay is exact relative to this boundary dataset and its version; it does not claim greater accuracy than the source boundaries.

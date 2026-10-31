@@ -3,6 +3,9 @@
 
     // DATA & MAP INITIALIZATION (same as before)
     const saveDelineationUrl = "{{ Auth::user()->isExpert() ? route('expert.delineations.store') : route('delineations.store') }}";
+    const reviseDelineationUrlTemplate = @json(route('delineations.revise', ['delineation' => '__DELINEATION_ID__']));
+    const updateBoundaryUrlTemplate = @json(route('delineations.boundary.update', ['delineation' => '__DELINEATION_ID__']));
+    const resolveDelineationLocationUrl = @json(route('delineations.location-preview'));
     const deleteDelineationBaseUrl = "{{ url('/delineations') }}";
     const annualObservationBaseUrl = @json(url('/delineations'));
     const isExpertUser = {{ Auth::check() && Auth::user()->isExpert() ? 'true' : 'false' }};
@@ -60,6 +63,9 @@
       ? mergeDelineationsById(savedDelineations, residentDelineations)
       : mergeDelineationsById(savedDelineations, approvedDelineations);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const droneImageryIndexUrl = @json(route('drone-imagery.index'));
+    const droneImageryUploadUrl = @json(route('drone-imagery.store'));
+    const droneImageryStatusUrl = @json(url('/drone-imagery'));
 
 
     function extractPoints(coords) {
@@ -93,7 +99,6 @@
       return {
         type: feature.type,
         coords: feature.coords,
-        location: feature.detected_location || null,
         genera: Array.isArray(feature.genera) ? feature.genera : (currentSelectedGenera || []),
       };
     }
@@ -109,129 +114,59 @@
       return [total[0] / points.length, total[1] / points.length];
     }
 
-    const locationCache = new Map();
+    let activeLocationPreviewToken = 0;
 
-    const knownCoastalRegions = [
-      { name: 'Sogod, Southern Leyte', latMin: 10.36, latMax: 10.45, lngMin: 124.96, lngMax: 125.04 },
-      { name: 'Bontoc, Southern Leyte', latMin: 10.30, latMax: 10.36, lngMin: 124.93, lngMax: 125.00 },
-      { name: 'Tomas Oppus, Southern Leyte', latMin: 10.22, latMax: 10.30, lngMin: 124.95, lngMax: 125.02 },
-      { name: 'Malitbog, Southern Leyte', latMin: 10.12, latMax: 10.22, lngMin: 124.97, lngMax: 125.05 },
-      { name: 'Padre Burgos, Southern Leyte', latMin: 10.05, latMax: 10.12, lngMin: 124.99, lngMax: 125.07 },
-      { name: 'Libagon, Southern Leyte', latMin: 10.24, latMax: 10.35, lngMin: 125.02, lngMax: 125.09 },
-      { name: 'Liloan, Southern Leyte', latMin: 10.13, latMax: 10.22, lngMin: 125.10, lngMax: 125.18 },
-      { name: 'San Francisco, Southern Leyte', latMin: 10.00, latMax: 10.13, lngMin: 125.12, lngMax: 125.24 },
-      { name: 'Pintuyan, Southern Leyte', latMin: 9.92, latMax: 10.00, lngMin: 125.18, lngMax: 125.28 },
-      { name: 'San Ricardo, Southern Leyte', latMin: 9.87, latMax: 9.96, lngMin: 125.26, lngMax: 125.33 },
-      { name: 'Limasawa, Southern Leyte', latMin: 9.89, latMax: 9.95, lngMin: 125.05, lngMax: 125.09 },
-      { name: 'Saint Bernard, Southern Leyte', latMin: 10.27, latMax: 10.36, lngMin: 125.11, lngMax: 125.21 },
-      { name: 'San Juan, Southern Leyte', latMin: 10.22, latMax: 10.31, lngMin: 125.15, lngMax: 125.23 },
-      { name: 'Anahawan, Southern Leyte', latMin: 10.32, latMax: 10.39, lngMin: 125.21, lngMax: 125.29 },
-      { name: 'Hinundayan, Southern Leyte', latMin: 10.33, latMax: 10.40, lngMin: 125.23, lngMax: 125.30 },
-      { name: 'Hinunangan, Southern Leyte', latMin: 10.38, latMax: 10.48, lngMin: 125.17, lngMax: 125.26 },
-      { name: 'Silago, Southern Leyte', latMin: 10.48, latMax: 10.60, lngMin: 125.12, lngMax: 125.23 },
-      { name: 'Macrohon, Southern Leyte', latMin: 10.03, latMax: 10.12, lngMin: 124.90, lngMax: 124.98 },
-      { name: 'Maasin City, Southern Leyte', latMin: 10.10, latMax: 10.22, lngMin: 124.80, lngMax: 124.92 },
-      { name: 'Sogod Bay, Southern Leyte', latMin: 10.05, latMax: 10.42, lngMin: 124.95, lngMax: 125.08 },
-    ];
-
-    function getKnownLocalRegion(lat, lng) {
-      for (const region of knownCoastalRegions) {
-        if (lat >= region.latMin && lat <= region.latMax && lng >= region.lngMin && lng <= region.lngMax) {
-          return region.name;
-        }
-      }
-      return null;
-    }
-
-    async function detectGeographicLocation(lat, lng) {
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        return 'Unknown location';
-      }
-
-      const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
-      if (locationCache.has(cacheKey)) {
-        return locationCache.get(cacheKey);
-      }
-
-      const fallbackName = getKnownLocalRegion(lat, lng) || `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`;
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=14&addressdetails=1`;
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          const addr = data.address || {};
-          const local = addr.village || addr.suburb || addr.neighbourhood || addr.quarter || addr.hamlet || addr.isolated_dwelling || addr.bay || addr.beach || addr.island || addr.natural;
-          const municipality = addr.municipality || addr.town || addr.city || addr.city_district || addr.county || addr.district;
-          const province = addr.state || addr.province || addr.region;
-          const country = addr.country;
-
-          const parts = [];
-          if (local) parts.push(local);
-          if (municipality && municipality !== local) parts.push(municipality);
-          if (province && province !== municipality) parts.push(province);
-          else if (!province && country) parts.push(country);
-
-          let resolved = parts.join(', ');
-          if (!resolved && data.display_name) {
-            resolved = data.display_name.split(',').slice(0, 3).map(s => s.trim()).join(', ');
-          }
-
-          if (resolved) {
-            locationCache.set(cacheKey, resolved);
-            return resolved;
-          }
-        }
-      } catch (e) {
-        // Fallback on network timeout / offline / CORS
-      }
-
-      locationCache.set(cacheKey, fallbackName);
-      return fallbackName;
-    }
-
-    let activeLocationDetectionToken = 0;
-
-    async function updateFeatureLocationDisplay(feature, featureIndex) {
+    async function updateFeatureLocationDisplay(feature, featureIndex = selectedDrawnIndex) {
       const locationEl = document.getElementById('delineationFeatureLocation') || document.getElementById('delineationFeatureLabel');
       if (!locationEl) return;
 
-      const [lat, lng] = getFeatureCenter(feature);
-      const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
-
-      if (feature.detected_location) {
-        locationEl.textContent = feature.detected_location;
+      const token = ++activeLocationPreviewToken;
+      if (feature.location_status === 'matched' && feature.location) {
+        locationEl.textContent = feature.location;
         return;
       }
 
-      if (locationCache.has(cacheKey)) {
-        feature.detected_location = locationCache.get(cacheKey);
-        locationEl.textContent = feature.detected_location;
-        return;
-      }
+      locationEl.textContent = 'Locating barangay...';
 
-      const immediate = getKnownLocalRegion(lat, lng) || 'Detecting location...';
-      locationEl.textContent = immediate;
+      try {
+        const response = await fetch(resolveDelineationLocationUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          body: JSON.stringify({
+            feature: {
+              type: feature.type,
+              coords: feature.coords,
+            },
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.feature) {
+          throw new Error(payload.message || 'Unable to preview location.');
+        }
 
-      const token = ++activeLocationDetectionToken;
-      const detected = await detectGeographicLocation(lat, lng);
+        feature.location = payload.feature.location || null;
+        feature.location_status = payload.feature.location_status || 'outside_boundaries';
+        feature.location_details = payload.feature.location_details || null;
 
-      if (token !== activeLocationDetectionToken) return;
+        if (token !== activeLocationPreviewToken || drawnFeatures[featureIndex] !== feature) return;
 
-      feature.detected_location = detected;
-      if (selectedDrawnIndex === featureIndex) {
-        locationEl.textContent = detected;
-        const labelInput = document.getElementById('delineationLabel');
-        if (labelInput && !labelInput.value.trim() && !feature.delineation_id) {
-          labelInput.value = detected;
-          feature.label = detected;
+        if (feature.location_status === 'matched' && feature.location) {
+          locationEl.textContent = feature.location;
+          if (!feature.delineation_id) {
+            feature.label = feature.location;
+          }
+        } else if (feature.location_status === 'pending') {
+          locationEl.textContent = 'Location pending boundary import';
+        } else {
+          locationEl.textContent = 'Outside loaded barangay boundaries';
+        }
+      } catch (error) {
+        if (token === activeLocationPreviewToken) {
+          locationEl.textContent = 'Location preview unavailable';
         }
       }
     }
@@ -256,6 +191,7 @@
       'Bruguiera': 'Miapi',
       'Ceriops': 'Tungog',
       'Xylocarpus': 'Tabigi',
+      'Nypa': 'Nipa/Sasa',
     };
 
     function getGenusDisplayLabel(genus) {
@@ -463,14 +399,20 @@
           result.type = 'button';
           result.className = 'quick-jump-result';
 
+          const heading = document.createElement('span');
+          heading.className = 'quick-jump-result-heading';
+          const locationIcon = document.createElement('i');
+          locationIcon.className = 'bi bi-geo-alt-fill';
+          locationIcon.setAttribute('aria-hidden', 'true');
           const name = document.createElement('span');
           name.className = 'quick-jump-result-name';
           name.textContent = zone.name;
+          heading.append(locationIcon, name);
           const meta = document.createElement('span');
           meta.className = 'quick-jump-result-meta';
-          meta.textContent = `${zone.status} · ${zone.area}`;
+          meta.textContent = `Mangrove Area: ${formatFeatureAreaHectares(zone.feature)}`;
 
-          result.append(name, meta);
+          result.append(heading, meta);
           result.addEventListener('click', () => {
             selectZone(index);
             quickJumpInput.value = zone.name;
@@ -485,7 +427,9 @@
     }
 
     if (quickJumpInput && quickJumpResults) {
-      quickJumpInput.placeholder = zones.length ? 'Search saved areas' : 'No saved areas available';
+      quickJumpInput.placeholder = zones.length
+        ? 'Search Mangrove areas'
+        : 'No saved areas available';
       quickJumpInput.disabled = zones.length === 0;
       quickJumpInput.addEventListener('focus', () => renderQuickJumpResults(quickJumpInput.value));
       quickJumpInput.addEventListener('input', () => renderQuickJumpResults(quickJumpInput.value));
@@ -504,7 +448,6 @@
     }
 
     const tileLayerOpts = {
-      maxZoom: 18,
       updateWhenZooming: false,
       updateWhenIdle: true,
       keepBuffer: 2,
@@ -520,16 +463,25 @@
       return Math.log2((EARTH_CIRCUMFERENCE_M * Math.cos(latRad)) / heightM);
     }
 
-    const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', tileLayerOpts);
-    const osmL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', tileLayerOpts);
+    const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      ...tileLayerOpts,
+      maxNativeZoom: 19,
+      maxZoom: 22,
+    });
+    const osmL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      ...tileLayerOpts,
+      maxNativeZoom: 19,
+      maxZoom: 22,
+    });
     const topoL = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
       ...tileLayerOpts,
-      maxZoom: 17,
+      maxNativeZoom: 17,
+      maxZoom: 22,
     });
     const mangroveL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       ...tileLayerOpts,
-      maxZoom: 21,
       maxNativeZoom: 19,
+      maxZoom: 22,
     });
     const baseLayers = {
       sat: satL,
@@ -543,6 +495,207 @@
       preferCanvas: true,
       layers: [satL],
     }).setView([10.358, 124.973], 13);
+
+    const droneImageryLayersElement = document.getElementById('droneImageryLayers');
+    const droneImageryMessageElement = document.getElementById('droneImageryMessage');
+    const droneImageryUploadForm = document.getElementById('droneImageryUploadForm');
+    const droneImageryUploadProgress = document.getElementById('droneImageryUploadProgress');
+    const droneImageryUploadProgressBar = document.getElementById('droneImageryUploadProgressBar');
+    const droneImageryUploadProgressFill = droneImageryUploadProgressBar?.querySelector('.drone-imagery-upload-progress-fill');
+    const droneImageryUploadPercentage = document.getElementById('droneImageryUploadPercentage');
+    const droneImageryTileLayers = new Map();
+
+    function showDroneImageryMessage(message, isError = false) {
+      if (!droneImageryMessageElement) return;
+      droneImageryMessageElement.textContent = message;
+      droneImageryMessageElement.style.color = isError ? '#b42318' : '#4c6b5d';
+    }
+
+    function updateDroneImageryUploadProgress(percentage) {
+      if (!droneImageryUploadProgress || !droneImageryUploadProgressBar || !droneImageryUploadProgressFill || !droneImageryUploadPercentage) return;
+      const progress = Math.max(0, Math.min(100, Math.round(percentage)));
+      droneImageryUploadProgress.hidden = false;
+      droneImageryUploadProgressBar.setAttribute('aria-valuenow', String(progress));
+      droneImageryUploadProgressFill.style.width = `${progress}%`;
+      droneImageryUploadPercentage.textContent = `${progress}%`;
+    }
+
+    function uploadDroneImagery(formData, onProgress) {
+      return new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open('POST', droneImageryUploadUrl);
+        request.withCredentials = true;
+        request.setRequestHeader('Accept', 'application/json');
+        request.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+        request.upload.addEventListener('progress', event => {
+          if (event.lengthComputable) {
+            onProgress((event.loaded / event.total) * 100);
+          }
+        });
+        request.addEventListener('load', () => {
+          let payload;
+          try {
+            payload = JSON.parse(request.responseText);
+          } catch {
+            reject(new Error('The server returned an invalid response while uploading TIFF files.'));
+            return;
+          }
+
+          if (request.status < 200 || request.status >= 300) {
+            const validationError = payload.errors ? Object.values(payload.errors).flat()[0] : null;
+            reject(new Error(validationError || payload.message || 'Unable to upload TIFF files.'));
+            return;
+          }
+
+          resolve(payload);
+        });
+        request.addEventListener('error', () => reject(new Error('Network error while uploading TIFF files.')));
+        request.addEventListener('abort', () => reject(new Error('TIFF file upload was cancelled.')));
+        request.send(formData);
+      });
+    }
+
+    function addDroneImageryTileLayer(layer) {
+      if (!layer.tile_url || !layer.bounds) return null;
+      if (droneImageryTileLayers.has(layer.id)) return droneImageryTileLayers.get(layer.id);
+
+      const bounds = L.latLngBounds(
+        [layer.bounds.south, layer.bounds.west],
+        [layer.bounds.north, layer.bounds.east]
+      );
+      const tileLayer = L.tileLayer(layer.tile_url, {
+        opacity: 0.78,
+        bounds,
+        minNativeZoom: layer.zoom_min,
+        maxNativeZoom: layer.zoom_max,
+        maxZoom: 22,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+      });
+      droneImageryTileLayers.set(layer.id, tileLayer);
+      return tileLayer;
+    }
+
+    function renderDroneImageryLayers(layers, activateLayerId = null) {
+      if (!droneImageryLayersElement) return;
+      droneImageryLayersElement.replaceChildren();
+
+      layers.forEach(layer => {
+        const row = document.createElement('label');
+        row.className = 'drone-imagery-layer';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.disabled = layer.status !== 'ready';
+
+        const info = document.createElement('span');
+        info.className = 'drone-imagery-layer-info';
+        const name = document.createElement('span');
+        name.className = 'drone-imagery-layer-name';
+        name.textContent = layer.name;
+        const state = document.createElement('span');
+        state.className = 'drone-imagery-layer-state';
+        state.textContent = layer.status === 'ready'
+          ? `${layer.source_type === 'batch' ? 'Mosaic' : 'GeoTIFF'} · zoom ${layer.zoom_min}–${layer.zoom_max}`
+          : (layer.error_message || layer.status);
+        info.append(name, state);
+        row.append(checkbox, info);
+        droneImageryLayersElement.appendChild(row);
+
+        if (layer.status !== 'ready') return;
+
+        const tileLayer = addDroneImageryTileLayer(layer);
+        if (!tileLayer) return;
+
+        checkbox.checked = mainMap.hasLayer(tileLayer) || Number(activateLayerId) === Number(layer.id);
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            tileLayer.addTo(mainMap);
+          } else {
+            mainMap.removeLayer(tileLayer);
+          }
+        });
+
+        if (Number(activateLayerId) === Number(layer.id)) {
+          tileLayer.addTo(mainMap);
+        }
+      });
+    }
+
+    async function loadDroneImageryLayers(activateLayerId = null) {
+      if (!droneImageryLayersElement) return [];
+      const response = await fetch(droneImageryIndexUrl, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      const payload = await response.json();
+      if (!response.ok || !Array.isArray(payload.layers)) {
+        throw new Error(payload.message || 'Unable to load your drone imagery layers.');
+      }
+      renderDroneImageryLayers(payload.layers, activateLayerId);
+      return payload.layers;
+    }
+
+    async function waitForDroneImagery(layerId) {
+      for (let attempt = 0; attempt < 1200; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const response = await fetch(`${droneImageryStatusUrl}/${encodeURIComponent(layerId)}`, {
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.message || 'Unable to check raster processing status.');
+        }
+        if (payload.status === 'ready') return payload;
+        if (payload.status === 'failed') {
+          throw new Error(payload.error_message || 'Raster processing failed.');
+        }
+        showDroneImageryMessage('Upload received. Validating and processing the imagery…');
+      }
+      throw new Error('Raster processing is taking longer than expected. Check this layer again later.');
+    }
+
+    if (droneImageryUploadForm) {
+      droneImageryUploadForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const fileInput = document.getElementById('droneImageryFiles');
+        const submitButton = droneImageryUploadForm.querySelector('button[type="submit"]');
+        if (!fileInput?.files?.length) {
+          showDroneImageryMessage('Select at least one .tif or .tiff file.', true);
+          return;
+        }
+
+        const formData = new FormData(droneImageryUploadForm);
+        submitButton.disabled = true;
+        showDroneImageryMessage('Uploading TIFF files…');
+        try {
+          const payload = await uploadDroneImagery(formData, updateDroneImageryUploadProgress);
+
+          if (droneImageryUploadProgress) droneImageryUploadProgress.hidden = true;
+          showDroneImageryMessage('Upload complete. Waiting for GDAL processing…');
+          await waitForDroneImagery(payload.id);
+          const layers = await loadDroneImageryLayers(payload.id);
+          const readyLayer = layers.find(layer => Number(layer.id) === Number(payload.id));
+          showDroneImageryMessage(readyLayer ? `"${readyLayer.name}" is ready and displayed on the map.` : 'Imagery is ready.');
+          droneImageryUploadForm.reset();
+        } catch (error) {
+          if (droneImageryUploadProgress) droneImageryUploadProgress.hidden = true;
+          showDroneImageryMessage(error.message || 'Drone imagery upload failed.', true);
+          try {
+            await loadDroneImageryLayers();
+          } catch (loadError) {
+            console.error('Unable to refresh drone imagery layer list.', loadError);
+          }
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
+    }
+
+    loadDroneImageryLayers().catch(error => {
+      showDroneImageryMessage(error.message || 'Unable to load drone imagery layers.', true);
+      console.error('Unable to load drone imagery layers.', error);
+    });
 
     let mainMapResizeTimer = null;
     let mainMapLastSize = { w: 0, h: 0 };
@@ -745,6 +898,19 @@
     let historyIndex = -1;
     let currentSelectedZoneIndex = -1;
     let selectedDrawnIndex = -1;
+    let rejectedRevisionIndex = -1;
+    let rejectedRevisionFeatureIndexes = [];
+    let rejectedRevisionOriginalFeatures = [];
+    let isEditingRejectedRevision = false;
+    let rejectedRevisionControlStates = new Map();
+    // Editing the boundary of an existing saved delineation (updates the same record in place).
+    let boundaryEdit = null; // { delineationId, featureIndexes, originalFeatures }
+    let selectedEditVertex = null; // { featureIndex, vertexIndex }
+    let editVertexHandles = []; // [{ featureIndex, vertexIndex, handle }] for the vertices currently rendered
+
+    function isGeometryEditLocked() {
+      return isEditingRejectedRevision || boundaryEdit !== null;
+    }
 
     function loadSavedDelineations() {
       if (!Array.isArray(savedDelineations) || savedDelineations.length === 0) {
@@ -756,7 +922,9 @@
           record.features.forEach(feature => {
             drawnFeatures.push({
               ...feature,
-              detected_location: feature.location || null,
+              location: feature.location || null,
+              location_status: feature.location_status || null,
+              location_details: feature.location_details || null,
               genera: Array.isArray(feature.genera) ? feature.genera : [],
               label: record.name,
               notes: record.notes,
@@ -790,7 +958,9 @@
         drawnFeatures.push({
           type: feature.type,
           coords: feature.coords,
-          detected_location: feature.location || null,
+          location: feature.location || null,
+          location_status: feature.location_status || null,
+          location_details: feature.location_details || null,
           genera: Array.isArray(feature.genera) ? feature.genera : [],
           label: record.name,
           notes: record.notes,
@@ -800,6 +970,8 @@
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
           rejection_notes: record.rejection_notes || null,
+          last_revised_by_name: record.last_revised_by_name || null,
+          last_revised_at: record.last_revised_at || null,
           is_own: !!options.is_own,
           created_by: options.created_by || record.user?.name || authUserName || 'Unknown user',
         });
@@ -906,6 +1078,13 @@
       if (event && typeof event.stopPropagation === 'function') {
         event.stopPropagation();
       }
+      if (rejectedRevisionIndex >= 0) {
+        cancelRejectedDelineationRevision(false);
+      }
+      if (boundaryEdit) {
+        if (!confirmDiscardBoundaryEdit()) return;
+        cancelBoundaryEdit(false);
+      }
       const panel = document.getElementById('mapRightPanel');
       const backdrop = document.getElementById('panelBackdrop');
       if (panel) {
@@ -1011,6 +1190,14 @@
     initBottomSheetGestures();
 
     function selectZone(i) {
+      if (rejectedRevisionIndex >= 0) {
+        cancelRejectedDelineationRevision(false);
+      }
+      if (boundaryEdit) {
+        if (!confirmDiscardBoundaryEdit()) return;
+        cancelBoundaryEdit(false);
+      }
+      document.getElementById('boundaryEditActions')?.style.setProperty('display', 'none');
       currentSelectedZoneIndex = i;
       let z = zones[i];
       if (quickJumpInput && z) quickJumpInput.value = z.name;
@@ -1031,7 +1218,7 @@
       document.getElementById('dStatus').className = `d-val ${z.sc}`;
       document.getElementById('dGenus').textContent = z.genus;
       document.getElementById('dScan').textContent = z.scan;
-      loadAnnualObservationCharts(z.id, z.name);
+      loadAnnualObservationCharts(z.id);
 
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
@@ -1061,20 +1248,56 @@
     }
 
     function selectDrawnFeature(i) {
+      if (rejectedRevisionIndex >= 0 && i !== rejectedRevisionIndex) {
+        const revisionFeature = drawnFeatures[rejectedRevisionIndex];
+        const nextFeature = drawnFeatures[i];
+        if (!nextFeature || Number(nextFeature.delineation_id) !== Number(revisionFeature?.delineation_id)) {
+          cancelRejectedDelineationRevision(false);
+        }
+      }
+      if (boundaryEdit && Number(drawnFeatures[i]?.delineation_id) !== Number(boundaryEdit.delineationId)) {
+        if (!confirmDiscardBoundaryEdit()) return;
+        cancelBoundaryEdit(false);
+      }
       const feature = drawnFeatures[i];
       if (!feature) return;
       selectedDrawnIndex = i;
 
       openRightPanel();
-      const selectedZone = zones.find(zone => zone.id === feature.delineation_id);
-      loadAnnualObservationCharts(feature.delineation_id, selectedZone?.name || feature.label || 'Selected area');
+      loadAnnualObservationCharts(feature.delineation_id);
 
       document.getElementById('delineationInfoCard').style.display = 'block';
       document.getElementById('zoneDetailsContent').style.display = 'none';
 
+      const showResidentEditors = isExpertUser || !feature.is_approved;
+      const genusEditor = document.getElementById('delineationGenusEditor');
+      const generaRow = document.querySelector('.d-row-genera');
+      const notesEditor = document.getElementById('delineationNotesEditor');
+      if (genusEditor) genusEditor.style.display = showResidentEditors ? '' : 'none';
+      if (generaRow) generaRow.style.display = feature.delineation_id ? '' : 'none';
+      if (notesEditor) notesEditor.style.display = showResidentEditors ? '' : 'none';
+
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
-        removeBtn.style.display = (feature.is_own && !feature.is_approved) ? 'block' : 'none';
+        removeBtn.style.display = (feature.is_own && !feature.is_approved && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
+      }
+      updateBoundaryEditActions(feature);
+      const lastEditedRow = document.getElementById('delineationLastEditedRow');
+      if (lastEditedRow) {
+        const editedBy = feature.last_revised_by_name;
+        lastEditedRow.style.display = feature.delineation_id && editedBy ? '' : 'none';
+        const editedAt = feature.last_revised_at ? new Date(feature.last_revised_at) : null;
+        document.getElementById('delineationLastEditedBy').textContent = editedBy
+          ? (editedAt && !isNaN(editedAt) ? `${editedBy} (${editedAt.toLocaleDateString()})` : editedBy)
+          : '-';
+      }
+      const revisionActions = document.getElementById('rejectedRevisionActions');
+      if (revisionActions) {
+        const canRevise = feature.is_own && feature.is_rejected && !feature.is_approved;
+        revisionActions.style.display = canRevise ? 'block' : 'none';
+        document.getElementById('startRejectedRevisionBtn').style.display = canRevise && !feature.is_editing_revision ? 'block' : 'none';
+        document.getElementById('saveRejectedRevisionBtn').style.display = feature.is_editing_revision ? 'block' : 'none';
+        document.getElementById('cancelRejectedRevisionBtn').style.display = feature.is_editing_revision ? 'block' : 'none';
       }
 
       document.getElementById('delineationFeatureType').textContent = feature.type || '-';
@@ -1083,11 +1306,6 @@
       if (locationEl) {
         updateFeatureLocationDisplay(feature, i);
       }
-      const labelField = document.getElementById('delineationFeatureLabel');
-      if (labelField) {
-        labelField.textContent = feature.label || '-';
-      }
-      document.getElementById('delineationLabel').value = feature.label || '';
       document.getElementById('delineationNotes').value = feature.notes || '';
 
       // Mangrove Genus Present
@@ -1184,30 +1402,476 @@
       }
     }
 
-    function validateDelineationMeta() {
-      const labelEl = document.getElementById('delineationLabel');
-      const notesEl = document.getElementById('delineationNotes');
-      const label = labelEl?.value.trim();
-      const notes = notesEl?.value.trim();
+    function finishRejectedDelineationRevision() {
+      rejectedRevisionIndex = -1;
+      rejectedRevisionFeatureIndexes = [];
+      rejectedRevisionOriginalFeatures = [];
+      isEditingRejectedRevision = false;
+      rejectedRevisionControlStates.forEach((wasDisabled, control) => {
+        control.disabled = wasDisabled;
+      });
+      rejectedRevisionControlStates.clear();
+      document.getElementById('rejectedRevisionActions')?.style.setProperty('display', 'none');
+    }
 
-      const labelValid = Boolean(label);
+    function setRejectedRevisionControlsLocked(locked) {
+      const controls = document.querySelectorAll('#drawTypeSelect, .draw-btn, #undoBtn, #redoBtn, #saveBtn, #editModeBtn');
+      if (locked) {
+        rejectedRevisionControlStates = new Map();
+        controls.forEach(control => {
+          rejectedRevisionControlStates.set(control, control.disabled);
+          control.disabled = true;
+        });
+        return;
+      }
+
+      rejectedRevisionControlStates.forEach((wasDisabled, control) => {
+        control.disabled = wasDisabled;
+      });
+      rejectedRevisionControlStates.clear();
+    }
+
+    function cancelRejectedDelineationRevision(restoreSelection = true) {
+      if (rejectedRevisionIndex < 0 || !rejectedRevisionOriginalFeatures.length) return;
+      rejectedRevisionFeatureIndexes.forEach((featureIndex, snapshotIndex) => {
+        drawnFeatures[featureIndex] = rejectedRevisionOriginalFeatures[snapshotIndex];
+      });
+      const selectedIndex = selectedDrawnIndex;
+      finishRejectedDelineationRevision();
+      redrawFeatures();
+      if (restoreSelection && selectedDrawnIndex === selectedIndex) {
+        selectDrawnFeature(selectedIndex);
+      }
+    }
+
+    function beginRejectedDelineationRevision() {
+      const feature = drawnFeatures[selectedDrawnIndex];
+      if (!feature?.is_own || !feature.is_rejected || feature.is_approved) return;
+
+      rejectedRevisionIndex = selectedDrawnIndex;
+      rejectedRevisionFeatureIndexes = drawnFeatures
+        .map((item, index) => Number(item.delineation_id) === Number(feature.delineation_id) ? index : -1)
+        .filter(index => index >= 0);
+      rejectedRevisionOriginalFeatures = rejectedRevisionFeatureIndexes
+        .map(index => JSON.parse(JSON.stringify(drawnFeatures[index])));
+      isEditingRejectedRevision = true;
+      rejectedRevisionFeatureIndexes.forEach(index => {
+        drawnFeatures[index].is_editing_revision = true;
+      });
+      setRejectedRevisionControlsLocked(true);
+      const drawTypeSelect = document.getElementById('drawTypeSelect');
+      if (drawTypeSelect) drawTypeSelect.value = '';
+      drawingMode = null;
+      document.querySelectorAll('.draw-btn').forEach(button => button.classList.remove('active'));
+      redrawFeatures();
+      selectDrawnFeature(selectedDrawnIndex);
+    }
+
+    async function submitRejectedDelineationRevision() {
+      const feature = drawnFeatures[rejectedRevisionIndex];
+      const selectedFeature = drawnFeatures[selectedDrawnIndex];
+      if (!feature || !isEditingRejectedRevision) return;
+
+      const notes = document.getElementById('delineationNotes')?.value.trim() || '';
+      if (!notes) {
+        alert('Please fill in Notes before resubmitting.');
+        document.getElementById('delineationNotes')?.focus();
+        return;
+      }
+
+      const delineationFeatures = drawnFeatures
+        .filter(item => Number(item.delineation_id) === Number(feature.delineation_id))
+        .map(item => ({
+          type: item.type,
+          coords: item.coords,
+          genera: item === selectedFeature ? currentSelectedGenera : (Array.isArray(item.genera) ? item.genera : []),
+        }));
+
+      showProcessingModal('Submitting revision...', 'Saving the revised boundary and sending it for expert review.');
+      try {
+        const response = await fetch(reviseDelineationUrlTemplate.replace('__DELINEATION_ID__', encodeURIComponent(feature.delineation_id)), {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          body: JSON.stringify({
+            features: delineationFeatures,
+            name: feature.location?.trim() || feature.label?.trim() || 'Saved delineation',
+            notes,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.delineation) {
+          throw new Error(payload.message || 'Unable to submit the revised delineation.');
+        }
+
+        const relatedFeatures = drawnFeatures.filter(item => Number(item.delineation_id) === Number(feature.delineation_id));
+        (payload.delineation.features || []).forEach((savedFeature, index) => {
+          const target = relatedFeatures[index];
+          if (!target) return;
+          Object.assign(target, savedFeature, {
+            label: payload.delineation.name,
+            notes: payload.delineation.notes,
+            is_approved: false,
+            is_rejected: false,
+            rejection_notes: null,
+          });
+          delete target.is_editing_revision;
+        });
+
+        const selectedIndex = rejectedRevisionIndex;
+        const activeIndex = selectedDrawnIndex;
+        finishRejectedDelineationRevision();
+        redrawFeatures();
+        selectDrawnFeature(activeIndex >= 0 ? activeIndex : selectedIndex);
+        hideProcessingModal();
+        showSuccessModal(payload.message || 'Revised delineation submitted for expert review.');
+      } catch (error) {
+        hideProcessingModal();
+        alert(error.message || 'Unable to submit the revised delineation. Please try again.');
+      }
+    }
+
+    document.getElementById('startRejectedRevisionBtn')?.addEventListener('click', beginRejectedDelineationRevision);
+    document.getElementById('saveRejectedRevisionBtn')?.addEventListener('click', submitRejectedDelineationRevision);
+    document.getElementById('cancelRejectedRevisionBtn')?.addEventListener('click', cancelRejectedDelineationRevision);
+
+    // ---- Edit an existing saved delineation's boundary (OSM-style vertex editing) ----
+    function canEditDelineationBoundary(feature) {
+      if (!feature?.delineation_id) return false;
+      if (isExpertUser) return true; // server also enforces: own records + resident records
+      return !!feature.is_own && !feature.is_approved && !feature.is_rejected;
+    }
+
+    function updateBoundaryEditActions(feature) {
+      const actions = document.getElementById('boundaryEditActions');
+      if (!actions) return;
+      const editing = !!(boundaryEdit && feature && Number(feature.delineation_id) === Number(boundaryEdit.delineationId));
+      const canEdit = editing || (!isEditingRejectedRevision && !boundaryEdit && canEditDelineationBoundary(feature));
+      actions.style.display = canEdit ? 'block' : 'none';
+      document.getElementById('startBoundaryEditBtn').style.display = canEdit && !editing ? 'block' : 'none';
+      document.getElementById('boundaryEditHint').style.display = editing ? 'block' : 'none';
+      document.getElementById('saveBoundaryEditBtn').style.display = editing ? 'block' : 'none';
+      document.getElementById('cancelBoundaryEditBtn').style.display = editing ? 'block' : 'none';
+      const deleteVertexBtn = document.getElementById('deleteBoundaryVertexBtn');
+      deleteVertexBtn.style.display = editing ? 'block' : 'none';
+      deleteVertexBtn.disabled = !(editing && selectedEditVertex);
+    }
+
+    function boundaryEditHasChanges() {
+      if (!boundaryEdit) return false;
+      return boundaryEdit.featureIndexes.some((featureIndex, snapshotIndex) =>
+        JSON.stringify(drawnFeatures[featureIndex]?.coords) !== JSON.stringify(boundaryEdit.originalFeatures[snapshotIndex]?.coords));
+    }
+
+    function confirmDiscardBoundaryEdit() {
+      return !boundaryEditHasChanges() || confirm('Discard your unsaved boundary changes?');
+    }
+
+    function finishBoundaryEdit() {
+      const previousDrawingMode = boundaryEdit?.previousDrawingMode || null;
+      boundaryEdit = null;
+      selectedEditVertex = null;
+      setRejectedRevisionControlsLocked(false);
+      // Restore the drawing mode that was active before editing (e.g. line mode on the Delineate page).
+      if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
+        drawingMode = previousDrawingMode;
+        const drawTypeSelect = document.getElementById('drawTypeSelect');
+        if (drawTypeSelect) drawTypeSelect.value = previousDrawingMode || '';
+        document.querySelectorAll('.draw-btn[data-mode]').forEach(button =>
+          button.classList.toggle('active', button.dataset.mode === previousDrawingMode));
+      }
+      updateHistoryButtons();
+    }
+
+    function beginBoundaryEdit() {
+      const feature = drawnFeatures[selectedDrawnIndex];
+      if (boundaryEdit || isEditingRejectedRevision || !canEditDelineationBoundary(feature)) return;
+
+      const featureIndexes = drawnFeatures
+        .map((item, index) => Number(item.delineation_id) === Number(feature.delineation_id) ? index : -1)
+        .filter(index => index >= 0);
+      boundaryEdit = {
+        delineationId: feature.delineation_id,
+        featureIndexes,
+        originalFeatures: featureIndexes.map(index => JSON.parse(JSON.stringify(drawnFeatures[index]))),
+        previousDrawingMode: drawingMode,
+      };
+      selectedEditVertex = null;
+      featureIndexes.forEach(index => { drawnFeatures[index].is_editing_boundary = true; });
+
+      // Stop any drawing in progress so map clicks don't add new features while editing.
+      currentFeature = null;
+      drawingMode = null;
+      const drawTypeSelect = document.getElementById('drawTypeSelect');
+      if (drawTypeSelect) drawTypeSelect.value = '';
+      document.querySelectorAll('.draw-btn[data-mode]').forEach(button => button.classList.remove('active'));
+      setRejectedRevisionControlsLocked(true);
+
+      redrawFeatures();
+      selectDrawnFeature(selectedDrawnIndex);
+    }
+
+    function cancelBoundaryEdit(restoreSelection = true) {
+      if (!boundaryEdit) return;
+      boundaryEdit.featureIndexes.forEach((featureIndex, snapshotIndex) => {
+        drawnFeatures[featureIndex] = boundaryEdit.originalFeatures[snapshotIndex];
+      });
+      const selectedIndex = selectedDrawnIndex;
+      finishBoundaryEdit();
+      redrawFeatures();
+      if (restoreSelection && selectedIndex >= 0) {
+        selectDrawnFeature(selectedIndex);
+      }
+    }
+
+    async function saveBoundaryEdit() {
+      if (!boundaryEdit) return;
+      const { delineationId, featureIndexes } = boundaryEdit;
+      const selectedFeature = drawnFeatures[selectedDrawnIndex];
+      const editedFeatures = featureIndexes.map(index => drawnFeatures[index]);
+
+      if (!boundaryEditHasChanges()) {
+        cancelBoundaryEdit();
+        return;
+      }
+
+      const saveBtn = document.getElementById('saveBoundaryEditBtn');
+      if (saveBtn) saveBtn.disabled = true;
+      showProcessingModal('Saving changes...', 'Updating the saved delineation boundary.');
+      try {
+        const response = await fetch(updateBoundaryUrlTemplate.replace('__DELINEATION_ID__', encodeURIComponent(delineationId)), {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+          },
+          body: JSON.stringify({
+            features: editedFeatures.map(item => ({
+              type: item.type,
+              coords: item.coords,
+              genera: item === selectedFeature ? currentSelectedGenera : (Array.isArray(item.genera) ? item.genera : []),
+            })),
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.delineation) {
+          throw new Error(payload.message || 'Unable to save the boundary changes.');
+        }
+
+        (payload.delineation.features || []).forEach((savedFeature, index) => {
+          const target = editedFeatures[index];
+          if (!target) return;
+          Object.assign(target, savedFeature, {
+            location_status: savedFeature.location_status || (savedFeature.location ? 'matched' : null),
+            last_revised_by_name: payload.delineation.last_revised_by_name || authUserName,
+            last_revised_at: payload.delineation.last_revised_at || new Date().toISOString(),
+          });
+        });
+        editedFeatures.forEach(target => { delete target.is_editing_boundary; });
+
+        const activeIndex = selectedDrawnIndex;
+        finishBoundaryEdit();
+        redrawFeatures();
+        if (activeIndex >= 0) selectDrawnFeature(activeIndex);
+        hideProcessingModal();
+        showSuccessModal(payload.message || 'Delineation boundary updated.', 'Changes saved');
+      } catch (error) {
+        hideProcessingModal();
+        alert(error.message || 'Unable to save the boundary changes. Please try again.');
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    }
+
+    function deleteSelectedEditVertex() {
+      if (!selectedEditVertex) return;
+      const { featureIndex, vertexIndex } = selectedEditVertex;
+      const feature = drawnFeatures[featureIndex];
+      if (feature) deleteEditableVertex(feature, featureIndex, vertexIndex);
+    }
+
+    document.getElementById('startBoundaryEditBtn')?.addEventListener('click', beginBoundaryEdit);
+    document.getElementById('saveBoundaryEditBtn')?.addEventListener('click', saveBoundaryEdit);
+    document.getElementById('cancelBoundaryEditBtn')?.addEventListener('click', () => cancelBoundaryEdit());
+    document.getElementById('deleteBoundaryVertexBtn')?.addEventListener('click', deleteSelectedEditVertex);
+    document.addEventListener('keydown', (event) => {
+      if (!selectedEditVertex || !isGeometryEditLocked()) return;
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      const tag = (event.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || event.target?.isContentEditable) return;
+      event.preventDefault();
+      deleteSelectedEditVertex();
+    });
+
+    // Vertex helpers shared by all editable line/area geometry.
+    function editableRingInfo(feature) {
+      const coords = Array.isArray(feature.coords) ? feature.coords : [];
+      const first = coords[0];
+      const last = coords[coords.length - 1];
+      const closed = feature.type === 'area' && coords.length > 3 && first && last
+        && Number(first[0]) === Number(last[0]) && Number(first[1]) === Number(last[1]);
+      return { ring: closed ? coords.slice(0, -1) : coords.slice(), closed };
+    }
+
+    function commitEditableRing(feature, ring, closed) {
+      feature.coords = closed && ring.length ? [...ring, [ring[0][0], ring[0][1]]] : ring;
+    }
+
+    function afterEditableGeometryChange(feature, featureIndex) {
+      delete feature.location;
+      delete feature.location_status;
+      delete feature.location_details;
+      saveDrawingStateToHistory();
+      redrawFeatures();
+      if (featureIndex === selectedDrawnIndex) {
+        document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
+        updateFeatureLocationDisplay(feature, featureIndex);
+      }
+      updateBoundaryEditActions(drawnFeatures[selectedDrawnIndex]);
+    }
+
+    function refreshSelectedVertexStyles() {
+      editVertexHandles.forEach(({ featureIndex, vertexIndex, handle }) => {
+        const selected = !!selectedEditVertex
+          && selectedEditVertex.featureIndex === featureIndex && selectedEditVertex.vertexIndex === vertexIndex;
+        handle.getElement()?.classList.toggle('is-selected', selected);
+      });
+      updateBoundaryEditActions(drawnFeatures[selectedDrawnIndex]);
+    }
+
+    function deleteEditableVertex(feature, featureIndex, vertexIndex) {
+      const { ring, closed } = editableRingInfo(feature);
+      const minPoints = feature.type === 'area' ? 3 : 2;
+      if (ring.length <= minPoints) {
+        alert(feature.type === 'area'
+          ? 'A polygon needs at least 3 points. Move this point instead of deleting it.'
+          : 'A line needs at least 2 points.');
+        return;
+      }
+      ring.splice(vertexIndex, 1);
+      commitEditableRing(feature, ring, closed);
+      selectedEditVertex = null;
+      afterEditableGeometryChange(feature, featureIndex);
+    }
+
+    function renderEditableVertices(feature, featureIndex, shape) {
+      const isArea = feature.type === 'area';
+      const { ring, closed } = editableRingInfo(feature);
+      const vertexIcon = (selected) => L.divIcon({
+        className: 'delineation-vertex-handle' + (selected ? ' is-selected' : ''),
+        html: '<div style="width:12px;height:12px;background:#1a73e8;border:2px solid #ffffff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:grab;"></div>',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+      const midpointIcon = L.divIcon({
+        className: 'delineation-midpoint-handle',
+        html: '<div style="width:10px;height:10px;background:rgba(255,255,255,0.75);border:2px solid #1a73e8;border-radius:50%;opacity:0.8;"></div>',
+        iconSize: [10, 10],
+        iconAnchor: [5, 5]
+      });
+      const refreshShape = () => {
+        shape.setLatLngs(feature.coords);
+        if (featureIndex === selectedDrawnIndex) {
+          document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
+        }
+      };
+
+      // Existing points: drag to move, click to select, double-click / right-click to delete.
+      ring.forEach((coord, vIdx) => {
+        const isSelectedVertex = selectedEditVertex
+          && selectedEditVertex.featureIndex === featureIndex && selectedEditVertex.vertexIndex === vIdx;
+        const handle = L.marker(coord, {
+          draggable: true,
+          icon: vertexIcon(isSelectedVertex),
+          zIndexOffset: 1000,
+          title: 'Drag to move. Double-click or right-click to delete.',
+        }).addTo(vertexLayer);
+        editVertexHandles.push({ featureIndex, vertexIndex: vIdx, handle });
+        handle.on('drag', (e) => {
+          ring[vIdx] = [e.latlng.lat, e.latlng.lng];
+          commitEditableRing(feature, ring, closed);
+          refreshShape();
+        });
+        handle.on('dragend', () => {
+          selectedEditVertex = { featureIndex, vertexIndex: vIdx };
+          afterEditableGeometryChange(feature, featureIndex);
+        });
+        handle.on('click', (e) => {
+          if (e?.originalEvent) L.DomEvent.stop(e.originalEvent);
+          // Toggle selection without re-rendering so a following double-click still hits this handle.
+          const alreadySelected = selectedEditVertex
+            && selectedEditVertex.featureIndex === featureIndex && selectedEditVertex.vertexIndex === vIdx;
+          selectedEditVertex = alreadySelected ? null : { featureIndex, vertexIndex: vIdx };
+          refreshSelectedVertexStyles();
+        });
+        const removeHandler = (e) => {
+          if (e?.originalEvent) L.DomEvent.stop(e.originalEvent);
+          deleteEditableVertex(feature, featureIndex, vIdx);
+        };
+        handle.on('dblclick', removeHandler);
+        handle.on('contextmenu', removeHandler);
+      });
+
+      // Midpoints between points: drag (or click) to insert a new point on that edge.
+      const segmentCount = isArea ? ring.length : ring.length - 1;
+      for (let sIdx = 0; sIdx < segmentCount; sIdx++) {
+        const a = ring[sIdx];
+        const b = ring[(sIdx + 1) % ring.length];
+        if (!a || !b) continue;
+        const mid = [(Number(a[0]) + Number(b[0])) / 2, (Number(a[1]) + Number(b[1])) / 2];
+        const insertAt = sIdx + 1;
+        let inserted = false;
+        const midHandle = L.marker(mid, {
+          draggable: true,
+          icon: midpointIcon,
+          title: 'Drag or click to add a point here.',
+        }).addTo(vertexLayer);
+        midHandle.on('dragstart', () => {
+          ring.splice(insertAt, 0, mid);
+          inserted = true;
+          commitEditableRing(feature, ring, closed);
+        });
+        midHandle.on('drag', (e) => {
+          if (!inserted) return;
+          ring[insertAt] = [e.latlng.lat, e.latlng.lng];
+          commitEditableRing(feature, ring, closed);
+          refreshShape();
+        });
+        midHandle.on('dragend', () => {
+          selectedEditVertex = { featureIndex, vertexIndex: insertAt };
+          afterEditableGeometryChange(feature, featureIndex);
+        });
+        midHandle.on('click', (e) => {
+          if (e?.originalEvent) L.DomEvent.stop(e.originalEvent);
+          if (inserted) return;
+          ring.splice(insertAt, 0, mid);
+          commitEditableRing(feature, ring, closed);
+          selectedEditVertex = { featureIndex, vertexIndex: insertAt };
+          afterEditableGeometryChange(feature, featureIndex);
+        });
+      }
+    }
+
+    function validateDelineationMeta() {
+      const notesEl = document.getElementById('delineationNotes');
+      const notes = notesEl?.value.trim();
       const notesValid = Boolean(notes);
 
-      labelEl?.classList.toggle('input-error', !labelValid);
       notesEl?.classList.toggle('input-error', !notesValid);
 
-      if (!labelValid || !notesValid) {
-        alert('Please fill in both Name / Label and Notes before saving.');
-        if (!labelValid) {
-          labelEl?.focus();
-        } else {
-          notesEl?.focus();
-        }
+      if (!notesValid) {
+        alert('Please fill in Notes before saving.');
+        notesEl?.focus();
         return null;
       }
 
+      const selectedFeature = drawnFeatures[selectedDrawnIndex];
       return {
-        name: label,
+        name: selectedFeature?.location?.trim() || selectedFeature?.label?.trim() || 'Saved delineation',
         notes,
         genera: [...currentSelectedGenera]
       };
@@ -1273,6 +1937,7 @@
     };
 
     function saveDrawingStateToHistory() {
+      if (isGeometryEditLocked()) return;
       // Save both completed features and current feature being drawn
       const state = {
         drawnFeatures: JSON.parse(JSON.stringify(drawnFeatures)),
@@ -1289,18 +1954,19 @@
       const saveBtn = document.getElementById('saveBtn');
       if (!saveBtn) return;
       const hasUnsaved = Array.isArray(drawnFeatures) && drawnFeatures.some(f => !f.delineation_id);
-      saveBtn.disabled = !hasUnsaved;
-      saveBtn.style.opacity = !hasUnsaved ? '0.4' : '1';
-      saveBtn.style.cursor = !hasUnsaved ? 'not-allowed' : 'pointer';
-      saveBtn.classList.toggle('disabled', !hasUnsaved);
+      const isDisabled = isGeometryEditLocked() || !hasUnsaved;
+      saveBtn.disabled = isDisabled;
+      saveBtn.style.opacity = isDisabled ? '0.4' : '1';
+      saveBtn.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
+      saveBtn.classList.toggle('disabled', isDisabled);
     }
 
     function updateHistoryButtons() {
       const undoBtn = document.getElementById('undoBtn');
       const redoBtn = document.getElementById('redoBtn');
 
-      undoBtn.disabled = historyIndex <= 0;
-      redoBtn.disabled = historyIndex >= featureHistory.length - 1;
+      undoBtn.disabled = isGeometryEditLocked() || historyIndex <= 0;
+      redoBtn.disabled = isGeometryEditLocked() || historyIndex >= featureHistory.length - 1;
 
       undoBtn.style.opacity = undoBtn.disabled ? '0.5' : '1';
       redoBtn.style.opacity = redoBtn.disabled ? '0.5' : '1';
@@ -1479,15 +2145,26 @@
         }
 
         if (payload.delineation) {
-          newFeatures.forEach(feature => {
+          newFeatures.forEach((feature, index) => {
+            const savedFeature = payload.delineation.features?.[index] || {};
             feature.delineation_id = payload.delineation.id;
             feature.is_approved = !!payload.delineation.is_approved;
             feature.is_rejected = !!payload.delineation.is_rejected;
             feature.label = payload.delineation.name;
             feature.notes = payload.delineation.notes;
             feature.genera = meta.genera;
+            feature.location = savedFeature.location || null;
+            feature.location_status = savedFeature.location_status || 'pending';
+            feature.location_details = savedFeature.location_details || null;
           });
+          const generaRow = document.querySelector('.d-row-genera');
+          if (generaRow && drawnFeatures[selectedDrawnIndex]?.delineation_id) {
+            generaRow.style.display = '';
+          }
           redrawFeatures();
+          if (selectedDrawnIndex >= 0 && drawnFeatures[selectedDrawnIndex]) {
+            updateFeatureLocationDisplay(drawnFeatures[selectedDrawnIndex]);
+          }
         }
 
         hideProcessingModal();
@@ -1593,6 +2270,7 @@
       // Clear only our overlay layers; keep the base tiles + controls intact.
       delineationLayer.clearLayers();
       vertexLayer.clearLayers();
+      editVertexHandles = [];
 
       function getFeatureColor(f) {
         if (f.is_rejected) return '#d04030';
@@ -1605,7 +2283,9 @@
       drawnFeatures.forEach((f, i) => {
         const isSelected = i === selectedDrawnIndex;
         const color = isSelected ? '#1a73e8' : getFeatureColor(f);
-        const isSelectedEditable = (isSelected && !f.delineation_id && document.getElementById('delineationToolbar')?.classList.contains('active'));
+        const isSelectedEditable = (isEditingRejectedRevision && f.is_editing_revision)
+          || (boundaryEdit !== null && f.is_editing_boundary)
+          || (isSelected && !f.delineation_id && document.getElementById('delineationToolbar')?.classList.contains('active'));
 
         if (f.type === 'point') {
           const marker = L.circleMarker(f.coords, {
@@ -1634,7 +2314,9 @@
               marker.setLatLng(f.coords);
             });
             handle.on('dragend', () => {
-              delete f.detected_location;
+              delete f.location;
+              delete f.location_status;
+              delete f.location_details;
               saveDrawingStateToHistory();
               redrawFeatures();
               updateFeatureLocationDisplay(f, i);
@@ -1651,27 +2333,7 @@
             selectDrawnFeature(i);
           });
           if (isSelectedEditable) {
-            f.coords.forEach((coord, vIdx) => {
-              const handle = L.marker(coord, {
-                draggable: true,
-                icon: L.divIcon({
-                  className: 'delineation-vertex-handle',
-                  html: '<div style="width:12px;height:12px;background:#1a73e8;border:2px solid #ffffff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:grab;"></div>',
-                  iconSize: [12, 12],
-                  iconAnchor: [6, 6]
-                })
-              }).addTo(vertexLayer);
-              handle.on('drag', (e) => {
-                f.coords[vIdx] = [e.latlng.lat, e.latlng.lng];
-                line.setLatLngs(f.coords);
-              });
-              handle.on('dragend', () => {
-                delete f.detected_location;
-                saveDrawingStateToHistory();
-                redrawFeatures();
-                updateFeatureLocationDisplay(f, i);
-              });
-            });
+            renderEditableVertices(f, i, line);
           } else if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
               radius: 3,
@@ -1695,33 +2357,7 @@
             selectDrawnFeature(i);
           });
           if (isSelectedEditable) {
-            f.coords.forEach((coord, vIdx) => {
-              const handle = L.marker(coord, {
-                draggable: true,
-                icon: L.divIcon({
-                  className: 'delineation-vertex-handle',
-                  html: '<div style="width:12px;height:12px;background:#1a73e8;border:2px solid #ffffff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:grab;"></div>',
-                  iconSize: [12, 12],
-                  iconAnchor: [6, 6]
-                })
-              }).addTo(vertexLayer);
-              handle.on('drag', (e) => {
-                const newPos = [e.latlng.lat, e.latlng.lng];
-                f.coords[vIdx] = newPos;
-                if (vIdx === 0 || vIdx === f.coords.length - 1) {
-                  f.coords[0] = newPos;
-                  f.coords[f.coords.length - 1] = newPos;
-                }
-                polygon.setLatLngs(f.coords);
-                document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(f);
-              });
-              handle.on('dragend', () => {
-                delete f.detected_location;
-                saveDrawingStateToHistory();
-                redrawFeatures();
-                updateFeatureLocationDisplay(f, i);
-              });
-            });
+            renderEditableVertices(f, i, polygon);
           } else if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
               radius: 3,
@@ -1785,7 +2421,7 @@
     }
 
     mainMap.on('click', (e) => {
-      if (!drawingMode) return;
+      if (!drawingMode || isGeometryEditLocked()) return;
       const snappedLatLng = getSnappedLatLng(e.latlng) || e.latlng;
       if (!currentFeature) {
         currentFeature = {
@@ -1890,17 +2526,37 @@
       const toggle = document.getElementById('layerToggle');
       if (!menu || !toggle) return;
       const isOpen = menu.classList.toggle('show');
+      if (isOpen) {
+        document.getElementById('droneImageryMenu')?.classList.remove('show');
+        document.getElementById('droneImageryToggle')?.setAttribute('aria-expanded', 'false');
+      }
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    };
+
+    window.toggleDroneImageryMenu = () => {
+      const menu = document.getElementById('droneImageryMenu');
+      const toggle = document.getElementById('droneImageryToggle');
+      if (!menu || !toggle) return;
+      const isOpen = menu.classList.toggle('show');
+      if (isOpen) {
+        document.getElementById('layerMenu')?.classList.remove('show');
+        document.getElementById('layerToggle')?.setAttribute('aria-expanded', 'false');
+      }
       toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     };
 
     document.addEventListener('click', (event) => {
-      const menu = document.getElementById('layerMenu');
-      const toggle = document.getElementById('layerToggle');
-      if (!menu || !toggle) return;
-      if (!menu.contains(event.target) && !toggle.contains(event.target)) {
-        menu.classList.remove('show');
-        toggle.setAttribute('aria-expanded', 'false');
-      }
+      [
+        ['layerMenu', 'layerToggle'],
+        ['droneImageryMenu', 'droneImageryToggle'],
+      ].forEach(([menuId, toggleId]) => {
+        const menu = document.getElementById(menuId);
+        const toggle = document.getElementById(toggleId);
+        if (menu && toggle && !menu.contains(event.target) && !toggle.contains(event.target)) {
+          menu.classList.remove('show');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
     });
 
     window.show = (id, btn) => {
@@ -2139,14 +2795,14 @@
       }
     }
 
-    function loadAnnualObservationCharts(delineationId, delineationName = 'Selected area') {
+    function loadAnnualObservationCharts(delineationId) {
       annualObservationRequest?.abort();
       if (!delineationId) {
-        setTemporalHistory([], delineationName, 'empty');
+        setTemporalHistory([], 'empty');
         setAnnualObservationEmptyState(null);
         return;
       }
-      setTemporalHistory([], delineationName, 'loading');
+      setTemporalHistory([], 'loading');
       setAnnualObservationEmptyState(delineationId ? 'Loading verified observations...' : null);
 
       annualObservationRequest = new AbortController();
@@ -2161,7 +2817,7 @@
         })
         .then(data => {
           const coverage = Array.isArray(data.coverage) ? data.coverage : [];
-          setTemporalHistory(coverage, delineationName);
+          setTemporalHistory(coverage);
           const genusDistribution = Array.isArray(data.genusDistribution) ? data.genusDistribution : [];
           const genusEmpty = document.getElementById('genusDistributionEmpty');
           const coverageEmpty = document.getElementById('coverageTrendEmpty');
@@ -2200,7 +2856,7 @@
           if (error.name !== 'AbortError') {
             console.error(error);
             setAnnualObservationEmptyState('Annual observations could not be loaded.');
-            setTemporalHistory([], delineationName, 'error');
+            setTemporalHistory([], 'error');
           }
         });
     }
@@ -2373,7 +3029,7 @@
       updateTemporalEpochList();
     }
 
-    function setTemporalHistory(observations, areaName, state = 'ready') {
+    function setTemporalHistory(observations, state = 'ready') {
       const timelineControl = document.getElementById('mapTimelineControl');
       const hasSelectedArea = state !== 'idle';
       if (timelineControl) timelineControl.style.display = hasSelectedArea ? 'block' : 'none';
@@ -2397,9 +3053,6 @@
         };
       });
       currentTimelineIndex = Math.max(temporalData.length - 1, 0);
-
-      const areaNameEl = document.getElementById('timelineAreaName');
-      if (areaNameEl) areaNameEl.textContent = areaName || 'No area selected';
 
       if (temporalData.length) {
         applyTimelineEpoch(currentTimelineIndex);
@@ -2754,7 +3407,7 @@
       }
     };
 
-    setTemporalHistory([], '', 'idle');
+    setTemporalHistory([], 'idle');
 
 
     if (APP_PAGE === 'delineate') {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Delineation;
 use App\Models\DelineationAnnualObservation;
 use App\Models\Genus;
+use App\Services\BoundaryResolver;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -92,7 +93,7 @@ class DelineationAnnualObservationController extends Controller
         ));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, BoundaryResolver $boundaryResolver): RedirectResponse
     {
         abort_unless($request->user()->isExpert(), 404);
 
@@ -111,7 +112,7 @@ class DelineationAnnualObservationController extends Controller
             'features.*.coords' => ['required', 'array'],
         ]);
 
-        $features = $this->validatedFeatures($validated['features']);
+        $features = $boundaryResolver->resolveFeatures($this->validatedFeatures($validated['features']));
 
         if (Carbon::parse($validated['observation_date'])->year !== (int) $validated['year']) {
             return back()->withErrors([

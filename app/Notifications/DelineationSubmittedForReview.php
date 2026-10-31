@@ -11,7 +11,7 @@ class DelineationSubmittedForReview extends Notification
 {
     use Queueable;
 
-    public function __construct(public Delineation $delineation) {}
+    public function __construct(public Delineation $delineation, public bool $isRevision = false) {}
 
     public function via(object $notifiable): array
     {
@@ -21,8 +21,10 @@ class DelineationSubmittedForReview extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'title' => 'Delineation submitted for review',
-            'message' => 'A new delineation has been submitted and is waiting for your review.',
+            'title' => $this->isRevision ? 'Delineation resubmitted for review' : 'Delineation submitted for review',
+            'message' => $this->isRevision
+                ? 'A revised delineation has been resubmitted and is waiting for your review.'
+                : 'A new delineation has been submitted and is waiting for your review.',
             'type' => 'delineation_submitted',
             'icon' => 'bi-hourglass-split',
             'delineation_id' => $this->delineation->id,

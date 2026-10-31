@@ -26,8 +26,8 @@
           <div class="map-quick-jump" id="mapQuickJump">
             <div class="quick-jump-field">
               <i class="bi bi-search" aria-hidden="true"></i>
-              <input id="quickJumpInput" type="search" autocomplete="off" aria-label="Search saved delineated areas"
-                aria-controls="quickJumpResults" aria-expanded="false" placeholder="Search saved areas">
+              <input id="quickJumpInput" type="search" autocomplete="off" aria-label="Jump to a saved area by name, genus, or status"
+                aria-controls="quickJumpResults" aria-expanded="false" placeholder="Jump to saved area by name, genus, or status">
             </div>
             <div class="quick-jump-results" id="quickJumpResults" role="group" aria-label="Saved areas" hidden></div>
           </div>
@@ -68,8 +68,12 @@
           </div>
           <div class="map-layer-control">
             <button id="layerToggle" type="button" onclick="toggleLayerMenu()" aria-expanded="false"
-              title="Choose map layer" aria-label="Choose map layer">
+              aria-controls="layerMenu" title="Choose map layer" aria-label="Choose map layer">
               <i class="bi bi-layers-fill"></i>
+            </button>
+            <button id="droneImageryToggle" type="button" onclick="toggleDroneImageryMenu()" aria-expanded="false"
+              aria-controls="droneImageryMenu" title="Drone imagery" aria-label="Drone imagery">
+              <i class="bi bi-globe2"></i>
             </button>
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
@@ -84,6 +88,31 @@
               <button class="layer-option" onclick="setBase('topo', this)">Topo</button>
               <button class="layer-option" onclick="setBase('mangrove', this)"
                 title="High-resolution view for identifying mangrove areas">Mangrove 400-ft View</button>
+            </div>
+            <div id="droneImageryMenu" class="layer-menu drone-imagery-menu" aria-label="Drone imagery uploads and layers">
+              <section class="drone-imagery-panel" aria-labelledby="droneImageryTitle">
+                <h3 id="droneImageryTitle">Drone imagery</h3>
+                <form id="droneImageryUploadForm">
+                  <label for="droneImageryName">Layer name</label>
+                  <input id="droneImageryName" name="name" type="text" maxlength="120" placeholder="Survey name">
+                  <label for="droneImageryFiles">GeoTIFF files</label>
+                  <input id="droneImageryFiles" name="files[]" type="file" accept=".tif,.tiff,image/tiff" multiple required>
+                  <button type="submit" class="drone-imagery-upload-button">Upload and process</button>
+                </form>
+                <div id="droneImageryUploadProgress" class="drone-imagery-upload-progress" hidden>
+                  <div class="drone-imagery-upload-progress-label">
+                    <span>Uploading TIFF files</span>
+                    <span id="droneImageryUploadPercentage">0%</span>
+                  </div>
+                  <div id="droneImageryUploadProgressBar" class="drone-imagery-upload-progress-track"
+                    role="progressbar" aria-label="TIFF upload progress" aria-valuemin="0" aria-valuemax="100"
+                    aria-valuenow="0">
+                    <div class="drone-imagery-upload-progress-fill"></div>
+                  </div>
+                </div>
+                <div id="droneImageryMessage" class="drone-imagery-message" role="status" aria-live="polite"></div>
+                <div id="droneImageryLayers" class="drone-imagery-layers" aria-label="Your drone imagery layers"></div>
+              </section>
             </div>
           </div>
 
@@ -112,12 +141,14 @@
               id="delineationFeatureArea">-</span></div>
             <div class="d-row"><span class="d-key">Location</span><span class="d-val" id="delineationFeatureLocation">-</span>
             </div>
-            <div class="d-row d-row-genera"><span class="d-key">Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span>
+            <div class="d-row d-row-genera" style="display:none;"><span class="d-key">Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span>
             </div>
             <div class="d-row"><span class="d-key">Delineated by</span><span class="d-val"
                 id="delineationCreatedBy">-</span></div>
             <div class="d-row"><span class="d-key">Review status</span><span class="d-val"
                 id="delineationReviewStatus">-</span></div>
+            <div class="d-row" id="delineationLastEditedRow" style="display:none;"><span class="d-key">Boundary last edited by</span><span class="d-val"
+                id="delineationLastEditedBy">-</span></div>
             <div id="approvedPlantingRecommendationSection" class="d-row" style="display:none;">
               <span class="d-key">Planting Recommendation</span>
               <span class="d-val" id="approvedPlantingRecommendation">-</span>
@@ -131,14 +162,7 @@
                   by</span><span class="d-val" id="delineationSubmitter">-</span></div>
             @endif
             <div class="div"></div>
-            <div style="margin-bottom:12px;">
-              <label for="delineationLabel" style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Name /
-                Label</label>
-              <input id="delineationLabel" type="text"
-                style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;"
-                placeholder="Enter zone name or note" />
-            </div>
-            <div style="margin-bottom:12px;">
+            <div id="delineationGenusEditor" style="margin-bottom:12px;">
               <label style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Mangrove Genus Present</label>
               <div id="genusQuickSelector" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                 <button type="button" class="genus-pill-btn" data-genus="Rhizophora" onclick="toggleGenusSelection('Rhizophora')"><i class="bi bi-plus"></i> Rhizophora <span class="genus-local-name">(Bakawan)</span></button>
@@ -147,6 +171,7 @@
                 <button type="button" class="genus-pill-btn" data-genus="Bruguiera" onclick="toggleGenusSelection('Bruguiera')"><i class="bi bi-plus"></i> Bruguiera <span class="genus-local-name">(Miapi)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Ceriops" onclick="toggleGenusSelection('Ceriops')"><i class="bi bi-plus"></i> Ceriops <span class="genus-local-name">(Tungog)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Xylocarpus" onclick="toggleGenusSelection('Xylocarpus')"><i class="bi bi-plus"></i> Xylocarpus <span class="genus-local-name">(Tabigi)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Nypa" onclick="toggleGenusSelection('Nypa')"><i class="bi bi-plus"></i> Nypa <span class="genus-local-name">(Nipa/Sasa)</span></button>
               </div>
               <div style="display:flex;gap:6px;">
                 <input id="delineationCustomGenusInput" type="text"
@@ -158,7 +183,7 @@
               </div>
               <div id="delineationSelectedGeneraContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
             </div>
-            <div style="margin-bottom:12px;">
+            <div id="delineationNotesEditor" style="margin-bottom:12px;">
               <label for="delineationNotes"
                 style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Notes</label>
               <textarea id="delineationNotes" rows="4"
@@ -190,11 +215,47 @@
                   <i class="bi bi-x-circle"></i> Reject delineation
                 </button>
               </div>
-            @elseif (request()->routeIs('delineate'))
+            @endif
+            @if (request()->routeIs('delineate') || request()->routeIs('expert.delineate'))
               <button id="saveBtn" type="button" class="btn btn-g delineation-save-btn" style="width:100%;">
                 <i class="bi bi-save"></i> Save delineation
               </button>
             @endif
+          </div>
+          @if(request()->routeIs('delineate'))
+            <div id="rejectedRevisionActions" style="display:none;margin-bottom:12px;">
+              <button type="button" id="startRejectedRevisionBtn" class="btn" style="width:100%;margin-bottom:8px;">
+                <i class="bi bi-pencil-square"></i> Revise rejected delineation
+              </button>
+              <button type="button" id="saveRejectedRevisionBtn" class="btn btn-g" style="display:none;width:100%;margin-bottom:8px;">
+                <i class="bi bi-send"></i> Resubmit for review
+              </button>
+              <button type="button" id="cancelRejectedRevisionBtn" class="btn" style="display:none;width:100%;">
+                Cancel revision
+              </button>
+            </div>
+          @endif
+          <div id="boundaryEditActions" class="boundary-edit-actions" style="display:none;">
+            <button type="button" id="startBoundaryEditBtn" class="btn" style="width:100%;margin-bottom:8px;">
+              <i class="bi bi-bounding-box-circles"></i> Edit Delineation
+            </button>
+            <div id="boundaryEditHint" class="boundary-edit-hint" style="display:none;">
+              <strong>Editing boundary</strong>
+              <ul>
+                <li>Drag a point to move it.</li>
+                <li>Drag or click a faded midpoint to add a point.</li>
+                <li>Double-click or right-click a point to delete it, or select it and press <kbd>Delete</kbd>.</li>
+              </ul>
+            </div>
+            <button type="button" id="deleteBoundaryVertexBtn" class="btn" style="display:none;width:100%;margin-bottom:8px;" disabled>
+              <i class="bi bi-dash-circle"></i> Delete selected point
+            </button>
+            <button type="button" id="saveBoundaryEditBtn" class="btn btn-g" style="display:none;width:100%;margin-bottom:8px;">
+              <i class="bi bi-check2-circle"></i> Save Changes
+            </button>
+            <button type="button" id="cancelBoundaryEditBtn" class="btn" style="display:none;width:100%;margin-bottom:8px;">
+              <i class="bi bi-x-circle"></i> Cancel
+            </button>
           </div>
           <button id="removeDelineationBtn" class="btn"
             style="width:100%;margin-top:8px;margin-bottom:14px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;"
@@ -234,7 +295,6 @@
                 <i class="bi bi-chevron-down"></i>
               </button>
             </div>
-            <div class="timeline-area-name" id="timelineAreaName">No area selected</div>
             <div class="timeline-body">
               <div class="timeline-info-row">
                 <div class="timeline-stat">
@@ -283,4 +343,3 @@
       <button type="button" class="btn btn-g success-modal-btn" onclick="hideSuccessModal()">Got it</button>
     </div>
   </div>
-

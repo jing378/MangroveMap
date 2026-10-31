@@ -6,6 +6,7 @@ use App\Notifications\DelineationSubmittedForReview;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
 class Delineation extends Model
@@ -55,6 +56,17 @@ class Delineation extends Model
     public function annualObservations(): HasMany
     {
         return $this->hasMany(DelineationAnnualObservation::class);
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(DelineationRevision::class);
+    }
+
+    /** Most recent revision (holds who last changed the boundary/details). */
+    public function latestRevision(): HasOne
+    {
+        return $this->hasOne(DelineationRevision::class)->latestOfMany('version');
     }
 
     public function rejectedBy()

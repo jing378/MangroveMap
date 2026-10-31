@@ -31,3 +31,16 @@ bootstrap/cache/
 /storage/framework/cache/
 /storage/framework/sessions/
 /storage/framework/views/
+# Drone imagery
+*.tif
+*.tiff
+
+# Generated raster tiles
+/public/tiles/
+/storage/app/drone/
+
+# Large GIS archives
+*.shp.zip
+
+# Editor language-server helper files
+/storage/framework/lsp-*.php

@@ -8,6 +8,7 @@ use App\Notifications\DelineationApproved;
 use App\Notifications\DelineationRejected;
 use App\Http\Controllers\EndUserController;
 use App\Models\User;
+use App\Services\BoundaryResolver;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +30,7 @@ class ExpertController extends Controller
         return app(EndUserController::class)->delineate();
     }
 
-    public function storeDelineation(Request $request)
+    public function storeDelineation(Request $request, BoundaryResolver $boundaryResolver)
     {
         $data = $request->validate([
             'features' => ['required', 'array', 'min:1', 'max:20'],
@@ -48,10 +49,10 @@ class ExpertController extends Controller
             return [
                 'type' => $feature['type'],
                 'coords' => $feature['coords'],
-                'location' => $feature['location'] ?? null,
                 'genera' => $feature['genera'] ?? $data['genera'] ?? [],
             ];
         })->values()->all();
+        $features = $boundaryResolver->resolveFeatures($features);
 
         $delineation = Delineation::create([
             'user_id' => $request->user()->id,
