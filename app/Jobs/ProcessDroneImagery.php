@@ -108,6 +108,7 @@ class ProcessDroneImagery implements ShouldQueue
                 '--xyz',
                 '--webviewer=none',
                 '--exclude',
+                '--resampling=bilinear',
                 '--processes='.max(1, (int) config('gdal.tile_processes')),
             ];
             if (is_string($zoom) && preg_match('/^\d{1,2}-\d{1,2}$/', $zoom)) {

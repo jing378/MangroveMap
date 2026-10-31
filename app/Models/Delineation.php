@@ -58,6 +58,11 @@ class Delineation extends Model
         return $this->hasMany(DelineationAnnualObservation::class);
     }
 
+    public function plantingRecommendations(): HasMany
+    {
+        return $this->hasMany(PlantingRecommendation::class);
+    }
+
     public function revisions(): HasMany
     {
         return $this->hasMany(DelineationRevision::class);

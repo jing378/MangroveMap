@@ -63,9 +63,6 @@
       ? mergeDelineationsById(savedDelineations, residentDelineations)
       : mergeDelineationsById(savedDelineations, approvedDelineations);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    const droneImageryIndexUrl = @json(route('drone-imagery.index'));
-    const droneImageryUploadUrl = @json(route('drone-imagery.store'));
-    const droneImageryStatusUrl = @json(url('/drone-imagery'));
 
 
     function extractPoints(coords) {
@@ -447,285 +444,7 @@
       });
     }
 
-    const tileLayerOpts = {
-      updateWhenZooming: false,
-      updateWhenIdle: true,
-      keepBuffer: 2,
-    };
-    // Viewing height for mangrove identification. Change this value to adjust later.
-    const MANGROVE_VIEW_HEIGHT_FT = 400;
-    const FEET_TO_METERS = 0.3048;
-    const EARTH_CIRCUMFERENCE_M = 40075016.686;
-
-    function zoomForViewHeightFt(heightFt, lat) {
-      const heightM = Math.max(Number(heightFt) * FEET_TO_METERS, 1);
-      const latRad = (Number(lat) || 0) * Math.PI / 180;
-      return Math.log2((EARTH_CIRCUMFERENCE_M * Math.cos(latRad)) / heightM);
-    }
-
-    const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      ...tileLayerOpts,
-      maxNativeZoom: 19,
-      maxZoom: 22,
-    });
-    const osmL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      ...tileLayerOpts,
-      maxNativeZoom: 19,
-      maxZoom: 22,
-    });
-    const topoL = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      ...tileLayerOpts,
-      maxNativeZoom: 17,
-      maxZoom: 22,
-    });
-    const mangroveL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      ...tileLayerOpts,
-      maxNativeZoom: 19,
-      maxZoom: 22,
-    });
-    const baseLayers = {
-      sat: satL,
-      osm: osmL,
-      topo: topoL,
-      mangrove: mangroveL,
-    };
-    let curBase = satL;
-    let mainMap = L.map('mainMap', {
-      zoomControl: true,
-      preferCanvas: true,
-      layers: [satL],
-    }).setView([10.358, 124.973], 13);
-
-    const droneImageryLayersElement = document.getElementById('droneImageryLayers');
-    const droneImageryMessageElement = document.getElementById('droneImageryMessage');
-    const droneImageryUploadForm = document.getElementById('droneImageryUploadForm');
-    const droneImageryUploadProgress = document.getElementById('droneImageryUploadProgress');
-    const droneImageryUploadProgressBar = document.getElementById('droneImageryUploadProgressBar');
-    const droneImageryUploadProgressFill = droneImageryUploadProgressBar?.querySelector('.drone-imagery-upload-progress-fill');
-    const droneImageryUploadPercentage = document.getElementById('droneImageryUploadPercentage');
-    const droneImageryTileLayers = new Map();
-
-    function showDroneImageryMessage(message, isError = false) {
-      if (!droneImageryMessageElement) return;
-      droneImageryMessageElement.textContent = message;
-      droneImageryMessageElement.style.color = isError ? '#b42318' : '#4c6b5d';
-    }
-
-    function updateDroneImageryUploadProgress(percentage) {
-      if (!droneImageryUploadProgress || !droneImageryUploadProgressBar || !droneImageryUploadProgressFill || !droneImageryUploadPercentage) return;
-      const progress = Math.max(0, Math.min(100, Math.round(percentage)));
-      droneImageryUploadProgress.hidden = false;
-      droneImageryUploadProgressBar.setAttribute('aria-valuenow', String(progress));
-      droneImageryUploadProgressFill.style.width = `${progress}%`;
-      droneImageryUploadPercentage.textContent = `${progress}%`;
-    }
-
-    function uploadDroneImagery(formData, onProgress) {
-      return new Promise((resolve, reject) => {
-        const request = new XMLHttpRequest();
-        request.open('POST', droneImageryUploadUrl);
-        request.withCredentials = true;
-        request.setRequestHeader('Accept', 'application/json');
-        request.setRequestHeader('X-CSRF-TOKEN', csrfToken);
-        request.upload.addEventListener('progress', event => {
-          if (event.lengthComputable) {
-            onProgress((event.loaded / event.total) * 100);
-          }
-        });
-        request.addEventListener('load', () => {
-          let payload;
-          try {
-            payload = JSON.parse(request.responseText);
-          } catch {
-            reject(new Error('The server returned an invalid response while uploading TIFF files.'));
-            return;
-          }
-
-          if (request.status < 200 || request.status >= 300) {
-            const validationError = payload.errors ? Object.values(payload.errors).flat()[0] : null;
-            reject(new Error(validationError || payload.message || 'Unable to upload TIFF files.'));
-            return;
-          }
-
-          resolve(payload);
-        });
-        request.addEventListener('error', () => reject(new Error('Network error while uploading TIFF files.')));
-        request.addEventListener('abort', () => reject(new Error('TIFF file upload was cancelled.')));
-        request.send(formData);
-      });
-    }
-
-    function addDroneImageryTileLayer(layer) {
-      if (!layer.tile_url || !layer.bounds) return null;
-      if (droneImageryTileLayers.has(layer.id)) return droneImageryTileLayers.get(layer.id);
-
-      const bounds = L.latLngBounds(
-        [layer.bounds.south, layer.bounds.west],
-        [layer.bounds.north, layer.bounds.east]
-      );
-      const tileLayer = L.tileLayer(layer.tile_url, {
-        opacity: 0.78,
-        bounds,
-        minNativeZoom: layer.zoom_min,
-        maxNativeZoom: layer.zoom_max,
-        maxZoom: 22,
-        updateWhenIdle: true,
-        keepBuffer: 2,
-      });
-      droneImageryTileLayers.set(layer.id, tileLayer);
-      return tileLayer;
-    }
-
-    function renderDroneImageryLayers(layers, activateLayerId = null) {
-      if (!droneImageryLayersElement) return;
-      droneImageryLayersElement.replaceChildren();
-
-      layers.forEach(layer => {
-        const row = document.createElement('label');
-        row.className = 'drone-imagery-layer';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.disabled = layer.status !== 'ready';
-
-        const info = document.createElement('span');
-        info.className = 'drone-imagery-layer-info';
-        const name = document.createElement('span');
-        name.className = 'drone-imagery-layer-name';
-        name.textContent = layer.name;
-        const state = document.createElement('span');
-        state.className = 'drone-imagery-layer-state';
-        state.textContent = layer.status === 'ready'
-          ? `${layer.source_type === 'batch' ? 'Mosaic' : 'GeoTIFF'} · zoom ${layer.zoom_min}–${layer.zoom_max}`
-          : (layer.error_message || layer.status);
-        info.append(name, state);
-        row.append(checkbox, info);
-        droneImageryLayersElement.appendChild(row);
-
-        if (layer.status !== 'ready') return;
-
-        const tileLayer = addDroneImageryTileLayer(layer);
-        if (!tileLayer) return;
-
-        checkbox.checked = mainMap.hasLayer(tileLayer) || Number(activateLayerId) === Number(layer.id);
-        checkbox.addEventListener('change', () => {
-          if (checkbox.checked) {
-            tileLayer.addTo(mainMap);
-          } else {
-            mainMap.removeLayer(tileLayer);
-          }
-        });
-
-        if (Number(activateLayerId) === Number(layer.id)) {
-          tileLayer.addTo(mainMap);
-        }
-      });
-    }
-
-    async function loadDroneImageryLayers(activateLayerId = null) {
-      if (!droneImageryLayersElement) return [];
-      const response = await fetch(droneImageryIndexUrl, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-      });
-      const payload = await response.json();
-      if (!response.ok || !Array.isArray(payload.layers)) {
-        throw new Error(payload.message || 'Unable to load your drone imagery layers.');
-      }
-      renderDroneImageryLayers(payload.layers, activateLayerId);
-      return payload.layers;
-    }
-
-    async function waitForDroneImagery(layerId) {
-      for (let attempt = 0; attempt < 1200; attempt += 1) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        const response = await fetch(`${droneImageryStatusUrl}/${encodeURIComponent(layerId)}`, {
-          headers: { Accept: 'application/json' },
-          credentials: 'same-origin',
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.message || 'Unable to check raster processing status.');
-        }
-        if (payload.status === 'ready') return payload;
-        if (payload.status === 'failed') {
-          throw new Error(payload.error_message || 'Raster processing failed.');
-        }
-        showDroneImageryMessage('Upload received. Validating and processing the imagery…');
-      }
-      throw new Error('Raster processing is taking longer than expected. Check this layer again later.');
-    }
-
-    if (droneImageryUploadForm) {
-      droneImageryUploadForm.addEventListener('submit', async event => {
-        event.preventDefault();
-        const fileInput = document.getElementById('droneImageryFiles');
-        const submitButton = droneImageryUploadForm.querySelector('button[type="submit"]');
-        if (!fileInput?.files?.length) {
-          showDroneImageryMessage('Select at least one .tif or .tiff file.', true);
-          return;
-        }
-
-        const formData = new FormData(droneImageryUploadForm);
-        submitButton.disabled = true;
-        showDroneImageryMessage('Uploading TIFF files…');
-        try {
-          const payload = await uploadDroneImagery(formData, updateDroneImageryUploadProgress);
-
-          if (droneImageryUploadProgress) droneImageryUploadProgress.hidden = true;
-          showDroneImageryMessage('Upload complete. Waiting for GDAL processing…');
-          await waitForDroneImagery(payload.id);
-          const layers = await loadDroneImageryLayers(payload.id);
-          const readyLayer = layers.find(layer => Number(layer.id) === Number(payload.id));
-          showDroneImageryMessage(readyLayer ? `"${readyLayer.name}" is ready and displayed on the map.` : 'Imagery is ready.');
-          droneImageryUploadForm.reset();
-        } catch (error) {
-          if (droneImageryUploadProgress) droneImageryUploadProgress.hidden = true;
-          showDroneImageryMessage(error.message || 'Drone imagery upload failed.', true);
-          try {
-            await loadDroneImageryLayers();
-          } catch (loadError) {
-            console.error('Unable to refresh drone imagery layer list.', loadError);
-          }
-        } finally {
-          submitButton.disabled = false;
-        }
-      });
-    }
-
-    loadDroneImageryLayers().catch(error => {
-      showDroneImageryMessage(error.message || 'Unable to load drone imagery layers.', true);
-      console.error('Unable to load drone imagery layers.', error);
-    });
-
-    let mainMapResizeTimer = null;
-    let mainMapLastSize = { w: 0, h: 0 };
-    let mainMapIsDragging = false;
-    mainMap.on('movestart', () => { mainMapIsDragging = true; });
-    mainMap.on('moveend', () => { mainMapIsDragging = false; });
-
-    if (typeof ResizeObserver !== 'undefined') {
-      const mapContainer = document.getElementById('mainMap');
-      if (mapContainer) {
-        new ResizeObserver((entries) => {
-          const entry = entries[0];
-          if (!entry) return;
-          const { width, height } = entry.contentRect;
-          if (Math.abs(width - mainMapLastSize.w) < 1 && Math.abs(height - mainMapLastSize.h) < 1) {
-            return;
-          }
-          mainMapLastSize = { w: width, h: height };
-          if (mainMapIsDragging) return;
-          // Debounce to prevent layout thrashing and stutter during CSS panel transitions
-          clearTimeout(mainMapResizeTimer);
-          mainMapResizeTimer = setTimeout(() => {
-            if (!mainMapIsDragging) {
-              mainMap.invalidateSize({ pan: false });
-            }
-          }, 200);
-        }).observe(mapContainer);
-      }
-    }
-
+    @include('users.partials.map-base-scripts')
     const snapPixelThreshold = 15; // pixels
     let snapMarker = L.circleMarker([0, 0], {
       radius: 8,
@@ -736,44 +455,6 @@
       opacity: 0
     }).addTo(mainMap);
 
-    let locationMarker = null;
-    let locationCircle = null;
-
-    function showMyLocation() {
-      mainMap.locate({
-        setView: true,
-        maxZoom: 15,
-        watch: false
-      });
-    }
-
-    mainMap.on('locationfound', (e) => {
-      if (locationMarker) mainMap.removeLayer(locationMarker);
-      if (locationCircle) mainMap.removeLayer(locationCircle);
-      locationMarker = L.marker(e.latlng).addTo(mainMap).bindPopup('You are here').openPopup();
-      locationCircle = L.circle(e.latlng, {
-        radius: e.accuracy || 50,
-        color: '#1e9e62',
-        fillColor: '#1e9e62',
-        fillOpacity: 0.15
-      }).addTo(mainMap);
-    });
-
-    mainMap.on('locationerror', () => {
-      alert('Unable to determine your location.');
-    });
-
-    const zoomControlContainer = mainMap.zoomControl.getContainer();
-    if (zoomControlContainer) {
-      const locateBtn = L.DomUtil.create('a', 'leaflet-control-locate-button', zoomControlContainer);
-      locateBtn.href = '#';
-      locateBtn.title = 'Show my location';
-      locateBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>';
-      L.DomEvent.on(locateBtn, 'click', L.DomEvent.stopPropagation)
-        .on(locateBtn, 'click', L.DomEvent.preventDefault)
-        .on(locateBtn, 'click', showMyLocation);
-    }
-
     // Keep overlay layers in dedicated groups so redraws are cheap.
     // This avoids expensive mainMap.eachLayer() scans/removals which can get laggy fast.
     const zoneMarkerLayer = L.layerGroup().addTo(mainMap);
@@ -782,16 +463,16 @@
 
     let polys = [];
     zones.forEach((z, i) => {
-      const p = L.circleMarker([z.lat, z.lng], {
-        radius: 8,
-        fillColor: z.color,
-        color: "#fff",
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.8
-      }).addTo(zoneMarkerLayer);
+      const locationIcon = L.divIcon({
+        className: '',
+        html: `<span style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#fff;background:${z.color};border:2px solid #fff;border-radius:50% 50% 50% 0;box-shadow:0 2px 8px rgba(0,0,0,.35);transform:rotate(-45deg);font-size:16px;"><i class="bi bi-geo-alt-fill" aria-hidden="true" style="transform:rotate(45deg);"></i></span>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 29],
+      });
+      const p = L.marker([z.lat, z.lng], { icon: locationIcon }).addTo(zoneMarkerLayer);
 
       p.bindPopup(`<div><b>${z.name}</b><br>Area: ${z.area}<br>NDVI: ${z.ndvi}<br>Status: ${z.status}</div>`);
+      p.bindTooltip(`${z.name} · Mangrove location`, { direction: 'top', offset: [0, -20] });
       p.on('click', (e) => {
         if (drawingMode) return;
         if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
@@ -839,19 +520,6 @@
       const map = ensurePlantMap();
       map.flyTo([plantSites[i].lat, plantSites[i].lng], 11);
       pMarkers[i]?.openPopup();
-    };
-    window.setBase = (t, btn) => {
-      document.querySelectorAll('.layer-btn, .layer-option').forEach(b => b.classList.remove('active'));
-      if (btn) btn.classList.add('active');
-      document.getElementById('layerMenu')?.classList.remove('show');
-      document.getElementById('layerToggle')?.setAttribute('aria-expanded', 'false');
-      mainMap.removeLayer(curBase);
-      curBase = baseLayers[t] || satL;
-      mainMap.addLayer(curBase);
-      if (t === 'mangrove') {
-        const targetZoom = zoomForViewHeightFt(MANGROVE_VIEW_HEIGHT_FT, mainMap.getCenter().lat);
-        mainMap.flyTo(mainMap.getCenter(), targetZoom, { duration: 0.7 });
-      }
     };
 
     function collectVertexCoords() {
@@ -1230,6 +898,7 @@
       document.getElementById('delineationInfoCard').style.display = 'none';
       document.getElementById('zoneDetailsContent').style.display = 'block';
       document.getElementById('expertReviewActions')?.style.setProperty('display', 'none');
+      resetExpertRejectionPrompt();
       document.getElementById('delineationSubmitterRow')?.style.setProperty('display', 'none');
       const feature = z.feature;
       if (feature?.type === 'point' && Array.isArray(feature.coords)) {
@@ -1262,6 +931,7 @@
       const feature = drawnFeatures[i];
       if (!feature) return;
       selectedDrawnIndex = i;
+      resetExpertRejectionPrompt();
 
       openRightPanel();
       loadAnnualObservationCharts(feature.delineation_id);
@@ -1312,17 +982,6 @@
       currentSelectedGenera = Array.isArray(feature.genera) ? [...feature.genera] : [];
       renderDelineationGenera(currentSelectedGenera);
 
-      const recommendationSection = document.getElementById('plantingRecommendationSection');
-      const recommendationInput = document.getElementById('plantingRecommendation');
-      const canEditRecommendation = isExpertUser && feature.delineation_id;
-      if (recommendationSection && recommendationInput) {
-        recommendationSection.style.display = canEditRecommendation ? 'block' : 'none';
-        recommendationInput.value = feature.planting_recommendation || '';
-        recommendationSection.dataset.delineationId = canEditRecommendation
-          ? String(feature.delineation_id)
-          : '';
-      }
-
       const createdByEl = document.getElementById('delineationCreatedBy');
       const statusEl = document.getElementById('delineationReviewStatus');
       const rejectionBox = document.getElementById('delineationRejectionBox');
@@ -1345,14 +1004,6 @@
       }
       statusEl.textContent = statusLabel;
       statusEl.className = `d-val ${statusClass}`;
-
-      const approvedRecommendationSection = document.getElementById('approvedPlantingRecommendationSection');
-      const approvedRecommendation = document.getElementById('approvedPlantingRecommendation');
-      const recommendation = feature.planting_recommendation?.trim() || '';
-      if (approvedRecommendationSection && approvedRecommendation) {
-        approvedRecommendationSection.style.display = feature.is_approved && recommendation ? 'flex' : 'none';
-        approvedRecommendation.textContent = recommendation || '-';
-      }
 
       if (feature.is_rejected && feature.rejection_notes) {
         rejectionBox.style.display = 'block';
@@ -2198,6 +1849,15 @@
       redrawFeatures();
     }
 
+    function resetExpertRejectionPrompt() {
+      const section = document.getElementById('expertRejectionNotesSection');
+      const notes = document.getElementById('expertRejectionNotes');
+      const rejectButton = document.getElementById('expertRejectBtn');
+      if (section) section.style.display = 'none';
+      if (notes) notes.value = '';
+      if (rejectButton) rejectButton.innerHTML = '<i class="bi bi-x-circle"></i> Reject';
+    }
+
     async function submitExpertReview(action) {
       const expertReview = document.getElementById('expertReviewActions');
       const delineationId = Number(expertReview?.dataset.delineationId);
@@ -2213,7 +1873,6 @@
       }
 
       const url = `${expertDelineationReviewBaseUrl}/${delineationId}/${action}`;
-      const plantingRecommendation = document.getElementById('plantingRecommendation')?.value.trim() || '';
       showProcessingModal(
         action === 'approve' ? 'Approving delineation...' : 'Rejecting delineation...',
         'Please wait.'
@@ -2230,7 +1889,7 @@
           },
           body: JSON.stringify(action === 'reject'
             ? { rejection_notes: rejectionNotes }
-            : { planting_recommendation: plantingRecommendation }),
+            : {}),
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -2242,7 +1901,6 @@
             is_approved: true,
             is_rejected: false,
             rejection_notes: null,
-            planting_recommendation: plantingRecommendation || null,
           });
         } else {
           applyReviewToDelineationFeatures(delineationId, {
@@ -2264,7 +1922,16 @@
     }
 
     document.getElementById('expertApproveBtn')?.addEventListener('click', () => submitExpertReview('approve'));
-    document.getElementById('expertRejectBtn')?.addEventListener('click', () => submitExpertReview('reject'));
+    document.getElementById('expertRejectBtn')?.addEventListener('click', () => {
+      const section = document.getElementById('expertRejectionNotesSection');
+      if (section?.style.display === 'none') {
+        section.style.display = 'block';
+        document.getElementById('expertRejectBtn').innerHTML = '<i class="bi bi-x-circle"></i> Confirm reject';
+        document.getElementById('expertRejectionNotes')?.focus();
+        return;
+      }
+      submitExpertReview('reject');
+    });
 
     function redrawFeatures() {
       // Clear only our overlay layers; keep the base tiles + controls intact.
@@ -2517,44 +2184,6 @@
             opacity: 0,
             fillOpacity: 0,
           });
-        }
-      });
-    });
-
-    window.toggleLayerMenu = () => {
-      const menu = document.getElementById('layerMenu');
-      const toggle = document.getElementById('layerToggle');
-      if (!menu || !toggle) return;
-      const isOpen = menu.classList.toggle('show');
-      if (isOpen) {
-        document.getElementById('droneImageryMenu')?.classList.remove('show');
-        document.getElementById('droneImageryToggle')?.setAttribute('aria-expanded', 'false');
-      }
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    };
-
-    window.toggleDroneImageryMenu = () => {
-      const menu = document.getElementById('droneImageryMenu');
-      const toggle = document.getElementById('droneImageryToggle');
-      if (!menu || !toggle) return;
-      const isOpen = menu.classList.toggle('show');
-      if (isOpen) {
-        document.getElementById('layerMenu')?.classList.remove('show');
-        document.getElementById('layerToggle')?.setAttribute('aria-expanded', 'false');
-      }
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    };
-
-    document.addEventListener('click', (event) => {
-      [
-        ['layerMenu', 'layerToggle'],
-        ['droneImageryMenu', 'droneImageryToggle'],
-      ].forEach(([menuId, toggleId]) => {
-        const menu = document.getElementById(menuId);
-        const toggle = document.getElementById(toggleId);
-        if (menu && toggle && !menu.contains(event.target) && !toggle.contains(event.target)) {
-          menu.classList.remove('show');
-          toggle.setAttribute('aria-expanded', 'false');
         }
       });
     });

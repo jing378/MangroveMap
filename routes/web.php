@@ -12,6 +12,7 @@ use App\Http\Controllers\DroneImageryController;
 use App\Http\Controllers\EndUserController;
 use App\Http\Controllers\ExpertController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PlantingRecommendationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
@@ -178,6 +179,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('expert.annual-observations.create');
         Route::post('/annual-observations', [DelineationAnnualObservationController::class, 'store'])
             ->name('expert.annual-observations.store');
+        Route::get('/recommendations', [PlantingRecommendationController::class, 'index'])
+            ->name('expert.recommendations.index');
+        Route::post('/recommendations', [PlantingRecommendationController::class, 'store'])
+            ->name('expert.recommendations.store');
+        Route::put('/recommendations/{recommendation}', [PlantingRecommendationController::class, 'update'])
+            ->name('expert.recommendations.update');
+        Route::delete('/recommendations/{recommendation}', [PlantingRecommendationController::class, 'destroy'])
+            ->name('expert.recommendations.destroy');
     });
 
     // Admin routes - RESTRICTED TO ADMIN ROLE ONLY

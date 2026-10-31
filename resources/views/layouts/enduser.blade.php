@@ -615,10 +615,10 @@
                     <span>Delineate</span>
                 </a>
                 @if (auth()->user()->isExpert())
-                    <a href="{{ route('expert.annual-observations.create') }}"
-                        class="sidebar-item {{ request()->routeIs('expert.annual-observations.*') ? 'active' : '' }}">
-                        <i class="bi bi-calendar2-check"></i>
-                        <span>Annual Observations</span>
+                    <a href="{{ route('expert.recommendations.index') }}"
+                        class="sidebar-item {{ request()->routeIs('expert.recommendations.*') ? 'active' : '' }}">
+                        <i class="bi bi-tree"></i>
+                        <span>Planting Recommendation</span>
                     </a>
                 @endif
                 <a href="{{ route('delineation.index') }}"

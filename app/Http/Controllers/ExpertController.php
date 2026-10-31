@@ -100,7 +100,7 @@ class ExpertController extends Controller
             'planting_recommendation' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $delineation->update([
+        $updates = [
             'is_approved' => true,
             'approved_at' => now(),
             'approved_by' => Auth::id(),
@@ -108,8 +108,11 @@ class ExpertController extends Controller
             'rejected_at' => null,
             'rejected_by' => null,
             'rejection_notes' => null,
-            'planting_recommendation' => trim((string) ($data['planting_recommendation'] ?? '')) ?: null,
-        ]);
+        ];
+        if (array_key_exists('planting_recommendation', $data)) {
+            $updates['planting_recommendation'] = trim((string) $data['planting_recommendation']) ?: null;
+        }
+        $delineation->update($updates);
 
         $delineation->load('user');
         $this->notifyUserSafely($delineation->user, new DelineationApproved($delineation));

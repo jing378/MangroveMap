@@ -66,15 +66,7 @@
               @endunless
             </div>
           </div>
-          <div class="map-layer-control">
-            <button id="layerToggle" type="button" onclick="toggleLayerMenu()" aria-expanded="false"
-              aria-controls="layerMenu" title="Choose map layer" aria-label="Choose map layer">
-              <i class="bi bi-layers-fill"></i>
-            </button>
-            <button id="droneImageryToggle" type="button" onclick="toggleDroneImageryMenu()" aria-expanded="false"
-              aria-controls="droneImageryMenu" title="Drone imagery" aria-label="Drone imagery">
-              <i class="bi bi-globe2"></i>
-            </button>
+          <x-map-layer-control>
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
             </button>
@@ -82,39 +74,7 @@
               aria-label="Upload image for delineation">
               <i class="bi bi-image"></i>
             </button>
-            <div id="layerMenu" class="layer-menu" aria-label="Base layer options">
-              <button class="layer-option active" onclick="setBase('sat', this)">Satellite</button>
-              <button class="layer-option" onclick="setBase('osm', this)">Street</button>
-              <button class="layer-option" onclick="setBase('topo', this)">Topo</button>
-              <button class="layer-option" onclick="setBase('mangrove', this)"
-                title="High-resolution view for identifying mangrove areas">Mangrove 400-ft View</button>
-            </div>
-            <div id="droneImageryMenu" class="layer-menu drone-imagery-menu" aria-label="Drone imagery uploads and layers">
-              <section class="drone-imagery-panel" aria-labelledby="droneImageryTitle">
-                <h3 id="droneImageryTitle">Drone imagery</h3>
-                <form id="droneImageryUploadForm">
-                  <label for="droneImageryName">Layer name</label>
-                  <input id="droneImageryName" name="name" type="text" maxlength="120" placeholder="Survey name">
-                  <label for="droneImageryFiles">GeoTIFF files</label>
-                  <input id="droneImageryFiles" name="files[]" type="file" accept=".tif,.tiff,image/tiff" multiple required>
-                  <button type="submit" class="drone-imagery-upload-button">Upload and process</button>
-                </form>
-                <div id="droneImageryUploadProgress" class="drone-imagery-upload-progress" hidden>
-                  <div class="drone-imagery-upload-progress-label">
-                    <span>Uploading TIFF files</span>
-                    <span id="droneImageryUploadPercentage">0%</span>
-                  </div>
-                  <div id="droneImageryUploadProgressBar" class="drone-imagery-upload-progress-track"
-                    role="progressbar" aria-label="TIFF upload progress" aria-valuemin="0" aria-valuemax="100"
-                    aria-valuenow="0">
-                    <div class="drone-imagery-upload-progress-fill"></div>
-                  </div>
-                </div>
-                <div id="droneImageryMessage" class="drone-imagery-message" role="status" aria-live="polite"></div>
-                <div id="droneImageryLayers" class="drone-imagery-layers" aria-label="Your drone imagery layers"></div>
-              </section>
-            </div>
-          </div>
+          </x-map-layer-control>
 
         </div>
       </div>
@@ -149,10 +109,6 @@
                 id="delineationReviewStatus">-</span></div>
             <div class="d-row" id="delineationLastEditedRow" style="display:none;"><span class="d-key">Boundary last edited by</span><span class="d-val"
                 id="delineationLastEditedBy">-</span></div>
-            <div id="approvedPlantingRecommendationSection" class="d-row" style="display:none;">
-              <span class="d-key">Planting Recommendation</span>
-              <span class="d-val" id="approvedPlantingRecommendation">-</span>
-            </div>
             <div id="delineationRejectionBox" class="delineation-rejection-box" style="display:none;">
               <strong>Expert feedback</strong>
               <p id="delineationRejectionNotes" style="margin:0;"></p>
@@ -193,27 +149,21 @@
             @if(Auth::user()->isExpert())
               <div id="expertReviewActions" class="expert-review-actions" style="display:none;">
                 <div class="div"></div>
-                <div class="sec" style="padding:0;margin-bottom:8px;">Expert review</div>
-                <div id="plantingRecommendationSection" style="display:none;margin-bottom:12px;">
-                  <label for="plantingRecommendation"
-                    style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Planting Recommendation</label>
-                  <textarea id="plantingRecommendation" rows="4"
-                    style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;overflow-y:auto;"
-                    placeholder="Add planting guidance before approving this delineation"></textarea>
+                <div id="expertRejectionNotesSection" style="display:none;margin-bottom:8px;">
+                  <textarea id="expertRejectionNotes" rows="3" aria-label="Rejection notes (required)"
+                    style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
+                    placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
                 </div>
-                <button type="button" id="expertApproveBtn" class="btn btn-g" style="width:100%;margin-bottom:8px;">
-                  <i class="bi bi-check-circle"></i> Approve delineation
-                </button>
-                <label for="expertRejectionNotes"
-                  style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Rejection
-                  notes (required to reject)</label>
-                <textarea id="expertRejectionNotes" rows="3"
-                  style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
-                  placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
-                <button type="button" id="expertRejectBtn" class="btn"
-                  style="width:100%;margin-top:8px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
-                  <i class="bi bi-x-circle"></i> Reject delineation
-                </button>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <button type="button" id="expertApproveBtn" class="btn btn-g"
+                    style="flex:1;min-width:0;padding:8px 4px;font-size:12px;">
+                    <i class="bi bi-check-circle"></i> Approve
+                  </button>
+                  <button type="button" id="expertRejectBtn" class="btn"
+                    style="flex:1;min-width:0;padding:8px 4px;font-size:12px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
+                    <i class="bi bi-x-circle"></i> Reject
+                  </button>
+                </div>
               </div>
             @endif
             @if (request()->routeIs('delineate') || request()->routeIs('expert.delineate'))
@@ -321,25 +271,4 @@
     </div>
 </div>
 
-  <!-- Processing Modal to prevent multiple clicks -->
-  <div id="processingModal" class="processing-modal-backdrop" role="dialog" aria-modal="true"
-    aria-label="Processing request">
-    <div class="processing-modal-card">
-      <div class="processing-spinner"></div>
-      <h3 class="processing-modal-title">Processing...</h3>
-      <p class="processing-modal-subtitle">Saving your delineation, please wait.</p>
-    </div>
-  </div>
-
-  <!-- Success Modal -->
-  <div id="successModal" class="processing-modal-backdrop" role="dialog" aria-modal="true" aria-label="Success">
-    <div class="processing-modal-card">
-      <div class="success-icon-wrapper">
-        <i class="bi bi-check-lg"></i>
-      </div>
-      <h3 class="processing-modal-title" id="successModalTitle">Success!</h3>
-      <p class="processing-modal-subtitle" id="successModalMessage">Delineation saved and submitted for expert review.
-      </p>
-      <button type="button" class="btn btn-g success-modal-btn" onclick="hideSuccessModal()">Got it</button>
-    </div>
-  </div>
+  @include('users.partials.workspace-modals')
