@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Analysis;
 use App\Models\Delineation;
 use App\Models\MangroveData;
+use App\Models\PlantingRecommendation;
 use App\Models\User;
 use App\Models\UserActivity;
 use App\Services\BoundaryResolver;
@@ -13,22 +14,96 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class EndUserController extends Controller
 {
     private const MAP_FEATURES_PER_DELINEATION = 20;
 
+    /** Expert Recommender-tab entries linked to a delineation (shown in its details panel). */
+    private const PLANTING_RECOMMENDATIONS_RELATION = 'plantingRecommendations.user:id,name';
+
+    /** Same cap as the expert Recommender tab. */
+    private const PLANTING_RECOMMENDATIONS_MAP_LIMIT = 300;
+
+    public const GENERA_REQUIRED_MESSAGE = 'Select at least one Mangrove Genus Present before saving.';
+
+    /**
+     * Every newly saved feature must record at least one non-blank genus.
+     *
+     * @param  array<int, array{genera?: mixed}>  $features
+     */
+    public static function assertFeaturesHaveGenera(array $features): void
+    {
+        foreach ($features as $feature) {
+            $genera = array_filter(
+                (array) ($feature['genera'] ?? []),
+                fn($genus) => is_string($genus) && trim($genus) !== ''
+            );
+
+            if ($genera === []) {
+                throw ValidationException::withMessages([
+                    'genera' => self::GENERA_REQUIRED_MESSAGE,
+                ]);
+            }
+        }
+    }
+
     public function dashboard()
     {
         $data = $this->buildDashboardData();
         $data['page'] = 'dashboard';
+        $data += $this->buildContributorData(Auth::user());
         return view('users.dashboard', $data);
+    }
+
+    /**
+     * Community contributor stats for resident/expert dashboards (approved work only).
+     */
+    private function buildContributorData(User $user): array
+    {
+        $myApprovedCount = Delineation::approved()->where('user_id', $user->id)->count();
+
+        $myContributorRank = null;
+        if ($myApprovedCount > 0) {
+            $myContributorRank = Delineation::approved()
+                ->select('user_id')
+                ->groupBy('user_id')
+                ->havingRaw('COUNT(*) > ?', [$myApprovedCount])
+                ->get()
+                ->count() + 1;
+        }
+
+        return [
+            'communityContributors' => Delineation::approved()->distinct()->count('user_id'),
+            'activeContributorsThisMonth' => Delineation::approved()
+                ->where('approved_at', '>=', now()->subMonth())
+                ->distinct()
+                ->count('user_id'),
+            'myContributorRank' => $myContributorRank,
+            'topContributors' => Delineation::approved()
+                ->selectRaw('user_id, COUNT(*) as approved_count')
+                ->with('user:id,name,role')
+                ->groupBy('user_id')
+                ->orderByDesc('approved_count')
+                ->take(5)
+                ->get(),
+        ];
     }
 
     public function map()
     {
         $data = $this->buildDashboardData();
         $data['page'] = 'map';
+        $data['plantingRecommendationsForMap'] = PlantingRecommendation::query()
+            ->visibleOnMapTo(Auth::user())
+            ->with(['user:id,name', 'delineation:id,name'])
+            ->latest()
+            ->limit(self::PLANTING_RECOMMENDATIONS_MAP_LIMIT)
+            ->get()
+            // Site notes are the expert's working notes; the map popup does not show them.
+            ->map(fn(PlantingRecommendation $recommendation) => Arr::except($recommendation->toMapPayload(), ['site_notes']))
+            ->values();
         return view('users.map', $data);
     }
 
@@ -91,7 +166,17 @@ class EndUserController extends Controller
     {
         $latestRevision = $delineation->relationLoaded('latestRevision') ? $delineation->latestRevision : null;
 
+        // Residents only see expert recommendations on approved delineations (same rule as the panel row).
+        $viewer = request()->user();
+        $plantingRecommendations = ($viewer?->isExpert() || $delineation->is_approved)
+            ? $delineation->loadMissing(self::PLANTING_RECOMMENDATIONS_RELATION)->plantingRecommendations
+                ->map(fn(PlantingRecommendation $recommendation) => $recommendation->toDelineationPanelPayload())
+                ->values()
+                ->all()
+            : [];
+
         $payload = array_merge(Arr::except($delineation->toArray(), ['latest_revision']), $extra, [
+            'planting_recommendations' => $plantingRecommendations,
             'features' => self::sanitizeFeaturesForMap($delineation->features),
             'user_name' => $delineation->user?->name ?? null,
             'created_by' => $delineation->user?->name ?? null,
@@ -221,7 +306,7 @@ class EndUserController extends Controller
         $delineationModels = Delineation::fetchForMap(
             $user->delineations()->with(['user:id,name,role', 'approvedBy:id,name']),
             Delineation::MAP_QUERY_LIMIT_OWN,
-            ['latestRevision.reviser:id,name']
+            ['latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION]
         );
         $delineations = $delineationModels
             ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d))
@@ -229,7 +314,8 @@ class EndUserController extends Controller
 
         $approvedForMapModels = Delineation::fetchForMap(
             Delineation::approved()->where('user_id', '!=', $user->id)->with(['user:id,name,role', 'approvedBy:id,name']),
-            Delineation::MAP_QUERY_LIMIT
+            Delineation::MAP_QUERY_LIMIT,
+            [self::PLANTING_RECOMMENDATIONS_RELATION]
         );
 
         $approvedDelineations = $approvedForMapModels;
@@ -245,7 +331,7 @@ class EndUserController extends Controller
         $residentDelineationsForMap = collect();
         if ($user->isExpert()) {
             $residentDelineationsForMap = Delineation::fetchResidentDelineationsForExpertMap()
-                ->load(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name'])
+                ->load(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION])
                 ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d))
                 ->values();
         }
@@ -309,6 +395,7 @@ class EndUserController extends Controller
                 'genera' => $feature['genera'] ?? $data['genera'] ?? [],
             ];
         })->values()->all();
+        self::assertFeaturesHaveGenera($features);
         $features = $boundaryResolver->resolveFeatures($features);
 
         $delineation = Delineation::create([

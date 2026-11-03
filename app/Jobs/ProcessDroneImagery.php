@@ -52,6 +52,7 @@ class ProcessDroneImagery implements ShouldQueue
             $inputPaths = [];
             $sourceCrs = null;
             $totalSize = 0;
+            $alphaSources = [];
             foreach ($layer->files as $file) {
                 if (! $localDisk->exists($file->stored_path)) {
                     throw new RuntimeException("Uploaded file is missing: {$file->original_name}");
@@ -60,9 +61,19 @@ class ProcessDroneImagery implements ShouldQueue
                 $inputPath = $localDisk->path($file->stored_path);
                 $info = $this->readRasterInfo($gdal, $inputPath, $workDirectory);
                 $this->validateSourceRaster($info, $file->original_name);
+                $alphaSources[$file->original_name] = $this->hasAlphaBand($info);
                 $sourceCrs ??= $info['coordinateSystem']['wkt'];
                 $inputPaths[] = $inputPath;
                 $totalSize += $file->file_size;
+            }
+
+            // gdalwarp only auto-detects source alpha for a single input; with several RGBA
+            // inputs it would copy alpha as a data band and add another (5 bands, which tiling rejects).
+            $withAlpha = count(array_filter($alphaSources));
+            if ($withAlpha > 0 && $withAlpha < count($alphaSources)) {
+                throw new RuntimeException(
+                    'This batch mixes RGB and RGBA (transparent) TIFFs. Export all files with the same settings and upload them again.'
+                );
             }
 
             if (! $localDisk->makeDirectory(dirname($mosaicRelativePath))) {
@@ -83,6 +94,7 @@ class ProcessDroneImagery implements ShouldQueue
                 'EPSG:3857',
                 '-r',
                 'bilinear',
+                ...($withAlpha > 0 ? ['-srcalpha'] : []),
                 '-dstalpha',
                 '-co',
                 'TILED=YES',
@@ -98,7 +110,7 @@ class ProcessDroneImagery implements ShouldQueue
             $mosaicInfo = $this->readRasterInfo($gdal, $mosaicPath, $workDirectory);
             $bounds = $this->readWgs84Bounds($mosaicInfo);
 
-            [$zoomMin, $zoomMax] = $this->tileZoomRange();
+            [$zoomMin, $zoomMax] = $this->tileZoomRange($mosaicInfo);
             $zoom = "{$zoomMin}-{$zoomMax}";
             $tileArguments = [
                 'python',
@@ -143,6 +155,10 @@ class ProcessDroneImagery implements ShouldQueue
                 'processed_at' => now(),
                 'error_message' => null,
             ]);
+
+            if (config('ml.drone.auto_segment')) {
+                $this->queueSegmentation($layer);
+            }
         } catch (Throwable $exception) {
             $localDisk->deleteDirectory($tileRelativePath);
             $localDisk->delete($mosaicRelativePath);
@@ -156,6 +172,24 @@ class ProcessDroneImagery implements ShouldQueue
             ]);
         } finally {
             File::deleteDirectory($workDirectory);
+        }
+    }
+
+    /** Segmentation failures must not mark the (already usable) imagery layer as failed. */
+    private function queueSegmentation(DroneImageryLayer $layer): void
+    {
+        try {
+            $layer->update(['segmentation_status' => 'queued', 'segmentation_error' => null]);
+            SegmentDroneImagery::dispatch($layer->id);
+        } catch (Throwable $exception) {
+            $layer->update([
+                'segmentation_status' => 'failed',
+                'segmentation_error' => 'Unable to queue AI segmentation.',
+            ]);
+            Log::error('Unable to queue drone imagery segmentation.', [
+                'layer_id' => $layer->id,
+                'exception' => $exception,
+            ]);
         }
     }
 
@@ -180,6 +214,25 @@ class ProcessDroneImagery implements ShouldQueue
         if (empty($info['coordinateSystem']['wkt']) || empty($info['geoTransform'])) {
             throw new RuntimeException("The TIFF has no usable CRS or georeferencing: {$fileName}");
         }
+
+        $bands = $info['bands'];
+        $bandCount = count($bands);
+        $isRgb = $bandCount === 3 || ($bandCount === 4 && $this->hasAlphaBand($info));
+        $isByte = collect($bands)->every(fn ($band) => ($band['type'] ?? null) === 'Byte');
+        if (! $isRgb || ! $isByte) {
+            throw new RuntimeException(
+                "Only 8-bit RGB or RGBA orthomosaics are supported ({$fileName} has {$bandCount} band(s)"
+                .($isByte ? '' : ', not 8-bit').'). Export a visible-colour (RGB) orthomosaic and upload it again.'
+            );
+        }
+    }
+
+    private function hasAlphaBand(array $info): bool
+    {
+        $last = end($info['bands']);
+
+        return count($info['bands']) === 4
+            && strcasecmp((string) ($last['colorInterpretation'] ?? ''), 'Alpha') === 0;
     }
 
     private function readWgs84Bounds(array $info): array
@@ -221,19 +274,41 @@ class ProcessDroneImagery implements ShouldQueue
         return $bounds;
     }
 
-    private function tileZoomRange(): array
+    private function tileZoomRange(array $mosaicInfo): array
     {
         $configuredRange = config('gdal.tile_zoom');
-        if (! is_string($configuredRange) || ! preg_match('/^(\d{1,2})-(\d{1,2})$/', $configuredRange, $matches)) {
-            throw new RuntimeException('GDAL_TILE_ZOOM must be a zoom range such as 12-20.');
+        if (! is_string($configuredRange) || ! preg_match('/^(\d{1,2})-(\d{1,2}|auto)$/', $configuredRange, $matches)) {
+            throw new RuntimeException('GDAL_TILE_ZOOM must be a zoom range such as 12-20 or 12-auto.');
         }
 
+        $cap = min(22, max(0, (int) config('gdal.max_tile_zoom', 22)));
         $minimum = (int) $matches[1];
-        $maximum = (int) $matches[2];
+        $maximum = $matches[2] === 'auto'
+            ? min($cap, $this->nativeZoom($mosaicInfo))
+            : (int) $matches[2];
+        $minimum = min($minimum, $maximum);
         if ($minimum < 0 || $maximum > 22 || $minimum > $maximum) {
             throw new RuntimeException('GDAL_TILE_ZOOM must be an ordered range between 0 and 22.');
         }
 
         return [$minimum, $maximum];
+    }
+
+    /**
+     * Smallest web-mercator zoom whose 256 px tiles are at least as detailed as the mosaic,
+     * so zooming in shows the full drone resolution instead of upscaled tiles.
+     */
+    private function nativeZoom(array $mosaicInfo): int
+    {
+        $pixelSize = abs((float) ($mosaicInfo['geoTransform'][1] ?? 0)); // EPSG:3857 units
+        if ($pixelSize <= 0) {
+            return 20;
+        }
+
+        // Tile pixel size at zoom z (EPSG:3857 units) = 40075016.686 / (256 * 2^z).
+        $zoom = log(40075016.686 / (256 * $pixelSize), 2);
+
+        // Round up only when the extra level adds meaningful detail (> ~30 % finer than z-1).
+        return (int) max(0, ($zoom - floor($zoom)) > 0.4 ? ceil($zoom) : floor($zoom));
     }
 }

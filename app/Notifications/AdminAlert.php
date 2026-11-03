@@ -80,6 +80,7 @@ class AdminAlert extends Notification implements ShouldQueue
     {
         return match ($type) {
             'new_user' => 'bi-person-plus',
+            'expert_application' => 'bi-person-badge',
             'new_analysis' => 'bi-graph-up',
             'analysis_failed' => 'bi-exclamation-triangle',
             'system_error' => 'bi-exclamation-circle',

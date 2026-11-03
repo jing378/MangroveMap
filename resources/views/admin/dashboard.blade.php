@@ -30,7 +30,57 @@
     </div>
 
     <div class="section">
-        <div class="section-title"><i class="bi bi-graph-up"></i> Recent User Activity</div>
+        <div class="section-title"><i class="bi bi-people-fill"></i> Delineation Contributors</div>
+        <div class="contributor-summary">
+            <div class="contributor-metric">
+                <div class="stat-value green">{{ number_format($totalContributors) }}</div>
+                <div class="stat-label">Total Contributors</div>
+            </div>
+            <div class="contributor-metric">
+                <div class="stat-value">{{ number_format($approvedContributors) }}</div>
+                <div class="stat-label">With Approved Work</div>
+            </div>
+            <div class="contributor-metric">
+                <div class="stat-value">{{ number_format($activeContributorsThisMonth) }}</div>
+                <div class="stat-label">Active This Month</div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Top Contributors</th>
+                        <th>Role</th>
+                        <th>Delineations</th>
+                        <th>Approved</th>
+                        <th>Pending</th>
+                        <th>Last Submission</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($topContributors as $contributor)
+                    <tr>
+                        <td>{{ $contributor->user?->name ?? 'Unknown' }}</td>
+                        <td>{{ $contributor->user ? ucwords(str_replace('_', ' ', $contributor->user->role)) : '—' }}</td>
+                        <td>{{ $contributor->total_count }}</td>
+                        <td><span class="badge success">{{ (int) $contributor->approved_count }}</span></td>
+                        <td><span class="badge pending">{{ (int) $contributor->pending_count }}</span></td>
+                        <td>{{ $contributor->last_submitted_at?->diffForHumans() ?? '—' }}</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="6">No delineations submitted yet.</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title"><i class="bi bi-graph-up"></i> Recent User Activity
+            <a href="{{ route('admin.activity-logs.index') }}" class="section-link">View all logs <i class="bi bi-arrow-right"></i></a>
+        </div>
         <div class="table-container">
             <table class="table">
                 <thead>
@@ -46,7 +96,7 @@
                     @forelse($recentActivities as $activity)
                     <tr>
                         <td>{{ $activity->user?->name ?? 'Unknown' }}</td>
-                        <td>{{ $activity->activity }}</td>
+                        <td><a href="{{ route('admin.activity-logs.show', $activity) }}" class="activity-link">{{ $activity->activity }}</a></td>
                         <td>{{ $activity->module }}</td>
                         <td><span class="badge {{ $activity->status }}">{{ ucfirst($activity->status) }}</span></td>
                         <td>{{ $activity->created_at?->diffForHumans() ?? '—' }}</td>
@@ -153,6 +203,47 @@
         gap: 10px;
     }
 
+    .section-link {
+        margin-left: auto;
+        font-size: 12px;
+        font-weight: 600;
+        color: #1e9e62;
+        text-decoration: none;
+    }
+
+    .section-link:hover,
+    .activity-link:hover {
+        text-decoration: underline;
+    }
+
+    .activity-link {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .contributor-summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .contributor-metric {
+        background: #f5f7f6;
+        border: 1px solid #e0e8e0;
+        border-radius: 10px;
+        padding: 14px 16px;
+    }
+
+    .contributor-metric .stat-value {
+        font-size: 24px;
+        margin-bottom: 2px;
+    }
+
+    .contributor-metric .stat-label {
+        margin-bottom: 0;
+    }
+
     .table-container {
         overflow-x: auto;
     }
@@ -245,6 +336,11 @@
 
         .grid {
             gap: 12px;
+        }
+
+        .contributor-summary {
+            grid-template-columns: 1fr;
+            gap: 10px;
         }
 
         .section {

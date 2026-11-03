@@ -561,11 +561,15 @@
                 z-index: 1900;
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
-                box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
             }
 
             .sidebar.active {
                 transform: translateX(0);
+                box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+            }
+
+            .container {
+                top: 56px;
             }
 
             .content {

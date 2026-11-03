@@ -3,6 +3,7 @@
 
     // DATA & MAP INITIALIZATION (same as before)
     const saveDelineationUrl = "{{ Auth::user()->isExpert() ? route('expert.delineations.store') : route('delineations.store') }}";
+    const delineatePageUrl = @json(Auth::user()->isExpert() ? route('expert.delineate') : route('delineate'));
     const reviseDelineationUrlTemplate = @json(route('delineations.revise', ['delineation' => '__DELINEATION_ID__']));
     const updateBoundaryUrlTemplate = @json(route('delineations.boundary.update', ['delineation' => '__DELINEATION_ID__']));
     const resolveDelineationLocationUrl = @json(route('delineations.location-preview'));
@@ -17,6 +18,8 @@
     const authUserId = @json(Auth::id());
     const authUserName = @json(Auth::user()?->name ?? '');
     const expertDelineationReviewBaseUrl = @json(url('/expert/delineations'));
+    const plantingRecommendationsForMap = @json($plantingRecommendationsForMap ?? []);
+    const plantingRecommendationsPageUrl = @json(Auth::user()?->isExpert() ? route('expert.recommendations.index') : null);
 
     function showProcessingModal(title, subtitle) {
       const modal = document.getElementById('processingModal');
@@ -169,6 +172,31 @@
     }
 
     let currentSelectedGenera = [];
+    let isSavingDelineation = false; // true while the Save delineation request is in flight
+
+    // Inline loading state for action buttons (used instead of the processing modal).
+    function setButtonLoading(button, isLoading, loadingText) {
+      if (!button) return;
+      if (isLoading) {
+        if (button.dataset.loading === 'true') return;
+        button.dataset.loading = 'true';
+        button.dataset.idleHtml = button.innerHTML;
+        button.dataset.idleDisabled = button.disabled ? 'true' : 'false';
+        button.innerHTML = `<span class="save-btn-spinner" aria-hidden="true"></span> ${escapeHtml(loadingText)}`;
+        button.disabled = true;
+        button.classList.add('is-saving');
+        button.setAttribute('aria-busy', 'true');
+        return;
+      }
+      if (button.dataset.loading !== 'true') return;
+      button.innerHTML = button.dataset.idleHtml || button.innerHTML;
+      button.disabled = button.dataset.idleDisabled === 'true';
+      button.classList.remove('is-saving');
+      button.setAttribute('aria-busy', 'false');
+      delete button.dataset.loading;
+      delete button.dataset.idleHtml;
+      delete button.dataset.idleDisabled;
+    }
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -232,6 +260,12 @@
           </span>
         `).join('');
       }
+
+      // Genus Present is required to save, so refresh the Save button.
+      if (currentSelectedGenera.length) {
+        document.getElementById('genusQuickSelector')?.classList.remove('input-error');
+      }
+      updateSaveButtonState();
     }
 
     window.toggleGenusSelection = function (genus) {
@@ -276,9 +310,16 @@
     });
 
     function formatFeatureArea(feature) {
-      const points = extractPoints(feature?.coords);
+      const points = [...extractPoints(feature?.coords)];
       if (!points.length) return 'N/A';
       if (feature?.type === 'point') return '1 pt';
+      if (feature?.type === 'area' && points.length > 1) {
+        const [firstLat, firstLng] = points[0];
+        const [lastLat, lastLng] = points[points.length - 1];
+        if (Number(firstLat) === Number(lastLat) && Number(firstLng) === Number(lastLng)) {
+          points.pop();
+        }
+      }
       return `${points.length} pts`;
     }
 
@@ -335,6 +376,7 @@
       };
     }
 
+
     // Residents: sidebar lists approved community zones. Experts: all resident submissions (incl. pending).
     const zoneRecords = Array.isArray(allDelineations)
       ? allDelineations.filter(r => isExpertUser ? !r?.is_rejected : (!!r?.is_approved && !r?.is_rejected))
@@ -351,7 +393,6 @@
         lat,
         lng,
         area: formatFeatureArea(feature),
-        ndvi: review.label,
         status: review.label,
         genus: (isExpertUser && record.user?.name)
           ? record.user.name
@@ -461,6 +502,99 @@
     const delineationLayer = L.layerGroup().addTo(mainMap);
     const vertexLayer = L.layerGroup().addTo(mainMap);
 
+    // Same palette as the expert Recommender tab.
+    const PLANTING_SUITABILITY_COLORS = {
+      highly_suitable: '#1e9e62',
+      moderately_suitable: '#7cb342',
+      marginally_suitable: '#c07818',
+      not_suitable: '#d04030',
+    };
+
+    // ---- Expert planting recommendation areas (Map page only) ----
+    // Drawn in a pane below the delineations so clicking a delineation still opens its details panel.
+    mainMap.createPane('plantingRecommendationPane');
+    mainMap.getPane('plantingRecommendationPane').style.zIndex = 390;
+    const plantingRecommendationLayer = L.layerGroup();
+
+    function plantingRecommendationPopupHtml(rec) {
+      const color = PLANTING_SUITABILITY_COLORS[rec.suitability] || '#7a9a7a';
+      const genera = Array.isArray(rec.recommended_genera) ? rec.recommended_genera : [];
+      const generaHtml = genera.length
+        ? genera.map(g => `<span class="genus-tag">${getGenusDisplayLabel(g)}</span>`).join(' ')
+        : '<span style="color:#9ab0a0;font-style:italic;">None (not suitable for planting)</span>';
+      const source = rec.delineation_id
+        ? `Approved delineation: ${escapeHtml(rec.delineation_name || `#${rec.delineation_id}`)}`
+        : 'Area drawn by expert';
+      const note = rec.recommendation?.trim()
+        ? `<div style="margin-top:6px;color:#4a6a4a;white-space:pre-line;">${escapeHtml(rec.recommendation.trim())}</div>`
+        : '';
+      const link = isExpertUser
+        ? `<a href="${plantingRecommendationsPageUrl}?recommendation=${encodeURIComponent(rec.id)}" style="display:inline-block;margin-top:8px;color:#1e9e62;font-weight:700;text-decoration:none;">Open in Recommender &rarr;</a>`
+        : '';
+      return `<div class="planting-rec-popup">`
+        + `<div style="font-weight:800;color:#1a2e1a;margin-bottom:2px;">${escapeHtml(rec.name)}</div>`
+        + `<div style="font-weight:700;color:${color};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;"></span>${escapeHtml(rec.suitability_label || rec.suitability)}</div>`
+        + `<div style="margin-top:6px;"><div style="color:#7a9a7a;margin-bottom:3px;">Recommended genus</div>${generaHtml}</div>`
+        + note
+        + `<div style="margin-top:6px;color:#7a9a7a;font-size:11px;">${source}${rec.expert_name ? ` · by ${escapeHtml(rec.expert_name)}` : ''}</div>`
+        + link
+        + `</div>`;
+    }
+
+    function renderPlantingRecommendations() {
+      plantingRecommendationLayer.clearLayers();
+      plantingRecommendationsForMap.forEach(rec => {
+        const color = PLANTING_SUITABILITY_COLORS[rec.suitability] || '#7a9a7a';
+        const popupHtml = plantingRecommendationPopupHtml(rec);
+        const tooltip = `${rec.name} · ${rec.suitability_label || rec.suitability}`;
+        (rec.features || []).forEach(feature => {
+          if (!Array.isArray(feature.coords) || feature.coords.length < 3) return;
+          const polygon = L.polygon(feature.coords, {
+            pane: 'plantingRecommendationPane',
+            color,
+            weight: 2,
+            dashArray: '6 4',
+            fillColor: color,
+            fillOpacity: 0.18,
+          }).addTo(plantingRecommendationLayer);
+          polygon.bindTooltip(tooltip, { sticky: true });
+          polygon.bindPopup(popupHtml, { maxWidth: 280 });
+          const marker = L.marker(polygon.getCenter(), {
+            icon: L.divIcon({
+              className: '',
+              html: `<span class="planting-rec-marker" style="--planting-rec-color:${color}"><i class="bi bi-flower1" aria-hidden="true"></i></span>`,
+              iconSize: [26, 26],
+              iconAnchor: [13, 13],
+            }),
+            title: tooltip,
+          }).addTo(plantingRecommendationLayer);
+          marker.bindPopup(popupHtml, { maxWidth: 280 });
+        });
+      });
+    }
+
+    function togglePlantingRecommendationLayer(forceVisible) {
+      const button = document.getElementById('plantingRecommendationToggle');
+      const visible = typeof forceVisible === 'boolean' ? forceVisible : !mainMap.hasLayer(plantingRecommendationLayer);
+      visible ? plantingRecommendationLayer.addTo(mainMap) : plantingRecommendationLayer.remove();
+      if (button) {
+        button.classList.toggle('active-toggle', visible);
+        button.setAttribute('aria-pressed', visible ? 'true' : 'false');
+        button.title = visible ? 'Hide planting recommendations' : 'Show planting recommendations';
+      }
+    }
+
+    if (APP_PAGE === 'map') {
+      // Leaflet's polygon.getCenter() throws unless the layer is already on the map, so show it first.
+      togglePlantingRecommendationLayer(true);
+      try {
+        renderPlantingRecommendations();
+      } catch (error) {
+        // Never let a bad recommendation shape stop the delineations from loading.
+        console.error('Planting recommendation layer failed:', error);
+      }
+    }
+
     let polys = [];
     zones.forEach((z, i) => {
       const locationIcon = L.divIcon({
@@ -471,7 +605,6 @@
       });
       const p = L.marker([z.lat, z.lng], { icon: locationIcon }).addTo(zoneMarkerLayer);
 
-      p.bindPopup(`<div><b>${z.name}</b><br>Area: ${z.area}<br>NDVI: ${z.ndvi}<br>Status: ${z.status}</div>`);
       p.bindTooltip(`${z.name} · Mangrove location`, { direction: 'top', offset: [0, -20] });
       p.on('click', (e) => {
         if (drawingMode) return;
@@ -575,9 +708,20 @@
     let boundaryEdit = null; // { delineationId, featureIndexes, originalFeatures }
     let selectedEditVertex = null; // { featureIndex, vertexIndex }
     let editVertexHandles = []; // [{ featureIndex, vertexIndex, handle }] for the vertices currently rendered
+    // Handle budget for large shapes (AI-detected areas): see renderEditableVertices.
+    const MAX_MIDPOINT_HANDLES = 120;
+    // Shapes with more points than this skip the decorative per-vertex dots when not selected.
+    const MAX_PASSIVE_VERTEX_DOTS = 60;
+    let editHandlesFollowViewport = false;
 
     function isGeometryEditLocked() {
       return isEditingRejectedRevision || boundaryEdit !== null;
+    }
+
+    function updateDrawingCursor() {
+      mainMap.getContainer().style.cursor = drawingMode ? 'crosshair' : '';
+      const drawHint = document.getElementById('delineationDrawHint');
+      if (drawHint) drawHint.hidden = !drawingMode;
     }
 
     function loadSavedDelineations() {
@@ -597,6 +741,7 @@
               label: record.name,
               notes: record.notes,
               planting_recommendation: record.planting_recommendation || null,
+              planting_recommendations: Array.isArray(record.planting_recommendations) ? record.planting_recommendations : [],
               approved_by_name: record.approved_by_name || null,
               delineation_id: record.id,
               is_approved: !!record.is_approved,
@@ -633,6 +778,7 @@
           label: record.name,
           notes: record.notes,
           planting_recommendation: record.planting_recommendation || null,
+          planting_recommendations: Array.isArray(record.planting_recommendations) ? record.planting_recommendations : [],
           approved_by_name: record.approved_by_name || null,
           delineation_id: record.id,
           is_approved: !!record.is_approved,
@@ -871,7 +1017,7 @@
       if (quickJumpInput && z) quickJumpInput.value = z.name;
       document.querySelectorAll('.zone-row').forEach((r, j) => r.classList.toggle('sel', j === i));
 
-      if (isExpertUser && z?.id) {
+      if (z?.id) {
         const featureIndex = drawnFeatures.findIndex(f => f.delineation_id === z.id);
         if (featureIndex >= 0) {
           selectDrawnFeature(featureIndex);
@@ -880,8 +1026,6 @@
       }
       document.getElementById('dName').textContent = z.name;
       document.getElementById('dArea').textContent = z.area;
-      document.getElementById('dNDVI').textContent = z.ndvi;
-      document.getElementById('dNDVI').className = `d-val ${z.sc}`;
       document.getElementById('dStatus').textContent = z.status;
       document.getElementById('dStatus').className = `d-val ${z.sc}`;
       document.getElementById('dGenus').textContent = z.genus;
@@ -916,7 +1060,48 @@
       polys[i].openPopup();
     }
 
-    function selectDrawnFeature(i) {
+    // Expert Recommender-tab entries for this delineation, plus the review-time free text.
+    function renderDelineationPlantingRecommendation(feature) {
+      const recommendationEl = document.getElementById('delineationPlantingRecommendation');
+      if (!recommendationEl) return;
+
+      const entries = Array.isArray(feature?.planting_recommendations) ? feature.planting_recommendations : [];
+      const reviewText = feature?.planting_recommendation?.trim() || '';
+      if (!entries.length) {
+        recommendationEl.textContent = reviewText || 'No recommendation provided';
+        return;
+      }
+
+      const blocks = entries.map(entry => {
+        const color = PLANTING_SUITABILITY_COLORS[entry.suitability] || '#7a9a7a';
+        const genera = Array.isArray(entry.recommended_genera) ? entry.recommended_genera : [];
+        const generaHtml = genera.length
+          ? genera.map(g => `<span class="genus-tag">${getGenusDisplayLabel(g)}</span>`).join(' ')
+          : '<span style="color:#9ab0a0;font-style:italic;">No genus (not suitable for planting)</span>';
+        const byline = entry.expert_name ? ` · by ${escapeHtml(entry.expert_name)}` : '';
+        const note = entry.recommendation?.trim()
+          ? `<div style="margin-top:4px;color:#4a6a4a;">${escapeHtml(entry.recommendation.trim())}</div>`
+          : '';
+        return `<div class="planting-rec-entry">`
+          + `<div style="font-weight:700;color:${color};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;"></span>${escapeHtml(entry.suitability_label || entry.suitability)}<span style="color:#7a9a7a;font-weight:500;">${byline}</span></div>`
+          + `<div style="margin-top:4px;"><span style="color:#7a9a7a;">Recommended genus:</span> ${generaHtml}</div>`
+          + note
+          + `</div>`;
+      });
+      if (reviewText) {
+        blocks.push(`<div class="planting-rec-entry"><div style="color:#7a9a7a;">Review note:</div><div style="color:#4a6a4a;">${escapeHtml(reviewText)}</div></div>`);
+      }
+      recommendationEl.innerHTML = blocks.join('');
+    }
+
+    function updateDelineationRecommendationVisibility(feature = drawnFeatures[selectedDrawnIndex]) {
+      const recommendationRow = document.getElementById('delineationPlantingRecommendation')?.closest('.d-row');
+      if (!recommendationRow) return;
+      const canViewRecommendation = isExpertUser || !!feature?.is_approved;
+      recommendationRow.style.display = canViewRecommendation ? '' : 'none';
+    }
+
+    function selectDrawnFeature(i, options = {}) {
       if (rejectedRevisionIndex >= 0 && i !== rejectedRevisionIndex) {
         const revisionFeature = drawnFeatures[rejectedRevisionIndex];
         const nextFeature = drawnFeatures[i];
@@ -930,6 +1115,7 @@
       }
       const feature = drawnFeatures[i];
       if (!feature) return;
+      updateDelineationRecommendationVisibility(feature);
       selectedDrawnIndex = i;
       resetExpertRejectionPrompt();
 
@@ -949,7 +1135,10 @@
 
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
-        removeBtn.style.display = (feature.is_own && !feature.is_approved && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
+        const isUnsaved = !feature.delineation_id;
+        // Unsaved shapes (hand-drawn or AI draft areas) can be dropped one by one before saving.
+        removeBtn.style.display = ((isUnsaved || feature.is_own) && !feature.is_approved && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
+        removeBtn.textContent = isUnsaved ? 'Remove this area' : 'Remove delineation';
       }
       updateBoundaryEditActions(feature);
       const lastEditedRow = document.getElementById('delineationLastEditedRow');
@@ -977,6 +1166,7 @@
         updateFeatureLocationDisplay(feature, i);
       }
       document.getElementById('delineationNotes').value = feature.notes || '';
+      updateSaveButtonState();
 
       // Mangrove Genus Present
       currentSelectedGenera = Array.isArray(feature.genera) ? [...feature.genera] : [];
@@ -1004,6 +1194,8 @@
       }
       statusEl.textContent = statusLabel;
       statusEl.className = `d-val ${statusClass}`;
+
+      renderDelineationPlantingRecommendation(feature);
 
       if (feature.is_rejected && feature.rejection_notes) {
         rejectionBox.style.display = 'block';
@@ -1034,8 +1226,8 @@
         expertReview.dataset.delineationId = canReview ? String(feature.delineation_id) : '';
       }
 
-      // Fly/fit to the clicked delineated feature
-      if (typeof mainMap !== 'undefined' && mainMap && Array.isArray(feature.coords) && feature.coords.length > 0) {
+      // Fly/fit to the clicked delineated feature (skipped when restoring undo/redo history)
+      if (options.fly !== false && typeof mainMap !== 'undefined' && mainMap && Array.isArray(feature.coords) && feature.coords.length > 0) {
         if (feature.type === 'point') {
           mainMap.flyTo([feature.coords[0], feature.coords[1]], Math.max(mainMap.getZoom(), 14), { duration: 0.8 });
         } else {
@@ -1065,8 +1257,9 @@
       document.getElementById('rejectedRevisionActions')?.style.setProperty('display', 'none');
     }
 
-    function setRejectedRevisionControlsLocked(locked) {
-      const controls = document.querySelectorAll('#drawTypeSelect, .draw-btn, #undoBtn, #redoBtn, #saveBtn, #editModeBtn');
+    function setRejectedRevisionControlsLocked(locked, includeHistoryControls = true) {
+      const historyControls = includeHistoryControls ? ', #undoBtn, #redoBtn' : '';
+      const controls = document.querySelectorAll(`#drawTypeSelect, .draw-btn${historyControls}, #saveBtn, #editModeBtn`);
       if (locked) {
         rejectedRevisionControlStates = new Map();
         controls.forEach(control => {
@@ -1113,6 +1306,7 @@
       const drawTypeSelect = document.getElementById('drawTypeSelect');
       if (drawTypeSelect) drawTypeSelect.value = '';
       drawingMode = null;
+      updateDrawingCursor();
       document.querySelectorAll('.draw-btn').forEach(button => button.classList.remove('active'));
       redrawFeatures();
       selectDrawnFeature(selectedDrawnIndex);
@@ -1138,7 +1332,11 @@
           genera: item === selectedFeature ? currentSelectedGenera : (Array.isArray(item.genera) ? item.genera : []),
         }));
 
-      showProcessingModal('Submitting revision...', 'Saving the revised boundary and sending it for expert review.');
+      const submitRevisionBtn = document.getElementById('saveRejectedRevisionBtn');
+      if (submitRevisionBtn?.dataset.loading === 'true') return;
+      setButtonLoading(submitRevisionBtn, true, 'Submitting revision...');
+      const cancelRevisionBtn = document.getElementById('cancelRejectedRevisionBtn');
+      if (cancelRevisionBtn) cancelRevisionBtn.disabled = true;
       try {
         const response = await fetch(reviseDelineationUrlTemplate.replace('__DELINEATION_ID__', encodeURIComponent(feature.delineation_id)), {
           method: 'PUT',
@@ -1154,6 +1352,9 @@
           }),
         });
         const payload = await response.json().catch(() => ({}));
+        // Restore the buttons before the panel re-renders its revision controls.
+        setButtonLoading(submitRevisionBtn, false);
+        if (cancelRevisionBtn) cancelRevisionBtn.disabled = false;
         if (!response.ok || !payload.delineation) {
           throw new Error(payload.message || 'Unable to submit the revised delineation.');
         }
@@ -1177,10 +1378,10 @@
         finishRejectedDelineationRevision();
         redrawFeatures();
         selectDrawnFeature(activeIndex >= 0 ? activeIndex : selectedIndex);
-        hideProcessingModal();
         showSuccessModal(payload.message || 'Revised delineation submitted for expert review.');
       } catch (error) {
-        hideProcessingModal();
+        setButtonLoading(submitRevisionBtn, false);
+        if (cancelRevisionBtn) cancelRevisionBtn.disabled = false;
         alert(error.message || 'Unable to submit the revised delineation. Please try again.');
       }
     }
@@ -1234,6 +1435,11 @@
         document.querySelectorAll('.draw-btn[data-mode]').forEach(button =>
           button.classList.toggle('active', button.dataset.mode === previousDrawingMode));
       }
+      featureHistory = [{
+        drawnFeatures: JSON.parse(JSON.stringify(drawnFeatures)),
+        currentFeature: currentFeature ? JSON.parse(JSON.stringify(currentFeature)) : null,
+      }];
+      historyIndex = 0;
       updateHistoryButtons();
     }
 
@@ -1252,16 +1458,23 @@
       };
       selectedEditVertex = null;
       featureIndexes.forEach(index => { drawnFeatures[index].is_editing_boundary = true; });
+      featureHistory = [{
+        drawnFeatures: JSON.parse(JSON.stringify(drawnFeatures)),
+        currentFeature: null,
+      }];
+      historyIndex = 0;
 
       // Stop any drawing in progress so map clicks don't add new features while editing.
       currentFeature = null;
       drawingMode = null;
+      updateDrawingCursor();
       const drawTypeSelect = document.getElementById('drawTypeSelect');
       if (drawTypeSelect) drawTypeSelect.value = '';
       document.querySelectorAll('.draw-btn[data-mode]').forEach(button => button.classList.remove('active'));
-      setRejectedRevisionControlsLocked(true);
+      setRejectedRevisionControlsLocked(true, false);
 
       redrawFeatures();
+      updateHistoryButtons();
       selectDrawnFeature(selectedDrawnIndex);
     }
 
@@ -1290,8 +1503,10 @@
       }
 
       const saveBtn = document.getElementById('saveBoundaryEditBtn');
-      if (saveBtn) saveBtn.disabled = true;
-      showProcessingModal('Saving changes...', 'Updating the saved delineation boundary.');
+      if (saveBtn?.dataset.loading === 'true') return;
+      setButtonLoading(saveBtn, true, 'Saving changes...');
+      const cancelBtn = document.getElementById('cancelBoundaryEditBtn');
+      if (cancelBtn) cancelBtn.disabled = true;
       try {
         const response = await fetch(updateBoundaryUrlTemplate.replace('__DELINEATION_ID__', encodeURIComponent(delineationId)), {
           method: 'PUT',
@@ -1328,13 +1543,13 @@
         finishBoundaryEdit();
         redrawFeatures();
         if (activeIndex >= 0) selectDrawnFeature(activeIndex);
-        hideProcessingModal();
         showSuccessModal(payload.message || 'Delineation boundary updated.', 'Changes saved');
       } catch (error) {
-        hideProcessingModal();
         alert(error.message || 'Unable to save the boundary changes. Please try again.');
       } finally {
+        setButtonLoading(saveBtn, false);
         if (saveBtn) saveBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
       }
     }
 
@@ -1431,8 +1646,19 @@
         }
       };
 
+      // Large shapes (e.g. AI-detected areas) would need hundreds of DOM handles, so only points
+      // near the current view get handles; panning/zooming re-renders them (see moveend below).
+      const view = mainMap.getBounds().pad(0.25);
+      const inView = (coord) => view.contains(L.latLng(Number(coord[0]), Number(coord[1])));
+      const visibleCount = ring.reduce((count, coord) => count + (inView(coord) ? 1 : 0), 0);
+      if (visibleCount < ring.length) editHandlesFollowViewport = true;
+      // Midpoint handles double the handle count; when many points are visible, zoom in to add points.
+      const showMidpoints = visibleCount <= MAX_MIDPOINT_HANDLES;
+      if (!showMidpoints) editHandlesFollowViewport = true;
+
       // Existing points: drag to move, click to select, double-click / right-click to delete.
       ring.forEach((coord, vIdx) => {
+        if (!inView(coord)) return;
         const isSelectedVertex = selectedEditVertex
           && selectedEditVertex.featureIndex === featureIndex && selectedEditVertex.vertexIndex === vIdx;
         const handle = L.marker(coord, {
@@ -1468,11 +1694,12 @@
       });
 
       // Midpoints between points: drag (or click) to insert a new point on that edge.
-      const segmentCount = isArea ? ring.length : ring.length - 1;
+      const segmentCount = showMidpoints ? (isArea ? ring.length : ring.length - 1) : 0;
       for (let sIdx = 0; sIdx < segmentCount; sIdx++) {
         const a = ring[sIdx];
         const b = ring[(sIdx + 1) % ring.length];
         if (!a || !b) continue;
+        if (!inView(a) && !inView(b)) continue;
         const mid = [(Number(a[0]) + Number(b[0])) / 2, (Number(a[1]) + Number(b[1])) / 2];
         const insertAt = sIdx + 1;
         let inserted = false;
@@ -1508,6 +1735,15 @@
     }
 
     function validateDelineationMeta() {
+      const genusSelector = document.getElementById('genusQuickSelector');
+      const generaValid = Array.isArray(currentSelectedGenera) && currentSelectedGenera.length > 0;
+      genusSelector?.classList.toggle('input-error', !generaValid);
+      if (!generaValid) {
+        alert('Please select at least one Mangrove Genus Present before saving.');
+        genusSelector?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return null;
+      }
+
       const notesEl = document.getElementById('delineationNotes');
       const notes = notesEl?.value.trim();
       const notesValid = Boolean(notes);
@@ -1588,7 +1824,7 @@
     };
 
     function saveDrawingStateToHistory() {
-      if (isGeometryEditLocked()) return;
+      if (isEditingRejectedRevision) return;
       // Save both completed features and current feature being drawn
       const state = {
         drawnFeatures: JSON.parse(JSON.stringify(drawnFeatures)),
@@ -1605,19 +1841,43 @@
       const saveBtn = document.getElementById('saveBtn');
       if (!saveBtn) return;
       const hasUnsaved = Array.isArray(drawnFeatures) && drawnFeatures.some(f => !f.delineation_id);
-      const isDisabled = isGeometryEditLocked() || !hasUnsaved;
+      // Genus Present and Notes are required; whitespace-only notes count as blank.
+      const generaSelected = Array.isArray(currentSelectedGenera) && currentSelectedGenera.length > 0;
+      const notesFilled = Boolean(document.getElementById('delineationNotes')?.value.trim());
+      if (isSavingDelineation) {
+        // While saving: keep it disabled but fully visible with the loading label.
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = '0.85';
+        saveBtn.style.cursor = 'wait';
+        saveBtn.classList.remove('disabled');
+        saveBtn.title = '';
+        return;
+      }
+      const isDisabled = isGeometryEditLocked() || !hasUnsaved || !generaSelected || !notesFilled;
       saveBtn.disabled = isDisabled;
       saveBtn.style.opacity = isDisabled ? '0.4' : '1';
       saveBtn.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
       saveBtn.classList.toggle('disabled', isDisabled);
+
+      const missing = [];
+      if (!generaSelected) missing.push('select at least one Mangrove Genus Present');
+      if (!notesFilled) missing.push('fill in Notes');
+      saveBtn.title = hasUnsaved && missing.length && !isGeometryEditLocked()
+        ? `To save, ${missing.join(' and ')}.`
+        : '';
     }
+
+    document.getElementById('delineationNotes')?.addEventListener('input', function () {
+      if (this.value.trim()) this.classList.remove('input-error');
+      updateSaveButtonState();
+    });
 
     function updateHistoryButtons() {
       const undoBtn = document.getElementById('undoBtn');
       const redoBtn = document.getElementById('redoBtn');
 
-      undoBtn.disabled = isGeometryEditLocked() || historyIndex <= 0;
-      redoBtn.disabled = isGeometryEditLocked() || historyIndex >= featureHistory.length - 1;
+      undoBtn.disabled = isEditingRejectedRevision || historyIndex <= 0;
+      redoBtn.disabled = isEditingRejectedRevision || historyIndex >= featureHistory.length - 1;
 
       undoBtn.style.opacity = undoBtn.disabled ? '0.5' : '1';
       redoBtn.style.opacity = redoBtn.disabled ? '0.5' : '1';
@@ -1634,18 +1894,18 @@
       const isOpening = !toolbar.classList.contains('active');
 
       toolbar.classList.toggle('active');
+      updateDelineationRecommendationVisibility();
 
       if (isOpening) {
         const leftPanel = document.querySelector('.left-panel');
         if (leftPanel) leftPanel.classList.add('hide');
         if (drawTypeSelect) {
           drawTypeSelect.disabled = false;
-          drawTypeSelect.value = lineOnlyDelineation ? 'line' : '';
-          drawingMode = lineOnlyDelineation ? 'line' : null;
-          drawModeButtons.forEach(btn => btn.classList.remove('active'));
-        } else {
-          drawingMode = lineOnlyDelineation ? 'line' : null;
+          drawTypeSelect.value = '';
         }
+        drawingMode = null;
+        updateDrawingCursor();
+        drawModeButtons.forEach(btn => btn.classList.remove('active'));
         // Initialize history with empty state including the current drawing context
         if (featureHistory.length === 0) {
           featureHistory = [{
@@ -1665,10 +1925,19 @@
 
         updateHistoryButtons();
         updateSaveButtonState();
+        // Hide "Changes over time" while delineating.
+        loadAnnualObservationCharts(null);
         setTimeout(() => mainMap.invalidateSize(), 50);
         setTimeout(() => mainMap.invalidateSize(), 250);
       } else {
+        // Leaving delineation mode: restore "Changes over time" for the selected area.
+        const selectedFeature = selectedDrawnIndex >= 0 ? drawnFeatures[selectedDrawnIndex] : null;
+        if (selectedFeature?.delineation_id) {
+          loadAnnualObservationCharts(selectedFeature.delineation_id);
+        }
         drawingMode = null;
+        updateDrawingCursor();
+        mainMap.doubleClickZoom.enable();
         const drawTypeSelect = document.getElementById('drawTypeSelect');
         if (drawTypeSelect) drawTypeSelect.disabled = true;
         const leftPanel = document.querySelector('.left-panel');
@@ -1690,12 +1959,20 @@
 
         if (isAlreadyActive) {
           drawingMode = null;
+          updateDrawingCursor();
+          mainMap.doubleClickZoom.enable();
           if (drawTypeSelect) drawTypeSelect.value = '';
           drawModeButtons.forEach(b => b.classList.remove('active'));
           return;
         }
 
         drawingMode = mode;
+        updateDrawingCursor();
+        if (lineOnlyDelineation || mode === 'area') {
+          mainMap.doubleClickZoom.disable();
+        } else {
+          mainMap.doubleClickZoom.enable();
+        }
         if (drawTypeSelect) drawTypeSelect.value = mode;
         drawModeButtons.forEach(b => b.classList.toggle('active', b === this));
       });
@@ -1703,47 +1980,74 @@
 
     drawTypeSelect?.addEventListener('change', function () {
       drawingMode = this.value;
+      updateDrawingCursor();
+      if (lineOnlyDelineation || drawingMode === 'area') {
+        mainMap.doubleClickZoom.disable();
+      } else {
+        mainMap.doubleClickZoom.enable();
+      }
       drawModeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === drawingMode));
     });
 
-    document.getElementById('undoBtn').addEventListener('click', () => {
-      if (historyIndex > 0) {
-        historyIndex--;
-        const state = featureHistory[historyIndex];
-        drawnFeatures = JSON.parse(JSON.stringify(state.drawnFeatures));
-        currentFeature = state.currentFeature ? JSON.parse(JSON.stringify(state.currentFeature)) : null;
-        redrawFeatures();
-        updateHistoryButtons();
-        if (selectedDrawnIndex >= 0) {
-          if (selectedDrawnIndex < drawnFeatures.length) {
-            selectDrawnFeature(selectedDrawnIndex);
-          } else if (drawnFeatures.length > 0) {
-            selectDrawnFeature(drawnFeatures.length - 1);
-          } else {
-            selectedDrawnIndex = -1;
-            document.getElementById('delineationInfoCard').style.display = 'none';
-          }
-        }
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || !drawingMode || isGeometryEditLocked()) return;
+      const tag = (event.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || event.target?.isContentEditable) return;
+
+      event.preventDefault();
+      currentFeature = null;
+      drawingMode = null;
+      updateDrawingCursor();
+      mainMap.doubleClickZoom.enable();
+      mainMap.dragging.enable();
+      snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+      if (drawTypeSelect) drawTypeSelect.value = '';
+      drawModeButtons.forEach(button => button.classList.remove('active'));
+      saveDrawingStateToHistory();
+      redrawFeatures();
+    });
+
+    function restoreHistoryState(index) {
+      historyIndex = index;
+      const state = featureHistory[historyIndex];
+      drawnFeatures = JSON.parse(JSON.stringify(state.drawnFeatures));
+      currentFeature = state.currentFeature ? JSON.parse(JSON.stringify(state.currentFeature)) : null;
+      redrawFeatures();
+      updateHistoryButtons();
+      if (selectedDrawnIndex < 0) return;
+      if (selectedDrawnIndex < drawnFeatures.length) {
+        // Refresh the panel for the same feature without moving the map.
+        selectDrawnFeature(selectedDrawnIndex, { fly: false });
+      } else {
+        // The selected feature was undone away; clear the selection instead of
+        // falling back to another (e.g. an approved) delineation.
+        selectedDrawnIndex = -1;
+        document.getElementById('delineationInfoCard').style.display = 'none';
+        closeRightPanel();
       }
+    }
+
+    document.getElementById('undoBtn').addEventListener('click', () => {
+      if (historyIndex > 0) restoreHistoryState(historyIndex - 1);
     });
 
     document.getElementById('redoBtn').addEventListener('click', () => {
-      if (historyIndex < featureHistory.length - 1) {
-        historyIndex++;
-        const state = featureHistory[historyIndex];
-        drawnFeatures = JSON.parse(JSON.stringify(state.drawnFeatures));
-        currentFeature = state.currentFeature ? JSON.parse(JSON.stringify(state.currentFeature)) : null;
-        redrawFeatures();
-        updateHistoryButtons();
-        if (selectedDrawnIndex >= 0) {
-          if (selectedDrawnIndex < drawnFeatures.length) {
-            selectDrawnFeature(selectedDrawnIndex);
-          } else if (drawnFeatures.length > 0) {
-            selectDrawnFeature(drawnFeatures.length - 1);
-          }
-        }
-      }
+      if (historyIndex < featureHistory.length - 1) restoreHistoryState(historyIndex + 1);
     });
+
+    const saveBtnIdleHtml = '<i class="bi bi-save"></i> Save delineation';
+    const saveBtnSavingHtml = '<span class="save-btn-spinner" aria-hidden="true"></span> Saving delineation...';
+
+    function setSaveButtonSaving(isSaving) {
+      isSavingDelineation = isSaving;
+      const saveBtn = document.getElementById('saveBtn');
+      if (saveBtn) {
+        saveBtn.innerHTML = isSaving ? saveBtnSavingHtml : saveBtnIdleHtml;
+        saveBtn.classList.toggle('is-saving', isSaving);
+        saveBtn.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+      }
+      updateSaveButtonState();
+    }
 
     async function persistDelineation() {
       const hasUnsaved = Array.isArray(drawnFeatures) && drawnFeatures.some(f => !f.delineation_id);
@@ -1756,23 +2060,16 @@
       if (!meta) return;
 
       const saveBtn = document.getElementById('saveBtn');
-      if (saveBtn?.disabled) return;
-      if (saveBtn) saveBtn.disabled = true;
-
-      const modalTitle = 'Saving Delineation...';
-      const modalSubtitle = isExpertUser ?
-        'Saving and publishing delineation to the map, please wait.' :
-        'Saving and submitting delineation for expert review, please wait.';
-
-      showProcessingModal(modalTitle, modalSubtitle);
+      if (saveBtn?.disabled || isSavingDelineation) return;
 
       const newFeatures = drawnFeatures.filter(f => !f.delineation_id && isValidMapFeature(f));
       if (!newFeatures.length) {
         alert('No new delineation made to save. Please draw a feature on the map first.');
-        if (saveBtn) saveBtn.disabled = false;
-        hideProcessingModal();
         return;
       }
+
+      // Loading state on the button itself (no saving modal).
+      setSaveButtonSaving(true);
 
       try {
         const response = await fetch(saveDelineationUrl, {
@@ -1818,20 +2115,64 @@
           }
         }
 
-        hideProcessingModal();
+        setSaveButtonSaving(false);
         showSuccessModal(payload.message || 'Delineation saved and submitted for expert review.');
       } catch (error) {
-        hideProcessingModal();
+        setSaveButtonSaving(false);
         console.error('Delineation save failed:', error);
         alert(error.message || 'Unable to save delineation. Please try again.');
       } finally {
-        updateSaveButtonState();
+        setSaveButtonSaving(false);
       }
     }
 
     document.getElementById('saveBtn')?.addEventListener('click', () => {
       persistDelineation();
     });
+
+    // Drawing tools only exist on the Delineate page; elsewhere "Use as delineation" opens it
+    // with ?ai_layer=<id> and the draft is loaded there (see the APP_PAGE === 'delineate' block).
+    window.aiExtentDelineateUrl = function (layerId) {
+      if (APP_PAGE === 'delineate') return null;
+      return `${delineatePageUrl}?ai_layer=${encodeURIComponent(layerId)}`;
+    };
+
+    // Called from the drone imagery panel (map-base-scripts): loads AI-detected mangrove
+    // polygons as unsaved areas so the user can patch them, pick genera and submit as usual.
+    window.useAiExtentAsDelineation = function (segmentation, layer) {
+      if (isGeometryEditLocked()) {
+        alert('Finish or cancel the current boundary edit before loading the AI extent.');
+        return 0;
+      }
+
+      const unsavedCount = drawnFeatures.filter(f => !f.delineation_id).length;
+      const room = MAX_FEATURES_PER_DELINEATION - unsavedCount;
+      if (room <= 0) {
+        alert(`A delineation can hold up to ${MAX_FEATURES_PER_DELINEATION} areas. Save or remove your unsaved shapes first.`);
+        return 0;
+      }
+
+      const notes = `AI-detected mangrove extent from drone survey "${layer.name}".`;
+      const features = (segmentation.features || [])
+        .filter(isValidMapFeature)
+        .slice(0, room)
+        .map(f => ({ type: 'area', coords: f.coords, label: `${layer.name} (AI extent)`, notes, source: 'ai' }));
+      if (!features.length) return 0;
+
+      if (!document.getElementById('delineationToolbar')?.classList.contains('active')) {
+        window.showEditMode();
+      }
+
+      const firstIndex = drawnFeatures.length;
+      drawnFeatures.push(...features);
+      saveDrawingStateToHistory();
+      // Select before redrawing so the selected area renders with draggable vertex handles.
+      selectDrawnFeature(firstIndex, { fly: false });
+      redrawFeatures();
+      mainMap.flyToBounds(L.latLngBounds(features.flatMap(f => f.coords)), { padding: [50, 50], maxZoom: 19, duration: 0.8 });
+
+      return features.length;
+    };
 
     const saveDelineationMetaBtn = document.getElementById('saveDelineationMetaBtn');
     if (saveDelineationMetaBtn) {
@@ -1873,10 +2214,20 @@
       }
 
       const url = `${expertDelineationReviewBaseUrl}/${delineationId}/${action}`;
-      showProcessingModal(
-        action === 'approve' ? 'Approving delineation...' : 'Rejecting delineation...',
-        'Please wait.'
-      );
+      const approveBtn = document.getElementById('expertApproveBtn');
+      const rejectBtn = document.getElementById('expertRejectBtn');
+      if (approveBtn?.dataset.loading === 'true' || rejectBtn?.dataset.loading === 'true') return;
+      const activeBtn = action === 'approve' ? approveBtn : rejectBtn;
+      const otherBtn = action === 'approve' ? rejectBtn : approveBtn;
+      setButtonLoading(activeBtn, true, action === 'approve' ? 'Approving...' : 'Rejecting...');
+      if (otherBtn) otherBtn.disabled = true;
+      const rejectionNotesEl = document.getElementById('expertRejectionNotes');
+      if (rejectionNotesEl) rejectionNotesEl.disabled = true;
+      const restoreReviewButtons = () => {
+        setButtonLoading(activeBtn, false);
+        if (otherBtn) otherBtn.disabled = false;
+        if (rejectionNotesEl) rejectionNotesEl.disabled = false;
+      };
 
       try {
         const response = await fetch(url, {
@@ -1910,13 +2261,14 @@
           });
         }
 
-        hideProcessingModal();
+        // Restore first so re-selecting the feature can reset the review controls.
+        restoreReviewButtons();
         showSuccessModal(payload.message || 'Review saved.');
         if (selectedDrawnIndex >= 0) {
           selectDrawnFeature(selectedDrawnIndex);
         }
       } catch (error) {
-        hideProcessingModal();
+        restoreReviewButtons();
         alert(error.message || 'Unable to complete review.');
       }
     }
@@ -1933,11 +2285,25 @@
       submitExpertReview('reject');
     });
 
+    // Clicking a shape changes which one is highlighted and (for unsaved shapes while delineating)
+    // which one gets draggable vertex handles, so redraw when the selection actually moves.
+    function selectDrawnFeatureAndRefresh(i) {
+      const previousIndex = selectedDrawnIndex;
+      selectDrawnFeature(i);
+      if (selectedDrawnIndex !== previousIndex) redrawFeatures();
+    }
+
+    // Re-render vertex handles for the visible part of a large editable shape after pan/zoom.
+    mainMap.on('moveend', () => {
+      if (editHandlesFollowViewport) redrawFeatures();
+    });
+
     function redrawFeatures() {
       // Clear only our overlay layers; keep the base tiles + controls intact.
       delineationLayer.clearLayers();
       vertexLayer.clearLayers();
       editVertexHandles = [];
+      editHandlesFollowViewport = false;
 
       function getFeatureColor(f) {
         if (f.is_rejected) return '#d04030';
@@ -1997,11 +2363,11 @@
           line.on('click', (e) => {
             if (drawingMode && !lineOnlyDelineation) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
-            selectDrawnFeature(i);
+            selectDrawnFeatureAndRefresh(i);
           });
           if (isSelectedEditable) {
             renderEditableVertices(f, i, line);
-          } else if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
+          } else if (f.coords.length <= MAX_PASSIVE_VERTEX_DOTS && document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
               radius: 3,
               color,
@@ -2021,11 +2387,11 @@
           polygon.on('click', (e) => {
             if (drawingMode && !lineOnlyDelineation) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
-            selectDrawnFeature(i);
+            selectDrawnFeatureAndRefresh(i);
           });
           if (isSelectedEditable) {
             renderEditableVertices(f, i, polygon);
-          } else if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
+          } else if (f.coords.length <= MAX_PASSIVE_VERTEX_DOTS && document.getElementById('delineationToolbar')?.classList.contains('active')) {
             f.coords.forEach(coord => L.circleMarker(coord, {
               radius: 3,
               color,
@@ -2050,14 +2416,15 @@
           }).addTo(delineationLayer);
         } else if (currentFeature.type === 'line') {
           L.polyline(currentFeature.coords, {
-            color: '#ff6b6b',
-            opacity: 0.7
+            color: '#4ecdc4',
+            opacity: 0.8,
+            interactive: false,
           }).addTo(delineationLayer);
-          currentFeature.coords.forEach(coord => L.circleMarker(coord, {
-            radius: 3,
-            color: '#ff6b6b',
+          currentFeature.coords.forEach((coord, index) => L.circleMarker(coord, {
+            radius: index === 0 ? 6 : 3,
+            color: '#4ecdc4',
             weight: 1,
-            fillColor: '#ff6b6b',
+            fillColor: index === 0 ? '#ffffff' : '#4ecdc4',
             fillOpacity: 0.9,
             interactive: false,
           }).addTo(vertexLayer));
@@ -2087,9 +2454,51 @@
       updateSaveButtonState();
     }
 
+    function finishAreaDrawing() {
+      if (!currentFeature || !['line', 'area'].includes(currentFeature.type)) return false;
+      const coordinates = currentFeature.coords;
+      const distinctCoordinates = coordinates.filter((coord, index) =>
+        index === 0 || Number(coord[0]) !== Number(coordinates[index - 1][0]) || Number(coord[1]) !== Number(coordinates[index - 1][1]));
+      if (distinctCoordinates.length > 1) {
+        const [firstLat, firstLng] = distinctCoordinates[0];
+        const [lastLat, lastLng] = distinctCoordinates[distinctCoordinates.length - 1];
+        const firstPoint = mainMap.latLngToContainerPoint(L.latLng(firstLat, firstLng));
+        const lastPoint = mainMap.latLngToContainerPoint(L.latLng(lastLat, lastLng));
+        if (firstPoint.distanceTo(lastPoint) < 3) distinctCoordinates.pop();
+      }
+      if (distinctCoordinates.length < 3) return false;
+
+      const [firstLat, firstLng] = distinctCoordinates[0];
+      distinctCoordinates.push([firstLat, firstLng]);
+      currentFeature.coords = distinctCoordinates;
+      currentFeature.type = 'area';
+      drawnFeatures.push(currentFeature);
+      currentFeature = null;
+      saveDrawingStateToHistory();
+      drawingMode = null;
+      updateDrawingCursor();
+      mainMap.doubleClickZoom.enable();
+      mainMap.dragging.enable();
+      snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+      document.querySelectorAll('.draw-btn').forEach(button => button.classList.remove('active'));
+      const drawTypeSelect = document.getElementById('drawTypeSelect');
+      if (drawTypeSelect) drawTypeSelect.value = '';
+      redrawFeatures();
+      selectDrawnFeature(drawnFeatures.length - 1);
+      redrawFeatures();
+      return true;
+    }
+
     mainMap.on('click', (e) => {
       if (!drawingMode || isGeometryEditLocked()) return;
       const snappedLatLng = getSnappedLatLng(e.latlng) || e.latlng;
+      if (currentFeature && ['line', 'area'].includes(drawingMode)) {
+        const last = currentFeature.coords[currentFeature.coords.length - 1];
+        if (last && mainMap.latLngToContainerPoint(L.latLng(last[0], last[1]))
+          .distanceTo(mainMap.latLngToContainerPoint(snappedLatLng)) < 3) {
+          return;
+        }
+      }
       if (!currentFeature) {
         currentFeature = {
           type: drawingMode,
@@ -2108,28 +2517,15 @@
         // Save state after each point added
         saveDrawingStateToHistory();
 
-        // Check if close to first point to close the delineation
+        // Clicking the first point completes the area.
         if (currentFeature.coords.length > 2) {
-          let first = currentFeature.coords[0];
+          const first = currentFeature.coords[0];
           const firstPixel = mainMap.latLngToContainerPoint(L.latLng(first[0], first[1]));
           const currentPixel = mainMap.latLngToContainerPoint(snappedLatLng);
           const pixelDist = firstPixel.distanceTo(currentPixel);
 
-          if (pixelDist < snapPixelThreshold * 2) { // use 2x threshold for closing
-            currentFeature.coords[currentFeature.coords.length - 1] = [first[0], first[1]];
-            currentFeature.type = 'area';
-            drawnFeatures.push(currentFeature);
-            currentFeature = null;
-            saveDrawingStateToHistory();
-            if (lineOnlyDelineation) {
-              drawingMode = 'line';
-            } else {
-              drawingMode = null;
-              mainMap.dragging.enable();
-              document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
-            }
-            redrawFeatures();
-            selectDrawnFeature(drawnFeatures.length - 1);
+          if (pixelDist < snapPixelThreshold * 2) {
+            finishAreaDrawing();
             return;
           }
         }
@@ -2151,6 +2547,8 @@
             currentFeature = null;
             saveDrawingStateToHistory();
             drawingMode = null;
+            updateDrawingCursor();
+            mainMap.doubleClickZoom.enable();
             mainMap.dragging.enable();
             document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
             redrawFeatures();
@@ -2160,6 +2558,12 @@
         }
       }
       redrawFeatures();
+    });
+
+    mainMap.on('dblclick', () => {
+      if ((lineOnlyDelineation || drawingMode === 'area') && drawingMode && !isGeometryEditLocked()) {
+        finishAreaDrawing();
+      }
     });
 
     // Throttle snapping updates to one per animation frame (mousemove can fire *a lot*).
@@ -2424,13 +2828,25 @@
       }
     }
 
+    function isDelineationModeActive() {
+      return !!document.getElementById('delineationToolbar')?.classList.contains('active');
+    }
+
     function loadAnnualObservationCharts(delineationId) {
       annualObservationRequest?.abort();
+      if (isDelineationModeActive()) {
+        // Users are actively delineating: keep "Changes over time" (and its
+        // historical map overlay) out of the way.
+        setTemporalHistory([], 'idle');
+        setAnnualObservationEmptyState(null);
+        return;
+      }
       if (!delineationId) {
         setTemporalHistory([], 'empty');
         setAnnualObservationEmptyState(null);
         return;
       }
+      document.getElementById('mapTimelineControl')?.classList.remove('collapsed');
       setTemporalHistory([], 'loading');
       setAnnualObservationEmptyState(delineationId ? 'Loading verified observations...' : null);
 
@@ -2933,8 +3349,6 @@
       // Update right panel details if temporal zone is selected
       if (isTemporalZoneSelected) {
         document.getElementById('dArea').textContent = epoch.areaFormatted;
-        document.getElementById('dNDVI').textContent = epoch.ndviText;
-        document.getElementById('dNDVI').className = `d-val ${epoch.isNegative ? 'r' : 'g'}`;
         document.getElementById('dStatus').textContent = epoch.status;
         document.getElementById('dStatus').className = `d-val ${epoch.isNegative ? 'p' : 'g'}`;
         document.getElementById('dScan').textContent = `${epoch.year} Satellite Epoch`;
@@ -2958,8 +3372,6 @@
 
       document.getElementById('dName').textContent = 'Silago Bay Reforestation Site';
       document.getElementById('dArea').textContent = epoch.areaFormatted;
-      document.getElementById('dNDVI').textContent = epoch.ndviText;
-      document.getElementById('dNDVI').className = `d-val ${epoch.isNegative ? 'r' : 'g'}`;
       document.getElementById('dStatus').textContent = epoch.status;
       document.getElementById('dStatus').className = `d-val ${epoch.isNegative ? 'p' : 'g'}`;
       document.getElementById('dGenus').textContent = 'Rhizophora & Avicennia';
@@ -3039,10 +3451,41 @@
     setTemporalHistory([], 'idle');
 
 
+    // Opened from "Use as delineation" on another page: load that drone layer's AI extent as a draft.
+    async function loadAiExtentFromQueryParam() {
+      const url = new URL(window.location.href);
+      const layerId = url.searchParams.get('ai_layer');
+      if (!layerId) return;
+      // Drop the parameter so a reload does not add the draft a second time.
+      url.searchParams.delete('ai_layer');
+      window.history.replaceState(window.history.state, '', url);
+      if (!/^\d+$/.test(layerId)) return;
+
+      try {
+        const response = await fetch(`${droneImageryStatusUrl}/${encodeURIComponent(layerId)}/segmentation`, {
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Unable to load the AI mangrove extent for this drone layer.');
+        if (!payload.features?.length) {
+          alert('The AI did not detect any mangrove areas large enough to delineate on this drone layer.');
+          return;
+        }
+        // Show the drone imagery underneath so the AI shapes can be checked against it.
+        await loadDroneImageryLayers(Number(layerId)).catch(error => console.error('Unable to show drone imagery.', error));
+        window.useAiExtentAsDelineation(payload, { id: payload.id, name: payload.name });
+      } catch (error) {
+        console.error('AI extent load failed:', error);
+        alert(error.message || 'Unable to load the AI mangrove extent.');
+      }
+    }
+
     if (APP_PAGE === 'delineate') {
       const toolbar = document.getElementById('delineationToolbar');
       if (toolbar && !toolbar.classList.contains('active') && typeof window.showEditMode === 'function') {
         window.showEditMode();
       }
+      loadAiExtentFromQueryParam();
     }
 </script>

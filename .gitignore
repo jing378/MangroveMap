@@ -44,3 +44,4 @@ bootstrap/cache/
 
 # Editor language-server helper files
 /storage/framework/lsp-*.php
+/tile

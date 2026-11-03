@@ -41,7 +41,35 @@ class Delineation extends Model
         'approved_at' => 'datetime',
         'is_rejected' => 'boolean',
         'rejected_at' => 'datetime',
+        'hidden_at' => 'datetime',
     ];
+
+    public function hiddenBy()
+    {
+        return $this->belongsTo(User::class, 'hidden_by');
+    }
+
+    public function isHiddenFromMap(): bool
+    {
+        return $this->hidden_at !== null;
+    }
+
+    /** Snapshot stored in delineation_revisions before an edit. */
+    public function recordRevision(User $editor, string $type): DelineationRevision
+    {
+        return $this->revisions()->create([
+            'revised_by' => $editor->id,
+            'version' => ((int) $this->revisions()->max('version')) + 1,
+            'snapshot' => [
+                'type' => $type,
+                'name' => $this->name,
+                'notes' => $this->notes,
+                'features' => $this->features,
+                'is_approved' => $this->is_approved,
+                'is_rejected' => $this->is_rejected,
+            ],
+        ]);
+    }
 
     public function user()
     {
@@ -60,7 +88,7 @@ class Delineation extends Model
 
     public function plantingRecommendations(): HasMany
     {
-        return $this->hasMany(PlantingRecommendation::class);
+        return $this->hasMany(PlantingRecommendation::class)->latest();
     }
 
     public function revisions(): HasMany
@@ -88,9 +116,10 @@ class Delineation extends Model
             : route('map', $params);
     }
 
+    /** Approved and published: delineations an admin hid from the map are excluded. */
     public function scopeApproved($query)
     {
-        return $query->where('is_approved', true);
+        return $query->where('delineations.is_approved', true)->whereNull('delineations.hidden_at');
     }
 
     public function scopeRejected($query)

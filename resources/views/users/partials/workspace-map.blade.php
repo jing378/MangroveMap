@@ -36,7 +36,9 @@
             <div class="draw-select-wrapper">
               @if (request()->routeIs('delineate', 'expert.delineate'))
                 <div class="draw-mode-group" aria-label="Drawing mode">
-                  <span class="draw-btn active"><i class="bi bi-slash-circle"></i><span>Line</span></span>
+                  <button type="button" class="draw-btn" data-mode="line" title="Draw a new area">
+                    <i class="bi bi-pentagon"></i><span>Draw area</span>
+                  </button>
                 </div>
               @else
                 <div class="draw-mode-group" role="group" aria-label="Drawing mode">
@@ -66,6 +68,11 @@
               @endunless
             </div>
           </div>
+          @if (request()->routeIs('delineate', 'expert.delineate'))
+            <div class="delineation-draw-hint" id="delineationDrawHint" role="status" aria-live="polite" hidden>
+              Click to add points. Click the starting point or double-click to finish the area. Esc cancels.
+            </div>
+          @endif
           <x-map-layer-control>
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
@@ -74,6 +81,12 @@
               aria-label="Upload image for delineation">
               <i class="bi bi-image"></i>
             </button>
+            @if (request()->routeIs('map', 'expert.map'))
+              <button id="plantingRecommendationToggle" type="button" class="active-toggle" onclick="togglePlantingRecommendationLayer()"
+                title="Hide planting recommendations" aria-label="Show or hide planting recommendations" aria-pressed="true">
+                <i class="bi bi-flower1"></i>
+              </button>
+            @endif
           </x-map-layer-control>
 
         </div>
@@ -107,6 +120,8 @@
                 id="delineationCreatedBy">-</span></div>
             <div class="d-row"><span class="d-key">Review status</span><span class="d-val"
                 id="delineationReviewStatus">-</span></div>
+            <div class="d-row d-row-recommendation"><span class="d-key">Planting recommendation</span><span class="d-val"
+                id="delineationPlantingRecommendation" style="white-space:pre-line;overflow-wrap:anywhere;">No recommendation provided</span></div>
             <div class="d-row" id="delineationLastEditedRow" style="display:none;"><span class="d-key">Boundary last edited by</span><span class="d-val"
                 id="delineationLastEditedBy">-</span></div>
             <div id="delineationRejectionBox" class="delineation-rejection-box" style="display:none;">
@@ -214,7 +229,6 @@
             <div class="d-card">
               <div class="d-title" id="dName"></div>
               <div class="d-row"><span class="d-key">Area</span><span class="d-val" id="dArea"></span></div>
-              <div class="d-row"><span class="d-key">Health (NDVI)</span><span class="d-val" id="dNDVI"></span></div>
               <div class="d-row"><span class="d-key">Status</span><span class="d-val" id="dStatus"></span></div>
               <div class="d-row"><span class="d-key">Dominant genus</span><span class="d-val" id="dGenus"></span></div>
               <div class="d-row"><span class="d-key">Last scan</span><span class="d-val" id="dScan"></span></div>

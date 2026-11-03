@@ -42,6 +42,21 @@ class PlantingRecommendation extends Model
         return $this->belongsTo(Delineation::class);
     }
 
+    /**
+     * Experts see every recommendation; residents see freely drawn areas and those
+     * on delineations that are still approved (same rule as the details panel).
+     */
+    public function scopeVisibleOnMapTo($query, User $user)
+    {
+        if ($user->isExpert()) {
+            return $query;
+        }
+
+        return $query->where(fn($q) => $q
+            ->whereNull('delineation_id')
+            ->orWhereHas('delineation', fn($d) => $d->approved()));
+    }
+
     /** @return array<string, mixed> */
     public function toMapPayload(): array
     {
@@ -49,10 +64,25 @@ class PlantingRecommendation extends Model
             'id', 'user_id', 'delineation_id', 'name', 'features', 'suitability',
             'recommended_genera', 'recommendation', 'site_notes',
         ]), [
+            'suitability_label' => self::SUITABILITY_LEVELS[$this->suitability] ?? $this->suitability,
             'expert_name' => $this->user?->name,
             'delineation_name' => $this->delineation?->name,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ]);
+    }
+
+    /** Summary shown in the Map/Delineate details panel of the linked delineation. */
+    public function toDelineationPanelPayload(): array
+    {
+        return [
+            'id' => $this->id,
+            'suitability' => $this->suitability,
+            'suitability_label' => self::SUITABILITY_LEVELS[$this->suitability] ?? $this->suitability,
+            'recommended_genera' => $this->recommended_genera ?? [],
+            'recommendation' => $this->recommendation,
+            'expert_name' => $this->user?->name,
+            'updated_at' => $this->updated_at?->toIso8601String(),
+        ];
     }
 }

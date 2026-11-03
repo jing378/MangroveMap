@@ -40,6 +40,7 @@ class PublicController extends Controller
             ->approved()
             ->latest('approved_at')
             ->get();
+        $contributorCount = $delineations->pluck('user_id')->unique()->count();
 
         return view('index', [
             'globalCoverage' => $globalCoverage,
@@ -51,6 +52,7 @@ class PublicController extends Controller
             'coverageTrends' => $coverageTrends,
             'years' => $years,
             'delineations' => $delineations,
+            'contributorCount' => $contributorCount,
         ]);
     }
 }

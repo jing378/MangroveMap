@@ -17,6 +17,16 @@
             <span>Users</span>
         </a>
 
+        <a href="{{ route('admin.map-layers.index') }}" class="sidebar-item {{ request()->routeIs('admin.map-layers.*') ? 'active' : '' }}">
+            <i class="bi bi-layers"></i>
+            <span>Map Layers</span>
+        </a>
+
+        <a href="{{ route('admin.activity-logs.index') }}" class="sidebar-item {{ request()->routeIs('admin.activity-logs.*') ? 'active' : '' }}">
+            <i class="bi bi-journal-text"></i>
+            <span>Activity Logs</span>
+        </a>
+
     </div>
 
     @php($currentUser = auth()->user())

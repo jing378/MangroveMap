@@ -113,7 +113,7 @@ class PlantingRecommendationController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:191'],
-            'delineation_id' => ['nullable', 'integer', Rule::exists('delineations', 'id')->where('is_approved', true)],
+            'delineation_id' => ['nullable', 'integer', Rule::exists('delineations', 'id')->where('is_approved', true)->whereNull('hidden_at')],
             'features' => ['required', 'array', 'min:1', 'max:20'],
             'features.*.type' => ['required', 'string', 'in:area'],
             'features.*.coords' => ['required', 'array', 'min:3', 'max:10000'],

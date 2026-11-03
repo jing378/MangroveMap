@@ -455,9 +455,12 @@ if ($currentUser && $currentUser->role === 'admin') {
         'delineation_approved' => '#10b981',
         'delineation_rejected' => '#ef4444',
         'delineation_submitted' => '#c07818',
+        'expert_application' => '#c07818',
+        'expert_application_approved' => '#10b981',
+        'expert_application_rejected' => '#ef4444',
         ];
         $delineationId = $notification->data['delineation_id'] ?? null;
-        $viewUrl = $notification->data['url'] ?? null;
+        $viewUrl = $notification->data['url'] ?? $notification->data['actionUrl'] ?? null;
         if ($delineationId) {
         $viewUrl = Auth::user()->isExpert()
         ? route('expert.map', ['delineation' => $delineationId])

@@ -23,7 +23,17 @@ class User extends Authenticatable implements MustVerifyEmail
         'phone',
         'profile_image',
         'last_login_at',
+        'expert_application_status',
+        'expert_qualifications',
+        'expert_applied_at',
+        'expert_reviewed_at',
+        'expert_reviewed_by',
+        'expert_rejection_notes',
     ];
+
+    public const EXPERT_APPLICATION_PENDING = 'pending';
+    public const EXPERT_APPLICATION_APPROVED = 'approved';
+    public const EXPERT_APPLICATION_REJECTED = 'rejected';
 
     protected $hidden = [
         'password',
@@ -33,8 +43,25 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
+        'expert_applied_at' => 'datetime',
+        'expert_reviewed_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    public function expertReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'expert_reviewed_by');
+    }
+
+    public function scopePendingExpertApplications($query)
+    {
+        return $query->where('expert_application_status', self::EXPERT_APPLICATION_PENDING);
+    }
+
+    public function hasPendingExpertApplication(): bool
+    {
+        return $this->expert_application_status === self::EXPERT_APPLICATION_PENDING;
+    }
 
     public function activities(): HasMany
     {

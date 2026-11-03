@@ -11,6 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // cloudflared runs on this machine, so only trust forwarded headers from localhost.
+        $middleware->trustProxies(at: ['127.0.0.1', '::1']);
+
         $middleware->alias([
             'admin' => \App\Http\Middleware\IsAdmin::class,
             'end_user' => \App\Http\Middleware\EnsureUserIsEndUser::class,

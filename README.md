@@ -36,9 +36,11 @@ php artisan queue:work drone_imagery --queue=drone-imagery --timeout=7200 --trie
 
 The queue connection's `GDAL_QUEUE_RETRY_AFTER` (default 7260 seconds) must
 remain longer than the job timeout. `GDAL_PROCESS_TIMEOUT` (default 7000
-seconds) limits each GDAL command. `GDAL_TILE_ZOOM` defaults to `12-20` to
-bound tile-generation cost; tune it for the imagery resolution and available
-storage.
+seconds) limits each GDAL command. `GDAL_TILE_ZOOM` defaults to `12-auto`:
+the maximum tile zoom is derived from each mosaic's native resolution (about
+z22 for 5 cm drone imagery) and capped by `GDAL_MAX_TILE_ZOOM` (default 22,
+the map's maximum zoom). Use a fixed range such as `12-20` to bound
+tile-generation cost and storage.
 
 On the authenticated map, open the layer menu to upload one GeoTIFF or a
 multi-file survey batch and toggle completed imagery overlays. Layer metadata

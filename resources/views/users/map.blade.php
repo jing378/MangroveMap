@@ -11,7 +11,7 @@
         .content.content-flush {
             position: relative;
             width: 100%;
-            height: calc(100vh - 60px);
+            height: 100%;
             overflow: hidden !important;
         }
         .enduser-workspace {

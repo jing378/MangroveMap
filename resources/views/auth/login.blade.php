@@ -237,6 +237,41 @@
             transform: translateY(0px);
         }
 
+        .submit-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .submit-btn:disabled,
+        .submit-btn.is-loading {
+            cursor: wait;
+            opacity: 0.85;
+            transform: none;
+            box-shadow: 0 4px 12px rgba(30, 158, 98, 0.2);
+        }
+
+        .submit-spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.45);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: submit-spin 0.7s linear infinite;
+        }
+
+        .submit-btn.is-loading .submit-spinner {
+            display: inline-block;
+        }
+
+        @keyframes submit-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .login-footer {
             text-align: center;
             margin-top: 20px;
@@ -497,7 +532,7 @@
                 <div class="status-message">{{ session('status') }}</div>
                 @endif
 
-                <form method="POST" action="/login">
+                <form method="POST" action="/login" id="loginForm">
                     @csrf
 
                     <div class="form-group">
@@ -530,7 +565,10 @@
                         </label>
                     </div>
 
-                    <button type="submit" class="submit-btn">Sign In</button>
+                    <button type="submit" class="submit-btn" id="loginSubmitBtn">
+                        <span class="submit-spinner" aria-hidden="true"></span>
+                        <span class="submit-label">Sign In</span>
+                    </button>
                 </form>
 
                 <div class="login-footer">
@@ -566,6 +604,27 @@
             }
 
             updateToggleVisibility();
+
+            // Loading state on Sign In.
+            const loginForm = document.getElementById('loginForm');
+            const submitBtn = document.getElementById('loginSubmitBtn');
+            const submitLabel = submitBtn.querySelector('.submit-label');
+
+            function setSubmitting(isSubmitting) {
+                submitBtn.disabled = isSubmitting;
+                submitBtn.classList.toggle('is-loading', isSubmitting);
+                submitBtn.setAttribute('aria-busy', isSubmitting ? 'true' : 'false');
+                submitLabel.textContent = isSubmitting ? 'Signing in...' : 'Sign In';
+            }
+
+            loginForm.addEventListener('submit', function() {
+                setSubmitting(true);
+            });
+
+            // Reset if the page is restored from the back/forward cache.
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted) setSubmitting(false);
+            });
 
             const inlineErrors = document.querySelectorAll('.error-message');
             if (inlineErrors.length) {

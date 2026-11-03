@@ -23,7 +23,8 @@
         <label for="droneImageryName">Layer name</label>
         <input id="droneImageryName" name="name" type="text" maxlength="120" placeholder="Survey name">
         <label for="droneImageryFiles">GeoTIFF files</label>
-        <input id="droneImageryFiles" name="files[]" type="file" accept=".tif,.tiff,image/tiff" multiple required>
+        <input id="droneImageryFiles" name="files[]" type="file" accept=".tif,.tiff,image/tiff" multiple required
+          data-max-files="{{ \App\Http\Controllers\DroneImageryController::maxUploadFiles() }}">
         <button type="submit" class="drone-imagery-upload-button">Upload and process</button>
       </form>
       <div id="droneImageryUploadProgress" class="drone-imagery-upload-progress" hidden>
@@ -38,7 +39,19 @@
         </div>
       </div>
       <div id="droneImageryMessage" class="drone-imagery-message" role="status" aria-live="polite"></div>
-      <div id="droneImageryLayers" class="drone-imagery-layers" aria-label="Your drone imagery layers"></div>
+      <div id="droneImageryLayers" class="drone-imagery-layers" aria-label="Available drone imagery layers"></div>
     </section>
+  </div>
+  {{-- Upload/processing progress that stays visible while the drone imagery panel is closed. --}}
+  <div id="droneImageryProgressChip" class="drone-progress-chip" role="status" aria-live="polite" tabindex="0"
+    title="Show drone imagery progress" hidden>
+    <i class="bi bi-cloud-arrow-up"></i>
+    <span class="drone-progress-chip-body">
+      <span class="drone-progress-chip-label">Processing drone imagery…</span>
+      <span class="drone-progress-chip-track" role="progressbar" aria-label="Drone imagery progress"
+        aria-valuemin="0" aria-valuemax="100">
+        <span class="drone-progress-chip-fill"></span>
+      </span>
+    </span>
   </div>
 </div>

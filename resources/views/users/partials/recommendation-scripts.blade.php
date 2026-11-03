@@ -15,7 +15,7 @@
     const REFERENCE_COLOR = '#7fa88a';
     const DRAFT_COLOR = '#1a73e8';
     const DRAWING_COLOR = '#4ecdc4';
-    const CLOSE_PIXEL_THRESHOLD = 18;
+    const SNAP_PIXEL_THRESHOLD = 15;
     const genusLocalNames = { Rhizophora: 'Bakawan', Avicennia: 'Bungalon', Sonneratia: 'Pagatpat' };
 
     @include('users.partials.map-base-scripts')
@@ -78,6 +78,13 @@
       return latLngs.length ? L.latLngBounds(latLngs) : null;
     }
 
+    function zoomToFeatures(features) {
+      const bounds = featuresBounds(features);
+      if (bounds?.isValid()) {
+        mainMap.flyToBounds(bounds, { padding: [50, 50], maxZoom: 17, duration: 0.8 });
+      }
+    }
+
     function genusLabelHtml(genus) {
       const local = genusLocalNames[genus];
       const safe = String(genus).replace(/[&<>"']/g, ch => `&#${ch.charCodeAt(0)};`);
@@ -98,6 +105,57 @@
     const recommendationLayer = L.layerGroup().addTo(mainMap);
     const draftLayer = L.layerGroup().addTo(mainMap);
     const vertexLayer = L.layerGroup().addTo(mainMap);
+    const snapMarker = L.circleMarker([0, 0], {
+      radius: 8,
+      color: '#1e9e62',
+      weight: 2,
+      fillColor: '#1e9e62',
+      fillOpacity: 0.35,
+      opacity: 0,
+      interactive: false,
+    }).addTo(mainMap);
+
+    function collectSnapVertices() {
+      const vertices = [];
+      const addCoordinates = (coordinates) => {
+        if (!Array.isArray(coordinates)) return;
+        if (coordinates.length >= 2 && Number.isFinite(Number(coordinates[0])) && Number.isFinite(Number(coordinates[1]))) {
+          vertices.push([Number(coordinates[0]), Number(coordinates[1])]);
+          return;
+        }
+        coordinates.forEach(addCoordinates);
+      };
+      referenceAreas.forEach(area => area.features?.forEach(feature => addCoordinates(feature.coords)));
+      recommendations.forEach(recommendation => recommendation.features?.forEach(feature => addCoordinates(feature.coords)));
+      draft?.features.forEach(feature => addCoordinates(feature.coords));
+      addCoordinates(drawingCoords);
+      return vertices;
+    }
+
+    function getSnappedLatLng(latlng) {
+      const mousePixel = mainMap.latLngToContainerPoint(latlng);
+      let nearest = null;
+      let nearestDistance = SNAP_PIXEL_THRESHOLD;
+      collectSnapVertices().forEach(([lat, lng]) => {
+        const candidate = L.latLng(lat, lng);
+        const distance = mousePixel.distanceTo(mainMap.latLngToContainerPoint(candidate));
+        if (distance < nearestDistance) {
+          nearest = candidate;
+          nearestDistance = distance;
+        }
+      });
+      return nearest;
+    }
+
+    function updateSnapMarker(latlng) {
+      const snapped = getSnappedLatLng(latlng);
+      snapMarker.setStyle({
+        opacity: snapped ? 1 : 0,
+        fillOpacity: snapped ? 0.35 : 0,
+      });
+      if (snapped) snapMarker.setLatLng(snapped);
+      return snapped;
+    }
 
     const panel = document.getElementById('mapRightPanel');
     const form = document.getElementById('recommendationForm');
@@ -169,10 +227,10 @@
             fillOpacity: mode === 'select' ? 0.3 : 0.08,
           }).addTo(referenceLayer);
           polygon.bindTooltip(`${area.name}${area.created_by ? ` · ${area.created_by}` : ''}`, { sticky: true });
-          const selectArea = (e) => {
+          const selectArea = (e, shouldFocus = true) => {
             if (mode !== 'select') return;
             L.DomEvent.stopPropagation(e);
-            startDraftFromReference(area, feature);
+            startDraftFromReference(area, feature, shouldFocus);
           };
           polygon.on('click', selectArea);
           const locationIcon = L.divIcon({
@@ -183,7 +241,11 @@
           });
           const marker = L.marker(polygon.getCenter(), { icon: locationIcon }).addTo(referenceLayer);
           marker.bindTooltip(`${area.name} · Approved delineation`, { direction: 'top', offset: [0, -20] });
-          marker.on('click', selectArea);
+          marker.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            zoomToFeatures([feature]);
+            selectArea(e, false);
+          });
         });
       });
     }
@@ -225,12 +287,10 @@
       vertexHandles = [];
 
       if (drawingCoords.length) {
-        const preview = drawingCoords.length >= 3
-          ? L.polygon(drawingCoords, { color: DRAWING_COLOR, fillOpacity: 0.3, interactive: false })
-          : L.polyline(drawingCoords, { color: DRAWING_COLOR, opacity: 0.8, interactive: false });
+        const preview = L.polyline(drawingCoords, { color: DRAWING_COLOR, opacity: 0.8, interactive: false });
         preview.addTo(draftLayer);
         drawingCoords.forEach((coord, index) => L.circleMarker(coord, {
-          radius: index === 0 && drawingCoords.length >= 3 ? 6 : 3,
+          radius: index === 0 ? 6 : 3,
           color: DRAWING_COLOR,
           weight: 1,
           fillColor: index === 0 ? '#ffffff' : DRAWING_COLOR,
@@ -541,7 +601,7 @@
       renderGenusButtons();
     }
 
-    function openDraft(nextDraft) {
+    function openDraft(nextDraft, shouldFocus = true) {
       draft = {
         id: null,
         delineation_id: null,
@@ -564,8 +624,7 @@
       renderDraft();
       scheduleLocationLookup();
       updatePanelActions();
-      const bounds = featuresBounds(draft.features);
-      if (bounds) mainMap.flyToBounds(bounds, { padding: [50, 50], maxZoom: 17, duration: 0.8 });
+      if (shouldFocus) zoomToFeatures(draft.features);
     }
 
     function closeDraft(force = false) {
@@ -587,7 +646,7 @@
       openDraft({ ...rec, source_name: rec.delineation_name });
     }
 
-    function startDraftFromReference(area, feature) {
+    function startDraftFromReference(area, feature, shouldFocus = true) {
       if (!confirmDiscardDraft()) return;
       setMode(null);
       openDraft({
@@ -596,7 +655,7 @@
         name: area.name,
         editingArea: true,
         features: [{ type: 'area', coords: feature.coords, location: feature.location, location_status: feature.location_status }],
-      });
+      }, shouldFocus);
     }
 
     document.getElementById('recEditAreaBtn').addEventListener('click', () => {
@@ -632,9 +691,10 @@
       modeButtons.forEach(button => button.classList.toggle('active', button.dataset.mode === mode));
       mainMap.getContainer().style.cursor = mode === 'draw' ? 'crosshair' : '';
       mode === 'draw' ? mainMap.doubleClickZoom.disable() : mainMap.doubleClickZoom.enable();
+      if (mode !== 'draw') snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
       modeHint.hidden = !mode;
       modeHint.textContent = mode === 'draw'
-        ? 'Click to add points. Click the first point or double-click to finish. Esc cancels.'
+        ? 'Click to add points. Click the starting point or double-click to finish the area. Esc cancels.'
         : (referenceAreas.length ? 'Click an approved delineation to evaluate it.' : 'No approved delineations are available to select.');
       resetHistory();
       renderReferenceAreas();
@@ -648,27 +708,37 @@
         alert('An area needs at least 3 points.');
         return;
       }
-      const coords = [...drawingCoords, [drawingCoords[0][0], drawingCoords[0][1]]];
+      const first = drawingCoords[0];
+      const last = drawingCoords[drawingCoords.length - 1];
+      const coords = [...drawingCoords];
+      if (Number(first[0]) !== Number(last[0]) || Number(first[1]) !== Number(last[1])) {
+        coords.push([first[0], first[1]]);
+      }
       setMode(null);
       openDraft({ editingArea: true, features: [{ type: 'area', coords }] });
     }
 
     mainMap.on('click', (e) => {
       if (mode !== 'draw') return;
+      const clickedLatLng = getSnappedLatLng(e.latlng) || e.latlng;
       if (drawingCoords.length >= 3) {
-        const first = mainMap.latLngToContainerPoint(L.latLng(drawingCoords[0][0], drawingCoords[0][1]));
-        if (first.distanceTo(mainMap.latLngToContainerPoint(e.latlng)) < CLOSE_PIXEL_THRESHOLD) {
+        const firstPoint = mainMap.latLngToContainerPoint(L.latLng(drawingCoords[0][0], drawingCoords[0][1]));
+        if (firstPoint.distanceTo(mainMap.latLngToContainerPoint(clickedLatLng)) < SNAP_PIXEL_THRESHOLD * 2) {
           finishDrawing();
           return;
         }
       }
       const last = drawingCoords[drawingCoords.length - 1];
-      if (last && mainMap.latLngToContainerPoint(L.latLng(last[0], last[1])).distanceTo(mainMap.latLngToContainerPoint(e.latlng)) < 3) {
+      if (last && mainMap.latLngToContainerPoint(L.latLng(last[0], last[1])).distanceTo(mainMap.latLngToContainerPoint(clickedLatLng)) < 3) {
         return; // second click of a double-click
       }
-      drawingCoords.push([e.latlng.lat, e.latlng.lng]);
+      drawingCoords.push([clickedLatLng.lat, clickedLatLng.lng]);
       pushHistory();
       renderDraft();
+    });
+
+    mainMap.on('mousemove', (e) => {
+      if (mode === 'draw') updateSnapMarker(e.latlng);
     });
 
     mainMap.on('dblclick', () => {

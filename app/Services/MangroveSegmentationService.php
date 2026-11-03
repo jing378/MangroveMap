@@ -33,18 +33,7 @@ class MangroveSegmentationService
             throw new RuntimeException('Image not found: ' . $imageAbsolutePath);
         }
 
-        $env = $this->pythonProcessEnvironment();
-        $this->exposeWindowsSocketEnv($env);
-
-        $pending = Process::timeout((int) config('ml.timeout', 180))->env($env);
-
-        if (PHP_OS_FAMILY === 'Windows') {
-            $pending = $pending->options([
-                'create_process_group' => true,
-            ]);
-        }
-
-        $result = $pending->run([
+        return $this->runScript([
             (string) $python,
             (string) $script,
             '--image',
@@ -55,18 +44,73 @@ class MangroveSegmentationService
             $overlayAbsolutePath,
             '--size',
             (string) config('ml.input_size', 512),
-        ]);
+        ], (int) config('ml.timeout', 180));
+    }
 
-        $output = trim($result->output());
-        $lines = preg_split('/\r\n|\r|\n/', $output) ?: [];
-        $jsonLine = '';
-        foreach (array_reverse($lines) as $line) {
-            if (str_starts_with(trim($line), '{')) {
-                $jsonLine = trim($line);
-                break;
-            }
+    /**
+     * Segment a large raster tile by tile, writing a 0/1 mask PNG with the same pixel grid.
+     *
+     * @return array<string, mixed>
+     */
+    public function predictRaster(string $rasterAbsolutePath, string $maskAbsolutePath): array
+    {
+        $python = config('ml.python');
+        $script = config('ml.predict_script');
+        $weights = $this->activeWeightsPath() ?? config('ml.model_path');
+
+        if (! is_file((string) $python) && $python !== 'python' && $python !== 'python3') {
+            throw new RuntimeException('Python interpreter not found. Create ml/.venv and install ml/requirements.txt.');
         }
-        $payload = json_decode($jsonLine, true);
+
+        if (! is_file((string) $script)) {
+            throw new RuntimeException('Prediction script is missing: ' . $script);
+        }
+
+        if (! is_file((string) $weights)) {
+            throw new RuntimeException('Model weights are missing: ' . $weights);
+        }
+
+        if (! is_file($rasterAbsolutePath)) {
+            throw new RuntimeException('Raster not found: ' . $rasterAbsolutePath);
+        }
+
+        return $this->runScript([
+            (string) $python,
+            (string) $script,
+            '--raster',
+            $rasterAbsolutePath,
+            '--weights',
+            $weights,
+            '--mask',
+            $maskAbsolutePath,
+            '--size',
+            (string) config('ml.input_size', 512),
+            '--overlap',
+            (string) config('ml.drone.tile_overlap', 64),
+            '--close',
+            (string) config('ml.drone.close_iterations', 2),
+        ], (int) config('ml.drone.timeout', 3600));
+    }
+
+    /**
+     * @param  array<int, string>  $command
+     * @return array<string, mixed>
+     */
+    private function runScript(array $command, int $timeout): array
+    {
+        $env = $this->pythonProcessEnvironment();
+        $this->exposeWindowsSocketEnv($env);
+
+        $pending = Process::timeout($timeout)->env($env);
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $pending = $pending->options([
+                'create_process_group' => true,
+            ]);
+        }
+
+        $result = $pending->run($command);
+        $payload = $this->lastJsonLine($result->output());
 
         if (! $result->successful() || ! is_array($payload) || empty($payload['ok'])) {
             $error = is_array($payload) ? ($payload['error'] ?? null) : null;
@@ -76,6 +120,19 @@ class MangroveSegmentationService
         }
 
         return $payload;
+    }
+
+    /** Library warnings may precede the result, so read the last JSON object line. */
+    private function lastJsonLine(string $output): mixed
+    {
+        $lines = preg_split('/\r\n|\r|\n/', trim($output)) ?: [];
+        foreach (array_reverse($lines) as $line) {
+            if (str_starts_with(trim($line), '{')) {
+                return json_decode(trim($line), true);
+            }
+        }
+
+        return null;
     }
 
     public function validateWeights(string $weightsPath): void
@@ -95,26 +152,20 @@ class MangroveSegmentationService
             throw new RuntimeException('Uploaded checkpoint could not be read.');
         }
 
-        $env = $this->pythonProcessEnvironment();
-        $this->exposeWindowsSocketEnv($env);
-
-        $pending = Process::timeout((int) config('ml.timeout', 180))->env($env);
-        if (PHP_OS_FAMILY === 'Windows') {
-            $pending = $pending->options(['create_process_group' => true]);
-        }
-
-        $result = $pending->run([
-            (string) $python,
-            (string) $script,
-            '--weights',
-            $weightsPath,
-            '--validate-weights',
-        ]);
-
-        $payload = json_decode(trim($result->output()), true);
-        if (! $result->successful() || ! is_array($payload) || empty($payload['ok'])) {
-            $error = is_array($payload) ? ($payload['error'] ?? null) : null;
-            throw new RuntimeException($error ?: 'Checkpoint is not compatible with the supported U-Net segmentation model.');
+        try {
+            $this->runScript([
+                (string) $python,
+                (string) $script,
+                '--weights',
+                $weightsPath,
+                '--validate-weights',
+            ], (int) config('ml.timeout', 180));
+        } catch (RuntimeException $exception) {
+            $message = $exception->getMessage();
+            throw new RuntimeException(
+                $message !== 'Segmentation failed.' ? $message : 'Checkpoint is not compatible with the supported U-Net segmentation model.',
+                previous: $exception
+            );
         }
     }
 

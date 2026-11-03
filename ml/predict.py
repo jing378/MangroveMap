@@ -221,20 +221,162 @@ def predict(image_path: Path, weights_path: Path, overlay_path: Path | None, siz
     }
 
 
+def shift_any(mask: np.ndarray, grow: bool) -> np.ndarray:
+    """One 8-neighbour dilation (grow=True) or erosion (grow=False) step."""
+    padded = np.pad(mask, 1, mode="constant", constant_values=not grow)
+    out = mask.copy()
+    for dy in (0, 1, 2):
+        for dx in (0, 1, 2):
+            if dy == 1 and dx == 1:
+                continue
+            window = padded[dy:dy + mask.shape[0], dx:dx + mask.shape[1]]
+            if grow:
+                out |= window
+            else:
+                out &= window
+    return out
+
+
+def close_mask(mask: np.ndarray, iterations: int) -> np.ndarray:
+    """Morphological closing: joins canopy fragments separated by thin gaps."""
+    for _ in range(iterations):
+        mask = shift_any(mask, grow=True)
+    for _ in range(iterations):
+        mask = shift_any(mask, grow=False)
+    return mask
+
+
+def tile_starts(length: int, size: int, stride: int) -> list[int]:
+    if length <= size:
+        return [0]
+    starts = list(range(0, length - size, stride))
+    starts.append(length - size)
+    return starts
+
+
+def predict_raster(
+    raster_path: Path,
+    weights_path: Path,
+    mask_path: Path,
+    size: int,
+    overlap: int,
+    batch_size: int,
+    close_iterations: int = 0,
+) -> dict:
+    """Segment a large orthomosaic tile by tile and write a full-size mask.
+
+    The mask PNG holds 1 for mangrove and 0 for background or no-data pixels.
+    Overlapping tiles are blended by averaging the mangrove probability.
+    """
+    Image.MAX_IMAGE_PIXELS = None
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = load_model(weights_path, device)
+
+    source = Image.open(raster_path)
+    source.load()
+    if source.mode == "RGBA":
+        rgba = np.asarray(source)
+        rgb = np.ascontiguousarray(rgba[:, :, :3])
+        valid = rgba[:, :, 3] > 0
+    else:
+        rgb = np.asarray(source.convert("RGB"))
+        valid = np.ones(rgb.shape[:2], dtype=bool)
+    source.close()
+
+    height, width = rgb.shape[:2]
+    stride = max(1, size - max(0, min(overlap, size // 2)))
+    prob_sum = np.zeros((height, width), dtype=np.float32)
+    hits = np.zeros((height, width), dtype=np.uint8)
+
+    windows = [
+        (x, y)
+        for y in tile_starts(height, size, stride)
+        for x in tile_starts(width, size, stride)
+        if valid[y:y + size, x:x + size].any()
+    ]
+
+    def run_batch(batch: list[tuple[int, int]]) -> None:
+        tensors = []
+        for x, y in batch:
+            tile = np.zeros((size, size, 3), dtype=np.uint8)
+            patch = rgb[y:y + size, x:x + size]
+            tile[: patch.shape[0], : patch.shape[1]] = patch
+            tensors.append(torch.from_numpy(tile.astype(np.float32) / 255.0).permute(2, 0, 1))
+        tensor = ((torch.stack(tensors) - IMAGENET_MEAN) / IMAGENET_STD).to(device)
+        with torch.no_grad():
+            logits = model(tensor)
+            if logits.shape[-2:] != (size, size):
+                logits = F.interpolate(logits, size=(size, size), mode="bilinear", align_corners=False)
+            probs = torch.softmax(logits, dim=1)[:, MANGROVE_CLASS].cpu().numpy()
+        for (x, y), prob in zip(batch, probs):
+            h = min(size, height - y)
+            w = min(size, width - x)
+            prob_sum[y:y + h, x:x + w] += prob[:h, :w]
+            hits[y:y + h, x:x + w] += 1
+
+    for start in range(0, len(windows), max(1, batch_size)):
+        run_batch(windows[start:start + batch_size])
+
+    covered = hits > 0
+    mean_prob = np.zeros_like(prob_sum)
+    mean_prob[covered] = prob_sum[covered] / hits[covered]
+    del prob_sum, hits
+    mangrove = (mean_prob >= 0.5) & valid
+    if close_iterations > 0:
+        mangrove = close_mask(mangrove, close_iterations) & valid
+
+    mask_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(mangrove.astype(np.uint8), mode="L").save(mask_path, format="PNG", optimize=True)
+
+    valid_pixels = int(valid.sum())
+    mangrove_pixels = int(mangrove.sum())
+    mean_conf = float(mean_prob[mangrove].mean()) if mangrove_pixels else 0.0
+
+    return {
+        "ok": True,
+        "width": width,
+        "height": height,
+        "tiles": len(windows),
+        "pixels_mangrove": mangrove_pixels,
+        "pixels_valid": valid_pixels,
+        "mangrove_coverage_percent": round(mangrove_pixels / valid_pixels * 100.0, 2) if valid_pixels else 0.0,
+        "mean_confidence": round(mean_conf, 4),
+        "input_size": size,
+        "device": str(device),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mangrove U-Net segmentation")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--image")
+    mode.add_argument("--raster", help="Large RGB/RGBA raster to segment tile by tile")
     mode.add_argument("--validate-weights", action="store_true")
     parser.add_argument("--weights", required=True)
     parser.add_argument("--overlay", default=None)
+    parser.add_argument("--mask", default=None, help="Output mask PNG for --raster")
     parser.add_argument("--size", type=int, default=512)
+    parser.add_argument("--overlap", type=int, default=64)
+    parser.add_argument("--batch", type=int, default=4)
+    parser.add_argument("--close", type=int, default=0, help="Mask closing iterations for --raster")
     args = parser.parse_args()
 
     try:
         if args.validate_weights:
             load_model(Path(args.weights), torch.device("cpu"))
             result = {"ok": True}
+        elif args.raster:
+            if not args.mask:
+                raise RuntimeError("--mask is required with --raster")
+            result = predict_raster(
+                Path(args.raster),
+                Path(args.weights),
+                Path(args.mask),
+                args.size,
+                args.overlap,
+                args.batch,
+                args.close,
+            )
         else:
             result = predict(
                 Path(args.image),

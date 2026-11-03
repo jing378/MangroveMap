@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\DelineationAnnualObservationController;
 use App\Http\Controllers\DelineationController;
 use App\Http\Controllers\DroneImageryController;
 use App\Http\Controllers\EndUserController;
+use App\Http\Controllers\MapLayerController;
 use App\Http\Controllers\ExpertController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlantingRecommendationController;
@@ -45,6 +47,11 @@ Route::middleware('guest')->group(function () {
     })->name('register');
 
     Route::post('/register', [RegisteredUserController::class, 'store']);
+
+    // Live "email already taken" check for the sign-up form (rate limited).
+    Route::get('/register/check-email', [RegisteredUserController::class, 'checkEmail'])
+        ->middleware('throttle:30,1')
+        ->name('register.check-email');
 
     Route::get('/forgot-password', function () {
         return view('auth.forgot-password');
@@ -120,9 +127,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/drone-imagery', [DroneImageryController::class, 'store'])
         ->middleware('throttle:10,1')
         ->name('drone-imagery.store');
+    Route::delete('/drone-imagery/{layerId}', [DroneImageryController::class, 'destroy'])
+        ->whereNumber('layerId')
+        ->name('drone-imagery.destroy');
     Route::get('/drone-imagery/{layerId}/tiles/{z}/{x}/{y}', [DroneImageryController::class, 'tile'])
         ->whereNumber(['layerId', 'z', 'x', 'y'])
         ->name('drone-imagery.tile');
+    Route::get('/drone-imagery/{layerId}/segmentation', [DroneImageryController::class, 'segmentation'])
+        ->whereNumber('layerId')
+        ->name('drone-imagery.segmentation.show');
+    Route::post('/drone-imagery/{layerId}/segmentation', [DroneImageryController::class, 'segment'])
+        ->whereNumber('layerId')
+        ->middleware('throttle:10,1')
+        ->name('drone-imagery.segmentation.store');
     Route::get('/drone-imagery/{layerId}', [DroneImageryController::class, 'show'])
         ->whereNumber('layerId')
         ->name('drone-imagery.show');
@@ -200,5 +217,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/users/{user}/edit', [AdminController::class, 'edit'])->name('admin.users.edit');
         Route::put('/users/{user}', [AdminController::class, 'update'])->name('admin.users.update');
         Route::delete('/users/{user}', [AdminController::class, 'destroy'])->name('admin.users.destroy');
+        Route::get('/map-layers', [MapLayerController::class, 'index'])->name('admin.map-layers.index');
+        Route::put('/map-layers/delineations/{delineation}', [MapLayerController::class, 'updateDelineation'])
+            ->name('admin.map-layers.delineations.update');
+        Route::post('/map-layers/delineations/{delineation}/hide', [MapLayerController::class, 'hideDelineation'])
+            ->name('admin.map-layers.delineations.hide');
+        Route::post('/map-layers/delineations/{delineation}/restore', [MapLayerController::class, 'restoreDelineation'])
+            ->name('admin.map-layers.delineations.restore');
+        Route::delete('/map-layers/delineations/{delineation}', [MapLayerController::class, 'destroyDelineation'])
+            ->name('admin.map-layers.delineations.destroy');
+        Route::put('/map-layers/imagery/{layer}', [MapLayerController::class, 'updateImagery'])
+            ->name('admin.map-layers.imagery.update');
+        Route::post('/map-layers/imagery/{layer}/reprocess', [MapLayerController::class, 'reprocessImagery'])
+            ->name('admin.map-layers.imagery.reprocess');
+        Route::post('/map-layers/imagery/{layer}/segment', [MapLayerController::class, 'resegmentImagery'])
+            ->name('admin.map-layers.imagery.segment');
+        Route::delete('/map-layers/imagery/{layer}', [MapLayerController::class, 'destroyImagery'])
+            ->name('admin.map-layers.imagery.destroy');
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('admin.activity-logs.index');
+        Route::get('/activity-logs/{activity}', [ActivityLogController::class, 'show'])
+            ->whereNumber('activity')
+            ->name('admin.activity-logs.show');
+        Route::post('/users/{user}/expert-application/approve', [AdminController::class, 'approveExpertApplication'])
+            ->name('admin.expert-applications.approve');
+        Route::post('/users/{user}/expert-application/reject', [AdminController::class, 'rejectExpertApplication'])
+            ->name('admin.expert-applications.reject');
     });
 });

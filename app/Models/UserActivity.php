@@ -15,7 +15,11 @@ class UserActivity extends Model
         'status',
         'subject_type',
         'subject_id',
+        'ip_address',
+        'user_agent',
     ];
+
+    public const STATUSES = ['success', 'pending', 'rejected', 'secondary'];
 
     public function user(): BelongsTo
     {
@@ -44,6 +48,7 @@ class UserActivity extends Model
             'status' => $status,
             'subject_type' => $subject ? $subject->getMorphClass() : null,
             'subject_id' => $subject?->getKey(),
+            ...static::requestDetails(),
         ]);
 
         if ($createdAt) {
@@ -53,6 +58,35 @@ class UserActivity extends Model
         }
 
         return $activity;
+    }
+
+    /**
+     * IP and browser of the web request that caused the activity; empty for queue jobs and CLI.
+     *
+     * @return array{ip_address?: ?string, user_agent?: ?string}
+     */
+    private static function requestDetails(): array
+    {
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
+            return [];
+        }
+
+        $request = request();
+
+        return [
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ? mb_substr($request->userAgent(), 0, 512) : null,
+        ];
+    }
+
+    public function statusLabel(): string
+    {
+        return match ($this->status) {
+            'success' => 'Success',
+            'pending' => 'Pending',
+            'rejected' => 'Rejected / Failed',
+            default => ucfirst((string) $this->status),
+        };
     }
 
     public static function statusForAnalysis(string $status): string

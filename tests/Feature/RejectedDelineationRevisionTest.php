@@ -98,6 +98,32 @@ class RejectedDelineationRevisionTest extends TestCase
             'id="saveBtn" type="button" class="btn btn-g delineation-save-btn"',
             $html,
         );
+        $this->assertStringNotContainsString('id="delineationPlantingRecommendation"', $html);
+    }
+
+    public function test_resident_delineate_page_keeps_changes_over_time_available(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $this->actingAs($resident);
+
+        $route = new Route(['GET'], '/delineate', ['uses' => fn() => null]);
+        $route->name('delineate');
+        $request = Request::create('/delineate', 'GET');
+        $request->setRouteResolver(fn() => $route);
+        $this->app->instance('request', $request);
+
+        $html = view('users.delineate', [
+            'delineations' => [],
+            'approvedDelineationsForMap' => [],
+            'residentDelineationsForMap' => [],
+            'focusDelineationId' => null,
+            'focusDelineationRecord' => null,
+            'page' => 'delineate',
+        ])->render();
+
+        $this->assertStringContainsString('id="mapTimelineControl"', $html);
+        $this->assertStringContainsString('Changes over time', $html);
+        $this->assertStringNotContainsString("body[data-page='delineate'] #mapTimelineControl", $html);
     }
 
     public function test_only_owner_can_revise_and_pending_delineations_remain_locked(): void

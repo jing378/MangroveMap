@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Delineation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DelineationBoundaryEditTest extends TestCase
@@ -126,5 +127,52 @@ class DelineationBoundaryEditTest extends TestCase
         $this->assertSame($expert->name, $record['last_revised_by_name']);
         $this->assertArrayNotHasKey('latest_revision', $record);
         $this->assertEquals([10.005, 124.025], $record['features'][0]['coords'][2]);
+    }
+
+    public function test_resident_map_shows_own_delineation_details(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $this->residentDelineation($resident, [
+            'is_approved' => true,
+            'planting_recommendation' => 'Plant Rhizophora along the shoreline.',
+        ]);
+        DB::connection()->getPdo()
+            ->sqliteCreateFunction('YEAR', fn($date) => $date ? (int) substr($date, 0, 4) : null, 1);
+
+        $this->actingAs($resident)
+            ->get(route('map'))
+            ->assertOk()
+            ->assertSee('Area (ha)')
+            ->assertSee('Mangrove Genus Present')
+            ->assertSee('Review status')
+            ->assertSee('Planting recommendation')
+            ->assertSee('Changes over time')
+            ->assertSee('Annual observations')
+            ->assertSee('Rhizophora')
+            ->assertSee('Plant Rhizophora along the shoreline.');
+    }
+
+    public function test_resident_map_shows_approved_community_delineation_details(): void
+    {
+        $owner = User::factory()->create(['role' => 'end_user']);
+        $residentViewer = User::factory()->create(['role' => 'end_user']);
+        $this->residentDelineation($owner, [
+            'is_approved' => true,
+            'planting_recommendation' => 'Plant Avicennia in the intertidal zone.',
+        ]);
+        DB::connection()->getPdo()
+            ->sqliteCreateFunction('YEAR', fn($date) => $date ? (int) substr($date, 0, 4) : null, 1);
+
+        $this->actingAs($residentViewer)
+            ->get(route('map'))
+            ->assertOk()
+            ->assertSee('Area (ha)')
+            ->assertSee('Mangrove Genus Present')
+            ->assertSee('Review status')
+            ->assertSee('Planting recommendation')
+            ->assertSee('Changes over time')
+            ->assertSee('Annual observations')
+            ->assertSee('Rhizophora')
+            ->assertSee('Plant Avicennia in the intertidal zone.');
     }
 }

@@ -708,10 +708,8 @@
       right: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
-      height: auto;
-      max-height: 85dvh;
-      max-height: 85vh;
-      /* fallback */
+      height: min(85vh, calc(100vh - 76px));
+      max-height: min(85vh, calc(100vh - 76px));
       border-left: none;
       border-top: 1px solid #d4dfd4;
       border-radius: 20px 20px 0 0;
@@ -725,6 +723,18 @@
       pointer-events: none;
     }
 
+    @supports (height: 100dvh) {
+      #mapRightPanel {
+        height: min(85dvh, calc(100dvh - 76px));
+        max-height: min(85dvh, calc(100dvh - 76px));
+      }
+
+      #mapRightPanel.open.peek,
+      #mapRightPanel.open:not(.expanded) {
+        transform: translateY(calc(100% - min(355px, 45dvh)));
+      }
+    }
+
     /* Hide any residual ::before drag handle */
     #mapRightPanel::before {
       display: none;
@@ -733,7 +743,7 @@
     /* Mobile: Initial peek popup — adjusted a little higher (~250px from the bottom) */
     #mapRightPanel.open.peek,
     #mapRightPanel.open:not(.expanded) {
-      transform: translateY(calc(100% - 355px));
+      transform: translateY(calc(100% - min(355px, 45vh)));
       visibility: visible;
       pointer-events: auto;
       box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.16);
@@ -850,6 +860,7 @@
     }
 
     #mapRightPanel .scroll {
+      min-height: 0;
       flex: 1;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
@@ -1244,6 +1255,48 @@
     text-align: left;
   }
 
+  .d-row-recommendation {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .d-row-recommendation .d-val {
+    width: 100%;
+    text-align: left;
+  }
+
+  .planting-rec-entry {
+    background: #f7faf7;
+    border: 1px solid #e3ece3;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: normal;
+  }
+
+  .planting-rec-entry + .planting-rec-entry {
+    margin-top: 6px;
+  }
+
+  .planting-rec-marker {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: var(--planting-rec-color);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+    font-size: 13px;
+  }
+
+  .planting-rec-popup {
+    font-size: 12px;
+    min-width: 200px;
+  }
+
   .d-key {
     color: #9ab0a0;
     flex-shrink: 0;
@@ -1569,6 +1622,212 @@
   .drone-imagery-layer-state {
     color: #73877a;
     overflow-wrap: anywhere;
+  }
+
+  .drone-imagery-layer-remove {
+    flex: 0 0 auto;
+    padding: 4px 7px;
+    border: 1px solid #e8c2bd;
+    border-radius: 6px;
+    background: #fff7f6;
+    color: #a63b30;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+  }
+
+  .drone-imagery-layer-remove:hover:not(:disabled) {
+    background: #fdf0ee;
+  }
+
+  .drone-imagery-layer-remove:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+  }
+
+  /* Floating upload/processing progress beside the map layer control. */
+  .drone-progress-chip {
+    position: absolute;
+    top: 38px;
+    left: calc(100% + 8px);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 250px;
+    padding: 8px 11px;
+    border: 1px solid #d6e6dc;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .14);
+    color: #24563c;
+    cursor: pointer;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .drone-progress-chip[hidden],
+  .layer-menu.show~.drone-progress-chip {
+    display: none;
+  }
+
+  .drone-progress-chip:focus-visible {
+    outline: 2px solid #1e9e62;
+    outline-offset: 2px;
+  }
+
+  .drone-progress-chip .bi {
+    flex: 0 0 auto;
+    color: #1e9e62;
+    font-size: 18px;
+  }
+
+  .drone-progress-chip-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .drone-progress-chip-label {
+    overflow: hidden;
+    font-size: 11px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .drone-progress-chip-track {
+    position: relative;
+    display: block;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5eee7;
+  }
+
+  .drone-progress-chip-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: #1e9e62;
+    transition: width .15s ease;
+  }
+
+  .drone-progress-chip-track.is-indeterminate .drone-progress-chip-fill {
+    width: 35%;
+    transition: none;
+    animation: drone-progress-slide 1.3s ease-in-out infinite;
+  }
+
+  @keyframes drone-progress-slide {
+    from {
+      transform: translateX(-100%);
+    }
+
+    to {
+      transform: translateX(290%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .drone-progress-chip-track.is-indeterminate .drone-progress-chip-fill {
+      width: 100%;
+      animation: none;
+      opacity: .55;
+    }
+  }
+
+  .drone-pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .drone-pipeline-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .drone-pipeline-step {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #eef3ef;
+    color: #8a9b90;
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  .drone-pipeline-step.done {
+    background: #dff2e7;
+    color: #1e7a4c;
+  }
+
+  .drone-pipeline-step.done::before {
+    content: '✓ ';
+  }
+
+  .drone-pipeline-step.active {
+    background: #1e9e62;
+    color: #fff;
+  }
+
+  @media (max-width: 780px) {
+    .drone-progress-chip {
+      width: min(230px, calc(100vw - 80px));
+    }
+  }
+
+  .drone-imagery-ai {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed #e3ebe5;
+  }
+
+  .drone-imagery-ai-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .drone-imagery-ai-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #4c6b5d;
+    cursor: pointer;
+  }
+
+  .drone-imagery-ai-button {
+    padding: 4px 7px;
+    border: 1px solid #cfe0d5;
+    border-radius: 6px;
+    background: #f5faf7;
+    color: #24563c;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+  }
+
+  .drone-imagery-ai-button.primary {
+    border-color: #1e9e62;
+    background: #1e9e62;
+    color: #fff;
+  }
+
+  .drone-imagery-ai-button:hover:not(:disabled) {
+    filter: brightness(.96);
+  }
+
+  .drone-imagery-ai-button:disabled {
+    cursor: wait;
+    opacity: .55;
   }
 
   .layer-option {
@@ -2479,6 +2738,39 @@
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
   }
 
+  .btn.is-saving {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: wait !important;
+    opacity: 0.85;
+  }
+
+  /* Follows the button's text color, so it works on green and light buttons alike. */
+  .save-btn-spinner {
+    display: inline-block;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: save-btn-spin 0.7s linear infinite;
+  }
+
+  @keyframes save-btn-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  #genusQuickSelector.input-error {
+    border-radius: 10px;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.55);
+    padding: 4px;
+  }
+
   /* Custom scrollbar for notes and narrow scrollable containers */
   #delineationNotes {
     scrollbar-width: thin;
@@ -2634,7 +2926,6 @@
     display: none !important;
   }
 
-  body[data-page='delineate'] #mapTimelineControl,
   body[data-page='delineate'] #classifyBtn,
   body[data-page='delineate'] #editModeBtn,
   body[data-page='delineate'] .left-panel {
@@ -2643,6 +2934,26 @@
 
   body[data-page='delineate'] #delineationToolbar {
     display: flex !important;
+  }
+
+  .delineation-draw-hint {
+    position: absolute;
+    top: 58px;
+    left: 50%;
+    z-index: 900;
+    max-width: calc(100% - 24px);
+    transform: translateX(-50%);
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(24, 41, 24, .86);
+    color: #fff;
+    font-size: 12px;
+    pointer-events: none;
+    text-align: center;
+  }
+
+  .delineation-draw-hint[hidden] {
+    display: none;
   }
 
   /* Saved-delineation boundary editing */

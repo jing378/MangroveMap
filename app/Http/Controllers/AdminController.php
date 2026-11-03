@@ -6,7 +6,9 @@ use App\Models\User;
 use App\Models\AIModel;
 use App\Models\MangroveData;
 use App\Models\Analysis;
+use App\Models\Delineation;
 use App\Models\UserActivity;
+use App\Notifications\ExpertApplicationReviewed;
 use App\Services\MangroveSegmentationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +43,24 @@ class AdminController extends Controller
 
         $growthChart = $this->weeklyGrowthChartData();
 
+        $totalContributors = Delineation::distinct()->count('user_id');
+        $approvedContributors = Delineation::approved()->distinct()->count('user_id');
+        $activeContributorsThisMonth = Delineation::where('created_at', '>=', now()->subMonth())
+            ->distinct()
+            ->count('user_id');
+        $topContributors = Delineation::query()
+            ->selectRaw('user_id, COUNT(*) as total_count')
+            ->selectRaw('SUM(CASE WHEN is_approved = 1 THEN 1 ELSE 0 END) as approved_count')
+            ->selectRaw('SUM(CASE WHEN is_approved = 0 AND is_rejected = 0 THEN 1 ELSE 0 END) as pending_count')
+            ->selectRaw('MAX(created_at) as last_submitted_at')
+            ->with('user:id,name,role')
+            ->groupBy('user_id')
+            ->orderByDesc('approved_count')
+            ->orderByDesc('total_count')
+            ->take(5)
+            ->get()
+            ->each->mergeCasts(['last_submitted_at' => 'datetime']);
+
         return view('admin.dashboard', [
             'totalUsers' => $totalUsers,
             'mappedZones' => $mappedZones,
@@ -52,6 +72,10 @@ class AdminController extends Controller
             'growthChartLabels' => $growthChart['labels'],
             'growthChartZones' => $growthChart['zones'],
             'growthChartAnalyses' => $growthChart['analyses'],
+            'totalContributors' => $totalContributors,
+            'approvedContributors' => $approvedContributors,
+            'activeContributorsThisMonth' => $activeContributorsThisMonth,
+            'topContributors' => $topContributors,
         ]);
     }
 
@@ -239,7 +263,12 @@ class AdminController extends Controller
             ->take(10)
             ->get();
 
+        $expertApplications = User::pendingExpertApplications()
+            ->orderBy('expert_applied_at')
+            ->get();
+
         return view('admin.users', [
+            'expertApplications' => $expertApplications,
             'users' => $users,
             'totalUsers' => $totalUsers,
             'activeUsers' => $activeUsers,
@@ -311,6 +340,15 @@ class AdminController extends Controller
             $user->password = Hash::make($validated['password']);
         }
 
+        // Promoting an applicant by hand settles their pending application too.
+        if ($validated['role'] === 'expert' && $user->hasPendingExpertApplication()) {
+            $user->forceFill([
+                'expert_application_status' => User::EXPERT_APPLICATION_APPROVED,
+                'expert_reviewed_at' => now(),
+                'expert_reviewed_by' => Auth::id(),
+            ]);
+        }
+
         $user->save();
 
         UserActivity::record(
@@ -329,6 +367,55 @@ class AdminController extends Controller
         }
 
         return redirect()->route('admin.users.edit', $user)->with('success', 'User updated successfully.');
+    }
+
+    public function approveExpertApplication(User $user): RedirectResponse
+    {
+        abort_if(Auth::user()->role !== 'admin', 403);
+
+        if (! $user->hasPendingExpertApplication()) {
+            return redirect()->route('admin.users')->with('error', 'This expert application has already been reviewed.');
+        }
+
+        $user->forceFill([
+            'role' => 'expert',
+            'expert_application_status' => User::EXPERT_APPLICATION_APPROVED,
+            'expert_reviewed_at' => now(),
+            'expert_reviewed_by' => Auth::id(),
+            'expert_rejection_notes' => null,
+        ])->save();
+
+        UserActivity::record(Auth::user(), 'Approved expert application: ' . $user->name, 'User Management', 'success', $user);
+        $user->notify(new ExpertApplicationReviewed(true));
+
+        return redirect()->route('admin.users')->with('success', $user->name . ' is now an expert.');
+    }
+
+    public function rejectExpertApplication(Request $request, User $user): RedirectResponse
+    {
+        abort_if(Auth::user()->role !== 'admin', 403);
+
+        $validated = $request->validate([
+            'rejection_notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if (! $user->hasPendingExpertApplication()) {
+            return redirect()->route('admin.users')->with('error', 'This expert application has already been reviewed.');
+        }
+
+        $notes = trim((string) ($validated['rejection_notes'] ?? '')) ?: null;
+
+        $user->forceFill([
+            'expert_application_status' => User::EXPERT_APPLICATION_REJECTED,
+            'expert_reviewed_at' => now(),
+            'expert_reviewed_by' => Auth::id(),
+            'expert_rejection_notes' => $notes,
+        ])->save();
+
+        UserActivity::record(Auth::user(), 'Rejected expert application: ' . $user->name, 'User Management', 'rejected', $user);
+        $user->notify(new ExpertApplicationReviewed(false, $notes));
+
+        return redirect()->route('admin.users')->with('success', 'Expert application from ' . $user->name . ' was rejected.');
     }
 
     public function destroy(User $user)

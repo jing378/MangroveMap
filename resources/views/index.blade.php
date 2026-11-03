@@ -376,9 +376,9 @@
     /* Live Hero Stats Metrics */
     .hero-stats-strip {
       width: 100%;
-      max-width: 900px;
+      max-width: 1040px;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 16px;
       background: rgba(14, 46, 26, 0.65);
       border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1214,8 +1214,12 @@
         row-gap: 18px;
       }
 
-      .hero-stat-card:nth-child(2) {
+      .hero-stat-card:nth-child(2n) {
         border-right: none;
+      }
+
+      .hero-stat-card:last-child:nth-child(odd) {
+        grid-column: span 2;
       }
     }
 
@@ -1256,6 +1260,7 @@
       .hero-stat-card:last-child {
         border-bottom: none;
         padding-bottom: 0;
+        grid-column: auto;
       }
 
       .features-grid, .impact-grid {
@@ -1386,6 +1391,10 @@
         <div class="hero-stat-card">
           <div class="stat-val">{{ count($delineations ?? []) }}<span>records</span></div>
           <div class="stat-label">Field Delineations</div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="stat-val">{{ number_format($contributorCount ?? 0) }}<span>people</span></div>
+          <div class="stat-label">Contributors</div>
         </div>
       </div>
     </div>

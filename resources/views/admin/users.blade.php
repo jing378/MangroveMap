@@ -29,6 +29,62 @@
         </div>
     </div>
 
+    @if(session('success'))
+    <div class="page-alert page-alert-success" role="status">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+    <div class="page-alert page-alert-error" role="alert">{{ session('error') }}</div>
+    @endif
+
+    <div class="section" id="expert-applications">
+        <div class="section-title">
+            <i class="bi bi-person-badge"></i> Pending Expert Applications
+            <span class="badge {{ $expertApplications->isEmpty() ? 'secondary' : 'pending' }}">{{ $expertApplications->count() }}</span>
+        </div>
+
+        @forelse($expertApplications as $applicant)
+        <div class="application-card">
+            <div class="application-main">
+                <div class="user-cell">
+                    <div class="user-avatar">{{ collect(explode(' ', $applicant->name))->map(fn($part) => strtoupper(substr($part, 0, 1)))->join('') }}</div>
+                    <div>
+                        <div class="user-name">{{ $applicant->name }}</div>
+                        <div class="user-info">
+                            {{ $applicant->email }}@if($applicant->phone) · {{ $applicant->phone }}@endif
+                            · Applied {{ $applicant->expert_applied_at?->diffForHumans() ?? 'recently' }}
+                            @unless($applicant->email_verified_at)· <span class="unverified-note">Email not verified</span>@endunless
+                        </div>
+                    </div>
+                </div>
+                <dl class="application-details">
+                    <dt>Organization</dt>
+                    <dd>{{ $applicant->organization ?: '—' }}</dd>
+                    <dt>Qualifications &amp; experience</dt>
+                    <dd class="application-qualifications">{{ $applicant->expert_qualifications ?: '—' }}</dd>
+                </dl>
+            </div>
+            <div class="application-actions">
+                <form action="{{ route('admin.expert-applications.approve', $applicant) }}" method="POST"
+                    onsubmit="return confirm('Approve {{ e(addslashes($applicant->name)) }} as an expert?');">
+                    @csrf
+                    <button type="submit" class="btn-primary"><i class="bi bi-check-lg"></i> Approve</button>
+                </form>
+                <details class="reject-details">
+                    <summary class="btn-secondary btn-reject"><i class="bi bi-x-lg"></i> Reject</summary>
+                    <form action="{{ route('admin.expert-applications.reject', $applicant) }}" method="POST" class="reject-form">
+                        @csrf
+                        <label for="rejection_notes_{{ $applicant->id }}">Reason (optional, shared with the applicant)</label>
+                        <textarea id="rejection_notes_{{ $applicant->id }}" name="rejection_notes" rows="2" maxlength="1000"></textarea>
+                        <button type="submit" class="btn-danger">Confirm rejection</button>
+                    </form>
+                </details>
+            </div>
+        </div>
+        @empty
+        <p class="empty-note">No expert applications are waiting for review.</p>
+        @endforelse
+    </div>
+
     <div class="section">
         <div class="section-title-with-actions">
             <div><i class="bi bi-people"></i> User Directory</div>
@@ -104,7 +160,12 @@
                             </div>
                         </td>
                         <td>{{ $user->email }}</td>
-                        <td><span class="role-badge {{ $roleClass }}">{{ $roleLabel }}</span></td>
+                        <td>
+                            <span class="role-badge {{ $roleClass }}">{{ $roleLabel }}</span>
+                            @if($user->hasPendingExpertApplication())
+                            <a href="#expert-applications" class="role-badge manager" title="Expert application pending review">Expert applicant</a>
+                            @endif
+                        </td>
                         <td><span class="badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
                         <td>{{ $user->created_at?->format('M j, Y') ?? 'Unknown' }}</td>
                         <td>{{ $user->last_login_at ? $user->last_login_at->diffForHumans() : 'Never' }}</td>
@@ -135,7 +196,9 @@
     </div>
 
     <div class="section">
-        <div class="section-title"><i class="bi bi-clipboard-check"></i> Recent User Activity</div>
+        <div class="section-title"><i class="bi bi-clipboard-check"></i> Recent User Activity
+            <a href="{{ route('admin.activity-logs.index') }}" class="section-link">View all logs <i class="bi bi-arrow-right"></i></a>
+        </div>
         <div class="table-container">
             <table class="table">
                 <thead>
@@ -151,7 +214,7 @@
                     @forelse($recentActivities as $activity)
                     <tr>
                         <td>{{ $activity->user?->name ?? 'Unknown' }}</td>
-                        <td>{{ $activity->activity }}</td>
+                        <td><a href="{{ route('admin.activity-logs.show', $activity) }}" class="activity-link">{{ $activity->activity }}</a></td>
                         <td>{{ $activity->module }}</td>
                         <td><span class="badge {{ $activity->status }}">{{ ucfirst($activity->status) }}</span></td>
                         <td>{{ $activity->created_at?->format('M j, g:i A') ?? '—' }}</td>
@@ -377,6 +440,172 @@
         background: #f0f4f0;
         color: #6a8a6a;
         border: 1px solid #d4e0d4;
+    }
+
+    .section-link {
+        margin-left: auto;
+        font-size: 12px;
+        font-weight: 600;
+        color: #1e9e62;
+        text-decoration: none;
+    }
+
+    .section-link:hover,
+    .activity-link:hover {
+        text-decoration: underline;
+    }
+
+    .activity-link {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .page-alert {
+        padding: 14px 18px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .page-alert-success {
+        background: #ecf9f0;
+        color: #145a33;
+        border: 1px solid #b8e0c4;
+    }
+
+    .page-alert-error {
+        background: #fdf0ee;
+        color: #d04030;
+        border: 1px solid #e8b8b0;
+    }
+
+    .application-card {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 16px;
+        border: 1px solid #e0e8e0;
+        border-radius: 12px;
+        background: #fbfcfb;
+    }
+
+    .application-card + .application-card {
+        margin-top: 12px;
+    }
+
+    .application-main {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .application-details {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 6px 16px;
+        margin: 14px 0 0;
+        font-size: 12px;
+        color: #3a5a3a;
+    }
+
+    .application-details dt {
+        font-weight: 700;
+        color: #9ab0a0;
+        text-transform: uppercase;
+        font-size: 10px;
+        letter-spacing: 0.5px;
+        padding-top: 2px;
+    }
+
+    .application-details dd {
+        margin: 0;
+    }
+
+    .application-qualifications {
+        white-space: pre-line;
+    }
+
+    .unverified-note {
+        color: #c07818;
+        font-weight: 600;
+    }
+
+    .application-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        width: 220px;
+        flex: none;
+    }
+
+    .application-actions .btn-primary {
+        width: 100%;
+    }
+
+    .reject-details summary {
+        list-style: none;
+        text-align: center;
+    }
+
+    .reject-details summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .btn-reject:hover {
+        border-color: #d04030;
+        background: #fdf0ee;
+        color: #d04030;
+    }
+
+    .reject-form {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+        font-size: 11px;
+        color: #6a8a6a;
+    }
+
+    .reject-form textarea {
+        padding: 8px 10px;
+        border: 1px solid #e0e8e0;
+        border-radius: 8px;
+        font-family: 'Manrope', sans-serif;
+        font-size: 12px;
+        resize: vertical;
+    }
+
+    .btn-danger {
+        padding: 9px 16px;
+        background: #d04030;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-family: 'Manrope', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .empty-note {
+        margin: 0;
+        font-size: 13px;
+        color: #7a9a7a;
+    }
+
+    @media (max-width: 768px) {
+        .application-card {
+            flex-direction: column;
+        }
+
+        .application-actions {
+            width: 100%;
+        }
+
+        .application-details {
+            grid-template-columns: 1fr;
+        }
     }
 
     .user-cell {

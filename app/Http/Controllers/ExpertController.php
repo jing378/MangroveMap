@@ -52,6 +52,7 @@ class ExpertController extends Controller
                 'genera' => $feature['genera'] ?? $data['genera'] ?? [],
             ];
         })->values()->all();
+        EndUserController::assertFeaturesHaveGenera($features);
         $features = $boundaryResolver->resolveFeatures($features);
 
         $delineation = Delineation::create([

@@ -66,83 +66,6 @@
         color: #a3e6be;
     }
 
-    /* Action Cards */
-    .action-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 20px;
-    }
-
-    .action-card {
-        background: #fff;
-        border: 1px solid #e0e8e0;
-        border-radius: 14px;
-        padding: 22px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        transition: all 0.25s ease;
-        text-decoration: none;
-        color: inherit;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .action-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
-        border-color: #1e9e62;
-    }
-
-    .action-icon-wrap {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 22px;
-        margin-bottom: 16px;
-    }
-
-    .action-card.card-map .action-icon-wrap {
-        background: #e6f4ea;
-        color: #1e9e62;
-    }
-
-    .action-card.card-delineate .action-icon-wrap {
-        background: #fef3e6;
-        color: #c07818;
-    }
-
-    .action-card.card-upload .action-icon-wrap {
-        background: #eaf3fd;
-        color: #2b78d4;
-    }
-
-    .action-title {
-        font-size: 16px;
-        font-weight: 700;
-        color: #1a2e1a;
-        margin-bottom: 6px;
-    }
-
-    .action-desc {
-        font-size: 13px;
-        color: #6a8a6a;
-        line-height: 1.45;
-        margin-bottom: 18px;
-    }
-
-    .action-link {
-        font-size: 13px;
-        font-weight: 700;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        color: #1e9e62;
-    }
-
     /* KPI Grid */
     .kpi-grid {
         display: grid;
@@ -328,9 +251,90 @@
         color: #fff;
     }
 
+    /* Top Contributors */
+    .contributor-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .contributor-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #f0f4f0;
+        font-size: 13px;
+        border-radius: 8px;
+    }
+
+    .contributor-row:last-child {
+        border-bottom: none;
+    }
+
+    .contributor-row.is-me {
+        background: #edf7f2;
+    }
+
+    .contributor-rank {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #f5f7f6;
+        color: #1e9e62;
+        font-weight: 800;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .contributor-row:first-child .contributor-rank {
+        background: #1e9e62;
+        color: #fff;
+    }
+
+    .contributor-name {
+        flex: 1;
+        font-weight: 700;
+        color: #1a2e1a;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .contributor-you {
+        margin-left: 6px;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: #1e9e62;
+        color: #fff;
+    }
+
+    .contributor-role {
+        font-size: 11px;
+        color: #7a9a7a;
+        font-weight: 600;
+    }
+
+    .contributor-count {
+        font-size: 12px;
+        font-weight: 700;
+        color: #1e9e62;
+        white-space: nowrap;
+    }
+
     @media (max-width: 768px) {
         .dash-hero {
             padding: 24px;
+        }
+
+        .contributor-role {
+            display: none;
         }
         .charts-grid {
             grid-template-columns: 1fr;
@@ -351,54 +355,6 @@
             <h1>Welcome back, {{ Auth::user()->name }}</h1>
             <p>Monitor local mangrove health, delineate geospatial forest boundaries, and perform high-precision canopy segmentations with our AI models.</p>
         </div>
-    </div>
-
-    <!-- Quick Navigation Action Cards -->
-    <div class="action-grid">
-        <!-- 1. Map -->
-        <a href="{{ auth()->user()->isExpert() ? route('expert.map') : route('map') }}" class="action-card card-map">
-            <div>
-                <div class="action-icon-wrap">
-                    <i class="bi bi-map"></i>
-                </div>
-                <div class="action-title">Coverage GIS Map</div>
-                <div class="action-desc">Explore live satellite imagery, temporal vegetation progression, and mangrove health zones.</div>
-            </div>
-            <div class="action-link">
-                <span>Open Map</span>
-                <i class="bi bi-arrow-right"></i>
-            </div>
-        </a>
-
-        <!-- 2. Delineate -->
-        <a href="{{ auth()->user()->isExpert() ? route('expert.delineate') : route('delineate') }}" class="action-card card-delineate">
-            <div>
-                <div class="action-icon-wrap">
-                    <i class="bi bi-pencil-square"></i>
-                </div>
-                <div class="action-title">Delineate Boundaries</div>
-                <div class="action-desc">Draw points, lines, and area polygons on satellite layers and submit zones for expert review.</div>
-            </div>
-            <div class="action-link">
-                <span>Start Delineating</span>
-                <i class="bi bi-arrow-right"></i>
-            </div>
-        </a>
-
-        <!-- 3. Upload Image -->
-        <a href="{{ route('delineation.index') }}" class="action-card card-upload">
-            <div>
-                <div class="action-icon-wrap">
-                    <i class="bi bi-cloud-arrow-up"></i>
-                </div>
-                <div class="action-title">AI Image Segmentation</div>
-                <div class="action-desc">Batch upload field or aerial mangrove photos to calculate automated U-Net canopy coverage.</div>
-            </div>
-            <div class="action-link">
-                <span>Upload Images</span>
-                <i class="bi bi-arrow-right"></i>
-            </div>
-        </a>
     </div>
 
     @php
@@ -446,6 +402,19 @@
                 <span class="kpi-badge g">{{ $completedAnalyses ?? 0 }} Completed</span>
             </div>
         </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="kpi-info">
+                <div class="kpi-val">{{ number_format($communityContributors ?? 0) }}</div>
+                <div class="kpi-label">Community Contributors</div>
+                @if(!empty($myContributorRank))
+                    <span class="kpi-badge g">You're #{{ $myContributorRank }} of {{ $communityContributors }}</span>
+                @else
+                    <span class="kpi-badge a">Get a delineation approved to join</span>
+                @endif
+            </div>
+        </div>
     </div>
 
     <!-- Charts Row -->
@@ -467,6 +436,35 @@
                 <canvas id="coverageTrendChart"></canvas>
             </div>
         </div>
+    </div>
+
+    <!-- Top Contributors Leaderboard -->
+    <div class="table-card">
+        <div class="table-header">
+            <div class="table-title"><i class="bi bi-trophy me-2"></i> Top Contributors</div>
+            <span class="kpi-badge g">{{ $activeContributorsThisMonth ?? 0 }} active this month</span>
+        </div>
+
+        @if(collect($topContributors ?? [])->isEmpty())
+            <div style="text-align: center; padding: 24px 20px; color: #7a9a7a; font-size: 14px;">
+                No approved delineations yet. Be the first contributor!
+            </div>
+        @else
+            <ol class="contributor-list">
+                @foreach($topContributors as $index => $contributor)
+                    @php $isMe = $contributor->user_id === auth()->id(); @endphp
+                    <li class="contributor-row {{ $isMe ? 'is-me' : '' }}">
+                        <span class="contributor-rank">{{ $index + 1 }}</span>
+                        <span class="contributor-name">
+                            {{ $contributor->user?->name ?? 'Unknown' }}
+                            @if($isMe)<span class="contributor-you">You</span>@endif
+                        </span>
+                        <span class="contributor-role">{{ $contributor->user?->isExpert() ? 'Expert' : 'Resident' }}</span>
+                        <span class="contributor-count">{{ $contributor->approved_count }} approved</span>
+                    </li>
+                @endforeach
+            </ol>
+        @endif
     </div>
 
     <!-- Recent Submissions Table -->
