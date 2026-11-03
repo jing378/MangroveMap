@@ -68,6 +68,13 @@
       text-decoration: none;
     }
 
+    .logo-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: inherit;
+    }
+
     .logo-icon {
       width: 34px;
       height: 34px;
@@ -919,7 +926,7 @@
   <!-- HEADER -->
   <header class="header">
     <a href="{{ Auth::user()->isExpert() ? route('expert.dashboard') : route('dashboard') }}" class="logo">
-      <div class="logo-icon"><i class="bi bi-tree-fill"></i></div>
+      <div class="logo-icon"><img src="/icon-192.png" alt=""></div>
       <div>
         <span>MangroveMap</span><br>
         <small>Image Delineation</small>

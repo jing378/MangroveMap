@@ -58,6 +58,13 @@
       white-space: nowrap;
     }
 
+    .logo-mark img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: inherit;
+    }
+
     .logo-mark {
       width: 36px;
       height: 36px;
@@ -2520,7 +2527,7 @@
         <i class="bi bi-list"></i>
       </button>
       <div class="logo">
-        <div class="logo-mark"><i class="bi bi-leaf"></i></div><span>MangroveMap</span>
+        <div class="logo-mark"><img src="/icon-192.png" alt=""></div><span>MangroveMap</span>
       </div>
     </div>
     <div class="header-right">

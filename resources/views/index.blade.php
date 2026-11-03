@@ -95,6 +95,13 @@
       color: inherit;
     }
 
+    .brand-logo-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: inherit;
+    }
+
     .brand-logo-icon {
       width: 36px;
       height: 36px;
@@ -1298,7 +1305,7 @@
   <header class="site-nav">
     <a href="/" class="brand-wrap" aria-label="MangroveMap Home">
       <div class="brand-logo-icon">
-        <i class="bi bi-leaf-fill"></i>
+        <img src="/icon-192.png" alt="">
       </div>
       <div class="brand-text">
         <div class="brand-title">Mangrove<span>Map</span></div>
@@ -1619,7 +1626,7 @@
     <div class="footer-container">
       <div class="footer-brand">
         <div class="brand-logo-icon" style="width: 30px; height: 30px; font-size: 16px;">
-          <i class="bi bi-leaf-fill"></i>
+          <img src="/icon-192.png" alt="">
         </div>
         <span>MangroveMap System</span>
       </div>

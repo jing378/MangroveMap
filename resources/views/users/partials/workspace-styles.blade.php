@@ -43,6 +43,13 @@
     white-space: nowrap;
   }
 
+  .logo-mark img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+  }
+
   .logo-mark {
     width: 36px;
     height: 36px;

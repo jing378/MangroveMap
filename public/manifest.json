@@ -1,10 +1,10 @@
 {
-  "name": "Mangrove Map",
-  "short_name": "Mangrove Map",
+  "name": "MangroveMap",
+  "short_name": "MangroveMap",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e9e62",
-  "theme_color": "#1e9e62",
+  "background_color": "#1aa056",
+  "theme_color": "#1aa056",
   "icons": [
     {
       "src": "/icon-192.png",

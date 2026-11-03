@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard - MangroveMap')</title>
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -57,6 +59,13 @@
             display: flex;
             align-items: center;
             gap: 16px;
+        }
+
+        .logo-mark img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: inherit;
         }
 
         .logo-mark {
@@ -589,7 +598,7 @@
                 <i class="bi bi-list"></i>
             </button>
             <div class="logo">
-                <div class="logo-mark"><i class="bi bi-leaf"></i></div>
+                <div class="logo-mark"><img src="/icon-192.png" alt=""></div>
                 <span>MangroveMap</span>
             </div>
         </div>
