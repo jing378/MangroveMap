@@ -17,7 +17,7 @@ class AuthenticatedSessionController extends Controller
             'password' => 'required'
         ]);
 
-        if (Auth::attempt($validated)) {
+        if (Auth::attempt($validated, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
             $user = Auth::user();
