@@ -496,7 +496,7 @@
     /* Polished Feature Section */
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 28px;
     }
 
@@ -1160,6 +1160,52 @@
       color: var(--primary-forest);
     }
 
+    .panel-grip {
+      display: none;
+    }
+
+    /* Phones: details panel becomes a bottom sheet so the map stays visible above it. */
+    @media (max-width: 768px) {
+      #mapRightPanel {
+        top: auto;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: none;
+        height: 58%;
+        border-left: none;
+        border-top: 1px solid var(--bd-d5e5d8, #d5e5d8);
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+        transform: translateY(105%);
+      }
+
+      #mapRightPanel.open {
+        transform: translateY(0);
+      }
+
+      #mapRightPanel .scroll {
+        padding: 6px 16px 20px;
+        overscroll-behavior: contain;
+      }
+
+      .panel-grip {
+        display: block;
+        flex-shrink: 0;
+        width: 40px;
+        height: 4px;
+        margin: 8px auto 4px;
+        border-radius: 999px;
+        background: var(--bg-cfdcd3, #cfdcd3);
+      }
+
+      .panel-close-btn {
+        top: 10px;
+        right: 12px;
+      }
+    }
+
     .sec {
       font-size: 12px;
       font-weight: 700;
@@ -1590,7 +1636,7 @@
       </h1>
 
       <p class="hero-description">
-        A modern Web GIS platform engineered to map mangrove forest extents, monitor canopy health via multi-spectral satellite analytics, and support data-driven coastal conservation and ecological restoration.
+        A Web GIS platform for mapping the mangrove forests of Southern Leyte. Residents draw mangrove boundaries on the map, experts review them, and drone imagery is classified by an AI model to help outline mangrove cover for conservation and restoration planning.
       </p>
 
       <div class="hero-actions">
@@ -1637,7 +1683,7 @@
       </div>
       <h2 class="section-title">Comprehensive Environmental GIS Tools</h2>
       <p class="section-subtitle">
-        Combining remote sensing, satellite cartography, and community participation to protect vital mangrove ecosystems.
+        Combining community mapping, expert review, and AI-assisted drone imagery to protect vital mangrove ecosystems.
       </p>
     </div>
 
@@ -1649,12 +1695,12 @@
         </div>
         <h3 class="feature-title">Mangrove Mapping</h3>
         <p class="feature-desc">
-          Accurate mapping and delineation of mangrove areas using high-resolution imagery and spatial analysis. Identifies and outlines mangrove boundaries, patches, and coastal forest coverage to support precise visualization, monitoring, and geographic assessment over time.
+          Residents draw mangrove areas directly on the map and submit them for review. Each delineation is matched to its barangay and municipality, and experts approve it, reject it with feedback, or correct its boundary.
         </p>
         <ul class="feature-points">
-          <li><i class="bi bi-check-circle-fill"></i> Precision polygon area measurement in hectares</li>
-          <li><i class="bi bi-check-circle-fill"></i> Community-driven field boundary uploads</li>
-          <li><i class="bi bi-check-circle-fill"></i> Expert review and delineation validation workflow</li>
+          <li><i class="bi bi-check-circle-fill"></i> Draw polygons with area measured in hectares</li>
+          <li><i class="bi bi-check-circle-fill"></i> Expert approval with revise-and-resubmit for rejected areas</li>
+          <li><i class="bi bi-check-circle-fill"></i> Automatic barangay and municipality lookup</li>
         </ul>
       </div>
 
@@ -1665,12 +1711,28 @@
         </div>
         <h3 class="feature-title">GIS Visualization</h3>
         <p class="feature-desc">
-          Interactive multi-layer geospatial interface supporting ESRI World Imagery satellite basemaps, OpenStreetMap, and Topographic terrain for multi-scale coastal analysis.
+          An interactive map with ESRI World Imagery satellite, OpenStreetMap street, and topographic basemaps, with approved mangrove areas, location pins, and planting recommendations drawn as layers you can switch on and off.
         </p>
         <ul class="feature-points">
-          <li><i class="bi bi-check-circle-fill"></i> High-resolution aerial satellite tile layers</li>
-          <li><i class="bi bi-check-circle-fill"></i> Interactive vector overlay rendering</li>
-          <li><i class="bi bi-check-circle-fill"></i> Responsive coordinate inspection &amp; zoom navigation</li>
+          <li><i class="bi bi-check-circle-fill"></i> Satellite, street, and topographic basemaps</li>
+          <li><i class="bi bi-check-circle-fill"></i> Toggleable layers for areas, pins, and recommendations</li>
+          <li><i class="bi bi-check-circle-fill"></i> Click any area for its genera, recommendation, and trend</li>
+        </ul>
+      </div>
+
+      <!-- Feature: Drone Imagery & AI Segmentation -->
+      <div class="feature-card">
+        <div class="feature-icon-box">
+          <i class="bi bi-airplane-fill"></i>
+        </div>
+        <h3 class="feature-title">Drone Imagery &amp; AI Detection</h3>
+        <p class="feature-desc">
+          Upload drone orthomosaics (GeoTIFF) to view them as high-resolution map layers. A U-Net deep learning model then detects mangrove cover in the imagery and turns it into draft boundaries you can review and submit.
+        </p>
+        <ul class="feature-points">
+          <li><i class="bi bi-check-circle-fill"></i> GeoTIFF upload with automatic map tiling</li>
+          <li><i class="bi bi-check-circle-fill"></i> AI mangrove segmentation into draft polygons</li>
+          <li><i class="bi bi-check-circle-fill"></i> Private layers, visible only to the uploader</li>
         </ul>
       </div>
 
@@ -1681,11 +1743,12 @@
         </div>
         <h3 class="feature-title">Mangrove Monitoring</h3>
         <p class="feature-desc">
-          Continuous monitoring of mangrove areas, tracking species distributions such as Rhizophora, Avicennia, and Sonneratia, while supporting data-driven analysis and restoration planning.
+          Experts record yearly observations of each mangrove area and track which genera are present, such as Rhizophora, Avicennia, and Sonneratia. They also add planting recommendations rated by site suitability to guide restoration.
         </p>
         <ul class="feature-points">
-          <li><i class="bi bi-check-circle-fill"></i> Historical coverage trend charting &amp; analytics</li>
-          <li><i class="bi bi-check-circle-fill"></i> Species &amp; genus composition breakdown</li>
+          <li><i class="bi bi-check-circle-fill"></i> Year-by-year coverage trend in hectares</li>
+          <li><i class="bi bi-check-circle-fill"></i> Genus composition for each mangrove area</li>
+          <li><i class="bi bi-check-circle-fill"></i> Planting recommendations with suitability ratings</li>
         </ul>
       </div>
     </div>
@@ -1700,7 +1763,7 @@
         </div>
         <h2 class="section-title">Live Mangrove Explorer</h2>
         <p class="section-subtitle">
-          Explore validated mangrove polygons, inspect field survey parameters, or evaluate restoration priority zones.
+          Explore expert-approved mangrove areas, see which genera grow there, and view planting recommendations.
         </p>
       </div>
 
@@ -1781,6 +1844,7 @@
 
             <!-- Slide-in Delineation Details Drawer -->
             <div class="right-panel" id="mapRightPanel">
+              <div class="panel-grip" aria-hidden="true"></div>
               <button onclick="closeRightPanel()" class="panel-close-btn" title="Close Panel" aria-label="Close details panel">
                 <i class="bi bi-x-lg"></i>
               </button>
@@ -2100,20 +2164,33 @@
           if (layer) {
             if (layer.getBounds) {
               mainMap.fitBounds(layer.getBounds(), {
-                padding: [50, 50],
+                ...panelFitPadding(),
                 maxZoom: 14,
                 animate: true,
                 duration: 0.8
               });
             } else if (layer.getLatLng) {
-              mainMap.flyTo(layer.getLatLng(), 13, {
-                animate: true,
+              const point = layer.getLatLng();
+              mainMap.flyToBounds(L.latLngBounds(point, point), {
+                ...panelFitPadding(),
+                maxZoom: 13,
                 duration: 0.8
               });
             }
           }
         }
       }, wasOpen ? 50 : 330);
+    }
+
+    // Fit padding that keeps the selected feature clear of the details panel:
+    // a bottom sheet on phones, a right-side drawer on wider screens.
+    function panelFitPadding() {
+      const panel = document.getElementById('mapRightPanel');
+      if (!panel || !panel.classList.contains('open')) return { padding: [50, 50] };
+      if (window.matchMedia('(max-width: 768px)').matches) {
+        return { paddingTopLeft: [30, 30], paddingBottomRight: [30, panel.offsetHeight + 30] };
+      }
+      return { paddingTopLeft: [50, 50], paddingBottomRight: [panel.offsetWidth + 50, 50] };
     }
 
     // ---- Map layers: approved areas, a location pin on each, and planting recommendations ----
@@ -2317,7 +2394,7 @@
           mainMap.invalidateSize();
         }
         if (polys[i]) {
-          mainMap.flyTo([z.lat, z.lng], 10, { duration: 0.8 });
+          mainMap.flyToBounds(L.latLngBounds([z.lat, z.lng], [z.lat, z.lng]), { ...panelFitPadding(), maxZoom: 10, duration: 0.8 });
           polys[i].openPopup();
         }
       }, wasOpen ? 50 : 330);

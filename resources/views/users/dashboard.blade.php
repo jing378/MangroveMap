@@ -162,6 +162,16 @@
         width: 100%;
     }
 
+    .chart-empty {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 13px;
+        color: var(--fg-7a9a7a, #7a9a7a);
+    }
+
     /* Submissions Table */
     .table-card {
         background: var(--bg-ffffff, #fff);
@@ -447,18 +457,23 @@
         <div class="kpi-card">
             <div class="kpi-icon"><i class="bi bi-pie-chart-fill"></i></div>
             <div class="kpi-info">
-                <div class="kpi-val">{{ number_format($totalCoverage ?? 47382, 0) }} ha</div>
+                {{-- Expert-approved delineations, system-wide. --}}
+                <div class="kpi-val">{{ number_format($totalCoverage ?? 0, ($totalCoverage ?? 0) < 100 ? 2 : 0) }} ha</div>
                 <div class="kpi-label">Total Monitored Area</div>
-                <span class="kpi-badge g">+3.2% recovery</span>
+                @if(isset($coverageChangePct))
+                    <span class="kpi-badge {{ $coverageChangePct >= 0 ? 'g' : 'a' }}">{{ $coverageChangePct >= 0 ? '+' : '' }}{{ number_format($coverageChangePct, 1) }}% since last year</span>
+                @else
+                    <span class="kpi-badge g">{{ number_format($approvedAreaCount ?? 0) }} approved {{ Str::plural('area', $approvedAreaCount ?? 0) }}</span>
+                @endif
             </div>
         </div>
 
         <div class="kpi-card">
             <div class="kpi-icon"><i class="bi bi-flower1"></i></div>
             <div class="kpi-info">
-                <div class="kpi-val">{{ $genusCount ?? 4 }}</div>
+                <div class="kpi-val">{{ $genusCount ?? 0 }}</div>
                 <div class="kpi-label">Mangrove Genera Found</div>
-                <span class="kpi-badge g">Stable Diversity</span>
+                <span class="kpi-badge g">In approved areas</span>
             </div>
         </div>
 
@@ -501,7 +516,11 @@
                 <div class="chart-title"><i class="bi bi-pie-chart me-2"></i> Genus Distribution</div>
             </div>
             <div class="chart-canvas-wrap">
-                <canvas id="genusPieChart"></canvas>
+                @if(!empty($genusSeries))
+                    <canvas id="genusPieChart"></canvas>
+                @else
+                    <div class="chart-empty">No genera recorded in approved areas yet.</div>
+                @endif
             </div>
         </div>
 
@@ -510,7 +529,11 @@
                 <div class="chart-title"><i class="bi bi-graph-up me-2"></i> Coverage Trend (ha)</div>
             </div>
             <div class="chart-canvas-wrap">
-                <canvas id="coverageTrendChart"></canvas>
+                @if(!empty($trendValues))
+                    <canvas id="coverageTrendChart"></canvas>
+                @else
+                    <div class="chart-empty">No approved mangrove areas yet.</div>
+                @endif
             </div>
         </div>
     </div>
@@ -625,11 +648,9 @@
         // Genus Distribution Doughnut
         const genusCtx = document.getElementById('genusPieChart');
         if (genusCtx) {
-            const rawLabels = @json($genusLabels ?? []);
-            const rawSeries = @json($genusSeries ?? []);
-            
-            const labels = rawLabels.length > 0 ? rawLabels : ['Rhizophora', 'Avicennia', 'Sonneratia', 'Bruguiera'];
-            const data = rawSeries.length > 0 ? rawSeries : [48, 28, 14, 10];
+            // Number of approved areas each genus is recorded in.
+            const labels = @json($genusLabels ?? []);
+            const data = @json($genusSeries ?? []);
 
             new Chart(genusCtx, {
                 type: 'doughnut',
@@ -663,11 +684,8 @@
         // Coverage Trend Line
         const trendCtx = document.getElementById('coverageTrendChart');
         if (trendCtx) {
-            const rawYears = @json($trendYears ?? []);
-            const rawValues = @json($trendValues ?? []);
-
-            const years = rawYears.length > 0 ? rawYears : ['2021', '2022', '2023', '2024', '2025', '2026'];
-            const values = rawValues.length > 0 ? rawValues : [42100, 43400, 44200, 45800, 46900, 47382];
+            const years = @json($trendYears ?? []);
+            const values = @json($trendValues ?? []);
 
             new Chart(trendCtx, {
                 type: 'line',

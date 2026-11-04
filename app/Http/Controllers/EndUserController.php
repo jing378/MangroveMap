@@ -5,10 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Analysis;
 use App\Models\Delineation;
 use App\Models\DelineationAnnualObservation;
-use App\Models\MangroveData;
 use App\Models\PlantingRecommendation;
 use App\Models\User;
 use App\Models\UserActivity;
+use App\Services\ApprovedCoverageStats;
 use App\Services\BoundaryResolver;
 use App\Services\DelineationObservationRecorder;
 use App\Notifications\DelineationSubmittedForReview;
@@ -275,36 +275,22 @@ class EndUserController extends Controller
         $failedAnalyses = $userAnalyses->where('status', 'failed')->count();
         $recentAnalyses = $userAnalyses->take(5);
 
-        $totalCoverage = (MangroveData::sum('coverage_area_km2') ?? 0) * 100;
-        $genusCount = MangroveData::whereNotNull('genus_id')->distinct()->count('genus_id');
-        $degradedArea = MangroveData::where('health_status', 'degraded')->sum('coverage_area_km2') ?? 0;
+        // Coverage figures come from expert-approved delineations, system-wide, in hectares.
+        $coverage = app(ApprovedCoverageStats::class)->summary();
+        $totalCoverage = $coverage['area_ha'];
+        $approvedAreaCount = $coverage['area_count'];
+        $genusCount = count($coverage['genera']);
+        $genusLabels = array_keys(array_slice($coverage['genera'], 0, 10, true));
+        $genusSeries = array_values(array_slice($coverage['genera'], 0, 10, true));
+        $trendYears = array_keys($coverage['trend']);
+        $trendValues = array_values($coverage['trend']);
 
-        $genusDistribution = MangroveData::select('genus_id', DB::raw('COUNT(*) as count'))
-            ->whereNotNull('genus_id')
-            ->groupBy('genus_id')
-            ->with('genus')
-            ->limit(10)
-            ->get();
-
-        $genusLabels = [];
-        $genusSeries = [];
-        foreach ($genusDistribution as $item) {
-            if ($item->genus) {
-                $genusLabels[] = $item->genus->common_name;
-                $genusSeries[] = $item->count;
-            }
+        // Change over the last year of the trend, when there is a previous year to compare with.
+        $coverageChangePct = null;
+        if (count($trendValues) >= 2 && $trendValues[count($trendValues) - 2] > 0) {
+            $previous = $trendValues[count($trendValues) - 2];
+            $coverageChangePct = round(($trendValues[count($trendValues) - 1] - $previous) / $previous * 100, 1);
         }
-
-        $coverageTrends = MangroveData::select(
-            DB::raw('YEAR(observation_date) as year'),
-            DB::raw('SUM(coverage_area_km2) as total')
-        )
-            ->groupBy(DB::raw('YEAR(observation_date)'))
-            ->orderBy('year')
-            ->get();
-
-        $trendYears = $coverageTrends->pluck('year')->toArray();
-        $trendValues = $coverageTrends->pluck('total')->toArray();
 
         $delineationModels = Delineation::fetchForMap(
             $user->delineations()->with(['user:id,name,role', 'approvedBy:id,name']),
@@ -360,8 +346,9 @@ class EndUserController extends Controller
             'failedAnalyses' => $failedAnalyses,
             'recentAnalyses' => $recentAnalyses,
             'totalCoverage' => $totalCoverage,
+            'approvedAreaCount' => $approvedAreaCount,
+            'coverageChangePct' => $coverageChangePct,
             'genusCount' => $genusCount,
-            'degradedArea' => $degradedArea,
             'genusLabels' => $genusLabels,
             'genusSeries' => $genusSeries,
             'trendYears' => $trendYears,
