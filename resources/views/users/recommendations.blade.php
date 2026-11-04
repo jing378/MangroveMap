@@ -120,23 +120,6 @@
             border: 2px dashed var(--bd-e8f5e8, #e8f5e8);
             outline: 1px solid #7fa88a;
         }
-        .rec-location-marker {
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-            background: var(--rec-marker-color);
-            border: 2px solid var(--bd-ffffff, #fff);
-            border-radius: 50% 50% 50% 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
-            transform: rotate(-45deg);
-            font-size: 16px;
-        }
-        .rec-location-marker i {
-            transform: rotate(45deg);
-        }
     </style>
 @endsection
 

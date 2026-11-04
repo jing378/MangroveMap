@@ -1286,6 +1286,28 @@
     margin-top: 6px;
   }
 
+  /* Location pin, same as the landing page (.map-pin in index.blade.php). --map-pin-color carries
+     the review status (approved green, pending orange) or the recommendation's suitability. */
+  .map-pin {
+    position: relative;
+    display: block;
+    width: 30px;
+    height: 30px;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+    transition: transform 0.15s ease;
+  }
+
+  .map-pin:hover {
+    transform: translateY(-2px) scale(1.08);
+  }
+
+  .map-pin i {
+    font-size: 30px;
+    line-height: 1;
+    color: var(--map-pin-color, var(--fg-1e9e62, #1e9e62));
+    -webkit-text-stroke: 1px var(--bg-ffffff, #fff);
+  }
+
   .planting-rec-marker {
     width: 26px;
     height: 26px;

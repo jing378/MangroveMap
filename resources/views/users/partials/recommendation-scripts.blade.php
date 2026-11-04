@@ -18,6 +18,18 @@
     const SNAP_PIXEL_THRESHOLD = 15;
     const genusLocalNames = { Rhizophora: 'Bakawan', Avicennia: 'Bungalon', Sonneratia: 'Pagatpat' };
 
+    // Same location pin as the landing page (.map-pin in workspace-styles), in the given color.
+    function locationPinIcon(color) {
+      return L.divIcon({
+        className: '',
+        html: `<span class="map-pin" style="--map-pin-color:${color}"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i></span>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 29],
+        popupAnchor: [0, -26],
+        tooltipAnchor: [0, -24],
+      });
+    }
+
     @include('users.partials.map-base-scripts')
 
     // ---- Modals (markup shared with the Delineate workspace) ----
@@ -258,14 +270,8 @@
             startDraftFromReference(area, feature, shouldFocus);
           };
           polygon.on('click', selectArea);
-          const locationIcon = L.divIcon({
-            className: '',
-            html: `<span class="rec-location-marker" style="--rec-marker-color:${REFERENCE_COLOR}"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i></span>`,
-            iconSize: [30, 30],
-            iconAnchor: [15, 29],
-          });
-          const marker = L.marker(polygon.getCenter(), { icon: locationIcon }).addTo(referenceLayer);
-          marker.bindTooltip(`${area.name} · Approved delineation`, { direction: 'top', offset: [0, -20] });
+          const marker = L.marker(polygon.getCenter(), { icon: locationPinIcon(REFERENCE_COLOR), title: area.name, riseOnHover: true }).addTo(referenceLayer);
+          marker.bindTooltip(`${area.name} · Approved delineation`, { direction: 'top' });
           marker.on('click', (e) => {
             L.DomEvent.stopPropagation(e);
             zoomToFeatures([feature]);
@@ -280,12 +286,7 @@
       recommendations.forEach(rec => {
         if (draft && draft.id === rec.id) return; // drawn as the editable draft instead
         const color = SUITABILITY_COLORS[rec.suitability] || REFERENCE_COLOR;
-        const locationIcon = L.divIcon({
-          className: '',
-          html: `<span class="rec-location-marker" style="--rec-marker-color:${color}"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i></span>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 29],
-        });
+        const locationIcon = locationPinIcon(color);
         (rec.features || []).forEach(feature => {
           const polygon = L.polygon(feature.coords, { color, fillColor: color, fillOpacity: 0.35, weight: 2 })
             .addTo(recommendationLayer);
@@ -295,8 +296,8 @@
             L.DomEvent.stopPropagation(e);
             openRecommendation(rec.id);
           });
-          const marker = L.marker(polygon.getCenter(), { icon: locationIcon }).addTo(recommendationLayer);
-          marker.bindTooltip(`${rec.name} · Mangrove location`, { direction: 'top', offset: [0, -20] });
+          const marker = L.marker(polygon.getCenter(), { icon: locationIcon, title: rec.name, riseOnHover: true }).addTo(recommendationLayer);
+          marker.bindTooltip(`${rec.name} · Mangrove location`, { direction: 'top' });
           marker.on('click', (e) => {
             if (mode) return;
             L.DomEvent.stopPropagation(e);

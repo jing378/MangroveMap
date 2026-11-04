@@ -622,15 +622,18 @@
 
     let polys = [];
     zones.forEach((z, i) => {
+      // Same pin as the landing page (.map-pin), colored by review status.
       const locationIcon = L.divIcon({
         className: '',
-        html: `<span style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#fff;background:${z.color};border:2px solid #fff;border-radius:50% 50% 50% 0;box-shadow:0 2px 8px rgba(0,0,0,.35);transform:rotate(-45deg);font-size:16px;"><i class="bi bi-geo-alt-fill" aria-hidden="true" style="transform:rotate(45deg);"></i></span>`,
+        html: `<span class="map-pin" style="--map-pin-color:${z.color}"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i></span>`,
         iconSize: [30, 30],
         iconAnchor: [15, 29],
+        popupAnchor: [0, -26],
+        tooltipAnchor: [0, -24],
       });
-      const p = L.marker([z.lat, z.lng], { icon: locationIcon }).addTo(zoneMarkerLayer);
+      const p = L.marker([z.lat, z.lng], { icon: locationIcon, title: z.name, riseOnHover: true }).addTo(zoneMarkerLayer);
 
-      p.bindTooltip(`${z.name} · Mangrove location`, { direction: 'top', offset: [0, -20] });
+      p.bindTooltip(`${z.name} · Mangrove location`, { direction: 'top' });
       p.on('click', (e) => {
         if (drawingMode) return;
         if (e && e.originalEvent) L.DomEvent.stopPropagation(e);

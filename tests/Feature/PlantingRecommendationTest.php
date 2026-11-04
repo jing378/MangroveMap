@@ -187,7 +187,7 @@ class PlantingRecommendationTest extends TestCase
             ->assertSee('<span>Planting Recommendation</span>', false)
             ->assertDontSee('<div class="sec">Summary</div>', false)
             ->assertDontSee('id="recommendationList"', false)
-            ->assertSee('rec-location-marker', false)
+            ->assertSee('class="map-pin"', false)
             ->assertSee('bi-geo-alt-fill', false)
             ->assertSee('id="recommendationForm"', false);
         $this->assertSame([$approved->id], collect($response->viewData('referenceAreas'))->pluck('id')->all());
