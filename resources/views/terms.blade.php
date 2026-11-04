@@ -1,7 +1,7 @@
 @php
     // Shown as the contact address in section 15. Set MAIL_FROM_ADDRESS to the project's real inbox.
     $contactEmail = config('mail.from.address');
-    $lastUpdated = 'November 4, 2026';
+    $lastUpdated = 'November 5, 2026';
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -254,7 +254,7 @@
                     <li><a href="#ai">AI Segmentation and Classification</a></li>
                     <li><a href="#recommendations">Planting Recommendations</a></li>
                     <li><a href="#acceptable-use">Acceptable Use</a></li>
-                    <li><a href="#privacy">Privacy and Personal Data</a></li>
+                    <li><a href="#privacy">Privacy, Personal Data, and Cookies</a></li>
                     <li><a href="#moderation">Review, Moderation, and Removal</a></li>
                     <li><a href="#ip">Intellectual Property</a></li>
                     <li><a href="#disclaimer">Disclaimers</a></li>
@@ -394,7 +394,7 @@
             </section>
 
             <section id="privacy">
-                <h2>9. Privacy and Personal Data</h2>
+                <h2>9. Privacy, Personal Data, and Cookies</h2>
                 <p>
                     The System processes personal data in line with the Data Privacy Act of 2012 (Republic Act No.
                     10173). We collect:
@@ -419,6 +419,14 @@
                     You may ask to access, correct, or delete your personal data by contacting us (see Section 15).
                     Some records, such as approved delineations and activity logs, may be kept after an account is
                     deleted where they are needed for the integrity of the map or for security.
+                </p>
+                <p id="cookies">
+                    <strong>Cookies.</strong> The System uses only the cookies it needs to work: a session cookie
+                    that keeps you signed in while you use the System, and a security cookie that protects forms
+                    from cross-site request forgery. If you tick <em>Remember Me</em> when signing in, we also set a
+                    cookie that keeps you signed in on that device until you log out. We do not use cookies for
+                    advertising, analytics, or tracking. Your light or dark display preference is saved in your
+                    browser's local storage and is not sent to us.
                 </p>
             </section>
 
