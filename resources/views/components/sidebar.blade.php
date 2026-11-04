@@ -27,11 +27,33 @@
             <span>Activity Logs</span>
         </a>
 
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-title">Account</div>
+
+        <a href="{{ route('profile.show') }}" class="sidebar-item {{ request()->routeIs('profile.*') ? 'active' : '' }}">
+            <i class="bi bi-person"></i>
+            <span>My Profile</span>
+        </a>
+
+        @php($unreadNotificationCount = auth()->user()->unreadNotifications()->count())
+        <a href="{{ route('notifications.index') }}"
+            id="sidebarNotificationsLink"
+            class="sidebar-item {{ request()->routeIs('notifications.*') ? 'active' : '' }} {{ $unreadNotificationCount > 0 ? 'has-unread' : '' }}">
+            <span class="sidebar-notification-icon">
+                <i class="bi bi-bell"></i>
+                @if($unreadNotificationCount > 0)
+                    <span class="sidebar-notification-badge" aria-label="{{ $unreadNotificationCount }} unread notifications">{{ $unreadNotificationCount }}</span>
+                @endif
+            </span>
+            <span>Notifications</span>
+        </a>
+
         <a href="{{ route('guide') }}" class="sidebar-item {{ request()->routeIs('guide') ? 'active' : '' }}">
             <i class="bi bi-question-circle"></i>
             <span>Help &amp; Guide</span>
         </a>
-
     </div>
 
     @php($currentUser = auth()->user())

@@ -328,6 +328,33 @@
             justify-content: center;
         }
 
+        .sidebar-notification-icon {
+            position: relative;
+        }
+
+        .sidebar-notification-badge {
+            position: absolute;
+            top: -7px;
+            right: -10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 17px;
+            height: 17px;
+            padding: 0 4px;
+            border: 2px solid #fff;
+            border-radius: 9px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .sidebar-item.has-unread {
+            font-weight: 800;
+        }
+
         .sidebar-item:hover {
             background: #f5f7f6;
             color: #1a2e1a;
