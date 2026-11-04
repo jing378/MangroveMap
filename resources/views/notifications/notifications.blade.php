@@ -355,12 +355,6 @@ if ($currentUser && $currentUser->role === 'admin') {
         @endif
     </div>
 
-    @if(session('success'))
-    <div class="unread-banner" style="background:#edf7f2;border-color:#c8e6d4;color:#1e9e62;margin-bottom:16px;">
-        <i class="bi bi-check-circle"></i> {{ session('success') }}
-    </div>
-    @endif
-
     @if($unreadCount > 0)
     <div class="unread-banner" id="unreadBanner">
         <i class="bi bi-info-circle"></i>
@@ -485,20 +479,6 @@ if ($currentUser && $currentUser->role === 'admin') {
             }
         }
 
-        function showSuccessMessage(msg) {
-            const banner = document.createElement('div');
-            banner.className = 'unread-banner';
-            banner.style.cssText = 'background:#edf7f2;border-color:#c8e6d4;color:#1e9e62;margin-bottom:16px;';
-            banner.innerHTML = `<i class="bi bi-check-circle"></i> ${msg}`;
-
-            const container = document.querySelector('.notifications-page');
-            const header = container?.querySelector('.notifications-header');
-            if (header?.nextElementSibling) {
-                header.nextElementSibling.insertAdjacentElement('beforebegin', banner);
-            }
-
-            setTimeout(() => banner.remove(), 4000);
-        }
 
         // Sends the form with fetch; resolves with the JSON body, or throws with the server's message.
         async function ajaxRequest(form) {
@@ -537,14 +517,16 @@ if ($currentUser && $currentUser->role === 'admin') {
             return data;
         }
 
-        // Confirmation → Processing → Success or Error (partials.action-feedback). Success is shown in the page banner.
-        async function ajaxAction(form, { confirm = null, busyLabel, lock = [] }, onSuccess) {
+        // Confirmation → Processing → Success or Error (partials.action-feedback).
+        // Success uses the same toast as the profile page.
+        async function ajaxAction(form, { confirm = null, busyLabel, lock = [], successMessage }, onSuccess) {
             const outcome = await window.AppActions.run({
                 confirm,
                 button: form.querySelector('button[type="submit"]'),
                 busyLabel,
                 lock,
                 task: () => ajaxRequest(form),
+                successMessage: data => data?.message || successMessage,
             });
             if (outcome.status === 'done') onSuccess(outcome.result);
         }
@@ -555,12 +537,11 @@ if ($currentUser && $currentUser->role === 'admin') {
         document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                await ajaxAction(form, { busyLabel: 'Marking as read...' }, (data) => {
+                await ajaxAction(form, { busyLabel: 'Marking as read...', successMessage: 'Notification marked as read' }, (data) => {
                     const card = form.closest('[data-notification-id]');
                     card?.classList.remove('unread');
                     form.remove();
                     updateUnreadUi(data.unreadCount ?? 0);
-                    showSuccessMessage('Marked as read');
                 });
             });
         });
@@ -612,13 +593,13 @@ if ($currentUser && $currentUser->role === 'admin') {
                 await ajaxAction(markAllForm, {
                     confirm: { title: 'Mark all as read?', message: 'Every unread notification is marked as read.', confirmLabel: 'Mark all' },
                     busyLabel: 'Marking all as read...',
+                    successMessage: 'All notifications marked as read',
                 }, () => {
                     document.querySelectorAll('.notification-card.unread').forEach(card => {
                         card.classList.remove('unread');
                         card.querySelector('[data-ajax-mark-read]')?.remove();
                     });
                     updateUnreadUi(0);
-                    showSuccessMessage('All notifications marked as read');
                 });
             });
         }
@@ -631,10 +612,10 @@ if ($currentUser && $currentUser->role === 'admin') {
                     confirm: { title: 'Approve this delineation?', message: 'It is published on the map and the resident is notified.', confirmLabel: 'Approve' },
                     busyLabel: 'Approving...',
                     lock: cardButtons(form),
+                    successMessage: 'Delineation approved successfully',
                 }, (data) => {
                     const card = form.closest('[data-notification-id]');
                     card?.remove();
-                    showSuccessMessage(data.message || 'Delineation approved successfully');
                     updateUnreadUi(data.unreadCount ?? 0);
                 });
             });
@@ -657,10 +638,10 @@ if ($currentUser && $currentUser->role === 'admin') {
                     confirm: { title: 'Reject this delineation?', message: 'The resident is notified with your notes and can revise it.', confirmLabel: 'Reject', tone: 'danger' },
                     busyLabel: 'Rejecting...',
                     lock: [...cardButtons(form), textarea],
+                    successMessage: 'Delineation rejected successfully',
                 }, (data) => {
                     const card = form.closest('[data-notification-id]');
                     card?.remove();
-                    showSuccessMessage(data.message || 'Delineation rejected successfully');
                     updateUnreadUi(data.unreadCount ?? 0);
                 });
             });
@@ -674,14 +655,19 @@ if ($currentUser && $currentUser->role === 'admin') {
                     confirm: { title: 'Delete this notification?', message: 'It is removed from your notifications.', confirmLabel: 'Delete', tone: 'danger' },
                     busyLabel: 'Deleting...',
                     lock: cardButtons(form),
+                    successMessage: 'Notification deleted',
                 }, (data) => {
                     const card = form.closest('[data-notification-id]');
                     card?.remove();
-                    showSuccessMessage('Notification deleted');
                     updateUnreadUi(data.unreadCount ?? 0);
                 });
             });
         });
+
+        // Results of full-page submits use the same success toast as the profile page.
+        @if (session('success'))
+        window.AppActions?.notify(@json(session('success')));
+        @endif
 
         document.querySelectorAll('[data-reject-toggle]').forEach(btn => {
             btn.addEventListener('click', () => {
