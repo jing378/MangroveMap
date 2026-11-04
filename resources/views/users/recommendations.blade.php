@@ -67,6 +67,28 @@
             cursor: default;
             opacity: .6;
         }
+        .rec-genus-add {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .rec-genus-add .rec-input {
+            flex: 1;
+            min-width: 0;
+        }
+        #recSelectedGenera {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        #recSelectedGenera .genus-tag-remove {
+            padding: 0;
+            border: 0;
+            background: none;
+            color: inherit;
+            font: inherit;
+        }
         .rec-readonly-note {
             font-size: 11px;
             color: var(--fg-3c5a3c, #3c5a3c);
@@ -207,6 +229,15 @@
                   <button type="button" class="genus-pill-btn" data-genus="{{ $genus }}" aria-pressed="false"></button>
                 @endforeach
               </div>
+              <div class="rec-genus-add">
+                <input id="recCustomGenusInput" class="rec-input" type="text" maxlength="80"
+                  placeholder="Or type another genus..." aria-label="Other recommended mangrove genus">
+                <button type="button" id="recAddCustomGenusBtn" class="btn btn-g"
+                  style="padding:7px 12px;font-size:12px;border-radius:8px;white-space:nowrap;">
+                  <i class="bi bi-plus-lg"></i> Add
+                </button>
+              </div>
+              <div id="recSelectedGenera" aria-live="polite"></div>
             </div>
 
             <div class="rec-field">

@@ -89,7 +89,11 @@ class PlantingRecommendationTest extends TestCase
 
         $this->postJson($url, $this->payload(['recommended_genera' => []]))
             ->assertJsonValidationErrors('recommended_genera');
-        $this->postJson($url, $this->payload(['recommended_genera' => ['Nypa']]))
+        $this->postJson($url, $this->payload(['recommended_genera' => ['MangroveX', 'mangrovex']]))
+            ->assertJsonValidationErrors('recommended_genera.1');
+        $this->postJson($url, $this->payload(['recommended_genera' => [' ']]))
+            ->assertJsonValidationErrors('recommended_genera.0');
+        $this->postJson($url, $this->payload(['recommended_genera' => [str_repeat('A', 81)]]))
             ->assertJsonValidationErrors('recommended_genera.0');
         $this->postJson($url, $this->payload(['suitability' => 'excellent']))
             ->assertJsonValidationErrors('suitability');
@@ -103,6 +107,23 @@ class PlantingRecommendationTest extends TestCase
         $this->postJson($url, $this->payload(['suitability' => 'not_suitable', 'recommended_genera' => ['Sonneratia']]))
             ->assertCreated()
             ->assertJsonPath('recommendation.recommended_genera', []);
+    }
+
+    public function test_recommendation_accepts_all_standard_and_custom_genera(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+        $this->actingAs($expert);
+        $url = route('expert.recommendations.store');
+
+        $this->postJson($url, $this->payload(['recommended_genera' => ['Nypa']]))
+            ->assertCreated()
+            ->assertJsonPath('recommendation.recommended_genera', ['Nypa']);
+        $this->postJson($url, $this->payload(['recommended_genera' => ['Avicennia', 'MangroveX']]))
+            ->assertCreated()
+            ->assertJsonPath('recommendation.recommended_genera', ['Avicennia', 'MangroveX']);
+        $this->postJson($url, $this->payload(['recommended_genera' => [' mangroveY ']]))
+            ->assertCreated()
+            ->assertJsonPath('recommendation.recommended_genera', ['MangroveY']);
     }
 
     public function test_recommendation_text_is_optional(): void

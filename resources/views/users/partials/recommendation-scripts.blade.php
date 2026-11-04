@@ -16,7 +16,15 @@
     const DRAFT_COLOR = '#1a73e8';
     const DRAWING_COLOR = '#4ecdc4';
     const SNAP_PIXEL_THRESHOLD = 15;
-    const genusLocalNames = { Rhizophora: 'Bakawan', Avicennia: 'Bungalon', Sonneratia: 'Pagatpat' };
+    const genusLocalNames = {
+      Rhizophora: 'Bakawan',
+      Avicennia: 'Bungalon',
+      Sonneratia: 'Pagatpat',
+      Bruguiera: 'Miapi',
+      Ceriops: 'Tungog',
+      Xylocarpus: 'Tabigi',
+      Nypa: 'Nipa/Sasa',
+    };
 
     // Same location pin as the landing page (.map-pin in workspace-styles), in the given color.
     function locationPinIcon(color) {
@@ -201,6 +209,8 @@
     const recommendationInput = document.getElementById('recRecommendation');
     const siteNotesInput = document.getElementById('recSiteNotes');
     const genusButtons = [...document.querySelectorAll('#recGenusGroup .genus-pill-btn')];
+    const customGenusInput = document.getElementById('recCustomGenusInput');
+    const addCustomGenusButton = document.getElementById('recAddCustomGenusBtn');
 
     document.querySelectorAll('[data-suitability-swatch]').forEach(swatch => {
       swatch.style.background = SUITABILITY_COLORS[swatch.dataset.suitabilitySwatch];
@@ -568,7 +578,50 @@
         button.disabled = disabled;
         button.innerHTML = `<i class="bi ${active ? 'bi-check2' : 'bi-plus'}"></i> ${genusLabelHtml(genus)}`;
       });
+      customGenusInput.disabled = disabled;
+      addCustomGenusButton.disabled = disabled;
+      document.getElementById('recSelectedGenera').innerHTML = draft
+        ? [...draft.genera].map(genus => `
+          <span class="genus-tag">
+            ${genusLabelHtml(genus)}
+            <button type="button" class="genus-tag-remove" data-remove-genus="${encodeURIComponent(genus)}"
+              aria-label="Remove ${genus.replace(/[&<>"']/g, ch => `&#${ch.charCodeAt(0)};`)}" title="Remove genus"
+              ${disabled ? 'disabled' : ''}>&times;</button>
+          </span>
+        `).join('')
+        : '';
+      document.querySelectorAll('#recSelectedGenera [data-remove-genus]').forEach(button => {
+        button.addEventListener('click', () => {
+          if (!draft?.can_edit) return;
+          draft.genera.delete(decodeURIComponent(button.dataset.removeGenus));
+          renderGenusButtons();
+          updatePanelActions();
+        });
+      });
     }
+
+    function addCustomGenus() {
+      if (!draft?.can_edit || suitabilityInput.value === 'not_suitable') return;
+      const raw = customGenusInput.value.trim();
+      if (!raw) return;
+      const genus = raw.charAt(0).toUpperCase() + raw.slice(1);
+      if (![...draft.genera].some(selected => selected.toLowerCase() === genus.toLowerCase())) {
+        draft.genera.add(genus);
+        document.getElementById('recGenusField').classList.remove('input-error');
+        renderGenusButtons();
+        updatePanelActions();
+      }
+      customGenusInput.value = '';
+      customGenusInput.focus();
+    }
+
+    addCustomGenusButton.addEventListener('click', addCustomGenus);
+    customGenusInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addCustomGenus();
+      }
+    });
 
     genusButtons.forEach(button => button.addEventListener('click', () => {
       if (!draft?.can_edit) return;
@@ -628,6 +681,7 @@
       suitabilityInput.value = draft.suitability || '';
       recommendationInput.value = draft.recommendation || '';
       siteNotesInput.value = draft.site_notes || '';
+      customGenusInput.value = '';
       [nameInput, suitabilityInput, recommendationInput, siteNotesInput].forEach(input => {
         input.disabled = !draft.can_edit;
         input.classList.remove('input-error');

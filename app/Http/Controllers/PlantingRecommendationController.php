@@ -120,7 +120,7 @@ class PlantingRecommendationController extends Controller
             'suitability' => ['required', 'string', Rule::in(array_keys(PlantingRecommendation::SUITABILITY_LEVELS))],
             // A "not suitable" verdict needs no genus; every other verdict names what to plant.
             'recommended_genera' => ['present', 'array', 'required_unless:suitability,not_suitable'],
-            'recommended_genera.*' => ['string', 'distinct', Rule::in(PlantingRecommendation::RECOMMENDED_GENERA)],
+            'recommended_genera.*' => ['string', 'max:80', 'not_regex:/^\s*$/u', 'distinct:ignore_case'],
             'recommendation' => ['nullable', 'string', 'max:5000'],
             'site_notes' => ['nullable', 'string', 'max:5000'],
         ], [
@@ -150,7 +150,9 @@ class PlantingRecommendationController extends Controller
             'delineation_id' => $data['delineation_id'] ?? null,
             'features' => $boundaryResolver->resolveFeatures($features),
             'suitability' => $data['suitability'],
-            'recommended_genera' => $data['suitability'] === 'not_suitable' ? [] : array_values($data['recommended_genera']),
+            'recommended_genera' => $data['suitability'] === 'not_suitable'
+                ? []
+                : array_map(fn(string $genus) => ucfirst(trim($genus)), array_values($data['recommended_genera'])),
             'recommendation' => isset($data['recommendation']) ? (trim($data['recommendation']) ?: null) : null,
             'site_notes' => isset($data['site_notes']) ? (trim($data['site_notes']) ?: null) : null,
         ];

@@ -14,7 +14,15 @@ class PlantingRecommendation extends Model
         'not_suitable' => 'Not suitable',
     ];
 
-    public const RECOMMENDED_GENERA = ['Rhizophora', 'Avicennia', 'Sonneratia'];
+    public const RECOMMENDED_GENERA = [
+        'Rhizophora',
+        'Avicennia',
+        'Sonneratia',
+        'Bruguiera',
+        'Ceriops',
+        'Xylocarpus',
+        'Nypa',
+    ];
 
     protected $fillable = [
         'user_id',
