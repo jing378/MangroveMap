@@ -409,9 +409,14 @@ if ($currentUser && $currentUser->role === 'admin') {
                 <p class="notification-card-meta">{{ $notification->created_at->diffForHumans() }}</p>
             </div>
             <div class="notification-card-actions">
-                @if($delineationId && $viewUrl)
+                @if($viewUrl)
+                {{-- Delineation notifications open the map; others (e.g. expert applications) use their own link. --}}
                 <a href="{{ $viewUrl }}" class="btn-view-delineation" @if(!$notification->read_at) data-mark-read-url="{{ route('notifications.mark-as-read', $notification->id) }}" @endif>
+                    @if($delineationId)
                     <i class="bi bi-map"></i> View
+                    @else
+                    <i class="bi bi-box-arrow-up-right"></i> {{ $notification->data['actionLabel'] ?? 'View' }}
+                    @endif
                 </a>
                 @endif
                 <form action="{{ route('notifications.destroy', $notification->id) }}" method="POST" data-delete-form>

@@ -37,6 +37,19 @@ class AdminAlert extends Notification implements ShouldQueue
     }
 
     /**
+     * The in-app notification is stored right away so admins see it without a queue worker running;
+     * only the email waits for the queue (so a slow mail server never holds up the request).
+     *
+     * @return array<string, string>
+     */
+    public function viaConnections(): array
+    {
+        return [
+            'database' => 'sync',
+        ];
+    }
+
+    /**
      * Get the mail representation of the notification.
      */
     public function toMail(object $notifiable): MailMessage

@@ -58,6 +58,27 @@ class ExpertApplicationTest extends TestCase
         Notification::assertSentTo($admin, AdminAlert::class, fn ($n) => $n->type === 'expert_application');
     }
 
+    public function test_admin_sees_expert_application_alert_without_a_queue_worker(): void
+    {
+        // Like the real app: queued jobs wait in the database until a worker runs.
+        config(['queue.default' => 'database']);
+        Event::fake([Registered::class]);
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->postJson('/register', $this->payload())->assertCreated();
+
+        $notification = $admin->notifications()->first();
+        $this->assertNotNull($notification, 'The in-app alert must not wait for the queue.');
+        $this->assertSame('expert_application', $notification->data['type']);
+
+        $this->actingAs($admin)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertSee('New expert account application')
+            ->assertSee('Review application')
+            ->assertSee(route('admin.users') . '#expert-applications', false);
+    }
+
     public function test_registering_without_expert_application_ignores_application_fields(): void
     {
         Event::fake([Registered::class]);
