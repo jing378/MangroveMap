@@ -100,7 +100,8 @@
     const areasChanged = () => areasSnapshot() !== saved.areas;
     // The slider moves in 5% steps, so a saved 0.78 shows as 80%: within half a step counts as unchanged.
     const opacityChanged = () => Math.abs(state.opacity - saved.opacity) >= 0.025;
-    const hasUnsavedChanges = () => areasChanged() || opacityChanged();
+    // detailsChanged (section 3: name, genus, notes) is a hoisted function declaration further down.
+    const hasUnsavedChanges = () => areasChanged() || opacityChanged() || detailsChanged();
 
     const ai = {
       status: editor.segmentation_status,
@@ -597,12 +598,16 @@
       statusElement.classList.toggle('is-failed', editor.status === 'failed');
       if (editor.status === 'failed') {
         statusElement.textContent = `Adding this imagery to the map failed: ${editor.error_message || 'unknown error'}. Confirm again to retry.`;
+      } else if (editor.status === 'ready' && editor.needs_delineation) {
+        statusElement.textContent = 'This imagery is processed, but its mangrove areas were never submitted. Choose the genus present and confirm.';
       } else if (editor.status === 'ready') {
         statusElement.textContent = editor.has_pending_edits
-          ? 'This imagery is on the map, but saved changes to it are not applied yet. Confirm to rebuild it.'
-          : 'This imagery is on the map. Mangrove area corrections apply as soon as you save.';
+          ? 'This imagery is processed, but saved changes to it are not applied yet. Confirm to rebuild it.'
+          : 'This imagery is processed. Its delineation is edited on the map, like any other delineation.';
       } else {
-        statusElement.textContent = 'Not on the map yet. Correct the mangrove areas, then confirm.';
+        statusElement.textContent = editor.needs_expert_review
+          ? 'Not on the map yet. Correct the mangrove areas, choose the genus present, then submit them for expert review.'
+          : 'Not on the map yet. Correct the mangrove areas, choose the genus present, then publish.';
       }
     }
 
@@ -615,11 +620,145 @@
       renderActionButtons();
     }
 
+    // ---- 3. Delineation details (first confirm only): submitted with the imagery ------------------
+    const generaBox = document.getElementById('droneEditorGenera');
+    const otherGeneraInput = document.getElementById('droneEditorOtherGenera');
+    const addGenusButton = document.getElementById('droneEditorAddGenus');
+    const selectedGeneraContainer = document.getElementById('droneEditorSelectedGenera');
+    const customGenera = [];
+
+    function selectedGenera() {
+      if (!generaBox) return [];
+      const picked = [...generaBox.querySelectorAll('.drone-editor-genus[aria-pressed="true"]')]
+        .map(button => button.dataset.genus)
+        .filter(Boolean);
+      const other = (otherGeneraInput?.value || '').split(',').map(value => value.trim()).filter(Boolean);
+      return [...new Set([...picked, ...customGenera, ...other])];
+    }
+
+    function renderCustomGenera() {
+      if (!selectedGeneraContainer) return;
+      selectedGeneraContainer.replaceChildren(...customGenera.map(genus => {
+        const tag = document.createElement('span');
+        tag.className = 'drone-editor-selected-genus';
+
+        const name = document.createElement('span');
+        name.textContent = genus;
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = '×';
+        remove.title = `Remove ${genus}`;
+        remove.setAttribute('aria-label', `Remove ${genus}`);
+        remove.addEventListener('click', () => {
+          customGenera.splice(customGenera.indexOf(genus), 1);
+          renderCustomGenera();
+          renderActionButtons();
+        });
+
+        tag.append(name, remove);
+        return tag;
+      }));
+    }
+
+    function addCustomGenera() {
+      if (!otherGeneraInput) return;
+      const entered = otherGeneraInput.value
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean)
+        .map(value => value.charAt(0).toUpperCase() + value.slice(1));
+      const selected = [...(generaBox
+        ? [...generaBox.querySelectorAll('.drone-editor-genus[aria-pressed="true"]')]
+          .map(button => button.dataset.genus)
+          .filter(Boolean)
+        : []), ...customGenera];
+      const existing = new Set(selected.map(genus => genus.toLowerCase()));
+
+      entered.forEach(genus => {
+        if (!existing.has(genus.toLowerCase())) {
+          customGenera.push(genus);
+          existing.add(genus.toLowerCase());
+        }
+      });
+
+      otherGeneraInput.value = '';
+      renderCustomGenera();
+      renderActionButtons();
+    }
+
+    const delineationNameInput = document.getElementById('droneEditorDelineationName');
+    const delineationNotesInput = document.getElementById('droneEditorDelineationNotes');
+
+    function delineationDetails() {
+      return {
+        name: delineationNameInput?.value.trim() || '',
+        genera: selectedGenera(),
+        notes: delineationNotesInput?.value.trim() || '',
+      };
+    }
+
+    // "Save draft" keeps the details too; compare with what the server has to enable it.
+    const detailsSnapshot = () => JSON.stringify(delineationDetails());
+    function detailsChanged() {
+      return editor.needs_delineation && saved.details !== undefined && detailsSnapshot() !== saved.details;
+    }
+
+    function setGenusPressed(button, selected) {
+      button.setAttribute('aria-pressed', String(selected));
+      button.classList.toggle('active', selected);
+      const icon = button.querySelector('i');
+      icon?.classList.toggle('bi-plus', !selected);
+      icon?.classList.toggle('bi-check2', selected);
+    }
+
+    generaBox?.addEventListener('click', event => {
+      const button = event.target.closest('.drone-editor-genus');
+      if (!button) return;
+
+      setGenusPressed(button, button.getAttribute('aria-pressed') !== 'true');
+      renderActionButtons();
+    });
+    [delineationNameInput, delineationNotesInput].forEach(input => input?.addEventListener('input', () => renderActionButtons()));
+
+    // Reopen with the details kept by "Save draft": listed genera as pressed pills, others as custom tags.
+    (() => {
+      const draft = editor.delineation_draft;
+      if (!editor.needs_delineation || !draft) return;
+      if (delineationNameInput && draft.name) delineationNameInput.value = draft.name;
+      if (delineationNotesInput && draft.notes) delineationNotesInput.value = draft.notes;
+      const buttons = generaBox ? [...generaBox.querySelectorAll('.drone-editor-genus')] : [];
+      (draft.genera || []).forEach(genus => {
+        const button = buttons.find(item => item.dataset.genus?.toLowerCase() === String(genus).toLowerCase());
+        if (button) setGenusPressed(button, true);
+        else if (!customGenera.some(item => item.toLowerCase() === String(genus).toLowerCase())) customGenera.push(genus);
+      });
+      renderCustomGenera();
+    })();
+    saved.details = detailsSnapshot();
+    addGenusButton?.addEventListener('click', addCustomGenera);
+    otherGeneraInput?.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addCustomGenera();
+      }
+    });
+    otherGeneraInput?.addEventListener('input', () => renderActionButtons());
+
     // Why Confirm cannot be used yet (null = it can).
     function confirmBlocker(unsaved) {
       // The AI job reads the mosaic that confirming rebuilds from, so wait for it to finish.
       if (aiIsRunning()) return 'Available when AI detection has finished.';
       if (ai.status === 'ready' && !ai.loaded) return 'Available when the mangrove areas have loaded.';
+      if (editor.needs_delineation) {
+        const count = areas().length;
+        if (!count) return 'Draw at least one mangrove area first (or run AI detection).';
+        if (count > editor.max_delineation_areas) {
+          return `A delineation can hold up to ${editor.max_delineation_areas} areas; there are ${count}. Remove the smallest ones.`;
+        }
+        if (!selectedGenera().length) return 'Choose at least one Mangrove Genus Present.';
+        return null;
+      }
       // Already on the map: only a rebuild with something new is worth confirming.
       if (editor.status === 'ready' && !unsaved && !editor.has_pending_edits) {
         return 'No changes to apply. Edit the mangrove areas or the appearance first.';
@@ -648,7 +787,9 @@
         busy: state.busy === 'save',
         idleHtml: SAVE_IDLE_HTML,
         busyLabel: 'Saving draft...',
-        title: unsaved ? '' : 'No unsaved changes. Edit the mangrove areas or the appearance first.',
+        title: unsaved ? '' : (editor.needs_delineation
+          ? 'No unsaved changes. Edit the mangrove areas, delineation details or appearance first.'
+          : 'No unsaved changes. Edit the mangrove areas or the appearance first.'),
       });
       setActionButton(confirmButton, {
         disabled: Boolean(state.busy) || blocker !== null,
@@ -696,11 +837,14 @@
     // Confirmation (partials.action-feedback) → Processing (button label) → Success or Error (message line).
     saveButton.addEventListener('click', async () => {
       if (saveButton.disabled) return;
+      const what = editor.needs_delineation
+        ? 'Your mangrove area corrections, delineation details (name, genus, notes) and appearance are saved.'
+        : 'Your mangrove area corrections and appearance are saved.';
       const confirmed = await window.AppActions.confirm({
         title: 'Save draft?',
-        message: editor.status === 'ready'
-          ? 'Your mangrove area corrections and appearance are saved and shown on the map.'
-          : 'Your mangrove area corrections and appearance are saved. You can come back and confirm later.',
+        message: editor.needs_delineation || editor.status !== 'ready'
+          ? `${what} You can come back and confirm later.`
+          : `${what} They are shown on the map.`,
         confirmLabel: 'Save',
       });
       if (!confirmed || state.busy || !hasUnsavedChanges()) return;
@@ -710,8 +854,13 @@
       try {
         await saveAiAreas();
         const sentOpacity = state.opacity;
-        const body = await send(editor.save_url, 'PUT', editsPayload());
+        const sentDetails = editor.needs_delineation ? delineationDetails() : null;
+        const body = await send(editor.save_url, 'PUT', {
+          ...editsPayload(),
+          ...(sentDetails ? { delineation: sentDetails } : {}),
+        });
         saved.opacity = sentOpacity;
+        if (sentDetails) saved.details = JSON.stringify(sentDetails);
         editor.has_pending_edits = body.has_pending_edits;
         renderStatus();
         showMessage(editor.status === 'ready' && body.has_pending_edits
@@ -727,9 +876,15 @@
 
     confirmButton.addEventListener('click', async () => {
       if (confirmButton.disabled) return;
-      const confirmed = await window.AppActions.confirm(editor.status === 'ready'
-        ? { title: 'Confirm?', message: 'This imagery is rebuilt on the map with your changes. It is hidden while it is processed.', confirmLabel: 'Confirm' }
-        : { title: 'Confirm?', message: 'This imagery and its mangrove areas are added to the map. Processing runs in the background.', confirmLabel: 'Confirm' });
+      let dialog;
+      if (!editor.needs_delineation) {
+        dialog = { title: 'Confirm?', message: 'This imagery is rebuilt with your changes. It is hidden while it is processed.', confirmLabel: 'Confirm' };
+      } else if (editor.needs_expert_review) {
+        dialog = { title: 'Submit for expert review?', message: 'The imagery is processed and its mangrove areas are submitted as a delineation. Once an expert approves it, both appear on the map.', confirmLabel: 'Submit' };
+      } else {
+        dialog = { title: 'Publish?', message: 'The imagery is processed in the background, then it and its mangrove areas are published on the map.', confirmLabel: 'Publish' };
+      }
+      const confirmed = await window.AppActions.confirm(dialog);
       if (!confirmed || state.busy || confirmButton.disabled) return;
 
       state.busy = 'confirm';
@@ -737,7 +892,10 @@
       showMessage('Sending your edits…');
       try {
         await saveAiAreas();
-        const body = await send(editor.confirm_url, 'POST', editsPayload());
+        const body = await send(editor.confirm_url, 'POST', {
+          ...editsPayload(),
+          ...(editor.needs_delineation ? { delineation: delineationDetails() } : {}),
+        });
         state.leaving = true;
         showMessage('Confirmed. Opening Drone Upload, where you can follow the progress…');
         window.location.href = body.redirect_url || editor.back_url;

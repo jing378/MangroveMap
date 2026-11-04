@@ -127,6 +127,11 @@
     const droneSegmentationCache = new Map(); // `${id}:${segmented_at}` -> payload
     let droneSegmentationPollTimer = null;
 
+    // layer.auto_show: published imagery (an expert's, or a resident's whose delineation an expert approved;
+    // the delineation itself is drawn with the other delineations), and for experts, resident imagery under
+    // review. Turned on once per page load, so unticking it is not undone by the status poll.
+    const droneAutoShownTiles = new Set();
+
     function isDroneSegmenting(layer) {
       return ['queued', 'processing'].includes(layer.segmentation_status);
     }
@@ -329,7 +334,6 @@
         });
         toggleLabel.append(toggle, document.createTextNode(' Show AI extent'));
         actions.appendChild(toggleLabel);
-
         if (typeof window.useAiExtentAsDelineation === 'function') {
           const useButton = document.createElement('button');
           useButton.type = 'button';
@@ -359,7 +363,6 @@
                   `Loaded ${loaded} AI area${loaded === 1 ? '' : 's'} as a draft${skipped > 0 ? ` (${skipped} smaller skipped)` : ''}. Edit the shapes, select the genus present and save.`
                 );
                 document.getElementById('droneImageryMenu')?.classList.remove('show');
-                document.getElementById('droneImageryToggle')?.setAttribute('aria-expanded', 'false');
               }
             } catch (error) {
               showDroneImageryMessage(error.message, true);
@@ -525,6 +528,11 @@
         const tileLayer = addDroneImageryTileLayer(layer);
         if (!tileLayer) return;
 
+        if (layer.auto_show && !droneAutoShownTiles.has(layer.id)) {
+          droneAutoShownTiles.add(layer.id);
+          if (!mainMap.hasLayer(tileLayer)) tileLayer.addTo(mainMap);
+        }
+
         checkbox.checked = mainMap.hasLayer(tileLayer) || Number(activateLayerId) === Number(layer.id);
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
@@ -683,21 +691,20 @@
       const isOpen = menu.classList.toggle('show');
       if (isOpen) {
         document.getElementById('droneImageryMenu')?.classList.remove('show');
-        document.getElementById('droneImageryToggle')?.setAttribute('aria-expanded', 'false');
       }
       toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     };
 
+    // The drone panel has no map button (the sidebar's Drone Upload tab replaced it); it is opened by
+    // the progress chip and by "View on map" (?drone=upload) from the Drone Upload page.
     window.toggleDroneImageryMenu = () => {
       const menu = document.getElementById('droneImageryMenu');
-      const toggle = document.getElementById('droneImageryToggle');
-      if (!menu || !toggle) return;
+      if (!menu) return;
       const isOpen = menu.classList.toggle('show');
       if (isOpen) {
         document.getElementById('layerMenu')?.classList.remove('show');
         document.getElementById('layerToggle')?.setAttribute('aria-expanded', 'false');
       }
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     };
 
     // "View on map" on the Drone Upload page links here with ?drone=upload to open the drone imagery panel
@@ -718,15 +725,15 @@
     }
 
     document.addEventListener('click', (event) => {
-      [
-        ['layerMenu', 'layerToggle'],
-        ['droneImageryMenu', 'droneImageryToggle'],
-      ].forEach(([menuId, toggleId]) => {
-        const menu = document.getElementById(menuId);
-        const toggle = document.getElementById(toggleId);
-        if (menu && toggle && !menu.contains(event.target) && !toggle.contains(event.target)) {
-          menu.classList.remove('show');
-          toggle.setAttribute('aria-expanded', 'false');
-        }
-      });
+      const layerMenu = document.getElementById('layerMenu');
+      const layerToggle = document.getElementById('layerToggle');
+      if (layerMenu && layerToggle && !layerMenu.contains(event.target) && !layerToggle.contains(event.target)) {
+        layerMenu.classList.remove('show');
+        layerToggle.setAttribute('aria-expanded', 'false');
+      }
+      // The progress chip stops propagation when it opens the panel, so it never reaches this.
+      const droneMenu = document.getElementById('droneImageryMenu');
+      if (droneMenu && !droneMenu.contains(event.target)) {
+        droneMenu.classList.remove('show');
+      }
     });

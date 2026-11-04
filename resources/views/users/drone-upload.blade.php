@@ -308,6 +308,41 @@
             margin-top: 2px;
         }
 
+        .drone-item-uploader {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--fg-1a2e1a, #1a2e1a);
+            margin-top: 4px;
+        }
+
+        .drone-role {
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            background: var(--bg-eef3ee, #eef3ee);
+            color: var(--fg-4c6b5d, #4c6b5d);
+        }
+
+        .drone-role.is-expert {
+            background: var(--bg-e6f0ff, #e6f0ff);
+            color: var(--fg-1d4fa3, #1d4fa3);
+        }
+
+        .drone-others {
+            margin-top: 18px;
+        }
+
+        .drone-others-hint {
+            font-size: 13px;
+            color: var(--fg-6b8a78, #6b8a78);
+            margin: -4px 0 12px;
+        }
+
         .drone-badge {
             flex-shrink: 0;
             padding: 4px 10px;
@@ -483,6 +518,18 @@
                 </div>
             </section>
         </div>
+
+        @if ($page['shows_others'])
+            {{-- Experts: everyone else's uploads (residents and other experts), with the uploader's name. --}}
+            <section class="drone-card drone-others" aria-labelledby="droneOthersTitle">
+                <h2 id="droneOthersTitle">Uploads by residents and other experts</h2>
+                <p class="drone-others-hint">Residents' imagery reaches the map once an expert approves its delineation.
+                    Open a submitted delineation to review it next to the imagery.</p>
+                <div id="droneOthersList" class="drone-list" aria-live="polite">
+                    <div class="drone-empty"><i class="bi bi-hourglass-split"></i>Loading…</div>
+                </div>
+            </section>
+        @endif
     </main>
 @endsection
 

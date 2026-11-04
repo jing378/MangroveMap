@@ -22,6 +22,7 @@ class Delineation extends Model
 
     protected $fillable = [
         'user_id',
+        'drone_imagery_layer_id',
         'name',
         'notes',
         'planting_recommendation',
@@ -74,6 +75,11 @@ class Delineation extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function droneImageryLayer()
+    {
+        return $this->belongsTo(DroneImageryLayer::class);
     }
 
     public function approvedBy()

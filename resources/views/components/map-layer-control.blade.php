@@ -4,10 +4,6 @@
     aria-controls="layerMenu" title="Choose map layer" aria-label="Choose map layer">
     <i class="bi bi-layers-fill"></i>
   </button>
-  <button id="droneImageryToggle" type="button" onclick="toggleDroneImageryMenu()" aria-expanded="false"
-    aria-controls="droneImageryMenu" title="Drone imagery" aria-label="Drone imagery">
-    <i class="bi bi-globe2"></i>
-  </button>
   {{ $slot }}
   <div id="layerMenu" class="layer-menu" aria-label="Base layer options">
     <button class="layer-option active" onclick="setBase('sat', this)">Satellite</button>
@@ -16,6 +12,8 @@
     <button class="layer-option" onclick="setBase('mangrove', this)"
       title="High-resolution view for identifying mangrove areas">Mangrove 400-ft View</button>
   </div>
+  {{-- No map button: the sidebar's Drone Upload tab is the entry point. The panel still opens from the
+       progress chip below and from "View on map" (?drone=upload) on the Drone Upload page. --}}
   <div id="droneImageryMenu" class="layer-menu drone-imagery-menu" aria-label="Drone imagery uploads and layers">
     <section class="drone-imagery-panel" aria-labelledby="droneImageryTitle">
       <h3 id="droneImageryTitle">Drone imagery</h3>

@@ -185,8 +185,31 @@
     updateSubmitState();
 
     // ---- Layer list ------------------------------------------------------------------------
-    const STEPS = ['Upload', 'Preview', 'AI detection', 'Your review', 'On the map'];
+    // Residents' imagery and delineation go on the map once an expert approves them; experts publish directly.
+    const STEPS = page.needs_expert_review
+      ? ['Upload', 'Preview', 'AI detection', 'Your review', 'Expert review', 'On the map']
+      : ['Upload', 'Preview', 'AI detection', 'Your review', 'On the map'];
+    const MAP_STEP = STEPS.length - 1;
     const isSegmenting = layer => ['queued', 'processing'].includes(layer.segmentation_status);
+
+    // A tiled layer: where its submitted delineation stands with the experts.
+    function readyStage(layer) {
+      if (isSegmenting(layer)) {
+        return { step: 4, busy: true, badge: 'AI running', tone: 'busy', text: 'The AI is detecting mangroves…' };
+      }
+      const unapplied = layer.has_pending_edits ? ' You saved edits that are not applied yet; open the editor and confirm them.' : '';
+      if (layer.review_state === 'pending') {
+        return { step: 4, waiting: true, badge: 'Awaiting expert review', tone: 'review', text: `Submitted. An expert will check the imagery and its mangrove areas; once approved, both appear on the map.${unapplied}` };
+      }
+      if (layer.review_state === 'rejected') {
+        return { step: 4, rejected: true, badge: 'Not approved', tone: 'failed', text: `An expert did not approve this delineation${layer.rejection_notes ? `: “${layer.rejection_notes}”` : '.'} Revise it and submit it again.${unapplied}` };
+      }
+      if (layer.is_published) {
+        return { step: MAP_STEP, badge: 'On the map', tone: 'ready', text: `The imagery and its delineation are on the map.${unapplied}` };
+      }
+      // Confirmed before delineations were submitted with the imagery: confirm again to submit one.
+      return { step: 3, waiting: true, badge: 'Not submitted', tone: 'review', text: 'Open the editor, choose the genus present and confirm to submit the mangrove areas.' };
+    }
 
     // step = index of the current step; busy = server work running (polled); waiting = needs the user.
     function stageOf(layer) {
@@ -196,12 +219,11 @@
         case 'awaiting_review':
           return isSegmenting(layer)
             ? { step: 2, busy: true, badge: 'AI running', tone: 'busy', text: 'The AI is detecting mangroves. You can already open the review, but you can only confirm once the AI has finished.' }
-            : { step: 3, waiting: true, badge: 'Ready for your review', tone: 'review', text: 'Remove the parts that are not mangrove (the AI result can do most of the work), then add the imagery to the map.' };
-        case 'finalizing': return { step: 4, busy: true, badge: 'Building map', tone: 'busy', text: 'Applying your edits and building the map tiles…' };
-        case 'ready':
-          return isSegmenting(layer)
-            ? { step: 4, busy: true, badge: 'On the map', tone: 'ready', text: 'On the map. The AI is detecting mangroves…' }
-            : { step: 5, badge: 'On the map', tone: 'ready', text: layer.has_pending_edits ? 'On the map. You saved edits that are not applied yet; open the editor and confirm them.' : 'On the map.' };
+            : { step: 3, waiting: true, badge: 'Ready for your review', tone: 'review', text: page.needs_expert_review
+              ? 'Check the mangrove areas (the AI result does most of the work), choose the genus present, then confirm and submit them for expert review.'
+              : 'Check the mangrove areas (the AI result does most of the work), choose the genus present, then confirm to publish them with the imagery.' };
+        case 'finalizing': return { step: 3, busy: true, badge: 'Building map', tone: 'busy', text: 'Applying your edits and building the map tiles…' };
+        case 'ready': return readyStage(layer);
         default: return { step: -1, badge: 'Failed', tone: 'failed', text: `Processing failed: ${layer.error_message || 'unknown error'}` };
       }
     }
@@ -245,11 +267,12 @@
 
       const steps = element('div', 'drone-steps');
       steps.setAttribute('aria-hidden', 'true');
+      steps.style.gridTemplateColumns = `repeat(${STEPS.length}, 1fr)`; // residents have an extra review step
       STEPS.forEach((label, index) => {
         let state = '';
         if (stage.step === -1) state = index === 0 ? 'is-done' : (index === 1 ? 'is-failed' : '');
         else if (index < stage.step) state = 'is-done';
-        else if (index === stage.step) state = stage.waiting ? 'is-waiting' : (stage.busy ? 'is-active' : 'is-done');
+        else if (index === stage.step) state = stage.rejected ? 'is-failed' : (stage.waiting ? 'is-waiting' : (stage.busy ? 'is-active' : 'is-done'));
         steps.append(element('span', `drone-step ${state}`, label));
       });
 
@@ -259,12 +282,13 @@
 
       const actions = element('div', 'drone-item-actions');
       if (layer.review_url) {
-        const label = layer.status === 'awaiting_review' ? 'Review & add to map'
+        const label = layer.status === 'awaiting_review' ? (page.needs_expert_review ? 'Review & submit' : 'Review & publish')
           : (layer.status === 'failed' ? 'Edit & retry' : 'Edit imagery');
-        actions.append(linkButton(layer.review_url, label, 'bi-pencil-square', layer.status !== 'ready'));
+        actions.append(linkButton(layer.review_url, label, 'bi-pencil-square', layer.status !== 'ready' || stage.badge === 'Not submitted'));
       }
-      if (layer.status === 'ready') {
-        actions.append(linkButton(`${page.map_url}?drone=upload&drone_layer=${encodeURIComponent(layer.id)}`, 'View on map', 'bi-map', !layer.review_url));
+      // A rejected delineation is revised where it was drawn (the existing revise flow on the Delineate map).
+      if (layer.review_state === 'rejected' && layer.delineation_url) {
+        actions.append(linkButton(layer.delineation_url, 'Revise delineation', 'bi-arrow-repeat', true));
       }
       const remove = element('button', 'drone-btn danger');
       remove.type = 'button';
@@ -326,18 +350,85 @@
       }
     }
 
+    // ---- Experts: everyone else's uploads (residents and other experts), read-only ---------------
+    const othersList = document.getElementById('droneOthersList');
+    const ROLE_LABELS = { end_user: 'Resident', expert: 'Expert', admin: 'Admin' };
+
+    // Where someone else's upload stands, worded for the expert looking at it.
+    function otherStage(layer) {
+      switch (layer.status) {
+        case 'queued':
+        case 'processing': return { busy: true, badge: 'Processing', tone: 'busy', text: 'The server is preparing the preview.' };
+        case 'awaiting_review': return { badge: 'With the uploader', tone: 'review', text: 'Prepared and checked by the AI; the uploader has not submitted it yet.' };
+        case 'finalizing': return { busy: true, badge: 'Building map', tone: 'busy', text: 'The uploader confirmed it; the map tiles are being built.' };
+        case 'ready':
+          if (layer.review_state === 'pending') return { badge: 'Awaiting expert review', tone: 'review', text: 'Submitted for review. Open the delineation to approve or reject it; the imagery is shown under it.' };
+          if (layer.review_state === 'rejected') return { badge: 'Not approved', tone: 'failed', text: `Not approved${layer.rejection_notes ? `: “${layer.rejection_notes}”` : '.'} The uploader can revise and resubmit it.` };
+          if (layer.is_published) return { badge: 'On the map', tone: 'ready', text: 'The imagery and its delineation are on the map.' };
+          return { badge: 'Not submitted', tone: 'review', text: 'Processed, but no delineation was submitted from it yet.' };
+        default: return { badge: 'Failed', tone: 'failed', text: `Processing failed: ${layer.error_message || 'unknown error'}` };
+      }
+    }
+
+    function renderOtherLayer(layer) {
+      const stage = otherStage(layer);
+      const item = element('article', 'drone-item');
+      item.dataset.layerId = layer.id;
+
+      const head = element('div', 'drone-item-head');
+      const title = element('div');
+      title.append(element('div', 'drone-item-name', layer.name));
+      const uploader = element('div', 'drone-item-uploader');
+      uploader.append(element('i', 'bi bi-person-circle'), element('span', '', `Uploaded by ${layer.uploaded_by || 'Unknown user'}`));
+      if (ROLE_LABELS[layer.uploader_role]) {
+        uploader.append(element('span', `drone-role${layer.uploader_role === 'expert' ? ' is-expert' : ''}`, ROLE_LABELS[layer.uploader_role]));
+      }
+      title.append(uploader);
+      const uploaded = layer.created_at ? new Date(layer.created_at).toLocaleString() : '';
+      title.append(element('div', 'drone-item-meta', `${layer.source_type === 'batch' ? 'Mosaic of several GeoTIFFs' : 'Single GeoTIFF'}${uploaded ? ` · uploaded ${uploaded}` : ''}`));
+      head.append(title, element('span', `drone-badge is-${stage.tone}`, stage.badge));
+
+      const stateText = element('div', `drone-item-state${stage.tone === 'failed' ? ' is-failed' : ''}`, stage.text);
+      const ai = aiSummary(layer).replace('(corrected by you)', '(corrected by the uploader)');
+      if (ai) stateText.append(document.createElement('br'), ai);
+
+      item.append(head, stateText);
+      if (layer.delineation_url) {
+        const actions = element('div', 'drone-item-actions');
+        actions.append(linkButton(
+          layer.delineation_url,
+          layer.review_state === 'pending' ? 'Review delineation' : 'Open delineation',
+          'bi-geo-alt',
+          layer.review_state === 'pending'
+        ));
+        item.append(actions);
+      }
+      return item;
+    }
+
+    function renderOthers(layers) {
+      if (!othersList) return;
+      othersList.replaceChildren();
+      if (!layers.length) {
+        othersList.append(element('div', 'drone-empty', 'No uploads from residents or other experts yet.'));
+        return;
+      }
+      layers.forEach(layer => othersList.append(renderOtherLayer(layer)));
+    }
+
     async function loadLayers() {
       const response = await fetch(page.index_url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !Array.isArray(payload.layers)) {
         throw new Error(payload.message || 'Unable to load your drone imagery.');
       }
-      // Shared expert layers are shown on the map; this tab lists only the viewer's own uploads.
       const owned = payload.layers.filter(layer => layer.is_owner);
       render(owned);
+      const others = page.shows_others ? payload.layers.filter(layer => !layer.is_owner) : [];
+      renderOthers(others);
 
       clearTimeout(pollTimer);
-      if (owned.some(layer => stageOf(layer).busy)) {
+      if (owned.some(layer => stageOf(layer).busy) || others.some(layer => otherStage(layer).busy)) {
         pollTimer = setTimeout(() => loadLayers().catch(error => console.error('Unable to refresh drone imagery.', error)), 5000);
       }
       return owned;
@@ -345,6 +436,7 @@
 
     loadLayers().catch(error => {
       list.replaceChildren(element('div', 'drone-empty', error.message));
+      othersList?.replaceChildren(element('div', 'drone-empty', error.message));
     });
   })();
 </script>

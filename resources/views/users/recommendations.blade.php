@@ -272,14 +272,14 @@
             <button type="submit" id="recSaveBtn" class="btn btn-g delineation-save-btn" style="width:100%;margin-bottom:8px;">
               <i class="bi bi-save"></i> <span>Save recommendation</span>
             </button>
-            <button type="button" id="recCancelBtn" class="btn" style="width:100%;margin-bottom:8px;display:none;">
-              <i class="bi bi-x-circle"></i> Discard changes
-            </button>
             <button type="button" id="recDeleteBtn" class="btn"
               style="width:100%;display:none;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);">
               <i class="bi bi-trash"></i> Delete recommendation
             </button>
           </form>
+          {{-- Below the card, like "Remove delineation" on the Delineate panel. --}}
+          <button type="button" id="recCancelBtn" class="btn"
+            style="width:100%;margin-top:8px;margin-bottom:14px;display:none;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);"><i class="bi bi-x-circle"></i> Discard changes</button>
         </div>
       </div>
     </div>

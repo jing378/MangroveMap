@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -40,6 +42,7 @@ class DroneImageryLayer extends Model
         'segmentation_stats',
         'segmentation_error',
         'segmented_at',
+        'delineation_details',
     ];
 
     protected function casts(): array
@@ -55,7 +58,56 @@ class DroneImageryLayer extends Model
             'reviewed_at' => 'datetime',
             'segmentation_stats' => 'array',
             'segmented_at' => 'datetime',
+            'delineation_details' => 'array',
         ];
+    }
+
+    /**
+     * Shared on everyone's map: ready, and either uploaded by an expert (published without review) or
+     * its submitted delineation was approved by an expert. Resident imagery stays private until then.
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('drone_imagery_layers.status', 'ready')
+            ->where(fn (Builder $published) => $published
+                ->whereHas('user', fn (Builder $user) => $user->where('role', 'expert'))
+                ->orWhereHas('delineation', fn (Builder $delineation) => $delineation
+                    ->where('is_approved', true)
+                    ->where('is_rejected', false)));
+    }
+
+    /** A resident's tiled imagery whose delineation waits for an expert: experts see it to review. */
+    public function scopeAwaitingExpertReview(Builder $query): Builder
+    {
+        return $query->where('drone_imagery_layers.status', 'ready')
+            ->whereHas('delineation', fn (Builder $delineation) => $delineation->pending());
+    }
+
+    public function isPublished(): bool
+    {
+        if ($this->status !== 'ready') {
+            return false;
+        }
+
+        $delineation = $this->delineation;
+
+        return (bool) $this->user?->isExpert()
+            || ($delineation !== null && $delineation->is_approved && ! $delineation->is_rejected);
+    }
+
+    /** null (no delineation submitted from this imagery), pending, approved or rejected. */
+    public function reviewState(): ?string
+    {
+        $delineation = $this->delineation;
+        if ($delineation === null) {
+            return null;
+        }
+
+        return match (true) {
+            (bool) $delineation->is_approved => 'approved',
+            (bool) $delineation->is_rejected => 'rejected',
+            default => 'pending',
+        };
     }
 
     public function isSegmenting(): bool
@@ -118,6 +170,12 @@ class DroneImageryLayer extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The delineation submitted from this imagery's mangrove areas (one per layer). */
+    public function delineation(): HasOne
+    {
+        return $this->hasOne(Delineation::class);
     }
 
     public function files(): HasMany

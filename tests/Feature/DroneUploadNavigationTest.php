@@ -30,17 +30,18 @@ class DroneUploadNavigationTest extends TestCase
             ->assertSee('id="droneUploadForm"', false)
             ->assertSee('Your drone imagery')
             ->assertSee(str_replace('/', '\/', route('drone-imagery.store')), false)
-            // "View on map" goes to the resident's Delineate page.
-            ->assertSee(str_replace('/', '\/', route('delineate')), false);
+            ->assertDontSee('View on map');
     }
 
-    public function test_expert_view_on_map_uses_the_expert_delineate_page(): void
+    public function test_only_residents_get_the_expert_review_step(): void
     {
-        $expert = User::factory()->create(['role' => 'expert']);
-
-        $this->actingAs($expert)->get(route('drone-imagery.page'))
+        $this->actingAs(User::factory()->create(['role' => 'end_user']))->get(route('drone-imagery.page'))
             ->assertOk()
-            ->assertSee(str_replace('/', '\/', route('expert.delineate')), false);
+            ->assertSee('"needs_expert_review":true', false);
+
+        $this->actingAs(User::factory()->create(['role' => 'expert']))->get(route('drone-imagery.page'))
+            ->assertOk()
+            ->assertSee('"needs_expert_review":false', false);
     }
 
     public function test_guests_are_sent_to_login(): void

@@ -336,14 +336,23 @@
       }
 
       if (!draft) return;
+      // Panel hidden with ×: the draft is kept and clicking it brings the panel back.
+      const panelHidden = !panel.classList.contains('open');
       draft.features.forEach((feature, featureIndex) => {
         const polygon = L.polygon(feature.coords, {
           color: DRAFT_COLOR,
           fillColor: DRAFT_COLOR,
           fillOpacity: 0.3,
           weight: 3,
-          interactive: false,
+          interactive: panelHidden,
         }).addTo(draftLayer);
+        if (panelHidden) {
+          polygon.bindTooltip(draft.id === null ? 'Unsaved recommendation · click to continue' : `${draft.name || 'Recommendation'} · click to continue editing`, { sticky: true });
+          polygon.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            reopenDraftPanel();
+          });
+        }
         if (draft.editingArea) renderEditableVertices(feature, featureIndex, polygon);
       });
     }
@@ -535,7 +544,25 @@
       panel.classList.remove('expanded');
       document.getElementById('panelBackdrop').classList.remove('show');
     });
-    document.getElementById('recClosePanelBtn').addEventListener('click', () => closeDraft());
+    // × only hides the panel, like the Delineate side panel: a new or edited draft stays on the map (nothing
+    // is discarded) and clicking it reopens the panel. Discarding is the panel's Discard button.
+    function closePanelKeepDraft() {
+      if (draft && draft.id !== null && !isDraftDirty() && !draft.editingArea) {
+        closeDraft(true); // a saved recommendation with nothing changed: nothing to keep
+        return;
+      }
+      hidePanel();
+      renderDraft(); // the draft becomes clickable to reopen the panel
+    }
+
+    function reopenDraftPanel() {
+      if (!draft || panel.classList.contains('open')) return;
+      openPanel();
+      updatePanelActions();
+      renderDraft();
+    }
+
+    document.getElementById('recClosePanelBtn').addEventListener('click', closePanelKeepDraft);
 
     function readForm() {
       return {

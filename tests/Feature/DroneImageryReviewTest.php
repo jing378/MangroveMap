@@ -37,6 +37,18 @@ class DroneImageryReviewTest extends TestCase
         return $layer;
     }
 
+    /** Mangrove areas to submit plus the first confirm's delineation details (genus is required). */
+    private function submittable(DroneImageryLayer $layer): array
+    {
+        $path = "drone-imagery/processed/{$layer->id}/ai_extent.json";
+        Storage::disk('local')->put($path, json_encode([
+            'features' => [['type' => 'area', 'coords' => [[9.999, 124.001], [9.999, 124.004], [9.995, 124.004]]]],
+        ]));
+        $layer->update(['segmentation_status' => 'ready', 'segmentation_path' => $path]);
+
+        return ['delineation' => ['genera' => ['Rhizophora']]];
+    }
+
     private function editsPayload(array $overrides = []): array
     {
         return [
@@ -56,7 +68,7 @@ class DroneImageryReviewTest extends TestCase
 
         $this->actingAs($owner)->get(route('drone-imagery.edit', $layer->id))
             ->assertOk()
-            ->assertSee('Confirm &amp; add to map', false)
+            ->assertSee('Confirm &amp; submit for review', false)
             ->assertSee(str_replace('/', '\/', route('drone-imagery.preview', $layer->id)), false);
 
         $this->actingAs($owner)->get(route('drone-imagery.preview', $layer->id))
@@ -137,9 +149,10 @@ class DroneImageryReviewTest extends TestCase
         Queue::fake();
         $owner = User::factory()->create();
         $layer = $this->reviewLayer($owner);
+        $details = $this->submittable($layer);
 
         $this->actingAs($owner)
-            ->postJson(route('drone-imagery.confirm', $layer->id), $this->editsPayload())
+            ->postJson(route('drone-imagery.confirm', $layer->id), $this->editsPayload($details))
             ->assertAccepted()
             ->assertJsonPath('status', 'finalizing')
             ->assertJsonPath('redirect_url', route('drone-imagery.page', ['layer' => $layer->id]));
@@ -332,7 +345,7 @@ class DroneImageryReviewTest extends TestCase
             ->assertJsonValidationErrors('polygons');
 
         $this->actingAs($owner)
-            ->postJson(route('drone-imagery.confirm', $layer->id), $this->editsPayload(['mode' => 'keep_ai']))
+            ->postJson(route('drone-imagery.confirm', $layer->id), $this->editsPayload(['mode' => 'keep_ai', ...$this->submittable($layer)]))
             ->assertAccepted();
         $this->assertSame('keep_ai', $layer->fresh()->edits['mode']);
         Queue::assertPushed(FinalizeDroneImagery::class);

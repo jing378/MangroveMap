@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Jobs\FinalizeDroneImagery;
 use App\Jobs\ProcessDroneImagery;
 use App\Jobs\SegmentDroneImagery;
+use App\Models\Delineation;
 use App\Models\DroneImageryLayer;
+use App\Models\User;
 use App\Services\GdalCommandRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -124,6 +127,34 @@ class FinalizeDroneImageryTest extends TestCase
         $this->assertSame('ready', $layer->segmentation_status);
         Storage::disk('local')->assertExists("drone-imagery/processed/{$layer->id}/ai_extent.json");
         Queue::assertPushed(SegmentDroneImagery::class, 1); // only the one queued while preparing
+    }
+
+    public function test_submitted_mangrove_areas_become_a_pending_delineation_once_tiled(): void
+    {
+        Queue::fake();
+        Notification::fake();
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $layer = $this->preparedLayer();
+        $layer->update([
+            ...$this->readyAiResult($layer),
+            'user_id' => $resident->id,
+            'delineation_details' => ['name' => 'Submitted survey', 'genera' => ['Rhizophora'], 'notes' => null],
+        ]);
+        $ring = [[self::SOUTH, self::WEST], [self::SOUTH, self::EAST], [self::NORTH, self::EAST]];
+        Storage::disk('local')->put($layer->segmentation_path, json_encode([
+            'features' => [['type' => 'area', 'coords' => $ring]],
+            'stats' => [],
+        ]));
+
+        $this->finalize($layer);
+
+        $this->assertSame('ready', $layer->status, $layer->error_message ?? '');
+        $delineation = Delineation::sole();
+        $this->assertSame($layer->id, $delineation->drone_imagery_layer_id);
+        $this->assertSame('Submitted survey', $delineation->name);
+        $this->assertFalse((bool) $delineation->is_approved);
+        $this->assertNull($layer->delineation_details);
+        $this->assertFalse($layer->isPublished());
     }
 
     public function test_ai_delineation_is_kept_when_the_imagery_is_edited(): void

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\InteractsWithDroneRasters;
 use App\Models\DroneImageryLayer;
+use App\Services\DroneImageryDelineationPublisher;
 use App\Services\GdalCommandRunner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -145,6 +146,17 @@ class FinalizeDroneImagery implements ShouldQueue
             // Only when there is no AI delineation yet (never ran, or failed).
             if (! $hasAiResult && ! $layer->isSegmenting() && config('ml.drone.auto_segment')) {
                 $this->queueSegmentation($layer);
+            }
+
+            // "Confirm & submit/publish": the (aligned) mangrove areas become the delineation now that the
+            // imagery can be shown next to it. Pending expert review for residents, published for experts.
+            try {
+                app(DroneImageryDelineationPublisher::class)->publish($layer->fresh());
+            } catch (Throwable $exception) {
+                Log::error('Unable to create the delineation from drone imagery.', [
+                    'layer_id' => $layer->id,
+                    'exception' => $exception,
+                ]);
             }
         } catch (Throwable $exception) {
             // Keep the mosaic, preview and AI delineation so the owner can adjust the edits and confirm again.

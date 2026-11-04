@@ -389,6 +389,133 @@
             font-size: 13px;
         }
 
+        /* 3. Delineation details: submitted with the imagery on the first confirm. */
+        .drone-editor-field {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .drone-editor-field > span {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--fg-4c6b5d, #4c6b5d);
+            margin-bottom: 5px;
+        }
+
+        .drone-editor-field input[type="text"],
+        .drone-editor-field textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--bd-d4e0d4, #d4e0d4);
+            border-radius: 8px;
+            background: var(--bg-f8faf7, #f8faf7);
+            color: var(--fg-182918, #182918);
+            font: inherit;
+            font-size: 13px;
+            resize: vertical;
+        }
+
+        .drone-editor-genera {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .drone-editor-genus {
+            all: unset;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 9px;
+            border: 1px solid var(--bd-d4dfd4, #d4dfd4);
+            border-radius: 100px;
+            background: var(--bg-f8faf7, #f8faf7);
+            color: var(--fg-445944, #445944);
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s ease;
+            user-select: none;
+        }
+
+        .drone-editor-genus:hover {
+            border-color: #1e9e62;
+            background: var(--bg-f0f7f2, #f0f7f2);
+            color: var(--fg-1e9e62, #1e9e62);
+        }
+
+        .drone-editor-genus.active {
+            background: #1e9e62;
+            border-color: #1e9e62;
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(30, 158, 98, 0.25);
+        }
+
+        .drone-editor-genus:focus-visible {
+            outline: 2px solid #1e9e62;
+            outline-offset: 2px;
+        }
+
+        .drone-editor-genus small {
+            color: inherit;
+            font-weight: 400;
+        }
+
+        #droneEditorOtherGenera {
+            border-color: var(--bd-d4dfd4, #d4dfd4);
+            font-size: 12px;
+        }
+
+        .drone-editor-other-genera-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .drone-editor-add-genus {
+            flex: none;
+            padding: 7px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+
+        .drone-editor-selected-genera {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .drone-editor-selected-genus {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            border: 1px solid var(--bd-b0e0c0, #b0e0c0);
+            border-radius: 100px;
+            background: var(--bg-edf7f2, #edf7f2);
+            color: var(--fg-1e9e62, #1e9e62);
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .drone-editor-selected-genus button {
+            all: unset;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 2px;
+            opacity: .7;
+        }
+
+        .drone-editor-selected-genus button:hover {
+            opacity: 1;
+            color: var(--fg-d04030, #d04030);
+        }
+
 
 
 
@@ -672,10 +799,66 @@
                 </div>
             </section>
 
+            @if ($editor['needs_delineation'])
+                <section class="drone-editor-section" aria-labelledby="droneEditorDelineationTitle">
+                    <h2 id="droneEditorDelineationTitle">3. Delineation details</h2>
+                    <p class="drone-editor-hint">
+                        @if ($editor['needs_expert_review'])
+                            The mangrove areas are submitted as a delineation with this imagery. An expert reviews them;
+                            once approved, the imagery and the delineation appear on the map.
+                        @else
+                            The mangrove areas are published as a delineation with this imagery as soon as it is processed.
+                        @endif
+                    </p>
+                    <label class="drone-editor-field">
+                        <span>Name</span>
+                        <input type="text" id="droneEditorDelineationName" maxlength="191" value="{{ $layer->name }}">
+                    </label>
+                    <div class="drone-editor-field" role="group" aria-labelledby="droneEditorGeneraLabel">
+                        <span id="droneEditorGeneraLabel">Mangrove Genus Present (required)</span>
+                        <div class="drone-editor-genera" id="droneEditorGenera">
+                            @foreach ([
+                                'Rhizophora' => 'Bakawan',
+                                'Avicennia' => 'Bungalon',
+                                'Sonneratia' => 'Pagatpat',
+                                'Bruguiera' => 'Miapi',
+                                'Ceriops' => 'Tungog',
+                                'Xylocarpus' => 'Tabigi',
+                                'Nypa' => 'Nipa/Sasa',
+                            ] as $genus => $localName)
+                                <button type="button" class="drone-editor-genus" data-genus="{{ $genus }}" aria-pressed="false">
+                                    <i class="bi bi-plus" aria-hidden="true"></i> {{ $genus }} <small>({{ $localName }})</small>
+                                </button>
+                            @endforeach
+                        </div>
+                        <div class="drone-editor-other-genera-row">
+                            <input type="text" id="droneEditorOtherGenera" maxlength="200" placeholder="Or type other genus..." aria-label="Other genus">
+                            <button type="button" class="drone-editor-btn primary drone-editor-add-genus" id="droneEditorAddGenus">
+                                <i class="bi bi-plus-lg" aria-hidden="true"></i> Add
+                            </button>
+                        </div>
+                        <div class="drone-editor-selected-genera" id="droneEditorSelectedGenera" aria-live="polite"></div>
+                    </div>
+                    <label class="drone-editor-field">
+                        <span>Notes (optional)</span>
+                        <textarea id="droneEditorDelineationNotes" rows="3" maxlength="5000" placeholder="Anything the reviewer should know about this area"></textarea>
+                    </label>
+                </section>
+            @endif
+
             <div class="drone-editor-actions">
                 <div id="droneEditorMessage" class="drone-editor-message" role="status" aria-live="polite"></div>
                 <button type="button" class="drone-editor-btn" id="droneEditorSave"><i class="bi bi-floppy"></i> Save draft</button>
-                <button type="button" class="drone-editor-btn primary" id="droneEditorConfirm"><i class="bi bi-check2-circle"></i> Confirm &amp; add to map</button>
+                <button type="button" class="drone-editor-btn primary" id="droneEditorConfirm">
+                    <i class="bi bi-check2-circle"></i>
+                    @if (! $editor['needs_delineation'])
+                        Confirm &amp; apply
+                    @elseif ($editor['needs_expert_review'])
+                        Confirm &amp; submit for review
+                    @else
+                        Confirm &amp; publish
+                    @endif
+                </button>
             </div>
             </div>
         </aside>
