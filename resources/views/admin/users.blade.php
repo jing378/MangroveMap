@@ -29,13 +29,6 @@
         </div>
     </div>
 
-    @if(session('success'))
-    <div class="page-alert page-alert-success" role="status">{{ session('success') }}</div>
-    @endif
-    @if(session('error'))
-    <div class="page-alert page-alert-error" role="alert">{{ session('error') }}</div>
-    @endif
-
     <div class="section" id="expert-applications">
         <div class="section-title">
             <i class="bi bi-person-badge"></i> Pending Expert Applications
@@ -65,7 +58,7 @@
             </div>
             <div class="application-actions">
                 <form action="{{ route('admin.expert-applications.approve', $applicant) }}" method="POST"
-                    data-confirm="Approve this request?" data-confirm-message="{{ $applicant->name }} becomes an expert and can review delineations."
+                    data-confirm="Approve this expert application?" data-confirm-message="{{ $applicant->name }} becomes an expert and is notified."
                     data-confirm-label="Approve" data-busy-label="Approving...">
                     @csrf
                     <button type="submit" class="btn-primary"><i class="bi bi-check-lg"></i> Approve</button>
@@ -73,7 +66,7 @@
                 <details class="reject-details">
                     <summary class="btn-secondary btn-reject"><i class="bi bi-x-lg"></i> Reject</summary>
                     <form action="{{ route('admin.expert-applications.reject', $applicant) }}" method="POST" class="reject-form"
-                        data-confirm="Reject this request?" data-confirm-message="{{ $applicant->name }}'s expert application is rejected and they are notified."
+                        data-confirm="Reject this expert application?" data-confirm-message="{{ $applicant->name }} stays a resident and is notified, with your reason if you gave one."
                         data-confirm-label="Reject" data-confirm-tone="danger" data-busy-label="Rejecting...">
                         @csrf
                         <label for="rejection_notes_{{ $applicant->id }}">Reason (optional, shared with the applicant)</label>
@@ -455,26 +448,6 @@
         text-decoration: none;
     }
 
-    .page-alert {
-        padding: 14px 18px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        font-size: 13px;
-        font-weight: 600;
-    }
-
-    .page-alert-success {
-        background: var(--bg-ecf9f0, #ecf9f0);
-        color: var(--fg-145a33, #145a33);
-        border: 1px solid var(--bd-b8e0c4, #b8e0c4);
-    }
-
-    .page-alert-error {
-        background: var(--bg-fdf0ee, #fdf0ee);
-        color: var(--fg-d04030, #d04030);
-        border: 1px solid var(--bd-e8b8b0, #e8b8b0);
-    }
-
     .application-card {
         display: flex;
         justify-content: space-between;
@@ -547,7 +520,14 @@
         display: none;
     }
 
-    .btn-reject:hover {
+    /* Same as the notification cards: red outline at rest, so it reads as the reject action. */
+    .btn-secondary.btn-reject {
+        color: var(--fg-d04030, #d04030);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
+    }
+
+    .btn-secondary.btn-reject:hover,
+    .reject-details[open] .btn-reject {
         border-color: #d04030;
         background: var(--bg-fdf0ee, #fdf0ee);
         color: var(--fg-d04030, #d04030);
@@ -708,6 +688,11 @@
     .action-btn:hover {
         border-color: #1e9e62;
         background: var(--bg-edf7f2, #edf7f2);
+    }
+
+    .action-btn.delete {
+        color: var(--fg-d04030, #d04030);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
     }
 
     .action-btn.delete:hover {
@@ -1148,11 +1133,6 @@
         font-size: 13px;
     }
 
-    .modal-body .alert-success {
-        background: var(--bg-ecf9f0, #ecf9f0);
-        color: var(--fg-145a33, #145a33);
-        border: 1px solid var(--bd-b8e0c4, #b8e0c4);
-    }
 
     .modal-body .alert-danger {
         background: var(--bg-fdf0ee, #fdf0ee);
@@ -1316,6 +1296,7 @@
 @endsection
 
 @section('scripts')
+@include('partials.flash-toast')
 <script>
     function updateSearchFilter() {
         const searchTerm = document.querySelector('.search-input').value.toLowerCase();
@@ -1423,15 +1404,9 @@
                 });
 
                 if (outcome.status === 'done') {
-                    const successMessage = document.createElement('div');
-                    successMessage.className = 'alert alert-success';
-                    successMessage.textContent = outcome.result.data.success || 'User updated successfully.';
-                    form.parentElement.insertBefore(successMessage, form);
-
-                    setTimeout(() => {
-                        closeModal();
-                        window.location.reload();
-                    }, 900);
+                    // The reloaded page shows the flashed success message as the shared toast.
+                    closeModal();
+                    window.location.reload();
                 } else if (outcome.status === 'failed') {
                     const error = outcome.error;
                     if (error.response && error.response.status === 422) {

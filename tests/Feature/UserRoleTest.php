@@ -118,6 +118,21 @@ class UserRoleTest extends TestCase
         $this->assertSame('expert', $resident->fresh()->role);
     }
 
+    public function test_saving_from_the_users_page_modal_shows_the_shared_toast_after_reload(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $resident = User::factory()->create(['role' => 'end_user']);
+
+        $this->actingAs($admin)
+            ->put(route('admin.users.update', $resident), $this->updatePayload($resident, 'end_user'), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertJson(['success' => 'User updated successfully.']);
+
+        $html = $this->get(route('admin.users'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('window.AppActions?.notify("User updated successfully.")', $html);
+    }
+
     public function test_residents_and_experts_cannot_open_admin_pages(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'end_user']))

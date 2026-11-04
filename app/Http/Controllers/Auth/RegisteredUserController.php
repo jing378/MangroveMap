@@ -168,10 +168,14 @@ class RegisteredUserController extends Controller
                 User::where('role', 'admin')->get(),
                 new AdminAlert(
                     'New expert account application',
-                    $applicant->name . ' (' . $applicant->organization . ') applied for an expert account.',
+                    'A new expert account application is waiting for your review.',
                     'expert_application',
                     route('admin.users') . '#expert-applications',
-                    'Review application',
+                    'Review',
+                    details: [
+                        'applicant_name' => $applicant->name,
+                        'organization' => $applicant->organization,
+                    ],
                 ),
             );
         } catch (\Throwable $exception) {

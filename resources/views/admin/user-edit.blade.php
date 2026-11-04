@@ -14,13 +14,6 @@
             </div>
         </div>
 
-        @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-        @if(session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
-        @endif
-
         @if($errors->any())
         <div class="alert alert-danger">
             <ul>
@@ -151,12 +144,6 @@
         font-size: 12px;
     }
 
-    .alert-success {
-        background: var(--bg-edf7f2, #edf7f2);
-        color: var(--fg-1e9e62, #1e9e62);
-        border: 1px solid var(--bd-b0e0c0, #b0e0c0);
-    }
-
     .alert-danger {
         background: var(--bg-fdf0ee, #fdf0ee);
         color: var(--fg-d04030, #d04030);
@@ -252,4 +239,8 @@
         }
     }
 </style>
+@endsection
+
+@section('scripts')
+@include('partials.flash-toast')
 @endsection

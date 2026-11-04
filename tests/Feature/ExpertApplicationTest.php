@@ -75,7 +75,10 @@ class ExpertApplicationTest extends TestCase
             ->get(route('notifications.index'))
             ->assertOk()
             ->assertSee('New expert account application')
-            ->assertSee('Review application')
+            ->assertSee('Applicant:')
+            ->assertSee('DENR CENRO Maasin')
+            ->assertSee('Review')
+            ->assertDontSee('Review application')
             ->assertSee(route('admin.users') . '#expert-applications', false);
     }
 
@@ -121,6 +124,22 @@ class ExpertApplicationTest extends TestCase
             ->assertSee('Pending Expert Applications')
             ->assertSee('Marine biology lecturer studying mangrove genera.')
             ->assertSee(route('admin.expert-applications.approve', User::where('name', 'Pending Applicant')->first()));
+    }
+
+    public function test_approving_an_application_shows_the_shared_success_toast(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = $this->applicant(['name' => 'Pending Applicant']);
+
+        $html = $this->actingAs($admin)
+            ->followingRedirects()
+            ->post(route('admin.expert-applications.approve', $applicant))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('window.AppActions?.notify("Pending Applicant is now an expert.")', $html);
+        $this->assertStringNotContainsString('page-alert', $html);
     }
 
     public function test_admin_can_approve_application(): void

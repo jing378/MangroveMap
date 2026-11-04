@@ -114,6 +114,30 @@ class AdminMapLayersTest extends TestCase
         $this->assertDatabaseHas('user_activities', ['user_id' => $admin->id, 'module' => 'Map Layers']);
     }
 
+    public function test_results_and_errors_use_the_shared_toast(): void
+    {
+        $admin = $this->admin();
+        $delineation = $this->delineation();
+
+        $html = $this->actingAs($admin)
+            ->followingRedirects()
+            ->put(route('admin.map-layers.delineations.update', $delineation), ['name' => 'Sogod Bay North'])
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('window.AppActions?.notify("', $html);
+        $this->assertStringNotContainsString('page-alert', $html);
+
+        $html = $this->actingAs($admin)
+            ->followingRedirects()
+            ->from(route('admin.map-layers.index'))
+            ->put(route('admin.map-layers.delineations.update', $delineation), ['name' => ''])
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression('/window\.AppActions\?\.notify\(".+", \'error\'\)/', $html);
+    }
+
     public function test_hiding_removes_delineation_from_published_maps_and_restoring_brings_it_back(): void
     {
         Notification::fake();

@@ -4,26 +4,6 @@
         color: #9ab0a0;
     }
 
-    .page-alert {
-        padding: 14px 18px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        font-size: 13px;
-        font-weight: 600;
-    }
-
-    .page-alert-success {
-        background: var(--bg-ecf9f0, #ecf9f0);
-        color: var(--fg-145a33, #145a33);
-        border: 1px solid var(--bd-b8e0c4, #b8e0c4);
-    }
-
-    .page-alert-error {
-        background: var(--bg-fdf0ee, #fdf0ee);
-        color: var(--fg-d04030, #d04030);
-        border: 1px solid var(--bd-e8b8b0, #e8b8b0);
-    }
-
     .preview-label {
         margin-left: auto;
         font-size: 12px;
@@ -135,6 +115,11 @@
     .action-btn:disabled {
         opacity: 0.4;
         cursor: not-allowed;
+    }
+
+    .action-btn.delete {
+        color: var(--fg-d04030, #d04030);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
     }
 
     .action-btn.delete:hover {

@@ -21,7 +21,9 @@ class AdminAlert extends Notification implements ShouldQueue
         public string $type,
         public ?string $actionUrl = null,
         public ?string $actionLabel = 'View Details',
-        public ?string $icon = null
+        public ?string $icon = null,
+        /** Extra fields shown as detail lines on the notifications page (e.g. applicant_name, organization). */
+        public array $details = [],
     ) {
         //
     }
@@ -59,6 +61,12 @@ class AdminAlert extends Notification implements ShouldQueue
             ->greeting('Hello Admin,')
             ->line($this->message);
 
+        foreach ($this->details as $key => $value) {
+            if (filled($value)) {
+                $mailMessage->line(ucfirst(str_replace('_', ' ', $key)) . ': ' . $value);
+            }
+        }
+
         if ($this->actionUrl) {
             $mailMessage->action($this->actionLabel, url($this->actionUrl));
         }
@@ -76,14 +84,14 @@ class AdminAlert extends Notification implements ShouldQueue
         // Auto-assign icon based on type if not provided
         $icon = $this->icon ?? $this->getIconForType($this->type);
 
-        return [
+        return array_merge($this->details, [
             'title' => $this->title,
             'message' => $this->message,
             'type' => $this->type,
             'actionUrl' => $this->actionUrl,
             'actionLabel' => $this->actionLabel,
             'icon' => $icon,
-        ];
+        ]);
     }
 
     /**

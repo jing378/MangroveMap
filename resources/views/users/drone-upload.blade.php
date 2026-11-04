@@ -181,6 +181,7 @@
 
         .drone-btn.danger {
             color: var(--fg-b42318, #b42318);
+            border-color: var(--bd-e8b8b0, #e8b8b0);
         }
 
         .drone-btn.danger:hover:not(:disabled) {

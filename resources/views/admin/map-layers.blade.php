@@ -6,16 +6,6 @@
 <div id="map-layers-section">
     <div class="page-title">Map Layers</div>
 
-    @if(session('success'))
-    <div class="page-alert page-alert-success" role="status">{{ session('success') }}</div>
-    @endif
-    @if(session('error'))
-    <div class="page-alert page-alert-error" role="alert">{{ session('error') }}</div>
-    @endif
-    @if($errors->any())
-    <div class="page-alert page-alert-error" role="alert">{{ $errors->first() }}</div>
-    @endif
-
     <div class="grid cols-4">
         <div class="stat-card">
             <div class="stat-label">Published Delineations</div>
@@ -146,6 +136,7 @@
 @endsection
 
 @section('scripts')
+@include('partials.flash-toast', ['withValidationErrors' => true])
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 @include('admin.partials.map-layers-scripts')
 @endsection

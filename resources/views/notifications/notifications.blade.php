@@ -174,58 +174,6 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .notification-card-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        flex-shrink: 0;
-    }
-
-    .btn-mark-read {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 6px 12px;
-        border: 1px solid var(--bd-c8e6d4, #c8e6d4);
-        border-radius: 6px;
-        background: var(--bg-ffffff, #fff);
-        color: var(--fg-1e9e62, #1e9e62);
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        font-family: inherit;
-        white-space: nowrap;
-        transition: all 0.15s;
-    }
-
-    .btn-mark-read:hover {
-        background: #1e9e62;
-        color: #fff;
-        border-color: #1e9e62;
-    }
-
-    .btn-delete {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 6px 12px;
-        border: 1px solid var(--bd-f0d0d0, #f0d0d0);
-        border-radius: 6px;
-        background: var(--bg-ffffff, #fff);
-        color: var(--fg-d04030, #d04030);
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        font-family: inherit;
-        white-space: nowrap;
-        transition: all 0.15s;
-    }
-
-    .btn-delete:hover {
-        background: var(--bg-fef2f2, #fef2f2);
-        border-color: #d04030;
-    }
-
-    .notification-card-actions {
         display: grid;
         gap: 10px;
         margin-top: 14px;
@@ -271,31 +219,51 @@ if ($currentUser && $currentUser->role === 'admin') {
         width: 100%;
         padding: 10px 14px;
         border-radius: 10px;
-        border: none;
+        /* Each button sets its own border colour below; transparent keeps all buttons the same height. */
+        border: 1px solid transparent;
         cursor: pointer;
         font-size: 13px;
         font-weight: 700;
         font-family: inherit;
+        white-space: nowrap;
         transition: all 0.15s;
     }
 
     .btn-approve {
         background: #1e9e62;
         color: #fff;
+        border-color: #1e9e62;
     }
 
     .btn-approve:hover {
         background: #178a54;
+        border-color: #178a54;
     }
 
-    .btn-reject {
+    .btn-mark-read {
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-1e9e62, #1e9e62);
+        border-color: var(--bd-c8e6d4, #c8e6d4);
+    }
+
+    .btn-mark-read:hover {
+        background: #1e9e62;
+        color: #fff;
+        border-color: #1e9e62;
+    }
+
+    /* Red outline is visible at rest, not only on hover. */
+    .btn-reject,
+    .btn-delete {
         background: var(--bg-ffffff, #fff);
         color: var(--fg-d04030, #d04030);
-        border: 1px solid var(--bd-f0d0d0, #f0d0d0);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
     }
 
-    .btn-reject:hover {
+    .btn-reject:hover,
+    .btn-delete:hover {
         background: var(--bg-fef2f2, #fef2f2);
+        border-color: #d04030;
     }
 
     .notification-reject-form {
@@ -406,16 +374,24 @@ if ($currentUser && $currentUser->role === 'admin') {
                 @if(!empty($notification->data['submitted_by']))
                 <p class="notification-card-detail"><strong>Submitted by:</strong> {{ $notification->data['submitted_by'] }}</p>
                 @endif
+                @if(!empty($notification->data['applicant_name']))
+                <p class="notification-card-detail"><strong>Applicant:</strong> {{ $notification->data['applicant_name'] }}</p>
+                @endif
+                @if(!empty($notification->data['organization']))
+                <p class="notification-card-detail"><strong>Organization:</strong> {{ $notification->data['organization'] }}</p>
+                @endif
                 <p class="notification-card-meta">{{ $notification->created_at->diffForHumans() }}</p>
             </div>
             <div class="notification-card-actions">
                 @if($viewUrl)
-                {{-- Delineation notifications open the map; others (e.g. expert applications) use their own link. --}}
+                {{-- One-word labels, like the delineation cards: expert applications are reviewed, everything else is viewed. --}}
                 <a href="{{ $viewUrl }}" class="btn-view-delineation" @if(!$notification->read_at) data-mark-read-url="{{ route('notifications.mark-as-read', $notification->id) }}" @endif>
                     @if($delineationId)
                     <i class="bi bi-map"></i> View
+                    @elseif($type === 'expert_application')
+                    <i class="bi bi-person-check"></i> Review
                     @else
-                    <i class="bi bi-box-arrow-up-right"></i> {{ $notification->data['actionLabel'] ?? 'View' }}
+                    <i class="bi bi-box-arrow-up-right"></i> View
                     @endif
                 </a>
                 @endif

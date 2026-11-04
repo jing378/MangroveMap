@@ -375,6 +375,9 @@ class AdminController extends Controller
         );
 
         if ($request->ajax()) {
+            // The Users page reloads after a modal save and shows this as its success toast.
+            $request->session()->flash('success', 'User updated successfully.');
+
             return response()->json([
                 'success' => 'User updated successfully.',
                 'user'    => $user,

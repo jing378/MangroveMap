@@ -496,6 +496,11 @@
         background: var(--bg-edf7f2, #edf7f2);
     }
 
+    .action-btn.delete {
+        color: var(--fg-d04030, #d04030);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
+    }
+
     .action-btn.delete:hover {
         border-color: #d04030;
         background: var(--bg-fdf0ee, #fdf0ee);
