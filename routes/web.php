@@ -6,9 +6,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\ClassifyController;
 use App\Http\Controllers\DelineationAnnualObservationController;
-use App\Http\Controllers\DelineationController;
 use App\Http\Controllers\DroneImageryController;
 use App\Http\Controllers\EndUserController;
 use App\Http\Controllers\MapLayerController;
@@ -121,7 +119,11 @@ Route::get('/', function () {
     return app(PublicController::class)->index();
 })->name('index');
 
+Route::view('/terms', 'terms')->name('terms');
+
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Drone Upload tab: upload GeoTIFFs, then review and manage them
+    Route::get('/drone-upload', [DroneImageryController::class, 'page'])->name('drone-imagery.page');
     Route::get('/drone-imagery', [DroneImageryController::class, 'index'])
         ->name('drone-imagery.index');
     Route::post('/drone-imagery', [DroneImageryController::class, 'store'])
@@ -140,6 +142,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('layerId')
         ->middleware('throttle:10,1')
         ->name('drone-imagery.segmentation.store');
+    // Review editor: preview the prepared mosaic, mask non-mangrove areas, adjust, then confirm onto the map
+    Route::get('/drone-imagery/{layerId}/edit', [DroneImageryController::class, 'edit'])
+        ->whereNumber('layerId')
+        ->name('drone-imagery.edit');
+    Route::get('/drone-imagery/{layerId}/preview', [DroneImageryController::class, 'preview'])
+        ->whereNumber('layerId')
+        ->name('drone-imagery.preview');
+    Route::put('/drone-imagery/{layerId}/edits', [DroneImageryController::class, 'updateEdits'])
+        ->whereNumber('layerId')
+        ->middleware('throttle:60,1')
+        ->name('drone-imagery.edits.update');
+    Route::put('/drone-imagery/{layerId}/segmentation', [DroneImageryController::class, 'updateSegmentation'])
+        ->whereNumber('layerId')
+        ->middleware('throttle:60,1')
+        ->name('drone-imagery.segmentation.update');
+    Route::post('/drone-imagery/{layerId}/confirm', [DroneImageryController::class, 'confirm'])
+        ->whereNumber('layerId')
+        ->middleware('throttle:10,1')
+        ->name('drone-imagery.confirm');
     Route::get('/drone-imagery/{layerId}', [DroneImageryController::class, 'show'])
         ->whereNumber('layerId')
         ->name('drone-imagery.show');
@@ -148,6 +169,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.updatePassword');
+
+    // Help & user guide (sections shown depend on the user's role)
+    Route::view('/guide', 'guide')->name('guide');
 
     // Map viewer & Delineate studio (accessible to authenticated users)
     Route::get('/map', [EndUserController::class, 'map'])->name('map');
@@ -160,17 +184,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Edit the boundary of an existing saved delineation (experts: resident/own records; residents: own pending records)
     Route::put('/delineations/{delineation}/boundary', [EndUserController::class, 'updateDelineationBoundary'])
         ->name('delineations.boundary.update');
-
-    // Image classification (accessible to all authenticated users)
-    Route::get('/classify', [ClassifyController::class, 'create'])->name('classify');
-    Route::post('/classify', [ClassifyController::class, 'store'])->name('classify.store');
-    Route::get('/classify/{analysis}', [ClassifyController::class, 'results'])->name('classify.results');
-
-    // Dedicated delineation/batch-upload page
-    Route::get('/upload_image', [DelineationController::class, 'index'])->name('delineation.index');
-    Route::post('/upload_image', [DelineationController::class, 'store'])->name('delineation.store');
-    Route::delete('/upload_image/analyses', [DelineationController::class, 'destroyAll'])->name('delineation.destroyAll');
-    Route::delete('/upload_image/analyses/{analysis}', [DelineationController::class, 'destroy'])->name('delineation.destroy');
 
     // Notification routes (accessible to all authenticated users)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -192,10 +205,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/delineations', [ExpertController::class, 'storeDelineation'])->name('expert.delineations.store');
         Route::post('/delineations/{delineation}/approve', [ExpertController::class, 'approve'])->name('expert.delineations.approve');
         Route::post('/delineations/{delineation}/reject', [ExpertController::class, 'reject'])->name('expert.delineations.reject');
-        Route::get('/annual-observations', [DelineationAnnualObservationController::class, 'create'])
-            ->name('expert.annual-observations.create');
-        Route::post('/annual-observations', [DelineationAnnualObservationController::class, 'store'])
-            ->name('expert.annual-observations.store');
         Route::get('/recommendations', [PlantingRecommendationController::class, 'index'])
             ->name('expert.recommendations.index');
         Route::post('/recommendations', [PlantingRecommendationController::class, 'store'])

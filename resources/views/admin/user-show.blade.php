@@ -35,7 +35,7 @@
                     </tr>
                     <tr>
                         <th>Role</th>
-                        <td>{{ ucfirst(str_replace('_', ' ', $user->role)) }}</td>
+                        <td>{{ $user->roleLabel() }}</td>
                     </tr>
                     <tr>
                         <th>Organization</th>

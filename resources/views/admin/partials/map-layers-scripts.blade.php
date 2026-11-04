@@ -127,13 +127,6 @@
         document.querySelectorAll('[data-close-dialog]').forEach(button => {
             button.addEventListener('click', () => button.closest('dialog').close());
         });
-
-        document.querySelectorAll('form[data-confirm]').forEach(form => {
-            form.addEventListener('submit', event => {
-                if (form.dataset.confirm && !confirm(form.dataset.confirm)) {
-                    event.preventDefault();
-                }
-            });
-        });
+        // Forms with data-confirm / data-busy-label are handled by partials.action-feedback.
     })();
 </script>

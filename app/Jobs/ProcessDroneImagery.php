@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\InteractsWithDroneRasters;
 use App\Models\DroneImageryLayer;
 use App\Services\GdalCommandRunner;
 use Illuminate\Bus\Queueable;
@@ -15,9 +16,15 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
+/**
+ * Step 1 of the drone pipeline: reproject the uploaded GeoTIFF(s) into one EPSG:3857 mosaic,
+ * render a small preview image and queue AI segmentation of it. The layer then waits in
+ * awaiting_review until the owner confirms it in the editor (where the AI extent can be used as
+ * the areas to keep), which dispatches FinalizeDroneImagery (masking, tiles).
+ */
 class ProcessDroneImagery implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithDroneRasters, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 1;
 
@@ -33,11 +40,12 @@ class ProcessDroneImagery implements ShouldQueue
     {
         $layer = DroneImageryLayer::with('files')->findOrFail($this->layerId);
         $localDisk = Storage::disk('local');
+        $processedDirectory = "drone-imagery/processed/{$layer->id}";
         $tileRelativePath = "drone-imagery/tiles/{$layer->id}";
-        $tileDirectory = $localDisk->path($tileRelativePath);
         $workDirectory = storage_path("app/private/drone-imagery/{$layer->id}");
-        $mosaicRelativePath = "drone-imagery/processed/{$layer->id}/mosaic_3857.tif";
+        $mosaicRelativePath = "{$processedDirectory}/mosaic_3857.tif";
         $mosaicPath = $localDisk->path($mosaicRelativePath);
+        $previewRelativePath = "{$processedDirectory}/preview.png";
 
         $layer->update([
             'status' => 'processing',
@@ -76,15 +84,14 @@ class ProcessDroneImagery implements ShouldQueue
                 );
             }
 
-            if (! $localDisk->makeDirectory(dirname($mosaicRelativePath))) {
+            // Re-processing starts from scratch: drop tiles and outputs from an earlier run.
+            $localDisk->deleteDirectory($tileRelativePath);
+            $localDisk->deleteDirectory($processedDirectory);
+            if (! $localDisk->makeDirectory($processedDirectory)) {
                 throw new RuntimeException('Unable to create the processed raster directory.');
             }
 
-            if (! $localDisk->makeDirectory($tileRelativePath)) {
-                throw new RuntimeException('Unable to create the tile output directory.');
-            }
-
-            $warpArguments = [
+            $gdal->run([
                 'gdalwarp',
                 '-overwrite',
                 '-multi',
@@ -104,67 +111,51 @@ class ProcessDroneImagery implements ShouldQueue
                 'BIGTIFF=IF_SAFER',
                 ...$inputPaths,
                 $mosaicPath,
-            ];
-            $gdal->run($warpArguments, $workDirectory, (int) config('gdal.timeout'));
+            ], $workDirectory, (int) config('gdal.timeout'));
 
             $mosaicInfo = $this->readRasterInfo($gdal, $mosaicPath, $workDirectory);
             $bounds = $this->readWgs84Bounds($mosaicInfo);
-
-            [$zoomMin, $zoomMax] = $this->tileZoomRange($mosaicInfo);
-            $zoom = "{$zoomMin}-{$zoomMax}";
-            $tileArguments = [
-                'python',
-                '-m',
-                'osgeo_utils.gdal2tiles',
-                '--profile=mercator',
-                '--xyz',
-                '--webviewer=none',
-                '--exclude',
-                '--resampling=bilinear',
-                '--processes='.max(1, (int) config('gdal.tile_processes')),
-            ];
-            if (is_string($zoom) && preg_match('/^\d{1,2}-\d{1,2}$/', $zoom)) {
-                $tileArguments[] = '--zoom='.$zoom;
-            }
-            $tileArguments[] = $mosaicPath;
-            $tileArguments[] = $tileDirectory;
-
-            $gdal->run($tileArguments, $workDirectory, (int) config('gdal.timeout'));
-
-            $tileFiles = File::allFiles($tileDirectory);
-            if (count($tileFiles) === 0) {
-                throw new RuntimeException('GDAL2Tiles completed without generating any map tiles.');
-            }
+            $this->renderPreview($gdal, $mosaicInfo, $mosaicPath, $localDisk->path($previewRelativePath), $workDirectory);
 
             $layer->update([
-                'status' => 'ready',
+                'status' => 'awaiting_review',
                 'source_crs' => $sourceCrs,
                 'bounds' => $bounds,
+                'preview_bounds' => $bounds,
                 'metadata' => [
                     'source_count' => $layer->files->count(),
                     'source_size_bytes' => $totalSize,
                     'target_crs' => 'EPSG:3857',
                     'raster_size' => $mosaicInfo['size'] ?? null,
-                    'tile_count' => count($tileFiles),
-                    'tile_zoom' => $zoom,
                 ],
                 'mosaic_path' => $mosaicRelativePath,
-                'tiles_path' => $tileRelativePath,
-                'zoom_min' => $zoomMin,
-                'zoom_max' => $zoomMax,
-                'processed_at' => now(),
+                'preview_path' => $previewRelativePath,
+                'final_mosaic_path' => null,
+                'applied_edits' => null,
+                'tiles_path' => null,
                 'error_message' => null,
+                'segmentation_status' => null,
+                'segmentation_path' => null,
+                'segmentation_stats' => null,
+                'segmentation_error' => null,
+                'segmented_at' => null,
             ]);
 
+            // Detect mangroves before the review, so the editor can offer the AI extent as the areas to keep.
             if (config('ml.drone.auto_segment')) {
                 $this->queueSegmentation($layer);
             }
         } catch (Throwable $exception) {
             $localDisk->deleteDirectory($tileRelativePath);
-            $localDisk->delete($mosaicRelativePath);
+            $localDisk->deleteDirectory($processedDirectory);
             $layer->update([
                 'status' => 'failed',
                 'error_message' => mb_substr($exception->getMessage(), 0, 2000),
+                'mosaic_path' => null,
+                'preview_path' => null,
+                'preview_bounds' => null,
+                'final_mosaic_path' => null,
+                'tiles_path' => null,
             ]);
             Log::error('Drone imagery processing failed.', [
                 'layer_id' => $layer->id,
@@ -175,34 +166,31 @@ class ProcessDroneImagery implements ShouldQueue
         }
     }
 
-    /** Segmentation failures must not mark the (already usable) imagery layer as failed. */
-    private function queueSegmentation(DroneImageryLayer $layer): void
-    {
-        try {
-            $layer->update(['segmentation_status' => 'queued', 'segmentation_error' => null]);
-            SegmentDroneImagery::dispatch($layer->id);
-        } catch (Throwable $exception) {
-            $layer->update([
-                'segmentation_status' => 'failed',
-                'segmentation_error' => 'Unable to queue AI segmentation.',
-            ]);
-            Log::error('Unable to queue drone imagery segmentation.', [
-                'layer_id' => $layer->id,
-                'exception' => $exception,
-            ]);
+    /** Downscaled RGBA PNG of the mosaic for the review editor (L.imageOverlay over the mosaic bounds). */
+    private function renderPreview(
+        GdalCommandRunner $gdal,
+        array $mosaicInfo,
+        string $mosaicPath,
+        string $previewPath,
+        string $workDirectory,
+    ): void {
+        [$width, $height] = $mosaicInfo['size'];
+        $maxDimension = max(256, (int) config('gdal.preview_max_dimension', 2048));
+        $scale = min(1, $maxDimension / max($width, $height, 1));
+
+        $gdal->run([
+            'gdal_translate', '-q',
+            '-of', 'PNG',
+            '-outsize', (string) max(1, (int) round($width * $scale)), (string) max(1, (int) round($height * $scale)),
+            '-r', 'average',
+            '-co', 'ZLEVEL=6',
+            $mosaicPath,
+            $previewPath,
+        ], $workDirectory, (int) config('gdal.timeout'));
+
+        if (! is_file($previewPath)) {
+            throw new RuntimeException('GDAL did not produce the imagery preview.');
         }
-    }
-
-    private function readRasterInfo(GdalCommandRunner $gdal, string $path, string $workDirectory): array
-    {
-        $json = $gdal->run(['gdalinfo', '-json', $path], $workDirectory, (int) config('gdal.timeout'));
-        $info = json_decode($json, true);
-
-        if (! is_array($info)) {
-            throw new RuntimeException('GDAL returned invalid metadata for a TIFF file.');
-        }
-
-        return $info;
     }
 
     private function validateSourceRaster(array $info, string $fileName): void
@@ -233,82 +221,5 @@ class ProcessDroneImagery implements ShouldQueue
 
         return count($info['bands']) === 4
             && strcasecmp((string) ($last['colorInterpretation'] ?? ''), 'Alpha') === 0;
-    }
-
-    private function readWgs84Bounds(array $info): array
-    {
-        $coordinates = $info['wgs84Extent']['coordinates'][0] ?? null;
-        if (! is_array($coordinates) || $coordinates === []) {
-            throw new RuntimeException('GDAL could not determine geographic bounds for the processed raster.');
-        }
-
-        $longitudes = [];
-        $latitudes = [];
-        foreach ($coordinates as $coordinate) {
-            if (! is_array($coordinate) || ! isset($coordinate[0], $coordinate[1])) {
-                continue;
-            }
-            $longitudes[] = (float) $coordinate[0];
-            $latitudes[] = (float) $coordinate[1];
-        }
-
-        if ($longitudes === [] || $latitudes === []) {
-            throw new RuntimeException('GDAL returned invalid geographic bounds for the processed raster.');
-        }
-
-        $bounds = [
-            'west' => min($longitudes),
-            'south' => min($latitudes),
-            'east' => max($longitudes),
-            'north' => max($latitudes),
-        ];
-        if (
-            $bounds['west'] < -180 || $bounds['east'] > 180
-            || $bounds['south'] < -90 || $bounds['north'] > 90
-            || $bounds['west'] >= $bounds['east']
-            || $bounds['south'] >= $bounds['north']
-        ) {
-            throw new RuntimeException('The processed raster has invalid geographic bounds.');
-        }
-
-        return $bounds;
-    }
-
-    private function tileZoomRange(array $mosaicInfo): array
-    {
-        $configuredRange = config('gdal.tile_zoom');
-        if (! is_string($configuredRange) || ! preg_match('/^(\d{1,2})-(\d{1,2}|auto)$/', $configuredRange, $matches)) {
-            throw new RuntimeException('GDAL_TILE_ZOOM must be a zoom range such as 12-20 or 12-auto.');
-        }
-
-        $cap = min(22, max(0, (int) config('gdal.max_tile_zoom', 22)));
-        $minimum = (int) $matches[1];
-        $maximum = $matches[2] === 'auto'
-            ? min($cap, $this->nativeZoom($mosaicInfo))
-            : (int) $matches[2];
-        $minimum = min($minimum, $maximum);
-        if ($minimum < 0 || $maximum > 22 || $minimum > $maximum) {
-            throw new RuntimeException('GDAL_TILE_ZOOM must be an ordered range between 0 and 22.');
-        }
-
-        return [$minimum, $maximum];
-    }
-
-    /**
-     * Smallest web-mercator zoom whose 256 px tiles are at least as detailed as the mosaic,
-     * so zooming in shows the full drone resolution instead of upscaled tiles.
-     */
-    private function nativeZoom(array $mosaicInfo): int
-    {
-        $pixelSize = abs((float) ($mosaicInfo['geoTransform'][1] ?? 0)); // EPSG:3857 units
-        if ($pixelSize <= 0) {
-            return 20;
-        }
-
-        // Tile pixel size at zoom z (EPSG:3857 units) = 40075016.686 / (256 * 2^z).
-        $zoom = log(40075016.686 / (256 * $pixelSize), 2);
-
-        // Round up only when the extra level adds meaningful detail (> ~30 % finer than z-1).
-        return (int) max(0, ($zoom - floor($zoom)) > 0.4 ? ceil($zoom) : floor($zoom));
     }
 }

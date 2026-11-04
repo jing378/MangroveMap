@@ -181,15 +181,26 @@
             }
         }
 
+        /* Hidden until the user is working on the password, to keep the card compact. */
         .password-rules {
             list-style: none;
             margin: -4px 0 0;
             padding: 0;
-            display: grid;
+            display: none;
             grid-template-columns: 1fr 1fr;
             gap: 4px 12px;
             font-size: 11.5px;
             color: #7a8a7f;
+        }
+
+        .password-rules.is-visible {
+            display: grid;
+            animation: password-rules-in 0.15s ease-out;
+        }
+
+        @keyframes password-rules-in {
+            from { opacity: 0; transform: translateY(-3px); }
+            to { opacity: 1; transform: none; }
         }
 
         .password-rules li {
@@ -240,6 +251,23 @@
         /* Email gets the wider column; the 09 number needs less room. */
         .field-row--contact {
             grid-template-columns: 3fr 2fr;
+        }
+
+        /* A suffix is a few characters; give the last name most of the row. */
+        .field-row--surname {
+            grid-template-columns: 3fr 2fr;
+        }
+
+        .label-optional {
+            font-weight: 600;
+            color: #7a9a85;
+        }
+
+        .field-hint {
+            display: block;
+            margin-top: 4px;
+            font-size: 11px;
+            color: #7a9a85;
         }
 
         .field-row > *,
@@ -403,6 +431,33 @@
             resize: vertical;
             min-height: 72px;
             line-height: 1.45;
+        }
+
+        .terms-agree {
+            margin: 14px 0 0;
+        }
+
+        .terms-agree-toggle {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            cursor: pointer;
+            font-size: 12.5px;
+            line-height: 1.45;
+            color: #365a45;
+        }
+
+        .terms-agree-toggle input {
+            margin-top: 2px;
+            width: 16px;
+            height: 16px;
+            flex: none;
+            accent-color: #1e9e62;
+        }
+
+        .terms-agree-toggle a {
+            color: #1e9e62;
+            font-weight: 700;
         }
 
         .submit-btn {
@@ -777,6 +832,7 @@
             margin-bottom: 6px;
         }
     </style>
+    @include('partials.scrollbar-styles')
 </head>
 
 <body>
@@ -831,9 +887,37 @@
                         </div>
 
                         <div class="form-group">
+                            <label class="form-label" for="middle_name">Middle Name <span class="label-optional">(Optional)</span></label>
+                            <input type="text" id="middle_name" name="middle_name" class="form-input" placeholder="Santos" maxlength="100" autocomplete="additional-name" aria-describedby="middle_name_hint" value="{{ old('middle_name') }}">
+                            <small class="field-hint" id="middle_name_hint">Leave empty if no middle name.</small>
+                            @error('middle_name')
+                            <div class="error-message">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="field-row field-row--surname">
+                        <div class="form-group">
                             <label class="form-label" for="last_name">Last Name</label>
                             <input type="text" id="last_name" name="last_name" class="form-input" placeholder="Dela Cruz" required maxlength="100" autocomplete="family-name" value="{{ old('last_name') }}">
                             @error('last_name')
+                            <div class="error-message">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="suffix">Suffix <span class="label-optional">(Optional)</span></label>
+                            <input type="text" id="suffix" name="suffix" class="form-input" placeholder="Jr., Sr., III" maxlength="10" autocomplete="honorific-suffix" list="suffix_options" aria-describedby="suffix_hint" value="{{ old('suffix') }}">
+                            <datalist id="suffix_options">
+                                <option value="Jr."></option>
+                                <option value="Sr."></option>
+                                <option value="II"></option>
+                                <option value="III"></option>
+                                <option value="IV"></option>
+                                <option value="V"></option>
+                            </datalist>
+                            <small class="field-hint" id="suffix_hint">Leave empty if no suffix.</small>
+                            @error('suffix')
                             <div class="error-message">{{ $message }}</div>
                             @enderror
                         </div>
@@ -917,6 +1001,16 @@
                                 @enderror
                             </div>
                         </div>
+                    </div>
+
+                    <div class="form-group terms-agree">
+                        <label class="terms-agree-toggle" for="terms">
+                            <input type="checkbox" id="terms" name="terms" value="1" required @checked(old('terms'))>
+                            <span>I have read and agree to the <a href="{{ route('terms') }}" target="_blank" rel="noopener">Terms and Conditions</a>, including how my data is used.</span>
+                        </label>
+                        @error('terms')
+                        <div class="error-message">{{ $message }}</div>
+                        @enderror
                     </div>
 
                     <button type="submit" class="submit-btn">
@@ -1108,12 +1202,33 @@
                 item.classList.toggle('met', met);
                 item.classList.toggle('unmet', !met && showUnmet);
             });
+            updatePasswordRulesVisibility();
         }
+
+        // Show the checklist only while the password is being entered, or while a
+        // password that was already typed still misses a requirement.
+        const passwordWrapper = fieldInput('password').closest('.password-wrapper');
+
+        function updatePasswordRulesVisibility() {
+            const input = fieldInput('password');
+            const results = passwordRuleResults(input.value);
+            const allMet = Object.values(results).every(Boolean);
+            const editing = passwordWrapper.contains(document.activeElement);
+            const show = editing || (input.value !== '' && !allMet && touched.has('password'));
+            document.getElementById('passwordRules').classList.toggle('is-visible', show);
+        }
+
+        passwordWrapper.addEventListener('focusin', updatePasswordRulesVisibility);
+        // Wait for focus to settle so clicking the show/hide button doesn't flicker the list.
+        passwordWrapper.addEventListener('focusout', () => setTimeout(updatePasswordRulesVisibility, 0));
 
         // Client-side rules (the server still validates everything on submit).
         const validators = {
             first_name: value => value.trim() ? null : 'First name is required.',
             last_name: value => value.trim() ? null : 'Last name is required.',
+            suffix: value => (!value.trim() || /^[\p{L}.\s]+$/u.test(value.trim()))
+                ? null
+                : 'Suffix can only contain letters and periods (e.g. Jr., Sr., III).',
             email: value => {
                 const email = value.trim();
                 if (!email) return 'Email address is required.';
@@ -1140,6 +1255,9 @@
                 if (!value.trim()) return 'Describe your expertise so an administrator can review your application.';
                 return value.trim().length >= 20 ? null : 'Please describe your expertise in at least 20 characters.';
             },
+            terms: () => fieldInput('terms').checked
+                ? null
+                : 'You must agree to the Terms and Conditions to create an account.',
         };
 
         // A field only shows "required"/format errors after the user has left it once,
@@ -1201,6 +1319,8 @@
             });
 
             input.addEventListener('blur', () => {
+                // A checkbox is only checked on submit, not when the user tabs past it.
+                if (input.type === 'checkbox') return;
                 // Don't nag about an untouched empty field when the user just tabs past it.
                 if (!input.value && !touched.has(name)) return;
                 touched.add(name);

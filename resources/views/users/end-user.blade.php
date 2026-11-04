@@ -2317,10 +2317,13 @@
       box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
     }
 
-    /* Custom scrollbar for notes and narrow scrollable containers */
-    #delineationNotes {
-      scrollbar-width: thin;
-      scrollbar-color: #9ca3af #f0f4f0;
+    /* Custom scrollbar for notes and narrow scrollable containers.
+       Standard properties only as the Firefox fallback: Chromium ignores ::-webkit-scrollbar when they are set. */
+    @supports not selector(::-webkit-scrollbar) {
+      #delineationNotes {
+        scrollbar-width: thin;
+        scrollbar-color: #9ca3af #f0f4f0;
+      }
     }
 
     #delineationNotes::-webkit-scrollbar {
@@ -2518,6 +2521,7 @@
       box-shadow: 0 1px 3px rgba(30, 158, 98, 0.25);
     }
   </style>
+  @include('partials.scrollbar-styles')
 </head>
 
 <body>
@@ -2600,9 +2604,9 @@
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
             </button>
-            <button id="classifyBtn" type="button" onclick="showDelineation()" title="Upload image for delineation"
-              aria-label="Upload image for delineation">
-              <i class="bi bi-image"></i>
+            <button id="classifyBtn" type="button" onclick="showDelineation()" title="Upload drone imagery"
+              aria-label="Upload drone imagery">
+              <i class="bi bi-cloud-arrow-up"></i>
             </button>
             <div id="layerMenu" class="layer-menu" aria-label="Base layer options">
               <button class="layer-option active" onclick="setBase('sat', this)">Satellite</button>
@@ -4651,7 +4655,7 @@
     };
 
     window.showDelineation = () => {
-      window.location.href = @json(route('delineation.index'));
+      window.location.href = @json(route('drone-imagery.page'));
     };
 
     window.showFromDropdown = (select) => {

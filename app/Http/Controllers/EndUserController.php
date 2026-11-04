@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Analysis;
 use App\Models\Delineation;
+use App\Models\DelineationAnnualObservation;
 use App\Models\MangroveData;
 use App\Models\PlantingRecommendation;
 use App\Models\User;
 use App\Models\UserActivity;
 use App\Services\BoundaryResolver;
+use App\Services\DelineationObservationRecorder;
 use App\Notifications\DelineationSubmittedForReview;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Arr;
@@ -530,6 +533,7 @@ class EndUserController extends Controller
         Request $request,
         Delineation $delineation,
         BoundaryResolver $boundaryResolver,
+        DelineationObservationRecorder $observationRecorder,
     ) {
         $user = $request->user();
         $delineation->loadMissing('user:id,name,role');
@@ -541,7 +545,28 @@ class EndUserController extends Controller
             'features.*.coords' => ['required', 'array', 'min:1', 'max:10000'],
             'features.*.genera' => ['nullable', 'array'],
             'features.*.genera.*' => ['string', 'max:100'],
+            // Experts say whether the edit fixes the drawing or records a real change in the mangroves.
+            'record_as' => ['nullable', 'string', 'in:correction,observation'],
+            // The app clock is UTC; "today" is judged in local (Philippine) time like the date picker.
+            'observation_date' => ['exclude_unless:record_as,observation', 'required', 'date', 'after_or_equal:2000-01-01', 'before_or_equal:' . now(DelineationAnnualObservation::LOCAL_TIMEZONE)->toDateString()],
+            'observation_source' => ['exclude_unless:record_as,observation', 'required', 'string', 'in:' . implode(',', array_keys(DelineationAnnualObservation::SOURCES))],
+        ], [
+            'observation_date.required' => 'Enter the date the change was observed.',
+            'observation_date.before_or_equal' => 'The observation date cannot be in the future.',
+            'observation_date.after_or_equal' => 'The observation date must be in 2000 or later.',
+            'observation_source.required' => 'Choose where the change was observed.',
+            'observation_source.in' => 'Choose where the change was observed.',
         ]);
+
+        $recordsObservation = ($data['record_as'] ?? 'correction') === 'observation';
+        if ($recordsObservation) {
+            abort_unless($user->isExpert(), 403, 'Only experts can record observed changes.');
+            if ($delineation->is_rejected) {
+                throw ValidationException::withMessages([
+                    'record_as' => 'Rejected delineations cannot have observed changes. Save it as a correction instead.',
+                ]);
+            }
+        }
 
         $features = [];
         foreach ($data['features'] as $index => $feature) {
@@ -577,7 +602,14 @@ class EndUserController extends Controller
         $features = $boundaryResolver->resolveFeatures($features);
         $delineationId = $delineation->id;
 
-        DB::transaction(function () use ($user, $delineationId, $features, &$delineation): void {
+        if ($recordsObservation && DelineationObservationRecorder::areaHectares($features) <= 0) {
+            throw ValidationException::withMessages([
+                'record_as' => 'An observed change needs at least one area shape so its hectares can be measured.',
+            ]);
+        }
+
+        $observation = null;
+        DB::transaction(function () use ($user, $delineationId, $features, $recordsObservation, $data, $observationRecorder, &$delineation, &$observation): void {
             $delineation = Delineation::query()->lockForUpdate()->findOrFail($delineationId);
             $delineation->loadMissing('user:id,name,role');
             abort_unless($this->userCanEditDelineationBoundary($user, $delineation), 403, 'You are not allowed to edit this delineation.');
@@ -595,15 +627,32 @@ class EndUserController extends Controller
                 ],
             ]);
 
+            $previousFeatures = $delineation->features ?? [];
+
             // Only the geometry changes: owner, name, notes and review status are preserved.
             $delineation->update(['features' => $features]);
+
+            if ($recordsObservation) {
+                $observation = $observationRecorder->record(
+                    $delineation,
+                    $previousFeatures,
+                    $features,
+                    Carbon::parse($data['observation_date']),
+                    DelineationAnnualObservation::SOURCES[$data['observation_source']],
+                    $user,
+                );
+            }
         });
 
         $delineation->load(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name']);
 
         return response()->json([
-            'message' => 'Delineation boundary updated.',
+            'message' => $observation
+                ? "Boundary updated and recorded as the {$observation->year} observation ("
+                    . number_format($observation->coverage_area_ha, 2) . ' ha).'
+                : 'Delineation boundary updated.',
             'delineation' => $this->delineationPayloadForMap($delineation),
+            'observation_year' => $observation?->year,
         ]);
     }
 

@@ -21,11 +21,6 @@ if ($currentUser && $currentUser->role === 'admin') {
         <div class="page-title">My Profile</div>
     </div>
 
-    @if ($message = Session::get('success'))
-    <div class="alert alert-success">
-        {{ $message }}
-    </div>
-    @endif
 
     <div class="profile-layout">
 
@@ -43,17 +38,17 @@ if ($currentUser && $currentUser->role === 'admin') {
                 <button type="button" class="avatar-camera-btn" onclick="document.getElementById('profile_image_sidebar').click()">
                     <i class="bi bi-camera-fill"></i>
                 </button>
-                <input type="file" id="profile_image_sidebar" name="profile_image_sidebar" class="file-input-hidden" accept="image/*" style="display: none;">
+                <input type="file" id="profile_image_sidebar" name="profile_image_sidebar" class="file-input-hidden" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;">
             </div>
 
             <h2 class="sidebar-name">{{ $user->name ?? 'Admin User' }}</h2>
             <p class="sidebar-email">{{ $user->email ?? 'admin@example.com' }}</p>
-            <span class="sidebar-role">{{ ucfirst(str_replace('_', ' ', $user->role ?? 'User')) }}</span>
+            <span class="sidebar-role">{{ $user->roleLabel() }}</span>
 
             <div class="sidebar-divider"></div>
 
             <ul class="sidebar-meta">
-                @if($user->role === 'admin' && $user->organization)
+                @if(($user->isExpert() || $user->isAdmin()) && $user->organization)
                 <li>
                     <i class="bi bi-building"></i>
                     <span>{{ $user->organization }}</span>
@@ -85,14 +80,58 @@ if ($currentUser && $currentUser->role === 'admin') {
                         Personal Information
                     </h3>
 
+                    @php
+                    // Accounts not yet split into name parts fall back to parsing the full name.
+                    $fallbackName = $user->first_name === null ? \App\Models\User::parseName((string) $user->name) : [];
+                    @endphp
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="name" class="form-label">Full Name</label>
-                            <input type="text" id="name" name="name" class="form-control"
-                                value="{{ $user->name }}" required>
-                            @error('name')<div class="form-error">{{ $message }}</div>@enderror
+                            <label for="first_name" class="form-label">First Name</label>
+                            <input type="text" id="first_name" name="first_name" class="form-control"
+                                value="{{ old('first_name', $user->first_name ?? ($fallbackName['first_name'] ?? '')) }}"
+                                maxlength="100" autocomplete="given-name" required>
+                            @error('first_name')<div class="form-error">{{ $message }}</div>@enderror
                         </div>
 
+                        <div class="form-group">
+                            <label for="middle_name" class="form-label">Middle Name <span class="label-optional">(Optional)</span></label>
+                            <input type="text" id="middle_name" name="middle_name" class="form-control"
+                                value="{{ old('middle_name', $user->middle_name ?? ($fallbackName['middle_name'] ?? '')) }}"
+                                maxlength="100" autocomplete="additional-name" aria-describedby="middle_name_hint">
+                            <small class="field-hint" id="middle_name_hint">Leave empty if no middle name. Only the initial is shown on your profile.</small>
+                            @error('middle_name')<div class="form-error">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="last_name" class="form-label">Last Name</label>
+                            <input type="text" id="last_name" name="last_name" class="form-control"
+                                value="{{ old('last_name', $user->last_name ?? ($fallbackName['last_name'] ?? '')) }}"
+                                maxlength="100" autocomplete="family-name" required>
+                            @error('last_name')<div class="form-error">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="form-group">
+                            <label for="suffix" class="form-label">Suffix <span class="label-optional">(Optional)</span></label>
+                            <input type="text" id="suffix" name="suffix" class="form-control"
+                                value="{{ old('suffix', $user->suffix ?? ($fallbackName['suffix'] ?? '')) }}"
+                                maxlength="10" placeholder="Jr., Sr., III" autocomplete="honorific-suffix"
+                                list="suffix_options" aria-describedby="suffix_hint">
+                            <datalist id="suffix_options">
+                                <option value="Jr."></option>
+                                <option value="Sr."></option>
+                                <option value="II"></option>
+                                <option value="III"></option>
+                                <option value="IV"></option>
+                                <option value="V"></option>
+                            </datalist>
+                            <small class="field-hint" id="suffix_hint">Leave empty if no suffix.</small>
+                            @error('suffix')<div class="form-error">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+
+                    <div class="form-row">
                         <div class="form-group">
                             <label for="email" class="form-label">Email Address</label>
                             <input type="email" id="email" name="email" class="form-control"
@@ -100,17 +139,6 @@ if ($currentUser && $currentUser->role === 'admin') {
                             <small class="email-helper">Must be a valid email address</small>
                             @error('email')<div class="form-error">{{ $message }}</div>@enderror
                         </div>
-                    </div>
-
-                    <div class="form-row">
-                        @if($user->role === 'admin')
-                        <div class="form-group">
-                            <label for="organization" class="form-label">Organization</label>
-                            <input type="text" id="organization" name="organization" class="form-control"
-                                value="{{ $user->organization ?? '' }}">
-                            @error('organization')<div class="form-error">{{ $message }}</div>@enderror
-                        </div>
-                        @endif
 
                         <div class="form-group">
                             <label for="phone" class="form-label">Phone Number</label>
@@ -126,6 +154,20 @@ if ($currentUser && $currentUser->role === 'admin') {
                             @error('phone')<div class="form-error">{{ $message }}</div>@enderror
                         </div>
                     </div>
+
+                    @if($user->isExpert() || $user->isAdmin())
+                    <div class="form-row">
+                        <div class="form-group">
+                            {{-- Same field as the expert application on the sign-up form. --}}
+                            <label for="organization" class="form-label">Organization / Affiliation</label>
+                            <input type="text" id="organization" name="organization" class="form-control"
+                                value="{{ old('organization', $user->organization ?? '') }}"
+                                placeholder="e.g. DENR CENRO Maasin, SLSU" maxlength="255" autocomplete="organization"
+                                @if($user->isExpert()) required @endif>
+                            @error('organization')<div class="form-error">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    @endif
                 </div>
 
                 <div class="form-actions">
@@ -148,7 +190,9 @@ if ($currentUser && $currentUser->role === 'admin') {
             </form>
 
             <!-- Password Update Form (separate from profile form) -->
-            <form action="{{ route('profile.updatePassword') }}" method="POST" class="password-form" style="margin-top: 24px;">
+            <form action="{{ route('profile.updatePassword') }}" method="POST" class="password-form" style="margin-top: 24px;"
+                data-confirm="Update password?" data-confirm-message="You use the new password the next time you log in."
+                data-confirm-label="Update" data-busy-label="Updating password...">
                 @csrf
                 @method('PUT')
 
@@ -209,13 +253,26 @@ if ($currentUser && $currentUser->role === 'admin') {
 
 <!-- Image Preview Modal -->
 <div id="image-preview-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <h3 class="modal-title">Preview Image</h3>
-        <img id="modal-preview-image" src="" alt="Preview" class="modal-preview-image">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="crop-modal-title">
+        <h3 class="modal-title" id="crop-modal-title">Adjust Profile Photo</h3>
+        <p class="crop-hint">Drag to reposition. Zoom to choose what shows inside the circle.</p>
+        <div class="crop-stage" id="crop-stage" tabindex="0"
+            aria-label="Photo crop area. Use arrow keys to move and plus or minus to zoom.">
+            <img id="modal-preview-image" src="" alt="Photo being cropped" class="crop-image" draggable="false">
+            <div class="crop-mask" aria-hidden="true"></div>
+        </div>
+        <div class="crop-zoom">
+            <i class="bi bi-zoom-out" aria-hidden="true"></i>
+            <input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
+            <i class="bi bi-zoom-in" aria-hidden="true"></i>
+            <button type="button" class="btn btn-secondary" id="crop-reset" title="Reset position and zoom">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
+        </div>
         <div class="modal-actions">
-            <button type="button" class="btn btn-primary" onclick="confirmImageUpload()">
+            <button type="button" class="btn btn-primary" id="crop-confirm" onclick="confirmImageUpload()">
                 <i class="bi bi-check-circle"></i>
-                OK
+                Use Photo
             </button>
             <button type="button" class="btn btn-secondary" onclick="cancelImageUpload()">
                 <i class="bi bi-x-circle"></i>
@@ -540,12 +597,18 @@ if ($currentUser && $currentUser->role === 'admin') {
         color: #d04030;
     }
 
-    .email-helper {
+    .email-helper,
+    .field-hint {
         display: block;
         font-size: 10px;
         color: #7a9a7a;
         margin-top: 4px;
         font-weight: 500;
+    }
+
+    .label-optional {
+        font-weight: 600;
+        color: #7a9a7a;
     }
 
     .email-helper.valid {
@@ -690,19 +753,29 @@ if ($currentUser && $currentUser->role === 'admin') {
         border-top: 1px solid #e0e8e0;
     }
 
+    /* Shared size and type for every button on this page; variants only change colours. */
     .btn {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
+        box-sizing: border-box;
         padding: 10px 18px;
-        border: none;
+        border: 1px solid transparent; /* same height whether or not a variant shows a border */
         border-radius: 8px;
+        font-family: 'Manrope', sans-serif;
         font-size: 12px;
         font-weight: 700;
+        line-height: 1.2;
+        white-space: nowrap;
         cursor: pointer;
         transition: all 0.15s;
         text-decoration: none;
-        font-family: 'Manrope', sans-serif;
+    }
+
+    .btn i {
+        font-size: 1.1em;
+        line-height: 1;
     }
 
     .btn-primary {
@@ -1000,11 +1073,6 @@ if ($currentUser && $currentUser->role === 'admin') {
             max-width: 95%;
         }
 
-        .modal-preview-image {
-            max-height: 200px;
-            margin-bottom: 16px;
-        }
-
         .modal-title {
             font-size: 14px;
             margin-bottom: 12px;
@@ -1055,13 +1123,71 @@ if ($currentUser && $currentUser->role === 'admin') {
         margin: 0 0 16px;
     }
 
-    .modal-preview-image {
-        width: 100%;
-        max-height: 280px;
-        border-radius: 8px;
-        border: 1px solid #e0e8e0;
-        object-fit: cover;
+    .crop-hint {
+        font-size: 13px;
+        color: #6a8a6a;
+        margin: -8px 0 14px;
+    }
+
+    .crop-stage {
+        --crop-size: min(260px, 70vw);
+        position: relative;
+        width: var(--crop-size);
+        height: var(--crop-size);
+        margin: 0 auto 16px;
+        overflow: hidden;
+        border-radius: 12px;
+        background: #1a2e1a;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+    }
+
+    .crop-stage:active {
+        cursor: grabbing;
+    }
+
+    .crop-stage:focus-visible {
+        outline: 3px solid #1e9e62;
+        outline-offset: 3px;
+    }
+
+    .crop-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        max-width: none;
+        transform-origin: 0 0;
+        pointer-events: none;
+    }
+
+    /* Circle matches the round avatar; the corners are dimmed because they get cut off. */
+    .crop-mask {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        pointer-events: none;
+    }
+
+    .crop-zoom {
+        display: flex;
+        align-items: center;
+        gap: 10px;
         margin-bottom: 20px;
+        color: #6a8a6a;
+    }
+
+    .crop-zoom input[type="range"] {
+        flex: 1;
+        accent-color: #1e9e62;
+    }
+
+    /* Reset sits beside the zoom slider, so it must not stretch like the full-width mobile buttons. */
+    .crop-zoom .btn {
+        width: auto;
+        flex: none;
     }
 
     .modal-actions {
@@ -1079,16 +1205,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         margin-top: 20px;
     }
 
+    /* Colour only: size, padding and font come from .btn (including its mobile sizes). */
     .btn-warning {
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 16px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
         box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
     }
 
@@ -1297,65 +1417,198 @@ if ($currentUser && $currentUser->role === 'admin') {
     let pendingImageFile = null;
     let tempImageDataUrl = null;
 
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const MAX_SOURCE_IMAGE_BYTES = 20 * 1024 * 1024; // the cropped 512px upload stays well under the 2 MB server limit
+
     sidebarFileInput.addEventListener('change', function(e) {
         if (this.files && this.files[0]) {
-            pendingImageFile = this.files[0];
-            showImagePreviewModal(this.files[0]);
+            const file = this.files[0];
+            // The original can be large: it is cropped and resized in the browser before upload.
+            const problem = !ALLOWED_IMAGE_TYPES.includes(file.type)
+                ? 'The profile photo must be a JPG, PNG, GIF, or WebP file.'
+                : (file.size > MAX_SOURCE_IMAGE_BYTES ? 'Please choose a photo smaller than 20 MB.' : null);
+
+            if (problem) {
+                this.value = '';
+                window.AppActions.notify(problem, 'error');
+                return;
+            }
+
+            showImagePreviewModal(file);
         }
     });
 
-    function showImagePreviewModal(file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            tempImageDataUrl = e.target.result;
-            document.getElementById('modal-preview-image').src = e.target.result;
-            document.getElementById('image-preview-modal').style.display = 'flex';
-        };
-        reader.readAsDataURL(file);
+    // ---- Crop & zoom ----------------------------------------------------------------------------
+    const CROP_OUTPUT_SIZE = 512; // px, square; displayed as a circle everywhere
+    const cropModal = document.getElementById('image-preview-modal');
+    const cropStage = document.getElementById('crop-stage');
+    const cropImage = document.getElementById('modal-preview-image');
+    const cropZoom = document.getElementById('crop-zoom');
+    const crop = { objectUrl: null, size: 0, naturalW: 0, naturalH: 0, baseScale: 1, scale: 1, x: 0, y: 0 };
+
+    function renderCrop() {
+        // Keep the image covering the whole frame so no empty edges end up in the photo.
+        const width = crop.naturalW * crop.scale;
+        const height = crop.naturalH * crop.scale;
+        crop.x = Math.min(0, Math.max(crop.size - width, crop.x));
+        crop.y = Math.min(0, Math.max(crop.size - height, crop.y));
+        cropImage.style.transform = `translate(${crop.x}px, ${crop.y}px) scale(${crop.scale})`;
     }
 
-    function confirmImageUpload() {
-        if (pendingImageFile && tempImageDataUrl) {
-            // Create a new FileList-like object using DataTransfer
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(pendingImageFile);
+    function setCropZoom(zoom, anchorX = crop.size / 2, anchorY = crop.size / 2) {
+        zoom = Math.min(Number(cropZoom.max), Math.max(Number(cropZoom.min), zoom));
+        const newScale = crop.baseScale * zoom;
+        // Zoom around the anchor point so the spot under the cursor/centre stays put.
+        const imageX = (anchorX - crop.x) / crop.scale;
+        const imageY = (anchorY - crop.y) / crop.scale;
+        crop.scale = newScale;
+        crop.x = anchorX - imageX * newScale;
+        crop.y = anchorY - imageY * newScale;
+        cropZoom.value = zoom;
+        renderCrop();
+    }
 
-            // Set the files on the main input
-            mainFileInput.files = dataTransfer.files;
+    function resetCrop() {
+        crop.size = cropStage.clientWidth;
+        crop.baseScale = Math.max(crop.size / crop.naturalW, crop.size / crop.naturalH);
+        crop.scale = crop.baseScale;
+        crop.x = (crop.size - crop.naturalW * crop.scale) / 2;
+        crop.y = (crop.size - crop.naturalH * crop.scale) / 2;
+        cropZoom.value = 1;
+        renderCrop();
+    }
 
-            // Update avatar display temporarily
-            const avatarWrapper = document.querySelector('.avatar-wrapper');
-            let avatarElement = avatarWrapper.querySelector('.profile-avatar');
+    function showImagePreviewModal(file) {
+        if (crop.objectUrl) URL.revokeObjectURL(crop.objectUrl);
+        crop.objectUrl = URL.createObjectURL(file);
 
-            // If avatar is a placeholder div, replace with img tag
-            if (avatarElement && avatarElement.classList.contains('avatar-placeholder')) {
-                const newImg = document.createElement('img');
-                newImg.src = tempImageDataUrl;
-                newImg.alt = 'Profile';
-                newImg.className = 'profile-avatar';
-                avatarElement.replaceWith(newImg);
-            } else if (avatarElement && avatarElement.tagName === 'IMG') {
-                // If it's already an img, just update the src
-                avatarElement.src = tempImageDataUrl;
-            }
-
-            // Close modal
-            document.getElementById('image-preview-modal').style.display = 'none';
-
-            // Reset sidebar input but KEEP pendingImageFile for form submission
+        cropImage.onload = function() {
+            crop.naturalW = cropImage.naturalWidth;
+            crop.naturalH = cropImage.naturalHeight;
+            cropModal.style.display = 'flex';
+            resetCrop(); // needs the modal visible to measure the frame
+            cropStage.focus();
+        };
+        cropImage.onerror = function() {
             sidebarFileInput.value = '';
+            window.AppActions.notify('That image could not be opened. Please try another photo.', 'error');
+        };
+        cropImage.src = crop.objectUrl;
+    }
+
+    let dragStart = null;
+    cropStage.addEventListener('pointerdown', function(e) {
+        dragStart = { pointerX: e.clientX, pointerY: e.clientY, x: crop.x, y: crop.y };
+        cropStage.setPointerCapture(e.pointerId);
+    });
+    cropStage.addEventListener('pointermove', function(e) {
+        if (!dragStart) return;
+        crop.x = dragStart.x + (e.clientX - dragStart.pointerX);
+        crop.y = dragStart.y + (e.clientY - dragStart.pointerY);
+        renderCrop();
+    });
+    ['pointerup', 'pointercancel'].forEach(type => cropStage.addEventListener(type, () => { dragStart = null; }));
+
+    cropStage.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const rect = cropStage.getBoundingClientRect();
+        const zoom = Number(cropZoom.value) * (e.deltaY < 0 ? 1.08 : 1 / 1.08);
+        setCropZoom(zoom, e.clientX - rect.left, e.clientY - rect.top);
+    }, { passive: false });
+
+    cropStage.addEventListener('keydown', function(e) {
+        const step = e.shiftKey ? 30 : 10;
+        const moves = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+        if (moves[e.key]) {
+            crop.x += moves[e.key][0];
+            crop.y += moves[e.key][1];
+            renderCrop();
+        } else if (e.key === '+' || e.key === '=') {
+            setCropZoom(Number(cropZoom.value) + 0.1);
+        } else if (e.key === '-') {
+            setCropZoom(Number(cropZoom.value) - 0.1);
+        } else if (e.key === 'Enter') {
+            confirmImageUpload();
+        } else {
+            return;
+        }
+        e.preventDefault();
+    });
+
+    cropZoom.addEventListener('input', () => setCropZoom(Number(cropZoom.value)));
+    document.getElementById('crop-reset').addEventListener('click', resetCrop);
+
+    function cropToBlob() {
+        const canvas = document.createElement('canvas');
+        canvas.width = CROP_OUTPUT_SIZE;
+        canvas.height = CROP_OUTPUT_SIZE;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; // transparent PNG/GIF areas become white instead of black in JPEG
+        ctx.fillRect(0, 0, CROP_OUTPUT_SIZE, CROP_OUTPUT_SIZE);
+        ctx.imageSmoothingQuality = 'high';
+        const sourceSize = crop.size / crop.scale;
+        ctx.drawImage(cropImage, -crop.x / crop.scale, -crop.y / crop.scale, sourceSize, sourceSize,
+            0, 0, CROP_OUTPUT_SIZE, CROP_OUTPUT_SIZE);
+        return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    }
+
+    function closeCropModal() {
+        cropModal.style.display = 'none';
+        sidebarFileInput.value = '';
+        if (crop.objectUrl) {
+            URL.revokeObjectURL(crop.objectUrl);
+            crop.objectUrl = null;
         }
     }
 
+    async function confirmImageUpload() {
+        if (!crop.objectUrl) return;
+
+        const blob = await cropToBlob();
+        if (!blob) {
+            window.AppActions.notify('The photo could not be cropped. Please try another image.', 'error');
+            return;
+        }
+        pendingImageFile = new File([blob], 'profile-photo.jpg', { type: 'image/jpeg' });
+        if (tempImageDataUrl) URL.revokeObjectURL(tempImageDataUrl);
+        tempImageDataUrl = URL.createObjectURL(blob);
+
+        // Create a new FileList-like object using DataTransfer
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(pendingImageFile);
+
+        // Set the files on the main input
+        mainFileInput.files = dataTransfer.files;
+
+        // Update avatar display temporarily
+        const avatarWrapper = document.querySelector('.avatar-wrapper');
+        let avatarElement = avatarWrapper.querySelector('.profile-avatar');
+
+        // If avatar is a placeholder div, replace with img tag
+        if (avatarElement && avatarElement.classList.contains('avatar-placeholder')) {
+            const newImg = document.createElement('img');
+            newImg.src = tempImageDataUrl;
+            newImg.alt = 'Profile';
+            newImg.className = 'profile-avatar';
+            avatarElement.replaceWith(newImg);
+        } else if (avatarElement && avatarElement.tagName === 'IMG') {
+            // If it's already an img, just update the src
+            avatarElement.src = tempImageDataUrl;
+        }
+
+        // Close modal; pendingImageFile is kept for form submission
+        closeCropModal();
+
+        // Save right away so "Use Photo" actually uploads it (runs the usual confirm + validation).
+        profileForm.requestSubmit();
+    }
+
     function cancelImageUpload() {
-        document.getElementById('image-preview-modal').style.display = 'none';
-        sidebarFileInput.value = '';
-        pendingImageFile = null;
-        tempImageDataUrl = null;
+        closeCropModal();
     }
 
     // Intercept form submission using fetch to ensure file is properly included
-    profileForm.addEventListener('submit', function(e) {
+    profileForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
         // Create a fresh FormData and manually add all fields
@@ -1367,9 +1620,16 @@ if ($currentUser && $currentUser->role === 'admin') {
         formData.append('_method', 'PUT');
 
         // Add form fields
-        formData.append('name', document.getElementById('name').value);
+        formData.append('first_name', document.getElementById('first_name').value);
+        formData.append('middle_name', document.getElementById('middle_name').value);
+        formData.append('last_name', document.getElementById('last_name').value);
+        formData.append('suffix', document.getElementById('suffix').value);
         formData.append('email', document.getElementById('email').value);
-        formData.append('organization', document.getElementById('organization').value);
+        // Organization is only rendered for admins.
+        const organizationInput = document.getElementById('organization');
+        if (organizationInput) {
+            formData.append('organization', organizationInput.value);
+        }
         formData.append('phone', document.getElementById('phone').value);
 
         // Add the file if we have one
@@ -1377,52 +1637,95 @@ if ($currentUser && $currentUser->role === 'admin') {
             formData.append('profile_image', pendingImageFile, pendingImageFile.name);
         }
 
-        // Log what we're sending
-        console.log('Submitting form with file:', pendingImageFile ? pendingImageFile.name + ' (' + pendingImageFile.type + ')' : 'no file');
-        console.log('File size:', pendingImageFile ? pendingImageFile.size + ' bytes' : 'N/A');
-
-        // Submit via fetch
-        fetch(profileForm.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
+        // Confirmation → Processing → Success or Error (partials.action-feedback), then submit via fetch.
+        const outcome = await window.AppActions.run({
+            confirm: { title: 'Save changes?', message: 'Your profile details are updated.', confirmLabel: 'Save' },
+            button: e.submitter || profileForm.querySelector('button[type="submit"]'),
+            busyLabel: 'Saving...',
+            task: async () => {
+                // Ask for JSON so validation errors come back as 422 instead of a redirect that looks like success.
+                const response = await fetch(profileForm.action, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const payload = await response.json().catch(() => null);
                 if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`HTTP ${response.status}: ${text}`);
-                    });
+                    console.error('Profile save failed:', response.status, payload);
+                    const firstError = payload?.errors ? Object.values(payload.errors).flat()[0] : null;
+                    throw new Error(
+                        firstError
+                        || (response.status === 413 ? 'The profile photo is too large. Please choose a smaller image.' : null)
+                        || `Unable to save your profile (HTTP ${response.status}). Please try again.`
+                    );
                 }
-                return response.text();
-            })
-            .then(data => {
-                console.log('Success response:', data);
-                // Reset state after successful submission
-                pendingImageFile = null;
-                tempImageDataUrl = null;
+                return payload;
+            },
+            // Same success toast as the other actions (e.g. deleting drone imagery).
+            successMessage: payload => payload?.message || 'Your profile was updated.',
+        });
+        if (outcome.status !== 'done') return;
 
-                // Show success message
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-success';
-                alertDiv.textContent = 'Profile updated successfully!';
-                const profileSection = document.getElementById('profile-section');
-                profileSection.insertBefore(alertDiv, profileSection.firstChild);
+        // Reset state after successful submission
+        pendingImageFile = null;
+        mainFileInput.value = '';
+        if (tempImageDataUrl) URL.revokeObjectURL(tempImageDataUrl);
+        tempImageDataUrl = null;
 
-                // Scroll to top to see message
-                window.scrollTo(0, 0);
-
-                // Reload to show changes after a brief delay
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            })
-            .catch(error => {
-                console.error('Full error details:', error);
-                console.error('Error message:', error.message);
-                console.error('Error stack:', error.stack);
-                alert('Error saving profile: ' + error.message + '\n\nCheck browser console for details.');
-            });
+        // Refresh the page in place instead of reloading, so the toast stays visible.
+        applySavedProfile(outcome.result || {});
     });
+
+    // Results of full-page submits (e.g. the password form) use the same success toast.
+    @if (session('success'))
+    document.addEventListener('DOMContentLoaded', () => window.AppActions?.notify(@json(session('success'))));
+    @endif
+
+    function applySavedProfile(saved) {
+        if (saved.name) {
+            document.querySelectorAll('.sidebar-name, .sidebar-profile-name')
+                .forEach(el => { el.textContent = saved.name; });
+            document.querySelectorAll('.sidebar-profile-link')
+                .forEach(el => el.setAttribute('aria-label', `View profile for ${saved.name}`));
+        }
+        if (saved.email) {
+            document.querySelectorAll('.sidebar-email, .sidebar-profile-email')
+                .forEach(el => { el.textContent = saved.email; });
+        }
+        if ('organization' in saved) {
+            const orgItem = document.querySelector('.sidebar-meta .bi-building')?.nextElementSibling;
+            if (orgItem && saved.organization) {
+                orgItem.textContent = saved.organization;
+            } else if (orgItem) {
+                orgItem.parentElement.remove();
+            } else if (saved.organization && document.getElementById('organization')) {
+                const li = document.createElement('li');
+                li.innerHTML = '<i class="bi bi-building"></i><span></span>';
+                li.querySelector('span').textContent = saved.organization;
+                document.querySelector('.sidebar-meta')?.prepend(li);
+            }
+        }
+        if (saved.phone) {
+            const phoneItem = document.querySelector('.sidebar-meta .bi-telephone')?.nextElementSibling;
+            if (phoneItem) phoneItem.textContent = saved.phone;
+        }
+        if (saved.profile_image_url) {
+            // Profile card avatar (the crop preview is a temporary blob URL).
+            const avatar = document.querySelector('.avatar-wrapper .profile-avatar');
+            if (avatar?.tagName === 'IMG') avatar.src = saved.profile_image_url;
+
+            // Navigation sidebar avatar(s): replace the initial with the photo if needed.
+            document.querySelectorAll('.sidebar-profile-avatar').forEach(slot => {
+                let img = slot.querySelector('img');
+                if (!img) {
+                    img = document.createElement('img');
+                    slot.replaceChildren(img);
+                }
+                img.src = saved.profile_image_url;
+                img.alt = `${saved.name || ''}'s profile photo`.trim();
+            });
+        }
+    }
 
     // Close modal when clicking outside
     document.getElementById('image-preview-modal').addEventListener('click', function(e) {

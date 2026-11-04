@@ -35,24 +35,50 @@ class ProfileController extends Controller
             return redirect()->route('login')->with('error', 'Please log in first.');
         }
 
+        $request->merge([
+            'first_name' => trim((string) $request->input('first_name')),
+            'last_name' => trim((string) $request->input('last_name')),
+            'middle_name' => trim((string) $request->input('middle_name')),
+            'suffix' => trim((string) $request->input('suffix')),
+        ]);
+
         $rules = [
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'suffix' => ['nullable', 'string', 'max:10', 'regex:/^[\pL.\s]+$/u'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'phone' => ['required', 'regex:/^[0-9]{11}$/', 'string'],
-            'profile_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+            'profile_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];
 
-        // Only require organization for admin users
-        if ($user->role === 'admin') {
+        // Organization / affiliation: experts must keep one (it is required when applying),
+        // admins may fill it in, and residents don't have the field.
+        $editsOrganization = $user->isExpert() || $user->isAdmin();
+        if ($user->isExpert()) {
+            $request->merge(['organization' => trim((string) $request->input('organization'))]);
+            $rules['organization'] = ['required', 'string', 'max:255'];
+        } elseif ($user->isAdmin()) {
             $rules['organization'] = ['nullable', 'string', 'max:255'];
         }
 
         $messages = [
+            'first_name.required' => 'First name is required.',
+            'last_name.required' => 'Last name is required.',
+            'middle_name.max' => 'Middle name must be 100 characters or fewer.',
+            'suffix.max' => 'Suffix must be 10 characters or fewer (e.g. Jr., Sr., III).',
+            'suffix.regex' => 'Suffix can only contain letters and periods (e.g. Jr., Sr., III).',
             'email.required' => 'Email address is required.',
             'email.email' => 'Please enter a valid email address.',
             'email.unique' => 'This email address is already in use. Please use a different email.',
+            'organization.required' => 'Organization or affiliation is required for expert accounts.',
+            'organization.max' => 'Organization or affiliation must be 255 characters or fewer.',
             'phone.required' => 'Phone number is required.',
             'phone.regex' => 'Phone number must be exactly 11 digits (e.g., 09123456789).',
+            'profile_image.image' => 'The profile photo must be an image.',
+            'profile_image.mimes' => 'The profile photo must be a JPG, PNG, GIF, or WebP file.',
+            'profile_image.max' => 'The profile photo must be 2 MB or smaller.',
+            'profile_image.uploaded' => 'The profile photo could not be uploaded. Please try a smaller image.',
         ];
 
         $validated = $request->validate($rules, $messages);
@@ -67,10 +93,8 @@ class ProfileController extends Controller
         }
 
         // Update user profile - only update fields that are in the validated data
-        $fieldsToUpdate = ['name', 'email', 'phone', 'profile_image'];
-        if ($user->role === 'admin') {
-            $fieldsToUpdate[] = 'organization';
-        }
+        // The User model rebuilds the display name ("Juan D. Dela Cruz Jr.") from the name parts.
+        $fieldsToUpdate = ['first_name', 'last_name', 'email', 'phone', 'profile_image'];
 
         foreach ($fieldsToUpdate as $field) {
             if (isset($validated[$field])) {
@@ -78,7 +102,30 @@ class ProfileController extends Controller
             }
         }
 
+        // Optional parts: an empty field clears them.
+        foreach (['middle_name', 'suffix'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $user->{$field} = $validated[$field];
+            }
+        }
+
+        // array_key_exists so an admin can clear their (optional) organization.
+        if ($editsOrganization && array_key_exists('organization', $validated)) {
+            $user->organization = $validated['organization'];
+        }
+
         $user->save();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Your profile was updated.',
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'organization' => $user->organization,
+                'profile_image_url' => $user->profile_image ? asset('storage/' . $user->profile_image) : null,
+            ]);
+        }
 
         return back()->with('success', 'Profile updated successfully!');
     }

@@ -92,7 +92,7 @@
                         </td>
                         <td>
                             <div class="user-name">{{ $activity->user?->name ?? 'Deleted user' }}</div>
-                            <div class="muted">{{ $activity->user?->isResident() ? 'Resident' : ucfirst($activity->user?->role ?? '') }}</div>
+                            <div class="muted">{{ $activity->user?->roleLabel() }}</div>
                         </td>
                         <td>{{ $activity->activity }}</td>
                         <td>{{ $activity->module }}</td>

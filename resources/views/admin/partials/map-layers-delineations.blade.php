@@ -30,7 +30,7 @@
                 </td>
                 <td>
                     <div>{{ $delineation->user?->name ?? 'Deleted user' }}</div>
-                    <div class="muted">{{ $delineation->user?->isResident() ? 'Resident' : ucfirst($delineation->user?->role ?? '') }}</div>
+                    <div class="muted">{{ $delineation->user?->roleLabel() }}</div>
                 </td>
                 <td>
                     <span class="badge {{ $statusClass }}">{{ $statusLabel }}</span>
@@ -56,7 +56,9 @@
                             data-name="{{ $delineation->name }}"
                             data-notes="{{ $delineation->notes }}"><i class="bi bi-pencil"></i></button>
                         @if($delineation->isHiddenFromMap())
-                        <form method="POST" action="{{ route('admin.map-layers.delineations.restore', $delineation) }}">
+                        <form method="POST" action="{{ route('admin.map-layers.delineations.restore', $delineation) }}"
+                            data-confirm="Restore this delineation?" data-confirm-message="&quot;{{ $delineation->name }}&quot; appears on the public and shared maps again, and the owner is notified."
+                            data-confirm-label="Restore" data-busy-label="Restoring...">
                             @csrf
                             <button type="submit" class="action-btn" title="Restore to map"><i class="bi bi-arrow-counterclockwise"></i></button>
                         </form>
@@ -66,7 +68,8 @@
                             data-name="{{ $delineation->name }}"><i class="bi bi-eye-slash"></i></button>
                         @endif
                         <form method="POST" action="{{ route('admin.map-layers.delineations.destroy', $delineation) }}"
-                            data-confirm="Permanently delete &quot;{{ $delineation->name }}&quot;? Its yearly observations and revisions are deleted too, and the owner is notified.">
+                            data-confirm="Delete this record?" data-confirm-message="&quot;{{ $delineation->name }}&quot; is permanently deleted with its yearly observations and revisions, and the owner is notified. This cannot be undone."
+                            data-confirm-label="Delete" data-confirm-tone="danger" data-busy-label="Deleting...">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>

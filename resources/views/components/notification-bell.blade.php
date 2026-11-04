@@ -173,23 +173,6 @@
         padding: 8px 0;
     }
 
-    .notification-menu::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .notification-menu::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .notification-menu::-webkit-scrollbar-thumb {
-        background: #d4e0d4;
-        border-radius: 3px;
-    }
-
-    .notification-menu::-webkit-scrollbar-thumb:hover {
-        background: #b8d4b8;
-    }
-
     .notification-item {
         display: flex;
         align-items: center;
@@ -492,15 +475,26 @@
                     'X-Requested-With': 'XMLHttpRequest',
                 },
             });
-            if (!res.ok) return null;
-            return res.json();
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Unable to update your notifications. Please try again.');
+            return data;
+        }
+
+        // Processing → Success or Error (partials.action-feedback); mark-all asks first.
+        function bellAction(form, options) {
+            return window.AppActions.run({
+                button: form.querySelector('button[type="submit"]'),
+                task: () => ajaxSubmit(form),
+                ...options,
+            });
         }
 
         document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                const data = await ajaxSubmit(form);
-                if (!data) return;
+                const outcome = await bellAction(form, { busyLabel: 'Marking...', successMessage: 'Marked as read.' });
+                if (outcome.status !== 'done') return;
+                const data = outcome.result;
 
                 const item = form.closest('.notification-item');
                 item?.classList.remove('unread');
@@ -549,8 +543,12 @@
         document.querySelectorAll('[data-ajax-mark-all]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                const data = await ajaxSubmit(form);
-                if (!data) return;
+                const outcome = await bellAction(form, {
+                    confirm: { title: 'Mark all as read?', message: 'Every unread notification is marked as read.', confirmLabel: 'Mark all' },
+                    busyLabel: 'Marking all...',
+                    successMessage: 'All notifications marked as read.',
+                });
+                if (outcome.status !== 'done') return;
 
                 document.querySelectorAll('.notification-item.unread').forEach(item => {
                     item.classList.remove('unread');

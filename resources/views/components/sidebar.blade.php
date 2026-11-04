@@ -27,6 +27,11 @@
             <span>Activity Logs</span>
         </a>
 
+        <a href="{{ route('guide') }}" class="sidebar-item {{ request()->routeIs('guide') ? 'active' : '' }}">
+            <i class="bi bi-question-circle"></i>
+            <span>Help &amp; Guide</span>
+        </a>
+
     </div>
 
     @php($currentUser = auth()->user())
@@ -41,11 +46,11 @@
             </span>
             <span class="sidebar-profile-details">
                 <span class="sidebar-profile-name">{{ $currentUser->name }}</span>
-                <span class="sidebar-profile-type">{{ $currentUser->isResident() ? 'Resident' : ucfirst($currentUser->role) }}</span>
+                <span class="sidebar-profile-type">{{ $currentUser->roleLabel() }}</span>
                 <span class="sidebar-profile-email">{{ $currentUser->email }}</span>
             </span>
         </a>
-        <form method="POST" action="{{ route('logout') }}">
+        <form method="POST" action="{{ route('logout') }}" data-confirm="Log out?" data-confirm-message="You will need to log in again to continue." data-confirm-label="Log out" data-confirm-tone="danger" data-confirm-icon="bi-box-arrow-right" data-busy-label="Logging out...">
             @csrf
             <button type="submit" class="sidebar-profile-logout" title="Logout" aria-label="Logout">
                 <i class="bi bi-box-arrow-right"></i>

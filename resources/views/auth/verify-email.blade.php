@@ -190,6 +190,7 @@
             }
         }
     </style>
+    @include('partials.scrollbar-styles')
 </head>
 
 <body>

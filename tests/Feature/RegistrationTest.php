@@ -21,7 +21,30 @@ class RegistrationTest extends TestCase
             'phone' => '123456789',
             'password' => 'Secret123',
             'password_confirmation' => 'Secret123',
+            'terms' => '1',
         ], $overrides);
+    }
+
+    public function test_terms_page_is_public(): void
+    {
+        $this->get('/terms')->assertOk()->assertSee('Terms and Conditions');
+    }
+
+    public function test_register_page_links_to_terms(): void
+    {
+        $html = $this->get('/register')->assertOk()->getContent();
+
+        $this->assertStringContainsString('name="terms"', $html);
+        $this->assertStringContainsString(route('terms'), $html);
+    }
+
+    public function test_registration_requires_accepting_terms(): void
+    {
+        $this->postJson('/register', $this->payload(['terms' => null]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['terms']);
+
+        $this->assertDatabaseCount('users', 0);
     }
 
     public function test_register_page_shows_first_last_name_and_fixed_09_prefix(): void

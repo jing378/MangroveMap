@@ -173,6 +173,7 @@
             text-decoration: underline;
         }
     </style>
+    @include('partials.scrollbar-styles')
 </head>
 
 <body>

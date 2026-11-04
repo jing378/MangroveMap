@@ -417,17 +417,6 @@
     flex: 1;
     overflow-y: auto;
     padding: 14px;
-    scrollbar-width: thin;
-    scrollbar-color: #d4e0d4 transparent;
-  }
-
-  #mapRightPanel .scroll::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  #mapRightPanel .scroll::-webkit-scrollbar-thumb {
-    background: #d4e0d4;
-    border-radius: 3px;
   }
 
   .panel-close-btn {
@@ -883,6 +872,18 @@
       padding: 10px;
       background: #1e9e62;
       box-shadow: 0 -6px 12px rgba(247, 250, 247, 0.95);
+    }
+
+    /* A sticky button only floats within its parent. These wrappers hold just a few buttons, so let their
+       buttons belong to the scrolling panel instead: Resubmit / Save Changes then float like Save. */
+    #mapRightPanel #rejectedRevisionActions,
+    #mapRightPanel #boundaryEditActions {
+      display: contents;
+    }
+
+    #mapRightPanel #cancelRejectedRevisionBtn,
+    #mapRightPanel #cancelBoundaryEditBtn {
+      margin-bottom: 12px !important;
     }
 
     #v-classify {
@@ -1542,50 +1543,23 @@
   }
 
   .drone-imagery-upload-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     padding: 8px 10px;
     border: 0;
     border-radius: 7px;
     background: #1e9e62;
     color: #fff;
     font: 600 12px 'Manrope', sans-serif;
+    text-decoration: none;
     cursor: pointer;
   }
 
-  .drone-imagery-upload-button:disabled {
-    opacity: .6;
-    cursor: wait;
-  }
-
-  .drone-imagery-upload-progress {
-    display: grid;
-    gap: 5px;
-  }
-
-  .drone-imagery-upload-progress[hidden] {
-    display: none;
-  }
-
-  .drone-imagery-upload-progress-label {
-    display: flex;
-    justify-content: space-between;
-    color: #4c6b5d;
-    font-size: 10px;
-    font-weight: 600;
-  }
-
-  .drone-imagery-upload-progress-track {
-    height: 7px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: #e5eee7;
-  }
-
-  .drone-imagery-upload-progress-fill {
-    width: 0;
-    height: 100%;
-    border-radius: inherit;
-    background: #1e9e62;
-    transition: width .15s ease;
+  .drone-imagery-upload-button:hover {
+    background: #16824f;
+    color: #fff;
   }
 
   .drone-imagery-message {
@@ -2778,10 +2752,13 @@
     padding: 4px;
   }
 
-  /* Custom scrollbar for notes and narrow scrollable containers */
-  #delineationNotes {
-    scrollbar-width: thin;
-    scrollbar-color: #9ca3af #f0f4f0;
+  /* Custom scrollbar for notes and narrow scrollable containers.
+     Standard properties only as the Firefox fallback: Chromium ignores ::-webkit-scrollbar when they are set. */
+  @supports not selector(::-webkit-scrollbar) {
+    #delineationNotes {
+      scrollbar-width: thin;
+      scrollbar-color: #9ca3af #f0f4f0;
+    }
   }
 
   #delineationNotes::-webkit-scrollbar {
@@ -2928,12 +2905,10 @@
 
   body[data-page='map'] #delineationToolbar,
   body[data-page='map'] #editModeBtn,
-  body[data-page='map'] #classifyBtn,
   body[data-page='map'] .left-panel {
     display: none !important;
   }
 
-  body[data-page='delineate'] #classifyBtn,
   body[data-page='delineate'] #editModeBtn,
   body[data-page='delineate'] .left-panel {
     display: none !important;
@@ -2970,4 +2945,18 @@
   .boundary-edit-hint kbd { font-size: 10px; padding: 0 4px; border: 1px solid #b8c8b8; border-radius: 3px; background: #fff; }
   .delineation-vertex-handle.is-selected div { background: #ff9800 !important; transform: scale(1.25); }
   .delineation-midpoint-handle div { cursor: copy; }
+
+  /* Expert choice: correction vs observed change (feeds "Changes over time") */
+  .boundary-record-as { border: 1px solid #d4dfd4; border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; background: #fff; }
+  .boundary-record-as legend { font-size: 11px; font-weight: 700; color: #556b56; padding: 0 4px; }
+  .boundary-record-option { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; cursor: pointer; }
+  .boundary-record-option input { margin-top: 2px; accent-color: #1e9e62; flex: none; }
+  .boundary-record-option strong { display: block; font-size: 12px; color: #182918; }
+  .boundary-record-option small { display: block; font-size: 11px; color: #6a8a6a; line-height: 1.35; }
+  .boundary-observation-fields { display: grid; gap: 4px; margin-top: 6px; padding-top: 8px; border-top: 1px dashed #d4dfd4; }
+  .boundary-observation-fields[hidden] { display: none; }
+  .boundary-observation-fields label { font-size: 11px; color: #556b56; }
+  .boundary-observation-fields input,
+  .boundary-observation-fields select { width: 100%; padding: 7px 9px; border: 1px solid #d4dfd4; border-radius: 8px; background: #f8faf7; color: #182918; font: inherit; font-size: 12px; margin-bottom: 4px; }
+  .boundary-observation-note { font-size: 10.5px; color: #6a8a6a; margin: 0; }
 </style>

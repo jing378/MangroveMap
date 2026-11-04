@@ -338,75 +338,6 @@ if ($currentUser && $currentUser->role === 'admin') {
     .pagination-wrap {
         margin-top: 24px;
     }
-
-    /* Processing Modal */
-    .processing-modal-backdrop {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(15, 23, 42, 0.55);
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 99999;
-        opacity: 0;
-        transition: opacity 0.25s ease;
-    }
-
-    .processing-modal-backdrop.active {
-        display: flex;
-        opacity: 1;
-    }
-
-    .processing-modal-card {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 32px 28px;
-        text-align: center;
-        max-width: 320px;
-        width: 90%;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05);
-        transform: scale(0.95);
-        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .processing-modal-backdrop.active .processing-modal-card {
-        transform: scale(1);
-    }
-
-    .processing-spinner {
-        width: 44px;
-        height: 44px;
-        margin: 0 auto 16px;
-        border: 3.5px solid #edf2f7;
-        border-top-color: #d04030;
-        border-radius: 50%;
-        animation: processingSpin 0.75s linear infinite;
-    }
-
-    @keyframes processingSpin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    .processing-modal-title {
-        font-size: 16px;
-        font-weight: 700;
-        color: #1a2e1a;
-        margin-bottom: 6px;
-    }
-
-    .processing-modal-subtitle {
-        font-size: 13px;
-        color: #64748b;
-        margin: 0;
-        line-height: 1.4;
-    }
 </style>
 @endsection
 
@@ -510,15 +441,6 @@ if ($currentUser && $currentUser->role === 'admin') {
         <p>No notifications yet</p>
     </div>
     @endif
-
-    <!-- Processing Modal to prevent multiple clicks -->
-    <div id="processingModal" class="processing-modal-backdrop" role="dialog" aria-modal="true" aria-label="Processing request">
-        <div class="processing-modal-card">
-            <div class="processing-spinner"></div>
-            <h3 class="processing-modal-title">Processing...</h3>
-            <p class="processing-modal-subtitle">Submitting your rejection notes, please wait.</p>
-        </div>
-    </div>
 </div>
 @endsection
 
@@ -526,22 +448,6 @@ if ($currentUser && $currentUser->role === 'admin') {
 <script>
     (function() {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
-        function showProcessingModal(title = 'Processing...', subtitle = 'Submitting rejection notes, please wait.') {
-            const modal = document.getElementById('processingModal');
-            if (!modal) return;
-            const titleEl = modal.querySelector('.processing-modal-title');
-            const subEl = modal.querySelector('.processing-modal-subtitle');
-            if (titleEl) titleEl.textContent = title;
-            if (subEl) subEl.textContent = subtitle;
-            modal.classList.add('active');
-        }
-
-        function hideProcessingModal() {
-            const modal = document.getElementById('processingModal');
-            if (!modal) return;
-            modal.classList.remove('active');
-        }
 
         function updateUnreadUi(count) {
             const badge = document.querySelector('.notification-badge');
@@ -594,7 +500,8 @@ if ($currentUser && $currentUser->role === 'admin') {
             setTimeout(() => banner.remove(), 4000);
         }
 
-        async function ajaxSubmit(form, onSuccess) {
+        // Sends the form with fetch; resolves with the JSON body, or throws with the server's message.
+        async function ajaxRequest(form) {
             const method = (form.querySelector('[name="_method"]')?.value || form.method || 'POST').toUpperCase();
             const options = {
                 method: method,
@@ -609,31 +516,46 @@ if ($currentUser && $currentUser->role === 'admin') {
                 options.body = new FormData(form);
             }
 
+            let res;
             try {
-                const res = await fetch(form.action, options);
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    let errMsg = data.message || 'Error performing action';
-                    if (data.errors) {
-                        const firstKey = Object.keys(data.errors)[0];
-                        if (firstKey && Array.isArray(data.errors[firstKey]) && data.errors[firstKey].length > 0) {
-                            errMsg = data.errors[firstKey][0];
-                        }
-                    }
-                    alert(errMsg);
-                    return;
-                }
-                onSuccess(data);
+                res = await fetch(form.action, options);
             } catch (err) {
                 console.error('AJAX error:', err);
-                alert('Network error. Please try again.');
+                throw new Error('Network error. Please try again.');
             }
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                let errMsg = data.message || 'Error performing action';
+                if (data.errors) {
+                    const firstKey = Object.keys(data.errors)[0];
+                    if (firstKey && Array.isArray(data.errors[firstKey]) && data.errors[firstKey].length > 0) {
+                        errMsg = data.errors[firstKey][0];
+                    }
+                }
+                throw new Error(errMsg);
+            }
+            return data;
         }
+
+        // Confirmation → Processing → Success or Error (partials.action-feedback). Success is shown in the page banner.
+        async function ajaxAction(form, { confirm = null, busyLabel, lock = [] }, onSuccess) {
+            const outcome = await window.AppActions.run({
+                confirm,
+                button: form.querySelector('button[type="submit"]'),
+                busyLabel,
+                lock,
+                task: () => ajaxRequest(form),
+            });
+            if (outcome.status === 'done') onSuccess(outcome.result);
+        }
+
+        // Every action button of the notification card, so a second action cannot start while one runs.
+        const cardButtons = form => [...(form.closest('[data-notification-id]')?.querySelectorAll('button') || [])];
 
         document.querySelectorAll('[data-ajax-mark-read]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                await ajaxSubmit(form, (data) => {
+                await ajaxAction(form, { busyLabel: 'Marking as read...' }, (data) => {
                     const card = form.closest('[data-notification-id]');
                     card?.classList.remove('unread');
                     form.remove();
@@ -687,7 +609,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         if (markAllForm) {
             markAllForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                await ajaxSubmit(markAllForm, () => {
+                await ajaxAction(markAllForm, {
+                    confirm: { title: 'Mark all as read?', message: 'Every unread notification is marked as read.', confirmLabel: 'Mark all' },
+                    busyLabel: 'Marking all as read...',
+                }, () => {
                     document.querySelectorAll('.notification-card.unread').forEach(card => {
                         card.classList.remove('unread');
                         card.querySelector('[data-ajax-mark-read]')?.remove();
@@ -702,23 +627,16 @@ if ($currentUser && $currentUser->role === 'admin') {
         document.querySelectorAll('[data-approve-form]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                const submitBtn = form.querySelector('button[type="submit"]');
-                if (submitBtn?.disabled) return;
-                if (submitBtn) submitBtn.disabled = true;
-
-                showProcessingModal('Approving Delineation...', 'Approving and publishing delineation, please wait.');
-
-                try {
-                    await ajaxSubmit(form, (data) => {
-                        const card = form.closest('[data-notification-id]');
-                        card?.remove();
-                        showSuccessMessage(data.message || 'Delineation approved successfully');
-                        updateUnreadUi(data.unreadCount ?? 0);
-                    });
-                } finally {
-                    hideProcessingModal();
-                    if (submitBtn) submitBtn.disabled = false;
-                }
+                await ajaxAction(form, {
+                    confirm: { title: 'Approve this delineation?', message: 'It is published on the map and the resident is notified.', confirmLabel: 'Approve' },
+                    busyLabel: 'Approving...',
+                    lock: cardButtons(form),
+                }, (data) => {
+                    const card = form.closest('[data-notification-id]');
+                    card?.remove();
+                    showSuccessMessage(data.message || 'Delineation approved successfully');
+                    updateUnreadUi(data.unreadCount ?? 0);
+                });
             });
         });
 
@@ -726,32 +644,25 @@ if ($currentUser && $currentUser->role === 'admin') {
         document.querySelectorAll('[data-reject-form]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                const submitBtn = form.querySelector('button[type="submit"]');
                 const textarea = form.querySelector('textarea[name="rejection_notes"]');
                 const notes = textarea?.value?.trim() || '';
 
                 if (notes.length < 10) {
-                    alert('Please enter at least 10 characters for rejection notes.');
+                    window.AppActions.notify('Please enter at least 10 characters for rejection notes.', 'error');
                     textarea?.focus();
                     return;
                 }
 
-                if (submitBtn?.disabled) return;
-                if (submitBtn) submitBtn.disabled = true;
-
-                showProcessingModal('Processing Rejection...', 'Submitting your rejection notes, please wait.');
-
-                try {
-                    await ajaxSubmit(form, (data) => {
-                        const card = form.closest('[data-notification-id]');
-                        card?.remove();
-                        showSuccessMessage(data.message || 'Delineation rejected successfully');
-                        updateUnreadUi(data.unreadCount ?? 0);
-                    });
-                } finally {
-                    hideProcessingModal();
-                    if (submitBtn) submitBtn.disabled = false;
-                }
+                await ajaxAction(form, {
+                    confirm: { title: 'Reject this delineation?', message: 'The resident is notified with your notes and can revise it.', confirmLabel: 'Reject', tone: 'danger' },
+                    busyLabel: 'Rejecting...',
+                    lock: [...cardButtons(form), textarea],
+                }, (data) => {
+                    const card = form.closest('[data-notification-id]');
+                    card?.remove();
+                    showSuccessMessage(data.message || 'Delineation rejected successfully');
+                    updateUnreadUi(data.unreadCount ?? 0);
+                });
             });
         });
 
@@ -759,8 +670,11 @@ if ($currentUser && $currentUser->role === 'admin') {
         document.querySelectorAll('[data-delete-form]').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                if (!confirm('Delete this notification?')) return;
-                await ajaxSubmit(form, (data) => {
+                await ajaxAction(form, {
+                    confirm: { title: 'Delete this notification?', message: 'It is removed from your notifications.', confirmLabel: 'Delete', tone: 'danger' },
+                    busyLabel: 'Deleting...',
+                    lock: cardButtons(form),
+                }, (data) => {
                     const card = form.closest('[data-notification-id]');
                     card?.remove();
                     showSuccessMessage('Notification deleted');

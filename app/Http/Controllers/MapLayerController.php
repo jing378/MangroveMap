@@ -259,7 +259,7 @@ class MapLayerController extends Controller
                     ->orWhereHas('user', fn(Builder $user) => $user->where('name', 'like', $like)));
             })
             ->when(
-                in_array($filters['status'] ?? null, ['queued', 'processing', 'ready', 'failed'], true),
+                in_array($filters['status'] ?? null, ['queued', 'processing', 'awaiting_review', 'finalizing', 'ready', 'failed'], true),
                 fn(Builder $query) => $query->where('status', $filters['status'])
             );
     }

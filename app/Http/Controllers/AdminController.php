@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -327,6 +328,20 @@ class AdminController extends Controller
             'password'              => ['nullable', 'string', 'min:8', 'confirmed'],
             'password_confirmation' => ['nullable', 'string'],
         ]);
+
+        // Admin access must not be lost by accident: admins cannot change their own role,
+        // and the last remaining admin account cannot be demoted.
+        if ($user->isAdmin() && $validated['role'] !== User::ROLE_ADMIN) {
+            $message = Auth::id() === $user->id
+                ? 'You cannot change your own administrator role.'
+                : (User::where('role', User::ROLE_ADMIN)->count() <= 1
+                    ? 'At least one administrator account must remain.'
+                    : null);
+
+            if ($message !== null) {
+                throw ValidationException::withMessages(['role' => $message]);
+            }
+        }
 
         $user->fill([
             'name'         => $validated['name'],

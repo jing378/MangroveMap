@@ -55,7 +55,7 @@
                 <dt>Email</dt>
                 <dd>{{ $activity->user->email }}</dd>
                 <dt>Role</dt>
-                <dd>{{ $activity->user->isResident() ? 'Resident' : ucfirst($activity->user->role) }}</dd>
+                <dd>{{ $activity->user->roleLabel() }}</dd>
                 <dt>Last login</dt>
                 <dd>{{ $activity->user->last_login_at?->diffForHumans() ?? 'Never' }}</dd>
             </dl>

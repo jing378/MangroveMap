@@ -77,10 +77,6 @@
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
             </button>
-            <button id="classifyBtn" type="button" onclick="showDelineation()" title="Upload image for delineation"
-              aria-label="Upload image for delineation">
-              <i class="bi bi-image"></i>
-            </button>
             @if (request()->routeIs('map', 'expert.map'))
               <button id="plantingRecommendationToggle" type="button" class="active-toggle" onclick="togglePlantingRecommendationLayer()"
                 title="Hide planting recommendations" aria-label="Show or hide planting recommendations" aria-pressed="true">
@@ -192,7 +188,7 @@
               <button type="button" id="startRejectedRevisionBtn" class="btn" style="width:100%;margin-bottom:8px;">
                 <i class="bi bi-pencil-square"></i> Revise rejected delineation
               </button>
-              <button type="button" id="saveRejectedRevisionBtn" class="btn btn-g" style="display:none;width:100%;margin-bottom:8px;">
+              <button type="button" id="saveRejectedRevisionBtn" class="btn btn-g delineation-save-btn" style="display:none;width:100%;margin-bottom:8px;">
                 <i class="bi bi-send"></i> Resubmit for review
               </button>
               <button type="button" id="cancelRejectedRevisionBtn" class="btn" style="display:none;width:100%;">
@@ -212,10 +208,36 @@
                 <li>Double-click or right-click a point to delete it, or select it and press <kbd>Delete</kbd>.</li>
               </ul>
             </div>
+            @if(Auth::user()->isExpert())
+              {{-- An observed change becomes that year's entry in "Changes over time"; a correction does not. --}}
+              <fieldset id="boundaryRecordAs" class="boundary-record-as" style="display:none;">
+                <legend>Record this change as</legend>
+                <label class="boundary-record-option">
+                  <input type="radio" name="boundaryRecordAs" value="correction" checked>
+                  <span><strong>Correction</strong><small>Fixes how the area was drawn. Not added to the timeline.</small></span>
+                </label>
+                <label class="boundary-record-option">
+                  <input type="radio" name="boundaryRecordAs" value="observation">
+                  <span><strong>Observed change</strong><small>The mangroves grew or shrank. Saved as that year's observation.</small></span>
+                </label>
+                <div id="boundaryObservationFields" class="boundary-observation-fields" hidden>
+                  <label for="boundaryObservationDate">Date observed</label>
+                  @php($localToday = now(\App\Models\DelineationAnnualObservation::LOCAL_TIMEZONE)->toDateString())
+                  <input type="date" id="boundaryObservationDate" min="2000-01-01" max="{{ $localToday }}" value="{{ $localToday }}">
+                  <label for="boundaryObservationSource">Observed through</label>
+                  <select id="boundaryObservationSource">
+                    @foreach (\App\Models\DelineationAnnualObservation::SOURCES as $value => $label)
+                      <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                  </select>
+                  <p class="boundary-observation-note">Hectares and genera are taken from the edited boundary.</p>
+                </div>
+              </fieldset>
+            @endif
             <button type="button" id="deleteBoundaryVertexBtn" class="btn" style="display:none;width:100%;margin-bottom:8px;" disabled>
               <i class="bi bi-dash-circle"></i> Delete selected point
             </button>
-            <button type="button" id="saveBoundaryEditBtn" class="btn btn-g" style="display:none;width:100%;margin-bottom:8px;">
+            <button type="button" id="saveBoundaryEditBtn" class="btn btn-g delineation-save-btn" style="display:none;width:100%;margin-bottom:8px;">
               <i class="bi bi-check2-circle"></i> Save Changes
             </button>
             <button type="button" id="cancelBoundaryEditBtn" class="btn" style="display:none;width:100%;margin-bottom:8px;">

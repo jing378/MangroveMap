@@ -52,7 +52,10 @@
                 <button class="dialog-close" type="button" data-close-upload aria-label="Close upload dialog">&times;</button>
             </div>
 
-            <form method="POST" action="{{ route('admin.models.upload') }}" enctype="multipart/form-data">
+            <form method="POST" action="{{ route('admin.models.upload') }}" enctype="multipart/form-data"
+                data-confirm="Upload and activate this model?"
+                data-confirm-message="The checkpoint is validated first; if it passes, it replaces the active segmentation model."
+                data-confirm-label="Upload" data-busy-label="Uploading...">
                 @csrf
                 <div class="model-upload-meta">
                     <label class="upload-field">

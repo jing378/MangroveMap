@@ -16,6 +16,8 @@
   {{-- Page-specific styles --}}
   @yield('styles')
   @stack('styles')
+  @include('partials.scrollbar-styles')
+  @include('partials.action-feedback')
 </head>
 
 <body>

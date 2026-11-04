@@ -33,10 +33,10 @@
                 </td>
                 <td>
                     <div>{{ $layer->user?->name ?? 'Deleted user' }}</div>
-                    <div class="muted">{{ $layer->user?->isResident() ? 'Resident' : ucfirst($layer->user?->role ?? '') }}</div>
+                    <div class="muted">{{ $layer->user?->roleLabel() }}</div>
                 </td>
                 <td>
-                    <span class="badge {{ $statusClass }}">{{ ucfirst($layer->status) }}</span>
+                    <span class="badge {{ $statusClass }}">{{ $layer->status === 'awaiting_review' ? 'Awaiting owner review' : ucfirst($layer->status) }}</span>
                     @if($layer->status === 'failed' && $layer->error_message)
                     <div class="muted clamp" title="{{ $layer->error_message }}">{{ $layer->error_message }}</div>
                     @endif
@@ -67,20 +67,25 @@
                             data-url="{{ route('admin.map-layers.imagery.update', $layer) }}"
                             data-name="{{ $layer->name }}"><i class="bi bi-pencil"></i></button>
                         @if($layer->status === 'failed')
-                        <form method="POST" action="{{ route('admin.map-layers.imagery.reprocess', $layer) }}">
+                        <form method="POST" action="{{ route('admin.map-layers.imagery.reprocess', $layer) }}"
+                            data-confirm="Retry processing?" data-confirm-message="&quot;{{ $layer->name }}&quot; is processed again in the background."
+                            data-confirm-label="Retry" data-busy-label="Retrying...">
                             @csrf
                             <button type="submit" class="action-btn" title="Retry processing"><i class="bi bi-arrow-repeat"></i></button>
                         </form>
                         @elseif($layer->status === 'ready' && ! $layer->isSegmenting())
                         <form method="POST" action="{{ route('admin.map-layers.imagery.segment', $layer) }}"
-                            data-confirm="{{ $layer->segmentation_status === 'ready' ? 'Run AI segmentation again? The current result is replaced when it finishes.' : '' }}">
+                            data-confirm="{{ $layer->segmentation_status === 'ready' ? 'Run AI segmentation again?' : 'Run AI segmentation?' }}"
+                            data-confirm-message="{{ $layer->segmentation_status === 'ready' ? 'The current result is replaced when it finishes.' : 'The AI detects the mangrove areas in the background.' }}"
+                            data-confirm-label="Run" data-busy-label="Starting AI...">
                             @csrf
                             <button type="submit" class="action-btn" title="{{ $layer->segmentation_status ? 'Re-run' : 'Run' }} AI segmentation"><i class="bi bi-cpu"></i></button>
                         </form>
                         @endif
                         @unless($layer->isProcessing() || $layer->isSegmenting())
                         <form method="POST" action="{{ route('admin.map-layers.imagery.destroy', $layer) }}"
-                            data-confirm="Delete &quot;{{ $layer->name }}&quot; and all of its uploaded TIFFs and tiles? This cannot be undone.">
+                            data-confirm="Delete this record?" data-confirm-message="&quot;{{ $layer->name }}&quot; and all of its uploaded TIFFs and tiles are deleted. This cannot be undone."
+                            data-confirm-label="Delete" data-confirm-tone="danger" data-busy-label="Deleting...">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>

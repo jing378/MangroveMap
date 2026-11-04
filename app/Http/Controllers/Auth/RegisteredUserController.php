@@ -49,11 +49,15 @@ class RegisteredUserController extends Controller
         $request->merge([
             'first_name' => trim((string) $request->input('first_name')),
             'last_name' => trim((string) $request->input('last_name')),
+            'middle_name' => trim((string) $request->input('middle_name')),
+            'suffix' => trim((string) $request->input('suffix')),
         ]);
 
         $validator = Validator::make($request->all(), [
             'first_name' => 'required|string|max:100',
+            'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => 'required|string|max:100',
+            'suffix' => ['nullable', 'string', 'max:10', 'regex:/^[\pL.\s]+$/u'],
             'email' => 'required|email|unique:users',
             // The form shows a fixed "09" prefix; only the remaining 9 digits are submitted.
             'phone' => ['nullable', 'digits:9'],
@@ -70,12 +74,16 @@ class RegisteredUserController extends Controller
                 'regex:/[0-9]/',
                 'confirmed',
             ],
+            'terms' => ['accepted'],
         ], [
             'email.unique' => self::EMAIL_TAKEN_MESSAGE,
             'email.email' => 'Please enter a valid email address.',
             'email.required' => 'Email address is required.',
             'first_name.required' => 'First name is required.',
             'last_name.required' => 'Last name is required.',
+            'middle_name.max' => 'Middle name must be 100 characters or fewer.',
+            'suffix.max' => 'Suffix must be 10 characters or fewer (e.g. Jr., Sr., III).',
+            'suffix.regex' => 'Suffix can only contain letters and periods (e.g. Jr., Sr., III).',
             'password.required' => 'Password is required.',
             'password.min' => 'Password must be at least 8 characters long.',
             'password.regex' => 'Password must include an uppercase letter, a lowercase letter, and a number.',
@@ -84,6 +92,7 @@ class RegisteredUserController extends Controller
             'organization.required' => 'Organization or affiliation is required for an expert application.',
             'expert_qualifications.required' => 'Describe your expertise so an administrator can review your application.',
             'expert_qualifications.min' => 'Please describe your expertise in at least 20 characters.',
+            'terms.accepted' => 'You must agree to the Terms and Conditions to create an account.',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -100,7 +109,11 @@ class RegisteredUserController extends Controller
         $appliesAsExpert = ! empty($validated['apply_as_expert']);
 
         $user = User::create([
-            'name' => $validated['first_name'] . ' ' . $validated['last_name'],
+            // The User model builds the display name ("Juan D. Dela Cruz Jr.") from these parts.
+            'first_name' => $validated['first_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
+            'last_name' => $validated['last_name'],
+            'suffix' => $validated['suffix'] ?? null,
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => 'end_user',

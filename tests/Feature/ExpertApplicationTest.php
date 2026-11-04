@@ -24,6 +24,7 @@ class ExpertApplicationTest extends TestCase
             'phone' => '',
             'password' => 'Secret123',
             'password_confirmation' => 'Secret123',
+            'terms' => '1',
             'apply_as_expert' => '1',
             'organization' => 'DENR CENRO Maasin',
             'expert_qualifications' => 'Forester with eight years of mangrove rehabilitation work.',

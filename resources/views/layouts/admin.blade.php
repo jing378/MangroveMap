@@ -473,15 +473,6 @@
             padding: 28px 32px;
         }
 
-        .content::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .content::-webkit-scrollbar-thumb {
-            background: #d4e0d4;
-            border-radius: 3px;
-        }
-
         .bi {
             display: inline-flex;
             align-items: center;
@@ -562,6 +553,8 @@
     @yield('styles')
     @stack('styles')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.scrollbar-styles')
+    @include('partials.action-feedback')
 </head>
 
 <body>

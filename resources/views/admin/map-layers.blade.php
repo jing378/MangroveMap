@@ -62,7 +62,7 @@
             <select name="status" class="filter-select" aria-label="Status">
                 <option value="">All Status</option>
                 @if($tab === 'imagery')
-                @foreach(['ready' => 'Ready', 'processing' => 'Processing', 'queued' => 'Queued', 'failed' => 'Failed'] as $value => $label)
+                @foreach(['ready' => 'Ready', 'awaiting_review' => 'Awaiting owner review', 'finalizing' => 'Finalizing', 'processing' => 'Processing', 'queued' => 'Queued', 'failed' => 'Failed'] as $value => $label)
                 <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
                 @endforeach
                 @else
@@ -85,7 +85,9 @@
     </div>
 
     <dialog id="editDelineationDialog" class="layer-dialog" aria-labelledby="editDelineationTitle">
-        <form method="POST" id="editDelineationForm">
+        <form method="POST" id="editDelineationForm" data-confirm="Save changes?"
+            data-confirm-message="The name and notes are updated; the previous details are kept as a revision."
+            data-confirm-label="Save" data-busy-label="Saving...">
             @csrf
             @method('PUT')
             <h3 id="editDelineationTitle">Edit delineation details</h3>
@@ -102,7 +104,9 @@
     </dialog>
 
     <dialog id="hideDelineationDialog" class="layer-dialog" aria-labelledby="hideDelineationTitle">
-        <form method="POST" id="hideDelineationForm">
+        <form method="POST" id="hideDelineationForm" data-confirm="Hide this delineation?"
+            data-confirm-message="It disappears from the public and shared maps until restored, and the owner is notified."
+            data-confirm-label="Hide" data-confirm-tone="danger" data-busy-label="Hiding...">
             @csrf
             <h3 id="hideDelineationTitle">Hide from map</h3>
             <p class="dialog-note">
@@ -119,7 +123,8 @@
     </dialog>
 
     <dialog id="renameImageryDialog" class="layer-dialog" aria-labelledby="renameImageryTitle">
-        <form method="POST" id="renameImageryForm">
+        <form method="POST" id="renameImageryForm" data-confirm="Save changes?"
+            data-confirm-message="The imagery layer is renamed." data-confirm-label="Save" data-busy-label="Saving...">
             @csrf
             @method('PUT')
             <h3 id="renameImageryTitle">Rename imagery layer</h3>

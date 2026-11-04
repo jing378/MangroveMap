@@ -115,6 +115,31 @@
       interactive: false,
     }).addTo(mainMap);
 
+    // Vertex that follows the cursor while drawing (like the drone imagery editor's draw hint).
+    // Own pane so it stays above the shapes and never takes the click.
+    mainMap.createPane('drawCursorPane');
+    mainMap.getPane('drawCursorPane').style.zIndex = 650;
+    mainMap.getPane('drawCursorPane').style.pointerEvents = 'none';
+    const cursorVertexMarker = L.circleMarker([0, 0], {
+      pane: 'drawCursorPane',
+      radius: 5,
+      color: '#1e9e62',
+      weight: 2,
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+      opacity: 1,
+      interactive: false,
+    });
+
+    function hideCursorVertex() {
+      cursorVertexMarker.remove();
+    }
+
+    function showCursorVertex(latlng) {
+      cursorVertexMarker.setLatLng(latlng);
+      if (!mainMap.hasLayer(cursorVertexMarker)) cursorVertexMarker.addTo(mainMap);
+    }
+
     function collectSnapVertices() {
       const vertices = [];
       const addCoordinates = (coordinates) => {
@@ -519,8 +544,17 @@
       return !!draft && draft.can_edit && draftSignature() !== draft.savedSignature;
     }
 
-    function confirmDiscardDraft() {
-      return !isDraftDirty() || confirm('Discard your unsaved planting recommendation changes?');
+    // true = nothing to lose, go on now. Otherwise asks with the shared dialog (partials.action-feedback)
+    // and, if the user agrees, runs proceed() (the caller's forced variant) afterwards.
+    function confirmDiscardDraft(proceed) {
+      if (!isDraftDirty()) return true;
+      window.AppActions.confirm({
+        title: 'Discard changes?',
+        message: 'Your unsaved planting recommendation changes are lost.',
+        confirmLabel: 'Discard',
+        tone: 'danger',
+      }).then(ok => { if (ok) proceed(); });
+      return false;
     }
 
     function renderGenusButtons() {
@@ -627,8 +661,9 @@
       if (shouldFocus) zoomToFeatures(draft.features);
     }
 
-    function closeDraft(force = false) {
-      if (!force && !confirmDiscardDraft()) return false;
+    // then: what the caller wanted to do once the draft is closed (also after a confirmed discard).
+    function closeDraft(force = false, then = null) {
+      if (!force && !confirmDiscardDraft(() => { closeDraft(true); then?.(); })) return false;
       draft = null;
       selectedVertex = null;
       hidePanel();
@@ -639,15 +674,15 @@
     }
 
     function openRecommendation(id, force = false) {
-      if (!force && draft && draft.id !== id && !confirmDiscardDraft()) return;
+      if (!force && draft && draft.id !== id && !confirmDiscardDraft(() => openRecommendation(id, true))) return;
       const rec = recommendations.find(item => item.id === id);
       if (!rec) return;
       setMode(null);
       openDraft({ ...rec, source_name: rec.delineation_name });
     }
 
-    function startDraftFromReference(area, feature, shouldFocus = true) {
-      if (!confirmDiscardDraft()) return;
+    function startDraftFromReference(area, feature, shouldFocus = true, force = false) {
+      if (!force && !confirmDiscardDraft(() => startDraftFromReference(area, feature, shouldFocus, true))) return;
       setMode(null);
       openDraft({
         delineation_id: area.id,
@@ -674,8 +709,9 @@
       if (!draft) return;
       if (draft.id === null) {
         closeDraft();
-      } else if (confirmDiscardDraft()) {
-        openRecommendation(draft.id, true);
+      } else {
+        const id = draft.id;
+        if (confirmDiscardDraft(() => openRecommendation(id, true))) openRecommendation(id, true);
       }
     });
 
@@ -684,14 +720,18 @@
     const modeHint = document.getElementById('recModeHint');
 
     function setMode(nextMode) {
+      const requested = nextMode;
       if (nextMode && nextMode === mode) nextMode = null;
-      if (nextMode && draft && !closeDraft()) return;
+      if (nextMode && draft && !closeDraft(false, () => setMode(requested))) return;
       drawingCoords = [];
       mode = nextMode;
       modeButtons.forEach(button => button.classList.toggle('active', button.dataset.mode === mode));
       mainMap.getContainer().style.cursor = mode === 'draw' ? 'crosshair' : '';
       mode === 'draw' ? mainMap.doubleClickZoom.disable() : mainMap.doubleClickZoom.enable();
-      if (mode !== 'draw') snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+      if (mode !== 'draw') {
+        snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+        hideCursorVertex();
+      }
       modeHint.hidden = !mode;
       modeHint.textContent = mode === 'draw'
         ? 'Click to add points. Click the starting point or double-click to finish the area. Esc cancels.'
@@ -738,8 +778,11 @@
     });
 
     mainMap.on('mousemove', (e) => {
-      if (mode === 'draw') updateSnapMarker(e.latlng);
+      if (mode !== 'draw') return;
+      showCursorVertex(updateSnapMarker(e.latlng) || e.latlng);
     });
+
+    mainMap.on('mouseout', hideCursorVertex);
 
     mainMap.on('dblclick', () => {
       if (mode === 'draw') finishDrawing();
@@ -782,25 +825,39 @@
       const values = readForm();
       if (!validateForm(values)) return;
 
+      // Confirmation → Processing → Success or Error (partials.action-feedback). The panel is re-rendered
+      // only after the buttons are restored, because rendering rewrites their labels.
       const saved = draft.id !== null;
       const saveBtn = document.getElementById('recSaveBtn');
-      saveBtn.disabled = true;
-      showProcessingModal('Saving recommendation...', 'Saving the planting recommendation, please wait.');
-      try {
-        const response = await fetch(saved ? `${recommendationsUrl}/${encodeURIComponent(draft.id)}` : recommendationsUrl, {
-          method: saved ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-          body: JSON.stringify({
-            ...values,
-            delineation_id: draft.delineation_id,
-            features: draft.features.map(feature => ({ type: 'area', coords: feature.coords })),
-          }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.recommendation) {
-          const firstError = payload.errors ? Object.values(payload.errors).flat()[0] : null;
-          throw new Error(firstError || payload.message || 'Unable to save the recommendation.');
-        }
+      const panelButtons = ['recCancelBtn', 'recDeleteBtn', 'recEditAreaBtn'].map(id => document.getElementById(id));
+      const outcome = await window.AppActions.run({
+        confirm: saved
+          ? { title: 'Save changes?', message: `The planting recommendation "${values.name}" is updated.`, confirmLabel: 'Save' }
+          : { title: 'Save recommendation?', message: `"${values.name}" is saved as a planting recommendation.`, confirmLabel: 'Save' },
+        button: saveBtn,
+        busyLabel: saved ? 'Saving changes...' : 'Saving recommendation...',
+        lock: panelButtons,
+        task: async () => {
+          const response = await fetch(saved ? `${recommendationsUrl}/${encodeURIComponent(draft.id)}` : recommendationsUrl, {
+            method: saved ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+            body: JSON.stringify({
+              ...values,
+              delineation_id: draft.delineation_id,
+              features: draft.features.map(feature => ({ type: 'area', coords: feature.coords })),
+            }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.recommendation) {
+            const firstError = payload.errors ? Object.values(payload.errors).flat()[0] : null;
+            throw new Error(firstError || payload.message || 'Unable to save the recommendation. Please try again.');
+          }
+          return payload;
+        },
+      });
+
+      if (outcome.status === 'done') {
+        const payload = outcome.result;
         const index = recommendations.findIndex(rec => rec.id === payload.recommendation.id);
         if (index >= 0) {
           recommendations[index] = payload.recommendation;
@@ -808,35 +865,39 @@
           recommendations.unshift(payload.recommendation);
         }
         openRecommendation(payload.recommendation.id, true);
-        hideProcessingModal();
         showSuccessModal(payload.message, saved ? 'Changes saved' : 'Recommendation saved');
-      } catch (error) {
-        hideProcessingModal();
-        alert(error.message || 'Unable to save the recommendation. Please try again.');
+      } else if (outcome.status === 'failed') {
         updatePanelActions();
       }
     });
 
     document.getElementById('recDeleteBtn').addEventListener('click', async () => {
       if (!draft?.id || !draft.can_edit) return;
-      if (!confirm(`Delete the planting recommendation "${draft.name}"? This cannot be undone.`)) return;
-      showProcessingModal('Deleting recommendation...', 'Please wait.');
-      try {
-        const response = await fetch(`${recommendationsUrl}/${encodeURIComponent(draft.id)}`, {
-          method: 'DELETE',
-          headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.message || 'Unable to delete the recommendation.');
-        const deletedId = draft.id;
-        recommendations = recommendations.filter(rec => rec.id !== deletedId);
-        closeDraft(true);
-        hideProcessingModal();
-        showSuccessModal(payload.message || 'Planting recommendation deleted.', 'Deleted');
-      } catch (error) {
-        hideProcessingModal();
-        alert(error.message || 'Unable to delete the recommendation.');
-      }
+      const deletedId = draft.id;
+      const outcome = await window.AppActions.run({
+        confirm: {
+          title: 'Delete this record?',
+          message: `The planting recommendation "${draft.name}" is permanently deleted. This cannot be undone.`,
+          confirmLabel: 'Delete',
+          tone: 'danger',
+        },
+        button: document.getElementById('recDeleteBtn'),
+        busyLabel: 'Deleting...',
+        lock: ['recSaveBtn', 'recCancelBtn', 'recEditAreaBtn'].map(id => document.getElementById(id)),
+        task: async () => {
+          const response = await fetch(`${recommendationsUrl}/${encodeURIComponent(deletedId)}`, {
+            method: 'DELETE',
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.message || 'Unable to delete the recommendation.');
+          return payload;
+        },
+      });
+      if (outcome.status !== 'done') return;
+      recommendations = recommendations.filter(rec => rec.id !== deletedId);
+      closeDraft(true);
+      showSuccessModal(outcome.result.message || 'Planting recommendation deleted.', 'Deleted');
     });
 
     // ---- Initial render ----

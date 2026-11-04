@@ -35,7 +35,7 @@ ML environment: `ml/.venv` (from `ml/requirements.txt`). `config/ml.php` automat
 `Delineation` stores GeoJSON in the `features` JSON column. Review state is tracked by the `is_approved`/`is_rejected` flags (there is no status enum). The flow is:
 1. A resident submits a delineation. `DelineationSubmittedForReview` notifies experts.
 2. An expert approves or rejects it. A resident can revise a rejected record (`delineations.revise`), and revisions are kept in `DelineationRevision`.
-3. Experts can also add yearly observations (`DelineationAnnualObservation`, with their own boundary revisions) and planting recommendations (`PlantingRecommendation`).
+3. Experts can also add yearly observations and planting recommendations (`PlantingRecommendation`). There is no separate observation form. When an expert saves a boundary edit (`delineations.boundary.update`) with `record_as=observation`, `DelineationObservationRecorder` creates or updates that year's `DelineationAnnualObservation`, with hectares computed from the polygon, genera taken from the features, and a boundary revision. The first observation also stores a baseline year from the original boundary. A `record_as=correction` edit (the default) only adds a `DelineationRevision`. `DelineationAnnualObservationController::index` is read-only and feeds the map's "Changes over time" timeline.
 
 Deleting a delineation also removes its review notifications (a model `deleting` hook). Map queries are capped by `Delineation::MAP_QUERY_LIMIT*`.
 

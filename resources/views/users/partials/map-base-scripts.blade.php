@@ -1,7 +1,6 @@
     {{-- Shared Leaflet base map: tile layers, drone imagery, resize handling, locate control and layer menus.
          Inlined into a page <script> that has already defined `csrfToken`; defines `mainMap`, `curBase` and the base layers. --}}
     const droneImageryIndexUrl = @json(route('drone-imagery.index'));
-    const droneImageryUploadUrl = @json(route('drone-imagery.store'));
     const droneImageryStatusUrl = @json(url('/drone-imagery'));
 
     // Highest zoom the map allows. Base maps and drone imagery are upscaled past their native zoom
@@ -79,11 +78,6 @@
 
     const droneImageryLayersElement = document.getElementById('droneImageryLayers');
     const droneImageryMessageElement = document.getElementById('droneImageryMessage');
-    const droneImageryUploadForm = document.getElementById('droneImageryUploadForm');
-    const droneImageryUploadProgress = document.getElementById('droneImageryUploadProgress');
-    const droneImageryUploadProgressBar = document.getElementById('droneImageryUploadProgressBar');
-    const droneImageryUploadProgressFill = droneImageryUploadProgressBar?.querySelector('.drone-imagery-upload-progress-fill');
-    const droneImageryUploadPercentage = document.getElementById('droneImageryUploadPercentage');
     const droneImageryTileLayers = new Map();
 
     function showDroneImageryMessage(message, isError = false) {
@@ -92,57 +86,18 @@
       droneImageryMessageElement.style.color = isError ? '#b42318' : '#4c6b5d';
     }
 
-    function updateDroneImageryUploadProgress(percentage) {
-      if (!droneImageryUploadProgress || !droneImageryUploadProgressBar || !droneImageryUploadProgressFill || !droneImageryUploadPercentage) return;
-      const progress = Math.max(0, Math.min(100, Math.round(percentage)));
-      droneImageryUploadProgress.hidden = false;
-      droneImageryUploadProgressBar.setAttribute('aria-valuenow', String(progress));
-      droneImageryUploadProgressFill.style.width = `${progress}%`;
-      droneImageryUploadPercentage.textContent = progress === 0 ? 'Waiting for server…' : `${progress}%`;
-    }
-
-    function uploadDroneImagery(formData, onProgress) {
-      return new Promise((resolve, reject) => {
-        const request = new XMLHttpRequest();
-        request.open('POST', droneImageryUploadUrl);
-        request.withCredentials = true;
-        request.setRequestHeader('Accept', 'application/json');
-        request.setRequestHeader('X-CSRF-TOKEN', csrfToken);
-        request.upload.addEventListener('progress', event => {
-          if (event.lengthComputable) {
-            onProgress((event.loaded / event.total) * 100);
-          }
-        });
-        request.addEventListener('load', () => {
-          let payload;
-          try {
-            payload = JSON.parse(request.responseText);
-          } catch {
-            // Usually a PHP warning or HTML error page (upload limits, timeout, expired session).
-            const status = request.status ? ` (HTTP ${request.status})` : '';
-            const hint = request.status === 413 ? ' The files are larger than the server allows.'
-              : (request.status === 419 ? ' Your session expired; reload the page and try again.' : ' Check the server upload limits in php.ini.');
-            reject(new Error(`The server returned an invalid response while uploading TIFF files${status}.${hint}`));
-            return;
-          }
-
-          if (request.status < 200 || request.status >= 300) {
-            const validationError = payload.errors ? Object.values(payload.errors).flat()[0] : null;
-            reject(new Error(validationError || payload.message || 'Unable to upload TIFF files.'));
-            return;
-          }
-
-          resolve(payload);
-        });
-        request.addEventListener('error', () => reject(new Error('Network error while uploading TIFF files.')));
-        request.addEventListener('abort', () => reject(new Error('TIFF file upload was cancelled.')));
-        request.send(formData);
-      });
-    }
-
     function addDroneImageryTileLayer(layer) {
       if (!layer.tile_url || !layer.bounds) return null;
-      if (droneImageryTileLayers.has(layer.id)) return droneImageryTileLayers.get(layer.id);
+      // Re-confirming edits rebuilds the tiles (and may crop or move the extent), so key on the build time.
+      const version = layer.processed_at || '';
+      const opacity = Number(layer.display_opacity) || 0.78;
+      const existing = droneImageryTileLayers.get(layer.id);
+      if (existing && existing.options.droneVersion === version) {
+        existing.setOpacity(opacity);
+        return existing;
+      }
+      const wasShown = existing ? mainMap.hasLayer(existing) : false;
+      if (existing && wasShown) mainMap.removeLayer(existing);
 
       const bounds = L.latLngBounds(
         [layer.bounds.south, layer.bounds.west],
@@ -150,8 +105,9 @@
       );
       // Drone tiles come through Laravel (auth-checked), so avoid the request burst of loading
       // every intermediate zoom level during the zoom animation; load once the zoom settles.
-      const tileLayer = L.tileLayer(layer.tile_url, {
-        opacity: 0.78,
+      const tileLayer = L.tileLayer(`${layer.tile_url}${layer.tile_url.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}`, {
+        droneVersion: version,
+        opacity,
         bounds,
         minNativeZoom: layer.zoom_min,
         maxNativeZoom: layer.zoom_max,
@@ -162,6 +118,7 @@
         zIndex: 5,
       });
       droneImageryTileLayers.set(layer.id, tileLayer);
+      if (wasShown) tileLayer.addTo(mainMap);
       return tileLayer;
     }
 
@@ -174,19 +131,34 @@
       return ['queued', 'processing'].includes(layer.segmentation_status);
     }
 
-    // Upload → stitch & tile (ProcessDroneImagery) → AI segmentation (SegmentDroneImagery) → ready.
-    const DRONE_PIPELINE_STEPS = ['Upload', 'Stitch & tile', 'AI segmentation', 'Ready'];
+    // Upload → prepare preview (ProcessDroneImagery) → AI detection (SegmentDroneImagery) → owner review
+    // in the editor → apply edits & tile (FinalizeDroneImagery; AI re-runs on the edited raster) → ready.
+    const DRONE_PIPELINE_STEPS = ['Upload', 'Prepare', 'AI detection', 'Review', 'Tile', 'Ready'];
     const droneProgressChip = document.getElementById('droneImageryProgressChip');
-    let droneUploadPercent = null; // number while a browser upload is in flight
     let droneOwnedLayers = [];
-    let pendingDroneActivationId = null; // freshly uploaded layer to show once it is ready
+    let pendingDroneActivationId = null; // freshly uploaded or confirmed layer to show once it is ready
 
+    // Server-side work in progress (polled). awaiting_review is not here: it waits for the owner.
     function dronePipelineStage(layer) {
-      if (layer.status === 'queued') return { step: 1, label: 'Waiting to stitch & tile…' };
-      if (layer.status === 'processing') return { step: 1, label: 'Stitching & tiling imagery…' };
-      if (layer.status === 'ready' && layer.segmentation_status === 'queued') return { step: 2, label: 'Waiting for AI segmentation…' };
-      if (layer.status === 'ready' && layer.segmentation_status === 'processing') return { step: 2, label: 'Detecting mangroves with AI…' };
+      if (layer.status === 'queued') return { step: 1, label: 'Waiting to prepare the preview…' };
+      if (layer.status === 'processing') return { step: 1, label: 'Stitching imagery and preparing the preview…' };
+      if (layer.status === 'awaiting_review' && layer.segmentation_status === 'queued') return { step: 2, label: 'Waiting for AI mangrove detection…' };
+      if (layer.status === 'awaiting_review' && layer.segmentation_status === 'processing') return { step: 2, label: 'Detecting mangroves with AI for your review…' };
+      if (layer.status === 'finalizing') return { step: 4, label: 'Applying your edits & tiling…' };
+      if (layer.status === 'ready' && layer.segmentation_status === 'queued') return { step: 5, label: 'Waiting for AI mangrove detection…' };
+      if (layer.status === 'ready' && layer.segmentation_status === 'processing') return { step: 5, label: 'Detecting mangroves with AI…' };
       return null;
+    }
+
+    function buildDroneReviewLink(layer) {
+      if (!layer.review_url) return null;
+      const link = document.createElement('a');
+      link.href = layer.review_url;
+      link.className = `drone-imagery-ai-button${layer.status === 'ready' ? '' : ' primary'}`;
+      link.textContent = layer.status === 'awaiting_review' ? 'Review & add to map'
+        : (layer.status === 'failed' ? 'Edit & retry' : 'Edit imagery');
+      link.title = 'Remove non-mangrove areas, adjust opacity and position';
+      return link;
     }
 
     function buildDronePipelineTracker(stage) {
@@ -219,17 +191,6 @@
       const label = droneProgressChip.querySelector('.drone-progress-chip-label');
       const track = droneProgressChip.querySelector('.drone-progress-chip-track');
       const fill = droneProgressChip.querySelector('.drone-progress-chip-fill');
-
-      if (droneUploadPercent !== null) {
-        const percent = Math.max(0, Math.min(100, Math.round(droneUploadPercent)));
-        label.textContent = percent === 0 ? 'Waiting for the server to accept the upload…'
-          : (percent < 100 ? `Uploading imagery… ${percent}%` : 'Upload complete, saving files on the server…');
-        track.classList.remove('is-indeterminate');
-        track.setAttribute('aria-valuenow', String(percent));
-        fill.style.width = `${percent}%`;
-        droneProgressChip.hidden = false;
-        return;
-      }
 
       const pending = droneOwnedLayers
         .map(layer => ({ layer, stage: dronePipelineStage(layer) }))
@@ -270,7 +231,9 @@
           const stats = layer.segmentation_stats || {};
           const area = Number(stats.mangrove_area_ha || 0).toFixed(2);
           const coverage = Number(stats.mangrove_coverage_percent || 0).toFixed(1);
-          return `AI extent: ${area} ha mangrove (${coverage}% of surveyed area)`;
+          return stats.edited
+            ? `Mangrove areas (corrected by the uploader): ${area} ha`
+            : `AI extent: ${area} ha mangrove (${coverage}% of surveyed area)`;
         }
         default: return 'AI segmentation not run yet';
       }
@@ -415,15 +378,24 @@
         runButton.textContent = layer.segmentation_status === 'ready' ? 'Re-run AI'
           : (layer.segmentation_status === 'failed' ? 'Retry AI' : 'Run AI segmentation');
         runButton.addEventListener('click', async () => {
-          runButton.disabled = true;
-          try {
-            await requestDroneSegmentation(layer);
+          const rerun = layer.segmentation_status === 'ready';
+          const outcome = await window.AppActions.run({
+            confirm: {
+              title: rerun ? 'Run AI segmentation again?' : 'Run AI segmentation?',
+              message: rerun ? 'The current result is replaced when it finishes.' : `The AI detects the mangrove areas on "${layer.name}" in the background.`,
+              confirmLabel: 'Run',
+            },
+            button: runButton,
+            busyLabel: 'Starting AI...',
+            errorMessage: false,
+            task: () => requestDroneSegmentation(layer),
+          });
+          if (outcome.status === 'done') {
             removeDroneSegmentationOverlay(layer.id);
             showDroneImageryMessage(`AI segmentation queued for "${layer.name}".`);
             await loadDroneImageryLayers();
-          } catch (error) {
-            runButton.disabled = false;
-            showDroneImageryMessage(error.message, true);
+          } else if (outcome.status === 'failed') {
+            showDroneImageryMessage(outcome.error.message, true);
           }
         });
         actions.appendChild(runButton);
@@ -465,11 +437,18 @@
         name.textContent = layer.name;
         const state = document.createElement('span');
         state.className = 'drone-imagery-layer-state';
-        state.textContent = layer.status === 'ready'
-          ? `${layer.source_type === 'batch' ? 'Mosaic' : 'GeoTIFF'} · zoom ${layer.zoom_min}–${layer.zoom_max}`
-          : (layer.status === 'failed'
-            ? `Processing failed: ${layer.error_message || 'unknown error'}`
-            : `${layer.source_type === 'batch' ? 'Mosaic' : 'GeoTIFF'} · processing on the server`);
+        const kind = layer.source_type === 'batch' ? 'Mosaic' : 'GeoTIFF';
+        if (layer.status === 'ready') {
+          state.textContent = `${kind} · zoom ${layer.zoom_min}–${layer.zoom_max}${layer.has_pending_edits ? ' · saved edits not applied yet' : ''}`;
+        } else if (layer.status === 'failed') {
+          state.textContent = `Processing failed: ${layer.error_message || 'unknown error'}`;
+        } else if (layer.status === 'awaiting_review') {
+          state.textContent = isDroneSegmenting(layer)
+            ? `${kind} · the AI is detecting mangroves so you can review the result.`
+            : `${kind} · ready for review. Remove non-mangrove areas, then add it to the map.`;
+        } else {
+          state.textContent = `${kind} · processing on the server`;
+        }
         const uploader = document.createElement('span');
         uploader.className = 'drone-imagery-layer-state';
         uploader.textContent = `Uploaded by ${layer.uploaded_by || 'Unknown user'}`;
@@ -479,6 +458,13 @@
         } else {
           const stage = dronePipelineStage(layer);
           if (stage) info.appendChild(buildDronePipelineTracker(stage));
+        }
+        const reviewLink = buildDroneReviewLink(layer);
+        if (reviewLink) {
+          const reviewActions = document.createElement('span');
+          reviewActions.className = 'drone-imagery-ai-actions';
+          reviewActions.appendChild(reviewLink);
+          info.appendChild(reviewActions);
         }
         if (layer.segmentation_status !== 'ready') {
           removeDroneSegmentationOverlay(layer.id);
@@ -491,36 +477,44 @@
           'aria-label',
           layer.is_owner ? `Delete ${layer.name}` : `Remove ${layer.name} from your map`
         );
-        removeButton.disabled = layer.is_owner && (['queued', 'processing'].includes(layer.status) || isDroneSegmenting(layer));
+        removeButton.disabled = layer.is_owner && (['queued', 'processing', 'finalizing'].includes(layer.status) || isDroneSegmenting(layer));
         removeButton.title = removeButton.disabled
           ? 'Wait until processing finishes before deleting this layer.'
           : (layer.is_owner ? 'Delete this TIFF layer and its files' : 'Hide this shared layer from your map');
         removeButton.addEventListener('click', async () => {
-          if (layer.is_owner && !window.confirm(`Permanently delete "${layer.name}" and its TIFF files?`)) return;
-          removeButton.disabled = true;
-          try {
-            const response = await fetch(`${droneImageryStatusUrl}/${encodeURIComponent(layer.id)}`, {
-              method: 'DELETE',
-              headers: {
-                Accept: 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
-              },
-              credentials: 'same-origin',
-            });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-              throw new Error(payload.message || 'Unable to remove this TIFF layer.');
-            }
+          // Confirmation → Processing → Success or Error (partials.action-feedback); messages use the panel's line.
+          const outcome = await window.AppActions.run({
+            confirm: layer.is_owner
+              ? { title: 'Delete this record?', message: `"${layer.name}" and its TIFF files are permanently deleted. This cannot be undone.`, confirmLabel: 'Delete', tone: 'danger' }
+              : { title: 'Remove this item?', message: `"${layer.name}" is hidden from your map. The owner keeps it.`, confirmLabel: 'Remove', tone: 'danger' },
+            button: removeButton,
+            busyLabel: layer.is_owner ? 'Deleting...' : 'Removing...',
+            errorMessage: false,
+            task: async () => {
+              const response = await fetch(`${droneImageryStatusUrl}/${encodeURIComponent(layer.id)}`, {
+                method: 'DELETE',
+                headers: {
+                  Accept: 'application/json',
+                  'X-CSRF-TOKEN': csrfToken,
+                },
+                credentials: 'same-origin',
+              });
+              const payload = await response.json().catch(() => ({}));
+              if (!response.ok) {
+                throw new Error(payload.message || 'Unable to remove this TIFF layer.');
+              }
 
-            const activeTileLayer = droneImageryTileLayers.get(layer.id);
-            if (activeTileLayer && mainMap.hasLayer(activeTileLayer)) mainMap.removeLayer(activeTileLayer);
-            droneImageryTileLayers.delete(layer.id);
-            removeDroneSegmentationOverlay(layer.id);
-            await loadDroneImageryLayers();
+              const activeTileLayer = droneImageryTileLayers.get(layer.id);
+              if (activeTileLayer && mainMap.hasLayer(activeTileLayer)) mainMap.removeLayer(activeTileLayer);
+              droneImageryTileLayers.delete(layer.id);
+              removeDroneSegmentationOverlay(layer.id);
+              await loadDroneImageryLayers();
+            },
+          });
+          if (outcome.status === 'done') {
             showDroneImageryMessage(layer.is_owner ? 'TIFF layer deleted.' : 'Shared TIFF layer removed from your map.');
-          } catch (error) {
-            removeButton.disabled = false;
-            showDroneImageryMessage(error.message || 'Unable to remove this TIFF layer.', true);
+          } else if (outcome.status === 'failed') {
+            showDroneImageryMessage(outcome.error.message || 'Unable to remove this TIFF layer.', true);
           }
         });
         row.append(checkbox, info, removeButton);
@@ -569,6 +563,9 @@
           pendingDroneActivationId = null;
           activateId = target.id;
           showDroneImageryMessage(`"${target.name}" is ready and displayed on the map.${isDroneSegmenting(target) ? ' AI mangrove segmentation is running in the background.' : ''}`);
+        } else if (target.status === 'awaiting_review' && !isDroneSegmenting(target)) {
+          pendingDroneActivationId = null;
+          showDroneImageryMessage(`"${target.name}" is ready for review. Use "Review & add to map" to remove non-mangrove areas before it is placed on the map.`);
         } else if (target.status === 'failed') {
           pendingDroneActivationId = null;
           showDroneImageryMessage(target.error_message || 'Raster processing failed.', true);
@@ -587,63 +584,10 @@
       clearTimeout(droneSegmentationPollTimer);
       droneSegmentationPollTimer = null;
       if (!layers.some(dronePipelineStage)) return;
-      const tiling = layers.some(layer => ['queued', 'processing'].includes(layer.status));
+      const tiling = layers.some(layer => ['queued', 'processing', 'finalizing'].includes(layer.status));
       droneSegmentationPollTimer = setTimeout(() => {
         loadDroneImageryLayers().catch(error => console.error('Unable to refresh drone imagery status.', error));
       }, tiling ? 4000 : 8000);
-    }
-
-    if (droneImageryUploadForm) {
-      droneImageryUploadForm.addEventListener('submit', async event => {
-        event.preventDefault();
-        const fileInput = document.getElementById('droneImageryFiles');
-        const submitButton = droneImageryUploadForm.querySelector('button[type="submit"]');
-        if (!fileInput?.files?.length) {
-          showDroneImageryMessage('Select at least one .tif or .tiff file.', true);
-          return;
-        }
-        const maxFiles = Number(fileInput.dataset.maxFiles) || 0;
-        if (maxFiles && fileInput.files.length > maxFiles) {
-          showDroneImageryMessage(
-            `You selected ${fileInput.files.length} files, but the server accepts up to ${maxFiles} per upload. Upload them in smaller batches, or ask the administrator to raise max_file_uploads in php.ini.`,
-            true
-          );
-          return;
-        }
-
-        const formData = new FormData(droneImageryUploadForm);
-        submitButton.disabled = true;
-        showDroneImageryMessage('Uploading TIFF files…');
-        updateDroneImageryUploadProgress(0);
-        droneUploadPercent = 0;
-        updateDroneProgressChip();
-        try {
-          const payload = await uploadDroneImagery(formData, percentage => {
-            updateDroneImageryUploadProgress(percentage);
-            droneUploadPercent = percentage;
-            updateDroneProgressChip();
-          });
-
-          droneUploadPercent = null;
-          if (droneImageryUploadProgress) droneImageryUploadProgress.hidden = true;
-          pendingDroneActivationId = payload.id;
-          showDroneImageryMessage('Upload complete. The imagery is being stitched and tiled on the server. You can keep working; progress stays visible on the map.');
-          droneImageryUploadForm.reset();
-          await loadDroneImageryLayers();
-        } catch (error) {
-          droneUploadPercent = null;
-          updateDroneProgressChip();
-          if (droneImageryUploadProgress) droneImageryUploadProgress.hidden = true;
-          showDroneImageryMessage(error.message || 'Drone imagery upload failed.', true);
-          try {
-            await loadDroneImageryLayers();
-          } catch (loadError) {
-            console.error('Unable to refresh drone imagery layer list.', loadError);
-          }
-        } finally {
-          submitButton.disabled = false;
-        }
-      });
     }
 
     loadDroneImageryLayers().catch(error => {
@@ -755,6 +699,23 @@
       }
       toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     };
+
+    // "View on map" on the Drone Upload page links here with ?drone=upload to open the drone imagery panel
+    // straight away (&drone_layer=<id> also shows that layer once it is ready). The params are dropped
+    // afterwards so a reload doesn't reopen the panel.
+    {
+      const pageUrl = new URL(window.location.href);
+      if (pageUrl.searchParams.get('drone') === 'upload') {
+        const layerId = Number(pageUrl.searchParams.get('drone_layer'));
+        if (layerId > 0) pendingDroneActivationId = layerId;
+        pageUrl.searchParams.delete('drone');
+        pageUrl.searchParams.delete('drone_layer');
+        window.history.replaceState(window.history.state, '', pageUrl);
+        if (!document.getElementById('droneImageryMenu')?.classList.contains('show')) {
+          window.toggleDroneImageryMenu();
+        }
+      }
+    }
 
     document.addEventListener('click', (event) => {
       [

@@ -8,6 +8,8 @@ return [
     'tile_zoom' => env('GDAL_TILE_ZOOM', '12-auto'),
     'max_tile_zoom' => (int) env('GDAL_MAX_TILE_ZOOM', 22),
     'tile_processes' => (int) env('GDAL_TILE_PROCESSES', 2),
+    // Longest side (px) of the PNG preview shown in the drone imagery review editor.
+    'preview_max_dimension' => (int) env('GDAL_PREVIEW_MAX_DIMENSION', 2048),
     // Files per drone imagery batch. PHP's max_file_uploads (php.ini) must be at least this high.
     'max_upload_files' => (int) env('DRONE_MAX_UPLOAD_FILES', 100),
 ];

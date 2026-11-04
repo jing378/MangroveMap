@@ -31,7 +31,8 @@
         </div>
         @endif
 
-        <form action="{{ route('admin.users.update', $user) }}" method="POST">
+        <form action="{{ route('admin.users.update', $user) }}" method="POST" data-confirm="Save changes?"
+            data-confirm-message="The user's account details are updated." data-confirm-label="Save" data-busy-label="Saving...">
             @csrf
             @method('PUT')
 

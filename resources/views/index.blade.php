@@ -824,6 +824,183 @@
       width: 12px;
       height: 12px;
       border-radius: 3px;
+      flex: none;
+    }
+
+    .leg-collapse {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      border: 0;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .leg-collapse .leg-title {
+      margin-bottom: 0;
+    }
+
+    .leg-collapse i {
+      font-size: 11px;
+      transition: transform 0.2s ease;
+    }
+
+    .map-legend-float.collapsed .leg-collapse i {
+      transform: rotate(180deg);
+    }
+
+    .map-legend-float.collapsed #legendBody {
+      display: none;
+    }
+
+    #legendBody {
+      margin-top: 8px;
+    }
+
+    .leg-toggle {
+      cursor: pointer;
+    }
+
+    .leg-toggle input {
+      accent-color: #1e9e62;
+      margin: 0;
+    }
+
+    .leg-toggle small {
+      color: #6a8a6a;
+      font-size: 11px;
+    }
+
+    .leg-pin {
+      color: #1e9e62;
+      font-size: 14px;
+      width: 12px;
+      text-align: center;
+    }
+
+    .leg-rec-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid #7cb342;
+      color: #7cb342;
+      font-size: 9px;
+    }
+
+    .leg-suitability {
+      display: grid;
+      gap: 3px;
+      margin: 4px 0 0 22px;
+      font-size: 11px;
+      color: #4a6a4a;
+    }
+
+    .leg-suitability span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .leg-swatch {
+      width: 14px;
+      height: 0;
+      border-top: 2px dashed currentColor;
+    }
+
+    /* Location pin on every approved delineation */
+    .map-pin {
+      position: relative;
+      display: block;
+      width: 30px;
+      height: 30px;
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+      transition: transform 0.15s ease;
+    }
+
+    .map-pin:hover {
+      transform: translateY(-2px) scale(1.08);
+    }
+
+    .map-pin i {
+      font-size: 30px;
+      line-height: 1;
+      color: #1e9e62;
+      -webkit-text-stroke: 1px #fff;
+    }
+
+    /* Planting recommendation marker, colored by suitability */
+    .rec-marker {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2.5px solid var(--rec-color, #7a9a7a);
+      color: var(--rec-color, #7a9a7a);
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .rec-popup {
+      font-size: 12.5px;
+      color: #2f4a3a;
+      line-height: 1.45;
+      min-width: 200px;
+    }
+
+    .rec-popup .rec-suit {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      margin: 2px 0 6px;
+    }
+
+    .rec-popup .rec-suit i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .rec-popup .rec-meta {
+      margin-top: 6px;
+      color: #7a9a7a;
+      font-size: 11px;
+    }
+
+    .rec-popup .rec-text {
+      margin-top: 6px;
+      white-space: pre-line;
+    }
+
+    .d-rec {
+      border: 1px solid #e0ece4;
+      border-left: 4px solid var(--rec-color, #7a9a7a);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #2f4a3a;
+    }
+
+    .d-rec strong {
+      display: block;
+      color: var(--rec-color, #1a3324);
+      margin-bottom: 4px;
+    }
+
+    .d-rec p {
+      margin-top: 4px;
+      white-space: pre-line;
     }
 
     /* Map Layer Control Widget */
@@ -1009,6 +1186,30 @@
     .d-val {
       font-weight: 600;
       color: #1a3324;
+      text-align: right;
+    }
+
+    .d-genera {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .d-genera span {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #edf7f2;
+      border: 1px solid #bce6cf;
+      color: #147a46;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .d-empty {
+      font-size: 12px;
+      color: #6a8a6a;
+      margin-bottom: 6px;
     }
 
     .tag {
@@ -1298,6 +1499,7 @@
       }
     }
   </style>
+  @include('partials.scrollbar-styles')
 </head>
 
 <body>
@@ -1383,21 +1585,22 @@
 
       <!-- Live GIS KPI / Statistics Strip -->
       <div class="hero-stats-strip">
+        {{-- All figures are from expert-approved delineations. --}}
         <div class="hero-stat-card">
-          <div class="stat-val">{{ number_format($globalCoverage ?? 46382, 1) }}<span>km²</span></div>
-          <div class="stat-label">Monitored Coverage</div>
+          <div class="stat-val">{{ number_format($mappedAreaHa ?? 0, 2) }}<span>ha</span></div>
+          <div class="stat-label">Mapped Mangrove Area</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val">{{ $protectedAreas > 0 ? $protectedAreas : 14 }}<span>zones</span></div>
-          <div class="stat-label">Monitored Regions</div>
+          <div class="stat-val">{{ number_format($barangayCount ?? 0) }}<span>barangays</span></div>
+          <div class="stat-label">Areas Mapped</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val">{{ $genusCount > 0 ? $genusCount : 5 }}<span>taxa</span></div>
-          <div class="stat-label">Mangrove Genera</div>
+          <div class="stat-val">{{ number_format($generaCount ?? 0) }}<span>genera</span></div>
+          <div class="stat-label">Mangrove Genera Recorded</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val">{{ count($delineations ?? []) }}<span>records</span></div>
-          <div class="stat-label">Field Delineations</div>
+          <div class="stat-val">{{ number_format(count($delineations ?? [])) }}<span>records</span></div>
+          <div class="stat-label">Approved Delineations</div>
         </div>
         <div class="hero-stat-card">
           <div class="stat-val">{{ number_format($contributorCount ?? 0) }}<span>people</span></div>
@@ -1430,7 +1633,7 @@
           Accurate mapping and delineation of mangrove areas using high-resolution imagery and spatial analysis. Identifies and outlines mangrove boundaries, patches, and coastal forest coverage to support precise visualization, monitoring, and geographic assessment over time.
         </p>
         <ul class="feature-points">
-          <li><i class="bi bi-check-circle-fill"></i> Precision polygon area measurement (ha / m²)</li>
+          <li><i class="bi bi-check-circle-fill"></i> Precision polygon area measurement in hectares</li>
           <li><i class="bi bi-check-circle-fill"></i> Community-driven field boundary uploads</li>
           <li><i class="bi bi-check-circle-fill"></i> Expert review and delineation validation workflow</li>
         </ul>
@@ -1514,16 +1717,32 @@
                 <div id="mainMap"></div>
 
                 <!-- Floating Zone Type Legend -->
-                <div class="map-legend-float">
-                  <div class="leg-title">Zone Health Type</div>
-                  <div class="leg-row">
-                    <div class="leg-dot" style="background:rgba(30,158,98,.5); border:1.5px solid #1e9e62"></div> Healthy Zone
-                  </div>
-                  <div class="leg-row">
-                    <div class="leg-dot" style="background:rgba(192,120,24,.5); border:1.5px solid #c07818"></div> Sparse Zone
-                  </div>
-                  <div class="leg-row">
-                    <div class="leg-dot" style="background:rgba(208,64,48,.5); border:1.5px solid #d04030"></div> Degraded Zone
+                {{-- Legend doubles as layer toggles. --}}
+                <div class="map-legend-float" id="mapLegend">
+                  <button type="button" class="leg-collapse" id="legendCollapse" aria-expanded="true" aria-controls="legendBody" title="Hide legend">
+                    <span class="leg-title">Legend</span><i class="bi bi-chevron-down" aria-hidden="true"></i>
+                  </button>
+                  <div id="legendBody">
+                    <label class="leg-row leg-toggle">
+                      <input type="checkbox" id="toggleDelineations" checked>
+                      <span class="leg-dot" style="background:rgba(30,158,98,.5); border:1.5px solid #1e9e62"></span>
+                      Mangrove areas <small>({{ count($delineations ?? []) }} · {{ number_format($mappedAreaHa ?? 0, 2) }} ha)</small>
+                    </label>
+                    <label class="leg-row leg-toggle">
+                      <input type="checkbox" id="togglePins" checked>
+                      <i class="bi bi-geo-alt-fill leg-pin" aria-hidden="true"></i>
+                      Location pins
+                    </label>
+                    <label class="leg-row leg-toggle">
+                      <input type="checkbox" id="toggleRecommendations" checked>
+                      <span class="leg-rec-icon"><i class="bi bi-flower1" aria-hidden="true"></i></span>
+                      Planting recommendations <small>({{ count($plantingRecommendations ?? []) }})</small>
+                    </label>
+                    <div class="leg-suitability" aria-label="Planting suitability colors">
+                      @foreach ($suitabilityLevels ?? [] as $key => $label)
+                        <span><i class="leg-swatch" data-suitability-swatch="{{ $key }}"></i>{{ $label }}</span>
+                      @endforeach
+                    </div>
                   </div>
                 </div>
 
@@ -1560,8 +1779,12 @@
                       <span class="d-val" id="dType">Area</span>
                     </div>
                     <div class="d-row" id="dAreaRow">
-                      <span class="d-key">Estimated Area</span>
+                      <span class="d-key">Area</span>
                       <span class="d-val" id="dArea">-</span>
+                    </div>
+                    <div class="d-row" id="dLocationRow" style="display:none;">
+                      <span class="d-key">Location</span>
+                      <span class="d-val" id="dLocation">-</span>
                     </div>
                     <div class="d-row">
                       <span class="d-key">Contributor</span>
@@ -1577,11 +1800,15 @@
                     </div>
                   </div>
                   <div class="div"></div>
-                  <div class="sec">Estimated Genus Distribution</div>
-                  <div class="cw" style="height:150px"><canvas id="pieC"></canvas></div>
+                  <div class="sec">Mangrove Genera Present</div>
+                  <div id="dGenera" class="d-genera"></div>
                   <div class="div"></div>
-                  <div class="sec">Coverage Trend (km²)</div>
-                  <div class="cw" style="height:110px"><canvas id="trendC"></canvas></div>
+                  <div class="sec">Planting Recommendation</div>
+                  <div id="dRecommendations"></div>
+                  <div class="div"></div>
+                  <div class="sec">Coverage Trend (ha)</div>
+                  <div id="trendEmpty" class="d-empty">No yearly observations recorded for this area yet.</div>
+                  <div class="cw" id="trendWrap" style="height:110px; display:none;"><canvas id="trendC"></canvas></div>
                 </div>
               </div>
             </div>
@@ -1640,6 +1867,7 @@
         @else
           <li><a href="{{ Auth::user()->homeRoute() }}">Dashboard</a></li>
         @endguest
+        <li><a href="{{ route('terms') }}">Terms</a></li>
       </ul>
     </div>
 
@@ -1720,36 +1948,57 @@
       polys.push(p);
     });
 
-    // Area Calculation Utility
-    function calculatePolygonArea(latlngs) {
-      if (!Array.isArray(latlngs) || latlngs.length < 3) return null;
-      try {
-        const R = 6378137; // Earth radius in meters
-        let ring = latlngs;
-        if (Array.isArray(latlngs[0]) && Array.isArray(latlngs[0][0])) {
-          ring = latlngs[0];
-        }
-        if (ring.length < 3) return null;
-        let area = 0;
-        for (let i = 0; i < ring.length; i++) {
-          let p1 = ring[i];
-          let p2 = ring[(i + 1) % ring.length];
-          let lat1 = Array.isArray(p1) ? p1[0] : p1.lat;
-          let lng1 = Array.isArray(p1) ? p1[1] : p1.lng;
-          let lat2 = Array.isArray(p2) ? p2[0] : p2.lat;
-          let lng2 = Array.isArray(p2) ? p2[1] : p2.lng;
-          area += (lng2 - lng1) * (Math.PI / 180) * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180));
-        }
-        area = Math.abs(area * R * R / 2.0);
-        if (area >= 10000) {
-          return (area / 10000).toFixed(2) + ' ha';
-        } else if (area > 0) {
-          return area.toFixed(1) + ' m²';
-        }
-      } catch (e) {
-        console.error('Area calculation error:', e);
+    // Areas are measured on the server (same formula as the map editor) and always shown in hectares.
+    function formatHectares(value) {
+      const hectares = Number(value);
+      if (!Number.isFinite(hectares) || hectares <= 0) return null;
+      if (hectares < 0.01) return '< 0.01 ha';
+      return `${hectares.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ha`;
+    }
+
+    let coverageTrendChart = null;
+    function renderCoverageTrend(trend) {
+      const points = Array.isArray(trend) ? trend : [];
+      const wrap = document.getElementById('trendWrap');
+      const empty = document.getElementById('trendEmpty');
+      if (wrap) wrap.style.display = points.length ? 'block' : 'none';
+      if (empty) empty.style.display = points.length ? 'none' : 'block';
+      if (!points.length || typeof Chart === 'undefined') return;
+
+      const labels = points.map(point => String(point.year));
+      const values = points.map(point => Number(point.area_ha));
+      if (coverageTrendChart) {
+        coverageTrendChart.data.labels = labels;
+        coverageTrendChart.data.datasets[0].data = values;
+        coverageTrendChart.update();
+        return;
       }
-      return null;
+      coverageTrendChart = new Chart(document.getElementById('trendC'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: '#1e9e62',
+            backgroundColor: 'rgba(30,158,98,.12)',
+            fill: true,
+            tension: 0.38,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: context => formatHectares(context.parsed.y) || '0 ha' } }
+          },
+          scales: {
+            y: { ticks: { font: { size: 9 }, callback: v => `${v} ha` } },
+            x: { ticks: { font: { size: 9 } } }
+          }
+        }
+      });
     }
 
     // Delineation Details Drawer
@@ -1763,10 +2012,12 @@
       if (dTypeEl) dTypeEl.textContent = featType;
       if (dTypeBadgeEl) dTypeBadgeEl.textContent = featType;
 
-      let areaStr = record.area;
-      if (!areaStr && feature.coords && (feature.type === 'area' || (!feature.type && Array.isArray(feature.coords)))) {
-        areaStr = calculatePolygonArea(feature.coords);
-      }
+      // The clicked shape's area; when a record has several shapes, also show the record total.
+      const featureArea = formatHectares(feature.area_ha);
+      const recordArea = formatHectares(record.area_ha);
+      const areaStr = featureArea && recordArea && Number(record.area_ha) > Number(feature.area_ha)
+        ? `${featureArea} (of ${recordArea})`
+        : featureArea;
       const areaRow = document.getElementById('dAreaRow');
       const dAreaEl = document.getElementById('dArea');
       if (areaStr && dAreaEl && areaRow) {
@@ -1775,6 +2026,24 @@
       } else if (areaRow) {
         areaRow.style.display = 'none';
       }
+
+      const locationRow = document.getElementById('dLocationRow');
+      const dLocationEl = document.getElementById('dLocation');
+      if (locationRow && dLocationEl) {
+        dLocationEl.textContent = feature.location || '';
+        locationRow.style.display = feature.location ? 'flex' : 'none';
+      }
+
+      const generaEl = document.getElementById('dGenera');
+      if (generaEl) {
+        const genera = Array.isArray(feature.genera) && feature.genera.length ? feature.genera : (record.genera || []);
+        generaEl.replaceChildren(...(genera.length
+          ? genera.map(name => Object.assign(document.createElement('span'), { textContent: name }))
+          : [Object.assign(document.createElement('div'), { className: 'd-empty', textContent: 'No genera recorded.' })]));
+      }
+
+      renderDelineationRecommendations(record);
+      renderCoverageTrend(record.coverage_trend);
 
       const contributor = record.user?.name || record.created_by || 'Community';
       const dContribEl = document.getElementById('dContributor');
@@ -1828,52 +2097,184 @@
       }, wasOpen ? 50 : 330);
     }
 
-    // Draw Approved Delineations onto Leaflet Map
-    function drawSavedDelineations() {
-      if (!Array.isArray(savedDelineations) || savedDelineations.length === 0) {
-        return;
+    // ---- Map layers: approved areas, a location pin on each, and planting recommendations ----
+    const SUITABILITY_COLORS = {
+      highly_suitable: '#1e9e62',
+      moderately_suitable: '#7cb342',
+      marginally_suitable: '#c07818',
+      not_suitable: '#d04030',
+    }; // same palette as the expert Recommender tab
+    const plantingRecommendations = @json($plantingRecommendations ?? []);
+
+    // Recommendations sit in a lower pane so clicking a delineation still opens its details.
+    mainMap.createPane('recommendationPane');
+    mainMap.getPane('recommendationPane').style.zIndex = 390;
+    const delineationLayer = L.featureGroup().addTo(mainMap);
+    const pinLayer = L.featureGroup().addTo(mainMap);
+    const recommendationLayer = L.featureGroup().addTo(mainMap);
+
+    const pinIcon = L.divIcon({
+      className: '',
+      html: '<span class="map-pin"><i class="bi bi-geo-alt-fill"></i></span>',
+      iconSize: [30, 30],
+      iconAnchor: [15, 29],
+      popupAnchor: [0, -26],
+      tooltipAnchor: [0, -24],
+    });
+
+    // Elements built with textContent: names, notes and advice are user input.
+    function el(tag, props = {}, children = []) {
+      const node = Object.assign(document.createElement(tag), props);
+      node.append(...children.filter(Boolean));
+      return node;
+    }
+
+    function delineationPopup(record, feature) {
+      const details = [formatHectares(feature.area_ha), feature.location].filter(Boolean).join(' · ');
+      return el('div', {}, [
+        el('strong', { textContent: record.name || 'Approved delineation' }),
+        details && el('div', { textContent: details, style: 'font-size:12px;color:#556b56;margin-top:2px;' }),
+      ]);
+    }
+
+    function recommendationPopup(rec) {
+      const color = SUITABILITY_COLORS[rec.suitability] || '#7a9a7a';
+      const genera = Array.isArray(rec.recommended_genera) ? rec.recommended_genera : [];
+      const meta = [
+        formatHectares(rec.area_ha),
+        rec.features?.[0]?.location,
+        rec.expert_name ? `by ${rec.expert_name}` : null,
+      ].filter(Boolean).join(' · ');
+      return el('div', { className: 'rec-popup' }, [
+        el('strong', { textContent: rec.name || 'Planting recommendation' }),
+        el('div', { className: 'rec-suit', style: `color:${color}` }, [el('i'), el('span', { textContent: rec.suitability_label || rec.suitability })]),
+        el('div', { textContent: genera.length ? `Recommended genus: ${genera.join(', ')}` : 'Not suitable for planting' }),
+        rec.recommendation?.trim() && el('div', { className: 'rec-text', textContent: rec.recommendation.trim() }),
+        meta && el('div', { className: 'rec-meta', textContent: meta }),
+      ]);
+    }
+
+    function pinPosition(feature, layer) {
+      if (feature.type === 'point') return feature.coords;
+      if (layer instanceof L.Polygon) return layer.getCenter();
+      if (layer instanceof L.Polyline) {
+        const points = layer.getLatLngs();
+        return points[Math.floor(points.length / 2)];
       }
+      return null;
+    }
 
-      savedDelineations.forEach((record) => {
-        if (!Array.isArray(record.features)) {
-          return;
-        }
-
-        record.features.forEach((feature) => {
-          let layer = null;
-          const featType = feature.type ? feature.type.toUpperCase() : 'AREA';
-          const popupContent = `<strong>${record.name || 'Saved Delineation'}</strong><br><span style="font-size:12px;color:#556b56;">Type: ${featType}</span>`;
-
-          if (feature.type === 'point') {
-            layer = L.marker(feature.coords).addTo(mainMap);
-          } else if (feature.type === 'line') {
-            layer = L.polyline(feature.coords, {
-              color: '#1e9e62',
-              weight: 3
-            }).addTo(mainMap);
+    function drawSavedDelineations() {
+      (Array.isArray(savedDelineations) ? savedDelineations : []).forEach((record) => {
+        (Array.isArray(record.features) ? record.features : []).forEach((feature) => {
+          let shape = null;
+          if (feature.type === 'line') {
+            shape = L.polyline(feature.coords, { color: '#1e9e62', weight: 3 }).addTo(delineationLayer);
           } else if (feature.type === 'area' || !feature.type) {
-            layer = L.polygon(feature.coords, {
-              color: '#1e9e62',
-              fillColor: '#1e9e62',
-              fillOpacity: 0.28,
-              weight: 2
-            }).addTo(mainMap);
+            shape = L.polygon(feature.coords, { color: '#1e9e62', fillColor: '#1e9e62', fillOpacity: 0.28, weight: 2 }).addTo(delineationLayer);
           }
 
-          if (layer) {
-            layer.bindPopup(popupContent);
+          const position = pinPosition(feature, shape);
+          const pin = position
+            ? L.marker(position, { icon: pinIcon, title: record.name || 'Approved delineation', riseOnHover: true }).addTo(pinLayer)
+            : null;
+          if (pin) pin.bindTooltip(record.name || 'Approved delineation', { direction: 'top' });
+
+          [shape, pin].filter(Boolean).forEach(layer => {
+            layer.bindPopup(delineationPopup(record, feature));
             layer.on('click', (e) => {
-              if (e && e.originalEvent) {
-                L.DomEvent.stopPropagation(e);
-              }
-              showDelineationDetails(record, feature, layer);
+              if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+              showDelineationDetails(record, feature, shape || pin);
             });
-          }
+          });
+        });
+      });
+    }
+
+    function drawPlantingRecommendations() {
+      plantingRecommendations.forEach(rec => {
+        const color = SUITABILITY_COLORS[rec.suitability] || '#7a9a7a';
+        const tooltip = `${rec.name} · ${rec.suitability_label || rec.suitability}`;
+        (rec.features || []).forEach(feature => {
+          const polygon = L.polygon(feature.coords, {
+            pane: 'recommendationPane',
+            color,
+            weight: 2,
+            dashArray: '6 4',
+            fillColor: color,
+            fillOpacity: 0.16,
+          }).addTo(recommendationLayer);
+          polygon.bindTooltip(tooltip, { sticky: true });
+          polygon.bindPopup(recommendationPopup(rec), { maxWidth: 280 });
+          L.marker(polygon.getCenter(), {
+            icon: L.divIcon({
+              className: '',
+              html: `<span class="rec-marker" style="--rec-color:${color}"><i class="bi bi-flower1"></i></span>`,
+              iconSize: [26, 26],
+              // Offset to the lower right so it isn't hidden under the area's location pin.
+              iconAnchor: [-4, -2],
+              popupAnchor: [17, 0],
+            }),
+            title: tooltip,
+            riseOnHover: true,
+          }).addTo(recommendationLayer).bindPopup(recommendationPopup(rec), { maxWidth: 280 });
         });
       });
     }
 
     drawSavedDelineations();
+    drawPlantingRecommendations();
+
+    // Open on the mapped areas rather than a fixed view.
+    (function fitToData() {
+      const bounds = L.latLngBounds([]);
+      [delineationLayer, pinLayer, recommendationLayer].forEach(group => {
+        if (group.getLayers().length) bounds.extend(group.getBounds());
+      });
+      if (bounds.isValid()) mainMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+    })();
+
+    // Legend checkboxes show or hide each layer.
+    [
+      ['toggleDelineations', delineationLayer],
+      ['togglePins', pinLayer],
+      ['toggleRecommendations', recommendationLayer],
+    ].forEach(([id, layer]) => {
+      document.getElementById(id)?.addEventListener('change', (event) => {
+        event.target.checked ? layer.addTo(mainMap) : layer.remove();
+      });
+    });
+    document.querySelectorAll('[data-suitability-swatch]').forEach(swatch => {
+      swatch.style.color = SUITABILITY_COLORS[swatch.dataset.suitabilitySwatch] || '#7a9a7a';
+    });
+    document.getElementById('legendCollapse')?.addEventListener('click', (event) => {
+      const legend = document.getElementById('mapLegend');
+      const collapsed = legend.classList.toggle('collapsed');
+      event.currentTarget.setAttribute('aria-expanded', String(!collapsed));
+      event.currentTarget.title = collapsed ? 'Show legend' : 'Hide legend';
+    });
+    // Keep the legend compact on phones.
+    if (window.matchMedia('(max-width: 640px)').matches) {
+      document.getElementById('mapLegend')?.classList.add('collapsed');
+      document.getElementById('legendCollapse')?.setAttribute('aria-expanded', 'false');
+    }
+
+    function renderDelineationRecommendations(record) {
+      const container = document.getElementById('dRecommendations');
+      if (!container) return;
+      const linked = plantingRecommendations.filter(rec => Number(rec.delineation_id) === Number(record.id));
+      container.replaceChildren(...(linked.length
+        ? linked.map(rec => {
+          const genera = Array.isArray(rec.recommended_genera) ? rec.recommended_genera : [];
+          return el('div', { className: 'd-rec', style: `--rec-color:${SUITABILITY_COLORS[rec.suitability] || '#7a9a7a'}` }, [
+            el('strong', { textContent: rec.suitability_label || rec.suitability }),
+            el('div', { textContent: genera.length ? `Plant: ${genera.join(', ')}` : 'Not suitable for planting' }),
+            rec.recommendation?.trim() && el('p', { textContent: rec.recommendation.trim() }),
+            rec.expert_name && el('div', { className: 'd-empty', style: 'margin:4px 0 0;', textContent: `By ${rec.expert_name}` }),
+          ]);
+        })
+        : [el('div', { className: 'd-empty', textContent: 'No planting recommendation for this area yet.' })]));
+    }
 
     function selectZone(i) {
       let z = zones[i];
@@ -1929,7 +2330,7 @@
     };
 
     window.showDelineation = () => {
-      window.location.href = "{{ route('delineation.index') }}";
+      window.location.href = "{{ Auth::check() ? route('drone-imagery.page') : route('login') }}";
     };
 
     window.setBase = (t, btn) => {
@@ -1956,73 +2357,6 @@
         if (mainMap) mainMap.invalidateSize();
       }, 120);
     });
-
-    // Chart.js Visualizations
-    const pieEl = document.getElementById('pieC');
-    if (pieEl) {
-      new Chart(pieEl, {
-        type: 'doughnut',
-        data: {
-          labels: ['Rhizophora', 'Avicennia', 'Sonneratia', 'Bruguiera', 'Others'],
-          datasets: [{
-            data: [34, 22, 18, 14, 12],
-            backgroundColor: ['#1e9e62', '#5ab8de', '#f4a840', '#a070e0', '#8ca090'],
-            borderWidth: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '66%',
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: {
-                boxWidth: 10,
-                font: { size: 10 }
-              }
-            }
-          }
-        }
-      });
-    }
-
-    const trendEl = document.getElementById('trendC');
-    if (trendEl) {
-      new Chart(trendEl, {
-        type: 'line',
-        data: {
-          labels: ['2021', '2022', '2023', '2024', '2025', '2026'],
-          datasets: [{
-            data: [46178, 45900, 46360, 46820, 47100, 47382],
-            borderColor: '#1e9e62',
-            backgroundColor: 'rgba(30,158,98,.12)',
-            fill: true,
-            tension: 0.38,
-            pointRadius: 2.5
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
-          scales: {
-            y: {
-              ticks: {
-                font: { size: 9 },
-                callback: v => (v / 1000).toFixed(0) + 'k'
-              },
-              min: 45000
-            },
-            x: {
-              ticks: { font: { size: 9 } }
-            }
-          }
-        }
-      });
-    }
 
     // Auto-Resize Map on DOM observation
     let indexMapResizeTimer = null;

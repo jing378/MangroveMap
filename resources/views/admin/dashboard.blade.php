@@ -61,7 +61,7 @@
                     @forelse($topContributors as $contributor)
                     <tr>
                         <td>{{ $contributor->user?->name ?? 'Unknown' }}</td>
-                        <td>{{ $contributor->user ? ucwords(str_replace('_', ' ', $contributor->user->role)) : '—' }}</td>
+                        <td>{{ $contributor->user?->roleLabel() ?? '—' }}</td>
                         <td>{{ $contributor->total_count }}</td>
                         <td><span class="badge success">{{ (int) $contributor->approved_count }}</span></td>
                         <td><span class="badge pending">{{ (int) $contributor->pending_count }}</span></td>

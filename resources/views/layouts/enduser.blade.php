@@ -497,15 +497,6 @@
             height: 100%;
         }
 
-        .content::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .content::-webkit-scrollbar-thumb {
-            background: #d4e0d4;
-            border-radius: 3px;
-        }
-
         .bi {
             display: inline-flex;
             align-items: center;
@@ -589,6 +580,8 @@
 
     @yield('styles')
     @stack('styles')
+    @include('partials.scrollbar-styles')
+    @include('partials.action-feedback')
 </head>
 
 <body>
@@ -634,10 +627,10 @@
                         <span>Planting Recommendation</span>
                     </a>
                 @endif
-                <a href="{{ route('delineation.index') }}"
-                    class="sidebar-item {{ request()->routeIs('delineation.*') ? 'active' : '' }}">
+                <a href="{{ route('drone-imagery.page') }}"
+                    class="sidebar-item {{ request()->routeIs('drone-imagery.page', 'drone-imagery.edit') ? 'active' : '' }}">
                     <i class="bi bi-cloud-arrow-up"></i>
-                    <span>Upload Image</span>
+                    <span>Drone Upload</span>
                 </a>
             </div>
 
@@ -660,6 +653,11 @@
                     </span>
                     <span>Notifications</span>
                 </a>
+                <a href="{{ route('guide') }}"
+                    class="sidebar-item {{ request()->routeIs('guide') ? 'active' : '' }}">
+                    <i class="bi bi-question-circle"></i>
+                    <span>Help &amp; Guide</span>
+                </a>
             </div>
             @php($currentUser = auth()->user())
             <div class="sidebar-profile-footer">
@@ -673,11 +671,11 @@
                     </span>
                     <span class="sidebar-profile-details">
                         <span class="sidebar-profile-name">{{ $currentUser->name }}</span>
-                        <span class="sidebar-profile-type">{{ $currentUser->isResident() ? 'Resident' : ucfirst($currentUser->role) }}</span>
+                        <span class="sidebar-profile-type">{{ $currentUser->roleLabel() }}</span>
                         <span class="sidebar-profile-email">{{ $currentUser->email }}</span>
                     </span>
                 </a>
-                <form method="POST" action="{{ route('logout') }}">
+                <form method="POST" action="{{ route('logout') }}" data-confirm="Log out?" data-confirm-message="You will need to log in again to continue." data-confirm-label="Log out" data-confirm-tone="danger" data-confirm-icon="bi-box-arrow-right" data-busy-label="Logging out...">
                     @csrf
                     <button type="submit" class="sidebar-profile-logout" title="Logout" aria-label="Logout">
                         <i class="bi bi-box-arrow-right"></i>

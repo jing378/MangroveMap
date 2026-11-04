@@ -144,7 +144,7 @@ class ActivityLogController extends Controller
                 'rows' => [
                     'Name' => $subject->name,
                     'Email' => $subject->email,
-                    'Role' => $subject->isResident() ? 'Resident' : ucfirst($subject->role),
+                    'Role' => $subject->roleLabel(),
                 ],
                 'url' => route('admin.users.show', $subject),
                 'urlLabel' => 'Open user',

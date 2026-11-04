@@ -459,7 +459,7 @@
                             {{ $contributor->user?->name ?? 'Unknown' }}
                             @if($isMe)<span class="contributor-you">You</span>@endif
                         </span>
-                        <span class="contributor-role">{{ $contributor->user?->isExpert() ? 'Expert' : 'Resident' }}</span>
+                        <span class="contributor-role">{{ $contributor->user?->roleLabel() ?? 'Resident' }}</span>
                         <span class="contributor-count">{{ $contributor->approved_count }} approved</span>
                     </li>
                 @endforeach

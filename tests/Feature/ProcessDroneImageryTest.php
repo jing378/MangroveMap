@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\FinalizeDroneImagery;
 use App\Jobs\ProcessDroneImagery;
 use App\Models\DroneImageryLayer;
 use App\Services\GdalCommandRunner;
@@ -135,6 +136,16 @@ class ProcessDroneImageryTest extends TestCase
             (new ProcessDroneImagery($layer->id))->handle(app(GdalCommandRunner::class));
             $layer->refresh();
 
+            // Prepared for review: mosaic and preview exist, but no tiles until the owner confirms.
+            $this->assertSame('awaiting_review', $layer->status, $layer->error_message ?? '');
+            $localDisk->assertExists($layer->preview_path);
+            $this->assertSame($layer->bounds, $layer->preview_bounds);
+            $this->assertNull($layer->tiles_path);
+            $this->assertFalse($localDisk->exists("drone-imagery/tiles/{$layer->id}"));
+
+            (new FinalizeDroneImagery($layer->id))->handle(app(GdalCommandRunner::class));
+            $layer->refresh();
+
             $this->assertSame('ready', $layer->status, $layer->error_message ?? '');
             $this->assertSame('EPSG:3857', $layer->metadata['target_crs']);
             $this->assertSame(2, $layer->metadata['source_count']);
@@ -208,7 +219,7 @@ class ProcessDroneImageryTest extends TestCase
 
         $layer = $this->processSyntheticBatch(['-bands', '4', '-co', 'PHOTOMETRIC=RGB', '-co', 'ALPHA=YES']);
 
-        $this->assertSame('ready', $layer->status, $layer->error_message ?? '');
+        $this->assertSame('awaiting_review', $layer->status, $layer->error_message ?? '');
         $info = json_decode(app(GdalCommandRunner::class)->run(
             ['gdalinfo', '-json', Storage::disk('local')->path($layer->mosaic_path)],
             storage_path('app/private'),
@@ -251,6 +262,7 @@ class ProcessDroneImageryTest extends TestCase
             ]);
 
             (new ProcessDroneImagery($layer->id))->handle(app(GdalCommandRunner::class));
+            (new FinalizeDroneImagery($layer->id))->handle(app(GdalCommandRunner::class));
             $layer->refresh();
 
             $this->assertSame('ready', $layer->status, $layer->error_message ?? '');

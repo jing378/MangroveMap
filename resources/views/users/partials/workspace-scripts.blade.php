@@ -496,6 +496,31 @@
       opacity: 0
     }).addTo(mainMap);
 
+    // Vertex that follows the cursor while drawing (like the drone imagery editor's draw hint).
+    // Own pane so it stays above the shapes and never takes the click.
+    mainMap.createPane('drawCursorPane');
+    mainMap.getPane('drawCursorPane').style.zIndex = 650;
+    mainMap.getPane('drawCursorPane').style.pointerEvents = 'none';
+    const cursorVertexMarker = L.circleMarker([0, 0], {
+      pane: 'drawCursorPane',
+      radius: 5,
+      color: '#1e9e62',
+      weight: 2,
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+      opacity: 1,
+      interactive: false,
+    });
+
+    function hideCursorVertex() {
+      cursorVertexMarker.remove();
+    }
+
+    function showCursorVertex(latlng) {
+      cursorVertexMarker.setLatLng(latlng);
+      if (!mainMap.hasLayer(cursorVertexMarker)) cursorVertexMarker.addTo(mainMap);
+    }
+
     // Keep overlay layers in dedicated groups so redraws are cheap.
     // This avoids expensive mainMap.eachLayer() scans/removals which can get laggy fast.
     const zoneMarkerLayer = L.layerGroup().addTo(mainMap);
@@ -722,6 +747,7 @@
       mainMap.getContainer().style.cursor = drawingMode ? 'crosshair' : '';
       const drawHint = document.getElementById('delineationDrawHint');
       if (drawHint) drawHint.hidden = !drawingMode;
+      if (!drawingMode) hideCursorVertex();
     }
 
     function loadSavedDelineations() {
@@ -896,7 +922,7 @@
         cancelRejectedDelineationRevision(false);
       }
       if (boundaryEdit) {
-        if (!confirmDiscardBoundaryEdit()) return;
+        if (!confirmDiscardBoundaryEdit(() => window.closeRightPanel())) return;
         cancelBoundaryEdit(false);
       }
       const panel = document.getElementById('mapRightPanel');
@@ -1008,7 +1034,7 @@
         cancelRejectedDelineationRevision(false);
       }
       if (boundaryEdit) {
-        if (!confirmDiscardBoundaryEdit()) return;
+        if (!confirmDiscardBoundaryEdit(() => selectZone(i))) return;
         cancelBoundaryEdit(false);
       }
       document.getElementById('boundaryEditActions')?.style.setProperty('display', 'none');
@@ -1110,7 +1136,7 @@
         }
       }
       if (boundaryEdit && Number(drawnFeatures[i]?.delineation_id) !== Number(boundaryEdit.delineationId)) {
-        if (!confirmDiscardBoundaryEdit()) return;
+        if (!confirmDiscardBoundaryEdit(() => selectDrawnFeature(i, options))) return;
         cancelBoundaryEdit(false);
       }
       const feature = drawnFeatures[i];
@@ -1153,7 +1179,8 @@
       const revisionActions = document.getElementById('rejectedRevisionActions');
       if (revisionActions) {
         const canRevise = feature.is_own && feature.is_rejected && !feature.is_approved;
-        revisionActions.style.display = canRevise ? 'block' : 'none';
+        // '' (not 'block') when shown: on mobile the CSS makes the wrapper display:contents so Resubmit floats.
+        revisionActions.style.display = canRevise ? '' : 'none';
         document.getElementById('startRejectedRevisionBtn').style.display = canRevise && !feature.is_editing_revision ? 'block' : 'none';
         document.getElementById('saveRejectedRevisionBtn').style.display = feature.is_editing_revision ? 'block' : 'none';
         document.getElementById('cancelRejectedRevisionBtn').style.display = feature.is_editing_revision ? 'block' : 'none';
@@ -1334,6 +1361,12 @@
 
       const submitRevisionBtn = document.getElementById('saveRejectedRevisionBtn');
       if (submitRevisionBtn?.dataset.loading === 'true') return;
+      const confirmed = await window.AppActions.confirm({
+        title: 'Submit revision?',
+        message: 'The revised delineation is sent back to the experts for review.',
+        confirmLabel: 'Submit',
+      });
+      if (!confirmed || submitRevisionBtn?.dataset.loading === 'true') return;
       setButtonLoading(submitRevisionBtn, true, 'Submitting revision...');
       const cancelRevisionBtn = document.getElementById('cancelRejectedRevisionBtn');
       if (cancelRevisionBtn) cancelRevisionBtn.disabled = true;
@@ -1382,7 +1415,7 @@
       } catch (error) {
         setButtonLoading(submitRevisionBtn, false);
         if (cancelRevisionBtn) cancelRevisionBtn.disabled = false;
-        alert(error.message || 'Unable to submit the revised delineation. Please try again.');
+        window.AppActions.notify(error.message || 'Unable to submit the revised delineation. Please try again.', 'error');
       }
     }
 
@@ -1402,11 +1435,14 @@
       if (!actions) return;
       const editing = !!(boundaryEdit && feature && Number(feature.delineation_id) === Number(boundaryEdit.delineationId));
       const canEdit = editing || (!isEditingRejectedRevision && !boundaryEdit && canEditDelineationBoundary(feature));
-      actions.style.display = canEdit ? 'block' : 'none';
+      // '' (not 'block') when shown: on mobile the CSS makes the wrapper display:contents so Save floats.
+      actions.style.display = canEdit ? '' : 'none';
       document.getElementById('startBoundaryEditBtn').style.display = canEdit && !editing ? 'block' : 'none';
       document.getElementById('boundaryEditHint').style.display = editing ? 'block' : 'none';
       document.getElementById('saveBoundaryEditBtn').style.display = editing ? 'block' : 'none';
       document.getElementById('cancelBoundaryEditBtn').style.display = editing ? 'block' : 'none';
+      const recordAs = document.getElementById('boundaryRecordAs');
+      if (recordAs) recordAs.style.display = editing ? 'block' : 'none';
       const deleteVertexBtn = document.getElementById('deleteBoundaryVertexBtn');
       deleteVertexBtn.style.display = editing ? 'block' : 'none';
       deleteVertexBtn.disabled = !(editing && selectedEditVertex);
@@ -1418,14 +1454,53 @@
         JSON.stringify(drawnFeatures[featureIndex]?.coords) !== JSON.stringify(boundaryEdit.originalFeatures[snapshotIndex]?.coords));
     }
 
-    function confirmDiscardBoundaryEdit() {
-      return !boundaryEditHasChanges() || confirm('Discard your unsaved boundary changes?');
+    // true = nothing to lose, go on now. Otherwise asks with the shared dialog (partials.action-feedback);
+    // if the user agrees, the edit is cancelled and proceed() repeats what they were doing.
+    function confirmDiscardBoundaryEdit(proceed) {
+      if (!boundaryEditHasChanges()) return true;
+      window.AppActions.confirm({
+        title: 'Discard changes?',
+        message: 'Your unsaved boundary changes are lost.',
+        confirmLabel: 'Discard',
+        tone: 'danger',
+      }).then(ok => {
+        if (!ok || !boundaryEdit) return;
+        cancelBoundaryEdit(false);
+        proceed();
+      });
+      return false;
     }
+
+    // Expert-only: whether a boundary edit is a correction or an observed change for the timeline.
+    function boundaryObservationChoice() {
+      const selected = document.querySelector('input[name="boundaryRecordAs"]:checked');
+      if (!selected || selected.value !== 'observation') return { record_as: 'correction' };
+      return {
+        record_as: 'observation',
+        observation_date: document.getElementById('boundaryObservationDate')?.value || '',
+        observation_source: document.getElementById('boundaryObservationSource')?.value || '',
+      };
+    }
+
+    function resetBoundaryObservationChoice() {
+      const correction = document.querySelector('input[name="boundaryRecordAs"][value="correction"]');
+      if (correction) correction.checked = true;
+      const fields = document.getElementById('boundaryObservationFields');
+      if (fields) fields.hidden = true;
+    }
+
+    document.querySelectorAll('input[name="boundaryRecordAs"]').forEach(input => {
+      input.addEventListener('change', () => {
+        const fields = document.getElementById('boundaryObservationFields');
+        if (fields) fields.hidden = boundaryObservationChoice().record_as !== 'observation';
+      });
+    });
 
     function finishBoundaryEdit() {
       const previousDrawingMode = boundaryEdit?.previousDrawingMode || null;
       boundaryEdit = null;
       selectedEditVertex = null;
+      resetBoundaryObservationChoice();
       setRejectedRevisionControlsLocked(false);
       // Restore the drawing mode that was active before editing (e.g. line mode on the Delineate page).
       if (document.getElementById('delineationToolbar')?.classList.contains('active')) {
@@ -1504,6 +1579,30 @@
 
       const saveBtn = document.getElementById('saveBoundaryEditBtn');
       if (saveBtn?.dataset.loading === 'true') return;
+      const observationChoice = isExpertUser ? boundaryObservationChoice() : { record_as: 'correction' };
+      const recordsObservation = observationChoice.record_as === 'observation';
+      if (recordsObservation) {
+        // Local date, not toISOString() (UTC), so "today" is accepted before 8 AM in the Philippines.
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (!observationChoice.observation_date) {
+          window.AppActions.notify('Enter the date the change was observed.', 'error');
+          return;
+        }
+        if (observationChoice.observation_date > today) {
+          window.AppActions.notify('The observation date cannot be in the future.', 'error');
+          return;
+        }
+      }
+      const observationYear = recordsObservation ? observationChoice.observation_date.slice(0, 4) : null;
+      const confirmed = await window.AppActions.confirm({
+        title: recordsObservation ? `Record as the ${observationYear} observation?` : 'Save boundary changes?',
+        message: recordsObservation
+          ? `The boundary is updated and its area is saved as the ${observationYear} entry in "Changes over time". The previous boundary is kept as a revision.`
+          : 'The delineation boundary is updated; the previous boundary is kept as a revision. This correction is not added to the timeline.',
+        confirmLabel: 'Save',
+      });
+      if (!confirmed || !boundaryEdit || saveBtn?.dataset.loading === 'true') return;
       setButtonLoading(saveBtn, true, 'Saving changes...');
       const cancelBtn = document.getElementById('cancelBoundaryEditBtn');
       if (cancelBtn) cancelBtn.disabled = true;
@@ -1521,6 +1620,7 @@
               coords: item.coords,
               genera: item === selectedFeature ? currentSelectedGenera : (Array.isArray(item.genera) ? item.genera : []),
             })),
+            ...observationChoice,
           }),
         });
         const payload = await response.json().catch(() => ({}));
@@ -1543,9 +1643,11 @@
         finishBoundaryEdit();
         redrawFeatures();
         if (activeIndex >= 0) selectDrawnFeature(activeIndex);
+        // Show the new year in "Changes over time" and the coverage trend.
+        if (payload.observation_year) loadAnnualObservationCharts(delineationId);
         showSuccessModal(payload.message || 'Delineation boundary updated.', 'Changes saved');
       } catch (error) {
-        alert(error.message || 'Unable to save the boundary changes. Please try again.');
+        window.AppActions.notify(error.message || 'Unable to save the boundary changes. Please try again.', 'error');
       } finally {
         setButtonLoading(saveBtn, false);
         if (saveBtn) saveBtn.disabled = false;
@@ -1774,7 +1876,7 @@
       feature.notes = meta.notes;
       feature.genera = meta.genera;
       renderDelineationGenera(meta.genera);
-      alert('Delineation details saved.');
+      window.AppActions.notify('Delineation details saved.');
     }
 
     window.removeCurrentDelineation = async function () {
@@ -1786,32 +1888,46 @@
       // If this feature came from a saved delineation record, deleting it must happen server-side.
       // Otherwise it will reappear on refresh (because it is loaded again from the DB).
       if (delineationId && feature?.is_own && !feature?.is_approved) {
-        const ok = confirm('Remove this delineation? This will permanently delete it.');
-        if (!ok) return;
-
-        try {
-          const response = await fetch(`${deleteDelineationBaseUrl}/${delineationId}`, {
-            method: 'DELETE',
-            headers: {
-              'Accept': 'application/json',
-              'X-CSRF-TOKEN': csrfToken,
-            },
-          });
-
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(payload.message || 'Unable to delete delineation.');
-          }
-
-          alert(payload.message || 'Delineation deleted.');
-          window.location.reload();
-          return;
-        } catch (error) {
-          console.error('Delete delineation failed:', error);
-          alert('Unable to delete delineation. Please try again.');
-          return;
-        }
+        // Confirmation → Processing → Success or Error (partials.action-feedback).
+        const outcome = await window.AppActions.run({
+          confirm: {
+            title: 'Remove this delineation?',
+            message: `"${feature.label || 'This delineation'}" is permanently deleted. This cannot be undone.`,
+            confirmLabel: 'Remove',
+            tone: 'danger',
+          },
+          button: document.getElementById('removeDelineationBtn'),
+          busyLabel: 'Removing...',
+          task: async () => {
+            const response = await fetch(`${deleteDelineationBaseUrl}/${delineationId}`, {
+              method: 'DELETE',
+              headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+              },
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              console.error('Delete delineation failed:', payload);
+              throw new Error(payload.message || 'Unable to delete delineation. Please try again.');
+            }
+            return payload;
+          },
+          successMessage: payload => payload.message || 'Delineation deleted.',
+        });
+        // Reload so the record disappears everywhere it is listed (after the message has been seen).
+        if (outcome.status === 'done') setTimeout(() => window.location.reload(), 1200);
+        return;
       }
+
+      // Unsaved shape (not on the server yet): still ask, then remove it locally.
+      const confirmed = await window.AppActions.confirm({
+        title: 'Remove this item?',
+        message: 'The unsaved shape is removed from the map. You can bring it back with Undo.',
+        confirmLabel: 'Remove',
+        tone: 'danger',
+      });
+      if (!confirmed || drawnFeatures[selectedDrawnIndex] !== feature) return;
 
       // Unsaved / in-memory only: remove locally.
       drawnFeatures.splice(selectedDrawnIndex, 1);
@@ -2068,6 +2184,14 @@
         return;
       }
 
+      // Confirmation → Processing → Success or Error (partials.action-feedback).
+      const confirmed = await window.AppActions.confirm({
+        title: 'Save delineation?',
+        message: `"${meta.name}" (${newFeatures.length} ${newFeatures.length === 1 ? 'shape' : 'shapes'}) is saved with the genera and notes you entered.`,
+        confirmLabel: 'Save',
+      });
+      if (!confirmed || isSavingDelineation) return;
+
       // Loading state on the button itself (no saving modal).
       setSaveButtonSaving(true);
 
@@ -2120,7 +2244,7 @@
       } catch (error) {
         setSaveButtonSaving(false);
         console.error('Delineation save failed:', error);
-        alert(error.message || 'Unable to save delineation. Please try again.');
+        window.AppActions.notify(error.message || 'Unable to save delineation. Please try again.', 'error');
       } finally {
         setSaveButtonSaving(false);
       }
@@ -2219,6 +2343,10 @@
       if (approveBtn?.dataset.loading === 'true' || rejectBtn?.dataset.loading === 'true') return;
       const activeBtn = action === 'approve' ? approveBtn : rejectBtn;
       const otherBtn = action === 'approve' ? rejectBtn : approveBtn;
+      const confirmed = await window.AppActions.confirm(action === 'approve'
+        ? { title: 'Approve this delineation?', message: 'It is published on the map and the resident is notified.', confirmLabel: 'Approve' }
+        : { title: 'Reject this delineation?', message: 'The resident is notified with your notes and can revise it.', confirmLabel: 'Reject', tone: 'danger' });
+      if (!confirmed || approveBtn?.dataset.loading === 'true' || rejectBtn?.dataset.loading === 'true') return;
       setButtonLoading(activeBtn, true, action === 'approve' ? 'Approving...' : 'Rejecting...');
       if (otherBtn) otherBtn.disabled = true;
       const rejectionNotesEl = document.getElementById('expertRejectionNotes');
@@ -2269,7 +2397,7 @@
         }
       } catch (error) {
         restoreReviewButtons();
-        alert(error.message || 'Unable to complete review.');
+        window.AppActions.notify(error.message || 'Unable to complete review.', 'error');
       }
     }
 
@@ -2577,6 +2705,11 @@
         snapRaf = 0;
         if (!drawingMode || !lastMouseLatLng) return;
         const snapped = getSnappedLatLng(lastMouseLatLng);
+        if (isGeometryEditLocked()) {
+          hideCursorVertex();
+        } else {
+          showCursorVertex(snapped || lastMouseLatLng);
+        }
         if (snapped) {
           snapMarker.setLatLng(snapped);
           snapMarker.setStyle({
@@ -2591,6 +2724,8 @@
         }
       });
     });
+
+    mainMap.on('mouseout', hideCursorVertex);
 
     window.show = (id, btn) => {
       document.querySelectorAll('.h-tab').forEach(b => b.classList.remove('active'));
@@ -2609,10 +2744,6 @@
           ensurePlantMap().invalidateSize();
         }
       }, 150);
-    };
-
-    window.showDelineation = () => {
-      window.location.href = @json(route('delineation.index'));
     };
 
     window.showFromDropdown = (select) => {
@@ -2876,7 +3007,7 @@
           if (coverageEmpty) {
             coverageEmpty.textContent = coverage.length
               ? ''
-              : 'No annual measurements have been entered for this zone.';
+              : 'No observed changes yet. Experts add one by saving a boundary edit as an observed change.';
             coverageEmpty.style.display = coverage.length ? 'none' : 'block';
           }
 
@@ -2891,9 +3022,13 @@
               : 'Genus Distribution';
           }
           if (genusEmpty) {
+            // Observations from boundary edits list the genera present rather than percentages.
+            const generaPresent = Array.isArray(data.generaPresent) ? data.generaPresent : [];
             genusEmpty.textContent = genusDistribution.length
               ? ''
-              : 'No verified genus breakdown has been entered for this zone.';
+              : generaPresent.length
+                ? `Genera present: ${generaPresent.join(', ')}`
+                : 'No verified genus data has been recorded for this zone.';
             genusEmpty.style.display = genusDistribution.length ? 'none' : 'block';
           }
         })

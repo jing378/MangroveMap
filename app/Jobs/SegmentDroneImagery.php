@@ -52,12 +52,16 @@ class SegmentDroneImagery implements ShouldQueue
         ]);
 
         try {
-            if ($layer->status !== 'ready' || ! $layer->mosaic_path || ! $localDisk->exists($layer->mosaic_path)) {
+            // The reviewed raster (removed areas transparent, cropped or shifted) when the owner edited it.
+            $rasterRelativePath = $layer->final_mosaic_path ?? $layer->mosaic_path;
+            // awaiting_review: runs on the unedited mosaic so the review editor can offer the AI extent.
+            if (! in_array($layer->status, ['ready', 'awaiting_review'], true)
+                || ! $rasterRelativePath || ! $localDisk->exists($rasterRelativePath)) {
                 throw new RuntimeException('The processed mosaic for this layer is missing.');
             }
 
             File::ensureDirectoryExists($workDirectory);
-            $mosaicPath = $localDisk->path($layer->mosaic_path);
+            $mosaicPath = $localDisk->path($rasterRelativePath);
             $inputPath = $workDirectory.DIRECTORY_SEPARATOR.'seg_input.tif';
             $maskPath = $workDirectory.DIRECTORY_SEPARATOR.'mask.png';
             $maskGeoPath = $workDirectory.DIRECTORY_SEPARATOR.'mask_geo.tif';
@@ -134,6 +138,12 @@ class SegmentDroneImagery implements ShouldQueue
                 'resolution_m' => round($pixelSize / $mercatorScale, 3),
                 'tiles' => (int) ($prediction['tiles'] ?? 0),
                 'device' => $prediction['device'] ?? null,
+                // Position nudge already contained in the coordinates (the edited raster is shifted),
+                // so the review editor can line the areas up with the preview.
+                'offset' => $layer->final_mosaic_path
+                    ? ($layer->applied_edits['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'])
+                    : DroneImageryLayer::EMPTY_EDITS['offset'],
+                'edited' => false,
             ];
 
             $localDisk->put($resultRelativePath, json_encode([

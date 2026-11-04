@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Delineation;
 use App\Models\DelineationAnnualObservation;
 use App\Models\User;
+use App\Services\DelineationObservationRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,65 +13,209 @@ class DelineationAnnualObservationBoundaryRevisionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_expert_saves_a_new_boundary_revision_without_changing_the_original_delineation(): void
+    // Non-whole coordinates: JSON turns 10.0 into 10, which would break strict array comparisons.
+    private const BASELINE = [
+        ['type' => 'area', 'coords' => [[10.001, 124.001], [10.001, 124.011], [10.011, 124.011]], 'genera' => ['Rhizophora']],
+    ];
+
+    private const GROWN = [
+        ['type' => 'area', 'coords' => [[10.001, 124.001], [10.001, 124.021], [10.011, 124.011]], 'genera' => ['Rhizophora', 'Avicennia']],
+    ];
+
+    private function residentDelineation(array $attributes = []): Delineation
     {
-        $expert = User::factory()->create(['role' => 'expert']);
-        $baseline = [
-            ['type' => 'area', 'coords' => [[10.0, 124.0], [10.0, 124.01], [10.01, 124.01]]],
-        ];
-        $adjusted = [
-            ['type' => 'area', 'coords' => [[10.0, 124.0], [10.0, 124.02], [10.01, 124.01]]],
-        ];
-        $delineation = Delineation::create([
-            'user_id' => $expert->id,
+        $resident = User::factory()->create(['role' => 'end_user']);
+
+        $delineation = Delineation::create(array_merge([
+            'user_id' => $resident->id,
             'name' => 'North Shore',
-            'notes' => 'Baseline zone',
-            'features' => $baseline,
-        ]);
+            'features' => self::BASELINE,
+            'is_approved' => true,
+            'is_rejected' => false,
+        ], $attributes));
 
-        $response = $this->actingAs($expert)->post(route('expert.annual-observations.store'), [
-            'delineation_id' => $delineation->id,
-            'year' => now()->year,
-            'observation_date' => now()->toDateString(),
-            'coverage_area_ha' => 12.5,
-            'source' => 'Field survey',
-            'features' => $adjusted,
-        ]);
+        // Drawn in an earlier year so the first observed change also gets a baseline year.
+        $delineation->forceFill(['created_at' => now()->subYears(2)])->save();
 
-        $response->assertRedirect(route('expert.annual-observations.create'));
-        $observation = DelineationAnnualObservation::firstOrFail();
-        $this->assertDatabaseHas('delineation_annual_observation_boundary_revisions', [
-            'annual_observation_id' => $observation->id,
-            'version' => 1,
-            'created_by' => $expert->id,
-        ]);
-        $this->assertSame($baseline, $delineation->fresh()->features);
-        $this->assertSame($adjusted, $observation->boundaryRevisions()->firstOrFail()->features);
+        return $delineation;
     }
 
-    public function test_saving_the_same_boundary_does_not_create_a_revision(): void
+    private function saveBoundary(User $user, Delineation $delineation, array $extra = [])
+    {
+        return $this->actingAs($user)->putJson(route('delineations.boundary.update', $delineation), array_merge([
+            'features' => self::GROWN,
+        ], $extra));
+    }
+
+    public function test_correction_edit_does_not_create_an_observation(): void
     {
         $expert = User::factory()->create(['role' => 'expert']);
-        $baseline = [
-            ['type' => 'area', 'coords' => [[10.0, 124.0], [10.0, 124.01], [10.01, 124.01]]],
-        ];
+        $delineation = $this->residentDelineation();
+
+        $this->saveBoundary($expert, $delineation, ['record_as' => 'correction'])
+            ->assertOk()
+            ->assertJsonPath('observation_year', null);
+
+        $this->assertDatabaseCount('delineation_annual_observations', 0);
+        $this->assertDatabaseCount('delineation_revisions', 1);
+    }
+
+    public function test_edit_without_choice_is_treated_as_correction(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+
+        $this->saveBoundary($expert, $this->residentDelineation())->assertOk();
+
+        $this->assertDatabaseCount('delineation_annual_observations', 0);
+    }
+
+    public function test_observed_change_records_year_area_genera_and_baseline(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation();
+        $observedOn = now()->subMonth()->toDateString();
+
+        $this->saveBoundary($expert, $delineation, [
+            'record_as' => 'observation',
+            'observation_date' => $observedOn,
+            'observation_source' => 'drone_imagery',
+        ])->assertOk()->assertJsonPath('observation_year', now()->subMonth()->year);
+
+        $observations = $delineation->annualObservations()->orderBy('year')->get();
+        $this->assertCount(2, $observations);
+
+        [$baseline, $observed] = $observations;
+        $this->assertSame(now()->subYears(2)->year, $baseline->year);
+        $this->assertSame(DelineationAnnualObservation::BASELINE_SOURCE, $baseline->source);
+        $this->assertEqualsWithDelta(DelineationObservationRecorder::areaHectares(self::BASELINE), $baseline->coverage_area_ha, 0.0001);
+
+        $this->assertSame($observedOn, $observed->observation_date->toDateString());
+        $this->assertSame('Drone imagery', $observed->source);
+        $this->assertSame(['Rhizophora', 'Avicennia'], $observed->genera_present);
+        $this->assertEqualsWithDelta(DelineationObservationRecorder::areaHectares(self::GROWN), $observed->coverage_area_ha, 0.0001);
+        $this->assertGreaterThan($baseline->coverage_area_ha, $observed->coverage_area_ha);
+        $this->assertSame($expert->id, $observed->created_by);
+        $this->assertSame(1, $observed->boundaryRevisions()->count());
+
+        // The delineation itself now shows the new boundary.
+        $this->assertSame(self::GROWN[0]['coords'], $delineation->fresh()->features[0]['coords']);
+    }
+
+    public function test_second_observed_change_in_same_year_replaces_figures(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation();
+        $choice = ['record_as' => 'observation', 'observation_date' => now()->toDateString(), 'observation_source' => 'field_survey'];
+
+        $this->saveBoundary($expert, $delineation, $choice)->assertOk();
+        $this->actingAs($expert)->putJson(route('delineations.boundary.update', $delineation), array_merge([
+            'features' => self::BASELINE,
+        ], $choice))->assertOk();
+
+        $thisYear = $delineation->annualObservations()->where('year', now()->year)->firstOrFail();
+        $this->assertSame(2, $delineation->annualObservations()->count(), 'baseline + this year only');
+        $this->assertEqualsWithDelta(DelineationObservationRecorder::areaHectares(self::BASELINE), $thisYear->coverage_area_ha, 0.0001);
+        $this->assertSame(2, $thisYear->boundaryRevisions()->count());
+    }
+
+    public function test_observation_in_the_year_the_area_was_drawn_has_no_separate_baseline(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation();
+        $delineation->forceFill(['created_at' => now()])->save();
+
+        $this->saveBoundary($expert, $delineation, [
+            'record_as' => 'observation',
+            'observation_date' => now()->toDateString(),
+            'observation_source' => 'field_survey',
+        ])->assertOk();
+
+        $this->assertSame(1, $delineation->annualObservations()->count());
+    }
+
+    public function test_observed_change_requires_a_valid_past_date_and_source(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation();
+
+        $this->saveBoundary($expert, $delineation, ['record_as' => 'observation'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['observation_date', 'observation_source']);
+
+        $this->saveBoundary($expert, $delineation, [
+            'record_as' => 'observation',
+            'observation_date' => now(DelineationAnnualObservation::LOCAL_TIMEZONE)->addDays(2)->toDateString(),
+            'observation_source' => 'field_survey',
+        ])->assertStatus(422)->assertJsonValidationErrors(['observation_date']);
+
+        $this->assertDatabaseCount('delineation_annual_observations', 0);
+        $this->assertSame(self::BASELINE[0]['coords'], $delineation->fresh()->features[0]['coords']);
+    }
+
+    public function test_residents_cannot_record_observed_changes(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
         $delineation = Delineation::create([
-            'user_id' => $expert->id,
-            'name' => 'North Shore',
-            'notes' => 'Baseline zone',
-            'features' => $baseline,
+            'user_id' => $resident->id,
+            'name' => 'My pending area',
+            'features' => self::BASELINE,
         ]);
 
-        $this->actingAs($expert)->post(route('expert.annual-observations.store'), [
-            'delineation_id' => $delineation->id,
-            'year' => now()->year,
+        $this->saveBoundary($resident, $delineation, [
+            'record_as' => 'observation',
             'observation_date' => now()->toDateString(),
-            'coverage_area_ha' => 12.5,
-            'source' => 'Field survey',
-            'features' => $baseline,
-        ])->assertRedirect(route('expert.annual-observations.create'));
+            'observation_source' => 'field_survey',
+        ])->assertForbidden();
 
-        $this->assertDatabaseCount('delineation_annual_observation_boundary_revisions', 0);
+        $this->assertDatabaseCount('delineation_annual_observations', 0);
+    }
+
+    public function test_observed_change_needs_an_area_shape(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation();
+
+        $this->saveBoundary($expert, $delineation, [
+            'features' => [['type' => 'line', 'coords' => [[10.001, 124.001], [10.011, 124.011]]]],
+            'record_as' => 'observation',
+            'observation_date' => now()->toDateString(),
+            'observation_source' => 'field_survey',
+        ])->assertStatus(422)->assertJsonValidationErrors(['record_as']);
+    }
+
+    public function test_area_matches_the_map_formula(): void
+    {
+        // About 1 km x 1 km near the equator: roughly 100 ha.
+        $square = [['type' => 'area', 'coords' => [[0.0, 0.0], [0.0, 0.009], [0.009, 0.009], [0.009, 0.0]]]];
+
+        $this->assertEqualsWithDelta(100.1, DelineationObservationRecorder::areaHectares($square), 0.5);
+    }
+
+    public function test_history_endpoint_returns_genera_present(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation();
+
+        $this->saveBoundary($expert, $delineation, [
+            'record_as' => 'observation',
+            'observation_date' => now()->toDateString(),
+            'observation_source' => 'satellite_imagery',
+        ])->assertOk();
+
+        $this->actingAs($expert)
+            ->getJson(route('delineations.annual-observations.index', $delineation))
+            ->assertOk()
+            ->assertJsonCount(2, 'coverage')
+            ->assertJsonPath('coverage.1.source', 'Satellite imagery')
+            ->assertJsonPath('coverage.1.features.0.coords', self::GROWN[0]['coords'])
+            ->assertJsonPath('generaPresent', ['Rhizophora', 'Avicennia']);
+    }
+
+    public function test_old_annual_observations_page_is_gone(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+
+        $this->actingAs($expert)->get('/expert/annual-observations')->assertNotFound();
     }
 
     public function test_residents_can_read_their_own_annual_observations(): void
@@ -142,16 +287,10 @@ class DelineationAnnualObservationBoundaryRevisionTest extends TestCase
     public function test_expert_map_history_contains_each_years_geometry_and_source(): void
     {
         $expert = User::factory()->create(['role' => 'expert']);
-        $baseline = [
-            ['type' => 'area', 'coords' => [[10.0, 124.0], [10.0, 124.01], [10.01, 124.01]]],
-        ];
-        $observed = [
-            ['type' => 'area', 'coords' => [[10.0, 124.0], [10.0, 124.02], [10.01, 124.01]]],
-        ];
         $delineation = Delineation::create([
             'user_id' => $expert->id,
             'name' => 'North Shore',
-            'features' => $baseline,
+            'features' => self::BASELINE,
         ]);
         $observation = $delineation->annualObservations()->create([
             'created_by' => $expert->id,
@@ -162,7 +301,7 @@ class DelineationAnnualObservationBoundaryRevisionTest extends TestCase
         ]);
         $observation->boundaryRevisions()->create([
             'version' => 1,
-            'features' => $observed,
+            'features' => self::GROWN,
             'created_by' => $expert->id,
         ]);
         $delineation->annualObservations()->create([
@@ -179,8 +318,8 @@ class DelineationAnnualObservationBoundaryRevisionTest extends TestCase
             ->assertJsonPath('coverage.0.year', 2024)
             ->assertJsonPath('coverage.0.coverageAreaHa', 12.5)
             ->assertJsonPath('coverage.0.source', 'Field survey')
-            ->assertJsonPath('coverage.0.features', $observed)
+            ->assertJsonPath('coverage.0.features', self::GROWN)
             ->assertJsonPath('coverage.1.year', 2025)
-            ->assertJsonPath('coverage.1.features', $observed);
+            ->assertJsonPath('coverage.1.features', self::GROWN);
     }
 }

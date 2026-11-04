@@ -65,13 +65,16 @@
             </div>
             <div class="application-actions">
                 <form action="{{ route('admin.expert-applications.approve', $applicant) }}" method="POST"
-                    onsubmit="return confirm('Approve {{ e(addslashes($applicant->name)) }} as an expert?');">
+                    data-confirm="Approve this request?" data-confirm-message="{{ $applicant->name }} becomes an expert and can review delineations."
+                    data-confirm-label="Approve" data-busy-label="Approving...">
                     @csrf
                     <button type="submit" class="btn-primary"><i class="bi bi-check-lg"></i> Approve</button>
                 </form>
                 <details class="reject-details">
                     <summary class="btn-secondary btn-reject"><i class="bi bi-x-lg"></i> Reject</summary>
-                    <form action="{{ route('admin.expert-applications.reject', $applicant) }}" method="POST" class="reject-form">
+                    <form action="{{ route('admin.expert-applications.reject', $applicant) }}" method="POST" class="reject-form"
+                        data-confirm="Reject this request?" data-confirm-message="{{ $applicant->name }}'s expert application is rejected and they are notified."
+                        data-confirm-label="Reject" data-confirm-tone="danger" data-busy-label="Rejecting...">
                         @csrf
                         <label for="rejection_notes_{{ $applicant->id }}">Reason (optional, shared with the applicant)</label>
                         <textarea id="rejection_notes_{{ $applicant->id }}" name="rejection_notes" rows="2" maxlength="1000"></textarea>
@@ -96,13 +99,11 @@
 
         <div class="filter-bar">
             <input type="text" class="search-input" placeholder="Search users by name or email...">
-            <select class="filter-select">
+            <select class="filter-select" aria-label="Filter by role">
                 <option value="">All Roles</option>
-                <option value="admin">Administrator</option>
-                <option value="manager">Manager</option>
-                <option value="scientist">Scientist</option>
-                <option value="analyst">Analyst</option>
-                <option value="viewer">Viewer</option>
+                @foreach(\App\Models\User::ROLE_LABELS as $roleValue => $roleName)
+                <option value="{{ $roleValue }}">{{ $roleName }}</option>
+                @endforeach
             </select>
             <select class="filter-select">
                 <option value="">All Status</option>
@@ -132,24 +133,16 @@
                     $initials = collect(explode(' ', $user->name))
                     ->map(fn($part) => strtoupper(substr($part, 0, 1)))
                     ->join('');
-                    $roleClass = match ($user->role) {
-                    'admin' => 'admin',
-                    'manager' => 'manager',
-                    'scientist' => 'scientist',
-                    'analyst' => 'analyst',
-                    'viewer' => 'viewer',
-                    default => 'secondary',
+                    $roleClass = match (true) {
+                    $user->isAdmin() => 'admin',
+                    $user->isExpert() => 'scientist',
+                    default => 'viewer',
                     };
-                    $roleLabel = match ($user->role) {
-                    'admin' => 'Administrator',
-                    'end_user' => 'Resident',
-                    'expert' => 'Expert',
-                    default => ucwords(str_replace('_', ' ', $user->role)),
-                    };
+                    $roleLabel = $user->roleLabel();
                     $statusLabel = $user->email_verified_at ? 'Active' : 'Pending';
                     $statusClass = $user->email_verified_at ? 'success' : 'secondary';
                     @endphp
-                    <tr>
+                    <tr data-role="{{ $user->role }}">
                         <td>
                             <div class="user-cell">
                                 <div class="user-avatar">{{ $initials }}</div>
@@ -172,7 +165,9 @@
                         <td class="actions-cell">
                             <a class="action-btn view" href="{{ route('admin.users.show', $user) }}" title="View" data-action="show"><i class="bi bi-eye"></i></a>
                             <a class="action-btn edit" href="{{ route('admin.users.edit', $user) }}" title="Edit" data-action="edit"><i class="bi bi-pencil"></i></a>
-                            <form action="{{ route('admin.users.destroy', $user) }}" method="POST" onsubmit="return confirm('Delete this user?');">
+                            <form action="{{ route('admin.users.destroy', $user) }}" method="POST"
+                                data-confirm="Delete this user?" data-confirm-message="{{ $user->name }}'s account is permanently deleted. This cannot be undone."
+                                data-confirm-label="Delete" data-confirm-tone="danger" data-busy-label="Deleting...">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="action-btn delete" title="Delete"><i class="bi bi-trash"></i></button>
@@ -1324,20 +1319,21 @@
 <script>
     function updateSearchFilter() {
         const searchTerm = document.querySelector('.search-input').value.toLowerCase();
-        const tableRows = document.querySelectorAll('.table tbody tr');
+        const roleFilter = document.querySelectorAll('.filter-select')[0].value;
+        const tableRows = document.querySelectorAll('.table tbody tr[data-role]');
 
         tableRows.forEach(row => {
             const userName = row.cells[0].textContent.toLowerCase();
             const userEmail = row.cells[1].textContent.toLowerCase();
-            row.style.display = (userName.includes(searchTerm) || userEmail.includes(searchTerm)) ? '' : 'none';
+            const matchesSearch = userName.includes(searchTerm) || userEmail.includes(searchTerm);
+            const matchesRole = !roleFilter || row.dataset.role === roleFilter;
+            row.style.display = matchesSearch && matchesRole ? '' : 'none';
         });
     }
 
     document.querySelector('.search-input').addEventListener('keyup', updateSearchFilter);
 
-    document.querySelectorAll('.filter-select')[0].addEventListener('change', function(e) {
-        console.log('Role filter:', e.target.value);
-    });
+    document.querySelectorAll('.filter-select')[0].addEventListener('change', updateSearchFilter);
 
     document.querySelectorAll('.filter-select')[1].addEventListener('change', function(e) {
         console.log('Status filter:', e.target.value);
@@ -1414,32 +1410,35 @@
             form.addEventListener('submit', async function(event) {
                 event.preventDefault();
                 const submitButton = event.submitter || userModalContent.querySelector('button[type="submit"], input[type="submit"]');
-                if (submitButton) {
-                    submitButton.disabled = true;
-                }
                 renderModalErrors([]);
 
-                try {
-                    const formData = new FormData(form);
-                    const response = await axios.post(form.action, formData);
+                // Errors are listed inside the modal, next to the fields, so no extra error message here.
+                const outcome = await window.AppActions.run({
+                    confirm: { title: 'Save changes?', message: 'The user\'s account details are updated.', confirmLabel: 'Save' },
+                    button: submitButton,
+                    busyLabel: 'Saving...',
+                    lock: [...userModalContent.querySelectorAll('[data-modal-close]')],
+                    task: () => axios.post(form.action, new FormData(form)),
+                    errorMessage: false,
+                });
 
+                if (outcome.status === 'done') {
                     const successMessage = document.createElement('div');
                     successMessage.className = 'alert alert-success';
-                    successMessage.textContent = response.data.success || 'User updated successfully.';
+                    successMessage.textContent = outcome.result.data.success || 'User updated successfully.';
                     form.parentElement.insertBefore(successMessage, form);
 
                     setTimeout(() => {
                         closeModal();
                         window.location.reload();
                     }, 900);
-                } catch (error) {
+                } else if (outcome.status === 'failed') {
+                    const error = outcome.error;
                     if (error.response && error.response.status === 422) {
                         renderModalErrors(error.response.data.errors);
                     } else {
                         renderModalErrors(['Unable to save changes. Please try again.']);
                     }
-                } finally {
-                    submitButton.disabled = false;
                 }
             });
         }
