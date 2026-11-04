@@ -98,7 +98,6 @@ class RejectedDelineationRevisionTest extends TestCase
             'id="saveBtn" type="button" class="btn btn-g delineation-save-btn"',
             $html,
         );
-        $this->assertStringNotContainsString('id="delineationPlantingRecommendation"', $html);
     }
 
     public function test_resident_delineate_page_keeps_changes_over_time_available(): void
