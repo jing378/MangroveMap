@@ -55,6 +55,8 @@ Keep `GDAL_QUEUE_RETRY_AFTER` (7260) above the job timeout (7200). Above that, `
 ### Frontend
 Blade views with Leaflet 1.9.4 from a CDN. Most map code is inline JS in Blade partials under `resources/views/users/partials/` (`workspace-*`, `map-base-scripts`, `recommendation-scripts`), not in `resources/js`. Layouts: `layouts/enduser`, `layouts/admin`, `layouts/app`.
 
+Dark mode: `partials/theme` (included first in every page `<head>`) sets `<html data-theme="light|dark">` from localStorage or the OS setting, and `partials/theme-toggle` is the header button. View CSS colors are written as `var(--bg-xxxxxx, #xxxxxx)` (prefix `bg`/`fg`/`bd` = role); light mode uses the fallback and the dark values live in the generated `partials/theme-palette`. After adding styles with literal colors, run `node scripts/theme/build-dark-theme.mjs` (`--check` lists views that still need it). It skips `<script>` blocks and `--custom-properties`, so colors in JS-built HTML or page-level CSS variables need a dark value by hand (see the `html[data-theme="dark"]` block in `index.blade.php`).
+
 ## Testing notes
 - `phpunit.xml` sets SQLite `:memory:`, `QUEUE_CONNECTION=sync`, and array mail/cache/session.
 - `ProcessDroneImageryTest` runs real GDAL through the QGIS install. If `gdal.qgis_env` doesn't exist, it skips itself.

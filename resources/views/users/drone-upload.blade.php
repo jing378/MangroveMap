@@ -7,7 +7,7 @@
         .drone-upload-page {
             max-width: 1180px;
             margin: 0 auto;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
         }
 
         .drone-upload-page h1 {
@@ -18,7 +18,7 @@
 
         .drone-upload-sub {
             font-size: 14px;
-            color: #6b8a78;
+            color: var(--fg-6b8a78, #6b8a78);
             margin-bottom: 18px;
         }
 
@@ -39,8 +39,8 @@
             gap: 7px;
             padding: 6px 12px;
             border-radius: 999px;
-            background: #edf7f2;
-            color: #2f5a46;
+            background: var(--bg-edf7f2, #edf7f2);
+            color: var(--fg-2f5a46, #2f5a46);
             font-size: 12.5px;
             font-weight: 700;
         }
@@ -65,8 +65,8 @@
         }
 
         .drone-card {
-            background: #fff;
-            border: 1px solid #e0e8e0;
+            background: var(--bg-ffffff, #fff);
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
             border-radius: 16px;
             padding: 20px;
             box-shadow: 0 1px 6px rgba(0, 0, 0, .04);
@@ -77,7 +77,7 @@
             font-weight: 800;
             letter-spacing: .6px;
             text-transform: uppercase;
-            color: #6b8a78;
+            color: var(--fg-6b8a78, #6b8a78);
             margin-bottom: 14px;
         }
 
@@ -93,7 +93,7 @@
 
         .drone-form input[type="text"] {
             padding: 9px 11px;
-            border: 1px solid #d4e0d4;
+            border: 1px solid var(--bd-d4e0d4, #d4e0d4);
             border-radius: 9px;
             font: inherit;
             font-size: 14px;
@@ -105,9 +105,9 @@
             place-items: center;
             gap: 6px;
             padding: 24px 14px;
-            border: 2px dashed #b9d3c2;
+            border: 2px dashed var(--bd-b9d3c2, #b9d3c2);
             border-radius: 12px;
-            background: #f7fbf8;
+            background: var(--bg-f7fbf8, #f7fbf8);
             text-align: center;
             cursor: pointer;
             transition: border-color .15s, background .15s;
@@ -116,12 +116,12 @@
         .drone-drop:hover,
         .drone-drop.is-over {
             border-color: #1e9e62;
-            background: #edf7f2;
+            background: var(--bg-edf7f2, #edf7f2);
         }
 
         .drone-drop i {
             font-size: 30px;
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
         }
 
         .drone-drop strong {
@@ -130,7 +130,7 @@
 
         .drone-drop span {
             font-size: 12.5px;
-            color: #6b8a78;
+            color: var(--fg-6b8a78, #6b8a78);
         }
 
         .drone-drop input {
@@ -142,7 +142,7 @@
 
         .drone-files {
             font-size: 12.5px;
-            color: #4c6b5d;
+            color: var(--fg-4c6b5d, #4c6b5d);
             overflow-wrap: anywhere;
         }
 
@@ -152,10 +152,10 @@
             justify-content: center;
             gap: 6px;
             padding: 8px 12px;
-            border: 1px solid #d4e0d4;
+            border: 1px solid var(--bd-d4e0d4, #d4e0d4);
             border-radius: 9px;
-            background: #fff;
-            color: #1a2e1a;
+            background: var(--bg-ffffff, #fff);
+            color: var(--fg-1a2e1a, #1a2e1a);
             font: inherit;
             font-size: 13px;
             font-weight: 700;
@@ -165,7 +165,7 @@
 
         .drone-btn:hover:not(:disabled) {
             border-color: #1e9e62;
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
         }
 
         .drone-btn.primary {
@@ -180,13 +180,13 @@
         }
 
         .drone-btn.danger {
-            color: #b42318;
+            color: var(--fg-b42318, #b42318);
         }
 
         .drone-btn.danger:hover:not(:disabled) {
             border-color: #b42318;
-            color: #b42318;
-            background: #fdecea;
+            color: var(--fg-b42318, #b42318);
+            background: var(--bg-fdecea, #fdecea);
         }
 
         /* Same as the delineation's Save: dimmed until there is something to send. */
@@ -226,14 +226,14 @@
             justify-content: space-between;
             font-size: 12px;
             font-weight: 700;
-            color: #4c6b5d;
+            color: var(--fg-4c6b5d, #4c6b5d);
             margin-bottom: 5px;
         }
 
         .drone-progress-track {
             height: 8px;
             border-radius: 999px;
-            background: #e5eee7;
+            background: var(--bg-e5eee7, #e5eee7);
             overflow: hidden;
         }
 
@@ -249,11 +249,11 @@
             font-size: 13px;
             line-height: 1.45;
             min-height: 1em;
-            color: #4c6b5d;
+            color: var(--fg-4c6b5d, #4c6b5d);
         }
 
         .drone-message.is-error {
-            color: #b42318;
+            color: var(--fg-b42318, #b42318);
         }
 
         .drone-list {
@@ -264,7 +264,7 @@
         .drone-empty {
             padding: 30px 10px;
             text-align: center;
-            color: #6b8a78;
+            color: var(--fg-6b8a78, #6b8a78);
             font-size: 14px;
         }
 
@@ -275,7 +275,7 @@
         }
 
         .drone-item {
-            border: 1px solid #e0e8e0;
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
             border-radius: 12px;
             padding: 14px 16px;
             display: grid;
@@ -303,7 +303,7 @@
 
         .drone-item-meta {
             font-size: 12.5px;
-            color: #6b8a78;
+            color: var(--fg-6b8a78, #6b8a78);
             margin-top: 2px;
         }
 
@@ -313,14 +313,14 @@
             border-radius: 999px;
             font-size: 12px;
             font-weight: 800;
-            background: #eef3ee;
-            color: #4c6b5d;
+            background: var(--bg-eef3ee, #eef3ee);
+            color: var(--fg-4c6b5d, #4c6b5d);
         }
 
-        .drone-badge.is-busy { background: #fff4e0; color: #9a5b00; }
-        .drone-badge.is-review { background: #e6f0ff; color: #1d4fa3; }
-        .drone-badge.is-ready { background: #e3f6ec; color: #16824f; }
-        .drone-badge.is-failed { background: #fdecea; color: #b42318; }
+        .drone-badge.is-busy { background: var(--bg-fff4e0, #fff4e0); color: var(--fg-9a5b00, #9a5b00); }
+        .drone-badge.is-review { background: var(--bg-e6f0ff, #e6f0ff); color: var(--fg-1d4fa3, #1d4fa3); }
+        .drone-badge.is-ready { background: var(--bg-e3f6ec, #e3f6ec); color: var(--fg-16824f, #16824f); }
+        .drone-badge.is-failed { background: var(--bg-fdecea, #fdecea); color: var(--fg-b42318, #b42318); }
 
         .drone-steps {
             display: grid;
@@ -340,19 +340,19 @@
             content: '';
             height: 5px;
             border-radius: 999px;
-            background: #e5eee7;
+            background: var(--bg-e5eee7, #e5eee7);
         }
 
-        .drone-step.is-done { color: #16824f; }
+        .drone-step.is-done { color: var(--fg-16824f, #16824f); }
         .drone-step.is-done::before { background: #1e9e62; }
-        .drone-step.is-active { color: #1a2e1a; }
+        .drone-step.is-active { color: var(--fg-1a2e1a, #1a2e1a); }
         .drone-step.is-active::before {
-            background: linear-gradient(90deg, #1e9e62 0 40%, #bfe3cf 40% 100%);
+            background: linear-gradient(90deg, #1e9e62 0 40%, var(--bg-bfe3cf, #bfe3cf) 40% 100%);
             background-size: 200% 100%;
             animation: drone-step-pulse 1.2s linear infinite;
         }
-        .drone-step.is-waiting::before { background: #6aa7ff; }
-        .drone-step.is-failed { color: #b42318; }
+        .drone-step.is-waiting::before { background: var(--bg-6aa7ff, #6aa7ff); }
+        .drone-step.is-failed { color: var(--fg-b42318, #b42318); }
         .drone-step.is-failed::before { background: #d04030; }
 
         @keyframes drone-step-pulse {
@@ -363,11 +363,11 @@
         .drone-item-state {
             font-size: 13px;
             line-height: 1.45;
-            color: #4c6b5d;
+            color: var(--fg-4c6b5d, #4c6b5d);
         }
 
         .drone-item-state.is-failed {
-            color: #b42318;
+            color: var(--fg-b42318, #b42318);
         }
 
         .drone-item-actions {

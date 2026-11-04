@@ -48,7 +48,7 @@
         width: 100%;
         padding: 28px 24px 22px;
         border-radius: 16px;
-        background: #fff;
+        background: var(--bg-ffffff, #fff);
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, .15), 0 10px 10px -5px rgba(0, 0, 0, .05);
         text-align: center;
         font-family: 'Manrope', sans-serif;
@@ -67,22 +67,22 @@
         width: 52px;
         height: 52px;
         margin: 0 auto 14px;
-        border: 2px solid #c8e6d4;
+        border: 2px solid var(--bd-c8e6d4, #c8e6d4);
         border-radius: 50%;
-        background: #edf7f2;
-        color: #1e9e62;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
         font-size: 24px;
     }
 
     .app-confirm-card.is-danger .app-confirm-icon {
-        border-color: #f2c2bd;
-        background: #fff1f0;
-        color: #c0392b;
+        border-color: var(--bd-f2c2bd, #f2c2bd);
+        background: var(--bg-fff1f0, #fff1f0);
+        color: var(--fg-c0392b, #c0392b);
     }
 
     .app-confirm-title {
         margin: 0 0 6px;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         font-size: 16px;
         font-weight: 700;
         line-height: 1.35;
@@ -91,7 +91,7 @@
 
     .app-confirm-message {
         margin: 0;
-        color: #64748b;
+        color: var(--fg-64748b, #64748b);
         font-size: 13px;
         line-height: 1.45;
         overflow-wrap: anywhere;
@@ -111,10 +111,10 @@
         gap: 6px;
         min-height: 40px;
         padding: 9px 14px;
-        border: 1px solid #d4e0d4;
+        border: 1px solid var(--bd-d4e0d4, #d4e0d4);
         border-radius: 10px;
-        background: #fff;
-        color: #1a2e1a;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-1a2e1a, #1a2e1a);
         font: inherit;
         font-size: 13px;
         font-weight: 700;
@@ -123,7 +123,7 @@
 
     .app-confirm-btn:hover {
         border-color: #1e9e62;
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .app-confirm-btn.is-primary {
@@ -200,11 +200,11 @@
         align-items: flex-start;
         gap: 10px;
         padding: 12px 12px 12px 14px;
-        border: 1px solid #c8e6d4;
+        border: 1px solid var(--bd-c8e6d4, #c8e6d4);
         border-radius: 12px;
-        background: #fff;
+        background: var(--bg-ffffff, #fff);
         box-shadow: 0 10px 24px rgba(0, 0, 0, .14);
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         font-family: 'Manrope', sans-serif;
         font-size: 13px;
         line-height: 1.45;
@@ -222,16 +222,16 @@
     .app-toast > i {
         flex: none;
         margin-top: 1px;
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
         font-size: 17px;
     }
 
     .app-toast.is-error {
-        border-color: #f2c2bd;
+        border-color: var(--bd-f2c2bd, #f2c2bd);
     }
 
     .app-toast.is-error > i {
-        color: #c0392b;
+        color: var(--fg-c0392b, #c0392b);
     }
 
     .app-toast-text {
@@ -247,12 +247,12 @@
         border: 0;
         border-radius: 6px;
         background: transparent;
-        color: #64748b;
+        color: var(--fg-64748b, #64748b);
         cursor: pointer;
     }
 
     .app-toast-close:hover {
-        background: #f1f5f2;
+        background: var(--bg-f1f5f2, #f1f5f2);
     }
 
     @media (max-width: 768px) {

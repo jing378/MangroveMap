@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    @include('partials.theme')
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Forgot Password - Mangrove Extent Mapping</title>
     <link rel="icon" type="image/png" href="/icon-192.png" />
@@ -23,8 +24,8 @@
             justify-content: center;
             background: radial-gradient(900px 500px at 10% 10%, rgba(16, 185, 129, 0.12), transparent 55%),
                 radial-gradient(900px 500px at 90% 20%, rgba(59, 130, 246, 0.10), transparent 55%),
-                #f5f7f6;
-            color: #1a2e1a;
+                var(--bg-f5f7f6, #f5f7f6);
+            color: var(--fg-1a2e1a, #1a2e1a);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             padding: 24px;
@@ -33,7 +34,7 @@
         .card {
             width: 100%;
             max-width: 420px;
-            background: rgba(255, 255, 255, 0.92);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.92);
             border-radius: 22px;
             padding: 36px 32px;
             box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
@@ -43,7 +44,7 @@
         .title {
             font-size: 26px;
             font-weight: 800;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             margin-bottom: 10px;
             letter-spacing: -0.02em;
         }
@@ -51,7 +52,7 @@
         .subtitle {
             font-size: 13px;
             line-height: 1.6;
-            color: #5b7864;
+            color: var(--fg-5b7864, #5b7864);
             margin-bottom: 28px;
         }
 
@@ -63,7 +64,7 @@
             display: block;
             font-size: 12px;
             font-weight: 800;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
             margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -76,8 +77,8 @@
             border-radius: 12px;
             font-family: inherit;
             font-size: 14px;
-            color: #1a2e1a;
-            background: rgba(255, 255, 255, 0.95);
+            color: var(--fg-1a2e1a, #1a2e1a);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.95);
             transition: all 0.2s ease;
         }
 
@@ -109,9 +110,9 @@
 
         .message {
             font-size: 13px;
-            color: #1e9e62;
-            background: #ecf9ef;
-            border: 1px solid #c7eed0;
+            color: var(--fg-1e9e62, #1e9e62);
+            background: var(--bg-ecf9ef, #ecf9ef);
+            border: 1px solid var(--bd-c7eed0, #c7eed0);
             padding: 14px 16px;
             border-radius: 12px;
             margin-bottom: 18px;
@@ -119,7 +120,7 @@
 
         .error-message {
             font-size: 12px;
-            color: #d04030;
+            color: var(--fg-d04030, #d04030);
             margin-top: 8px;
         }
 
@@ -131,7 +132,7 @@
         }
 
         .footer a {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
             text-decoration: none;
             font-weight: 700;
         }
@@ -170,6 +171,7 @@
             Remembered your password? <a href="{{ route('login') }}">Sign in</a>
         </div>
     </div>
+    @include('partials.theme-toggle', ['floating' => true])
 </body>
 
 </html>

@@ -133,7 +133,7 @@
         margin-bottom: 10px;
         font-size: 12px;
         font-weight: 700;
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
         text-decoration: none;
     }
 
@@ -157,7 +157,7 @@
         gap: 10px 16px;
         margin: 0;
         font-size: 13px;
-        color: #3a5a3a;
+        color: var(--fg-3a5a3a, #3a5a3a);
     }
 
     .detail-list dt {
@@ -175,14 +175,14 @@
 
     .detail-list a,
     .table a {
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
         font-weight: 600;
         text-decoration: none;
     }
 
     .detail-strong {
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .detail-wrap {

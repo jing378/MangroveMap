@@ -8,6 +8,7 @@
 
 <head>
     <meta charset="UTF-8">
+    @include('partials.theme')
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Terms and Conditions - MangroveMap</title>
     <link rel="icon" type="image/png" href="/icon-192.png" />
@@ -22,11 +23,11 @@
 
         body {
             font-family: 'Manrope', system-ui, -apple-system, Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             line-height: 1.65;
             background: radial-gradient(900px 500px at 10% 0%, rgba(16, 185, 129, 0.12), transparent 55%),
                 radial-gradient(900px 500px at 90% 10%, rgba(59, 130, 246, 0.08), transparent 55%),
-                #f5f7f6;
+                var(--bg-f5f7f6, #f5f7f6);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
@@ -76,7 +77,7 @@
         }
 
         .terms-card {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.9);
             border: 1px solid rgba(148, 163, 184, 0.45);
             border-radius: 18px;
             box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
@@ -85,17 +86,17 @@
 
         .terms-intro {
             font-size: 15px;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
             padding-bottom: 20px;
             margin-bottom: 8px;
-            border-bottom: 1px solid #e2e8e4;
+            border-bottom: 1px solid var(--bd-e2e8e4, #e2e8e4);
         }
 
         .toc {
             margin: 18px 0 8px;
             padding: 16px 20px;
-            background: #edf7f2;
-            border: 1px solid #b0e0c0;
+            background: var(--bg-edf7f2, #edf7f2);
+            border: 1px solid var(--bd-b0e0c0, #b0e0c0);
             border-radius: 12px;
         }
 
@@ -104,7 +105,7 @@
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
             margin-bottom: 8px;
         }
 
@@ -116,7 +117,7 @@
         }
 
         .toc a {
-            color: #1e7a4f;
+            color: var(--fg-1e7a4f, #1e7a4f);
             text-decoration: none;
         }
 
@@ -132,14 +133,14 @@
         h2 {
             font-size: 18px;
             font-weight: 800;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             margin-bottom: 8px;
         }
 
         p,
         li {
             font-size: 14.5px;
-            color: #2f4a3a;
+            color: var(--fg-2f4a3a, #2f4a3a);
         }
 
         p+p,
@@ -160,19 +161,19 @@
             margin-top: 12px;
             padding: 12px 14px;
             border-left: 4px solid #1e9e62;
-            background: #f3faf6;
+            background: var(--bg-f3faf6, #f3faf6);
             border-radius: 0 10px 10px 0;
         }
 
         a {
-            color: #1e7a4f;
+            color: var(--fg-1e7a4f, #1e7a4f);
         }
 
         .terms-footer {
             text-align: center;
             margin-top: 22px;
             font-size: 13px;
-            color: #7a8a7f;
+            color: var(--fg-7a8a7f, #7a8a7f);
         }
 
         @media (max-width: 640px) {
@@ -191,17 +192,17 @@
 
         @media print {
             body {
-                background: #fff;
+                background: var(--bg-ffffff, #fff);
             }
 
             .terms-header {
                 background: none;
-                color: #000;
+                color: var(--fg-000000, #000);
                 padding-bottom: 0;
             }
 
             .terms-header p {
-                color: #333;
+                color: var(--fg-333333, #333);
             }
 
             .back-link,
@@ -492,6 +493,7 @@
 
         <p class="terms-footer">&copy; {{ date('Y') }} MangroveMap. Empowering coastal communities through spatial science.</p>
     </main>
+    @include('partials.theme-toggle', ['floating' => true])
 </body>
 
 </html>

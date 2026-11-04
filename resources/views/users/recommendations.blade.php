@@ -22,14 +22,14 @@
         }
         .rec-list-empty {
             font-size: 12px;
-            color: #6a8a6a;
+            color: var(--fg-6a8a6a, #6a8a6a);
             padding: 6px 2px;
         }
         .rec-row-meta {
             display: block;
             font-size: 11px;
             font-weight: 400;
-            color: #7a917a;
+            color: var(--fg-7a917a, #7a917a);
         }
         .rec-field {
             margin-bottom: 12px;
@@ -37,16 +37,16 @@
         .rec-field > label {
             display: block;
             font-size: 12px;
-            color: #556b56;
+            color: var(--fg-556b56, #556b56);
             margin-bottom: 6px;
         }
         .rec-input {
             width: 100%;
             padding: 9px 10px;
-            border: 1px solid #d4dfd4;
+            border: 1px solid var(--bd-d4dfd4, #d4dfd4);
             border-radius: 10px;
-            background: #f8faf7;
-            color: #182918;
+            background: var(--bg-f8faf7, #f8faf7);
+            color: var(--fg-182918, #182918);
             font-size: 13px;
             font-family: inherit;
         }
@@ -69,9 +69,9 @@
         }
         .rec-readonly-note {
             font-size: 11px;
-            color: #3c5a3c;
-            background: #eef6ee;
-            border: 1px solid #cfe3cf;
+            color: var(--fg-3c5a3c, #3c5a3c);
+            background: var(--bg-eef6ee, #eef6ee);
+            border: 1px solid var(--bd-cfe3cf, #cfe3cf);
             border-radius: 8px;
             padding: 8px 10px;
             margin-bottom: 12px;
@@ -95,12 +95,12 @@
             left: 12px;
             bottom: 24px;
             z-index: 800;
-            background: rgba(255, 255, 255, .95);
-            border: 1px solid #d4dfd4;
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), .95);
+            border: 1px solid var(--bd-d4dfd4, #d4dfd4);
             border-radius: 10px;
             padding: 8px 10px;
             font-size: 11px;
-            color: #2d432d;
+            color: var(--fg-2d432d, #2d432d);
             box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
         }
         .rec-legend div {
@@ -117,7 +117,7 @@
         }
         .rec-legend .rec-legend-reference {
             background: transparent;
-            border: 2px dashed #e8f5e8;
+            border: 2px dashed var(--bd-e8f5e8, #e8f5e8);
             outline: 1px solid #7fa88a;
         }
         .rec-location-marker {
@@ -128,7 +128,7 @@
             justify-content: center;
             color: #fff;
             background: var(--rec-marker-color);
-            border: 2px solid #fff;
+            border: 2px solid var(--bd-ffffff, #fff);
             border-radius: 50% 50% 50% 0;
             box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
             transform: rotate(-45deg);
@@ -262,7 +262,7 @@
               <i class="bi bi-x-circle"></i> Discard changes
             </button>
             <button type="button" id="recDeleteBtn" class="btn"
-              style="width:100%;display:none;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
+              style="width:100%;display:none;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);">
               <i class="bi bi-trash"></i> Delete recommendation
             </button>
           </form>

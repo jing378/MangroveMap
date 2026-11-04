@@ -14,12 +14,12 @@
     }
 
     ::-webkit-scrollbar-thumb {
-        background: #d4e0d4;
+        background: var(--bg-d4e0d4, #d4e0d4);
         border-radius: 3px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-        background: #b8d4b8;
+        background: var(--bg-b8d4b8, #b8d4b8);
     }
 
     ::-webkit-scrollbar-corner {
@@ -36,7 +36,7 @@
     @supports not selector(::-webkit-scrollbar) {
         * {
             scrollbar-width: thin;
-            scrollbar-color: #d4e0d4 transparent;
+            scrollbar-color: var(--bg-d4e0d4, #d4e0d4) transparent;
         }
     }
 </style>

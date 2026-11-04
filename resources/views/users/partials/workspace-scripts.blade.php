@@ -557,7 +557,7 @@
         ? `<a href="${plantingRecommendationsPageUrl}?recommendation=${encodeURIComponent(rec.id)}" style="display:inline-block;margin-top:8px;color:#1e9e62;font-weight:700;text-decoration:none;">Open in Recommender &rarr;</a>`
         : '';
       return `<div class="planting-rec-popup">`
-        + `<div style="font-weight:800;color:#1a2e1a;margin-bottom:2px;">${escapeHtml(rec.name)}</div>`
+        + `<div style="font-weight:800;color:var(--fg-1a2e1a, #1a2e1a);margin-bottom:2px;">${escapeHtml(rec.name)}</div>`
         + `<div style="font-weight:700;color:${color};"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;"></span>${escapeHtml(rec.suitability_label || rec.suitability)}</div>`
         + `<div style="margin-top:6px;"><div style="color:#7a9a7a;margin-bottom:3px;">Recommended genus</div>${generaHtml}</div>`
         + note
@@ -1115,7 +1115,7 @@
           + `</div>`;
       });
       if (reviewText) {
-        blocks.push(`<div class="planting-rec-entry"><div style="color:#7a9a7a;">Review note:</div><div style="color:#4a6a4a;">${escapeHtml(reviewText)}</div></div>`);
+        blocks.push(`<div class="planting-rec-entry"><div style="color:#7a9a7a;">Review note:</div><div style="color:var(--fg-4a6a4a, #4a6a4a);">${escapeHtml(reviewText)}</div></div>`);
       }
       recommendationEl.innerHTML = blocks.join('');
     }

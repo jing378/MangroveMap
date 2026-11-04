@@ -86,7 +86,7 @@
         height: 40px;
         border-radius: 8px;
         background: transparent;
-        color: #6a8a6a;
+        color: var(--fg-6a8a6a, #6a8a6a);
         font-size: 18px;
         transition: all 0.15s;
         border: none;
@@ -95,8 +95,8 @@
     }
 
     .notification-bell-btn:hover {
-        background: #f5f7f6;
-        color: #1e9e62;
+        background: var(--bg-f5f7f6, #f5f7f6);
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .notification-badge {
@@ -114,15 +114,15 @@
         font-size: 11px;
         font-weight: 700;
         border-radius: 10px;
-        border: 2px solid white;
+        border: 2px solid var(--bd-ffffff, white);
     }
 
     .notification-dropdown {
         position: absolute;
         top: 68px;
         right: 0;
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 12px;
         min-width: 360px;
         max-width: 420px;
@@ -142,8 +142,8 @@
         justify-content: space-between;
         gap: 12px;
         padding: 16px;
-        border-bottom: 1px solid #f0f4f0;
-        background: #f8faf8;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        background: var(--bg-f8faf8, #f8faf8);
     }
 
     .dropdown-header-text {
@@ -159,12 +159,12 @@
     .dropdown-header-name {
         font-size: 14px;
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .dropdown-header-email {
         font-size: 12px;
-        color: #6a8a6a;
+        color: var(--fg-6a8a6a, #6a8a6a);
     }
 
     .notification-menu {
@@ -178,14 +178,14 @@
         align-items: center;
         gap: 12px;
         padding: 14px 16px;
-        border-bottom: 1px solid #f0f4f0;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
         transition: all 0.15s;
         position: relative;
         background: transparent;
     }
 
     .notification-item:hover {
-        background: #f5f7f6;
+        background: var(--bg-f5f7f6, #f5f7f6);
     }
 
     .notification-link {
@@ -202,11 +202,11 @@
     }
 
     .notification-item.unread {
-        background: #edf7f2;
+        background: var(--bg-edf7f2, #edf7f2);
     }
 
     .notification-item.unread:hover {
-        background: #e0f2e8;
+        background: var(--bg-e0f2e8, #e0f2e8);
     }
 
     .notification-icon {
@@ -216,8 +216,8 @@
         width: 36px;
         height: 36px;
         border-radius: 10px;
-        background: #edf7f2;
-        color: #1e9e62;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
         flex-shrink: 0;
         font-size: 16px;
     }
@@ -232,14 +232,14 @@
     .notification-title {
         font-size: 13px;
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         margin: 0;
         line-height: 1.3;
     }
 
     .notification-message {
         font-size: 12px;
-        color: #556d55;
+        color: var(--fg-556d55, #556d55);
         margin: 0;
         line-height: 1.5;
         overflow-wrap: anywhere;
@@ -247,7 +247,7 @@
 
     .notification-detail {
         font-size: 11px;
-        color: #6a8a6a;
+        color: var(--fg-6a8a6a, #6a8a6a);
         margin: 0;
         line-height: 1.4;
     }
@@ -263,7 +263,7 @@
         align-items: center;
         justify-content: flex-end;
         padding: 0 16px 10px;
-        border-bottom: 1px solid #f0f4f0;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
     }
 
     .mark-all-read-form {
@@ -275,10 +275,10 @@
         align-items: center;
         gap: 4px;
         padding: 6px 12px;
-        border: 1px solid #c8e6d4;
+        border: 1px solid var(--bd-c8e6d4, #c8e6d4);
         border-radius: 8px;
-        background: #fff;
-        color: #1e9e62;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-1e9e62, #1e9e62);
         font-size: 12px;
         font-weight: 700;
         cursor: pointer;
@@ -287,7 +287,7 @@
     }
 
     .mark-all-read-btn:hover {
-        background: #edf7f2;
+        background: var(--bg-edf7f2, #edf7f2);
         border-color: #1e9e62;
     }
 
@@ -309,14 +309,14 @@
 
     .dropdown-footer {
         padding: 12px 16px;
-        background: #f5f7f6;
+        background: var(--bg-f5f7f6, #f5f7f6);
     }
 
     .view-all-link {
         display: flex;
         align-items: center;
         gap: 6px;
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
         font-size: 12px;
         font-weight: 600;
         text-decoration: none;
@@ -324,13 +324,13 @@
     }
 
     .view-all-link:hover {
-        color: #16a34a;
+        color: var(--fg-16a34a, #16a34a);
         gap: 10px;
     }
 
     .dropdown-divider {
         height: 1px;
-        background: #e0e8e0;
+        background: var(--bg-e0e8e0, #e0e8e0);
         margin: 0;
     }
 

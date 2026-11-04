@@ -2,7 +2,7 @@
     .page-title {
         font-size: 28px;
         font-weight: 800;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         margin-bottom: 24px;
     }
 
@@ -17,8 +17,8 @@
     }
 
     .stat-card {
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 14px;
         padding: 20px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
@@ -36,16 +36,16 @@
     .stat-value {
         font-size: 32px;
         font-weight: 800;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         margin-bottom: 8px;
     }
 
     .stat-value.green {
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .stat-value.red {
-        color: #d04030;
+        color: var(--fg-d04030, #d04030);
     }
 
     .stat-change {
@@ -55,8 +55,8 @@
     }
 
     .section {
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 14px;
         padding: 24px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
@@ -66,7 +66,7 @@
     .section-title {
         font-size: 16px;
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         margin-bottom: 20px;
         display: flex;
         align-items: center;
@@ -84,12 +84,12 @@
     }
 
     .table th {
-        background: #f5f7f6;
+        background: var(--bg-f5f7f6, #f5f7f6);
         padding: 12px 16px;
         text-align: left;
         font-weight: 700;
         color: #9ab0a0;
-        border-bottom: 1px solid #e0e8e0;
+        border-bottom: 1px solid var(--bd-e0e8e0, #e0e8e0);
         text-transform: uppercase;
         font-size: 10px;
         letter-spacing: 0.5px;
@@ -97,13 +97,13 @@
 
     .table td {
         padding: 12px 16px;
-        border-bottom: 1px solid #f0f4f0;
-        color: #3a5a3a;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        color: var(--fg-3a5a3a, #3a5a3a);
         vertical-align: middle;
     }
 
     .table tbody tr:hover {
-        background: #f5f7f6;
+        background: var(--bg-f5f7f6, #f5f7f6);
     }
 
     .muted {
@@ -113,7 +113,7 @@
 
     .user-name {
         font-weight: 600;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .badge {
@@ -123,45 +123,45 @@
         font-size: 10px;
         font-weight: 700;
         white-space: nowrap;
-        background: #f0f4f0;
-        color: #6a8a6a;
-        border: 1px solid #d4e0d4;
+        background: var(--bg-f0f4f0, #f0f4f0);
+        color: var(--fg-6a8a6a, #6a8a6a);
+        border: 1px solid var(--bd-d4e0d4, #d4e0d4);
     }
 
     .badge.success {
-        background: #edf7f2;
-        color: #1e9e62;
-        border-color: #b0e0c0;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
+        border-color: var(--bd-b0e0c0, #b0e0c0);
     }
 
     .badge.pending {
-        background: #fdf5e8;
-        color: #c07818;
-        border-color: #e8cc98;
+        background: var(--bg-fdf5e8, #fdf5e8);
+        color: var(--fg-c07818, #c07818);
+        border-color: var(--bd-e8cc98, #e8cc98);
     }
 
     .badge.rejected {
-        background: #fdf0ee;
-        color: #d04030;
-        border-color: #e8b8b0;
+        background: var(--bg-fdf0ee, #fdf0ee);
+        color: var(--fg-d04030, #d04030);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
     }
 
     .action-btn {
         width: 32px;
         height: 32px;
-        border: 1px solid #e0e8e0;
-        background: #fff;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        background: var(--bg-ffffff, #fff);
         border-radius: 6px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #3a5a3a;
+        color: var(--fg-3a5a3a, #3a5a3a);
         text-decoration: none;
     }
 
     .action-btn:hover {
         border-color: #1e9e62;
-        background: #edf7f2;
+        background: var(--bg-edf7f2, #edf7f2);
     }
 
     .btn-primary,
@@ -185,15 +185,15 @@
     }
 
     .btn-secondary {
-        background: #fff;
-        color: #3a5a3a;
-        border: 1.5px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-3a5a3a, #3a5a3a);
+        border: 1.5px solid var(--bd-e0e8e0, #e0e8e0);
     }
 
     .btn-secondary:hover {
         border-color: #1e9e62;
-        background: #edf7f2;
-        color: #1e9e62;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     @media (max-width: 1024px) {

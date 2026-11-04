@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
+    @include('partials.theme')
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Verify Email - MangroveMap</title>
     <link rel="icon" type="image/png" href="/icon-192.png" />
@@ -22,7 +23,7 @@
             height: 100%;
             font-family: 'Manrope', system-ui, -apple-system, Segoe UI, sans-serif;
             background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%);
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -30,7 +31,7 @@
         }
 
         .verify-container {
-            background: #fff;
+            background: var(--bg-ffffff, #fff);
             border-radius: 14px;
             padding: 40px;
             max-width: 500px;
@@ -46,7 +47,7 @@
         .verify-icon {
             width: 80px;
             height: 80px;
-            background: #edf7f2;
+            background: var(--bg-edf7f2, #edf7f2);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -58,7 +59,7 @@
         .verify-title {
             font-size: 24px;
             font-weight: 800;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             margin-bottom: 8px;
         }
 
@@ -69,8 +70,8 @@
         }
 
         .verify-content {
-            background: #f5f7f6;
-            border: 1px solid #e0e8e0;
+            background: var(--bg-f5f7f6, #f5f7f6);
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 24px;
@@ -78,13 +79,13 @@
 
         .verify-message {
             font-size: 13px;
-            color: #3a5a3a;
+            color: var(--fg-3a5a3a, #3a5a3a);
             line-height: 1.8;
             margin-bottom: 12px;
         }
 
         .verify-message strong {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
         }
 
         .verify-message:last-child {
@@ -100,15 +101,15 @@
         }
 
         .alert-success {
-            background: #edf7f2;
-            color: #1e9e62;
-            border-color: #b0e0c0;
+            background: var(--bg-edf7f2, #edf7f2);
+            color: var(--fg-1e9e62, #1e9e62);
+            border-color: var(--bd-b0e0c0, #b0e0c0);
         }
 
         .alert-info {
-            background: #eff6ff;
-            color: #0369a1;
-            border-color: #7dd3fc;
+            background: var(--bg-eff6ff, #eff6ff);
+            color: var(--fg-0369a1, #0369a1);
+            border-color: var(--bd-7dd3fc, #7dd3fc);
         }
 
         .verify-actions {
@@ -145,14 +146,14 @@
         }
 
         .btn-secondary {
-            background: #f5f7f6;
-            color: #3a5a3a;
-            border: 1.5px solid #e0e8e0;
+            background: var(--bg-f5f7f6, #f5f7f6);
+            color: var(--fg-3a5a3a, #3a5a3a);
+            border: 1.5px solid var(--bd-e0e8e0, #e0e8e0);
         }
 
         .btn-secondary:hover {
-            background: #edf2ed;
-            border-color: #d4e0d4;
+            background: var(--bg-edf2ed, #edf2ed);
+            border-color: var(--bd-d4e0d4, #d4e0d4);
         }
 
         .verify-footer {
@@ -161,11 +162,11 @@
             color: #7a9a7a;
             margin-top: 20px;
             padding-top: 20px;
-            border-top: 1px solid #e0e8e0;
+            border-top: 1px solid var(--bd-e0e8e0, #e0e8e0);
         }
 
         .verify-footer a {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
             text-decoration: none;
             font-weight: 600;
         }
@@ -243,6 +244,7 @@
             <p>Need help? <a href="#">Contact our support team</a></p>
         </div>
     </div>
+    @include('partials.theme-toggle', ['floating' => true])
 </body>
 
 </html>

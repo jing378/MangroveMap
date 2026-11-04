@@ -75,8 +75,8 @@
 
     .kpi-card {
         min-width: 0;
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 12px;
         padding: 20px;
         display: flex;
@@ -88,8 +88,8 @@
         width: 44px;
         height: 44px;
         border-radius: 10px;
-        background: #f5f7f6;
-        color: #1e9e62;
+        background: var(--bg-f5f7f6, #f5f7f6);
+        color: var(--fg-1e9e62, #1e9e62);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -105,7 +105,7 @@
     .kpi-val {
         font-size: 22px;
         font-weight: 800;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         line-height: 1.2;
     }
 
@@ -125,8 +125,8 @@
         margin-top: 6px;
     }
 
-    .kpi-badge.g { background: #edf7f2; color: #1e9e62; }
-    .kpi-badge.a { background: #fef7ed; color: #c07818; }
+    .kpi-badge.g { background: var(--bg-edf7f2, #edf7f2); color: var(--fg-1e9e62, #1e9e62); }
+    .kpi-badge.a { background: var(--bg-fef7ed, #fef7ed); color: var(--fg-c07818, #c07818); }
 
     /* Visual Charts Section */
     .charts-grid {
@@ -137,8 +137,8 @@
 
     .chart-card {
         min-width: 0;
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 14px;
         padding: 24px;
     }
@@ -153,7 +153,7 @@
     .chart-title {
         font-size: 15px;
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .chart-canvas-wrap {
@@ -164,8 +164,8 @@
 
     /* Submissions Table */
     .table-card {
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 14px;
         padding: 24px;
     }
@@ -180,7 +180,7 @@
     .table-title {
         font-size: 16px;
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .custom-table {
@@ -197,17 +197,17 @@
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        border-bottom: 1px solid #e0e8e0;
+        border-bottom: 1px solid var(--bd-e0e8e0, #e0e8e0);
     }
 
     .custom-table td {
         padding: 14px;
-        border-bottom: 1px solid #f0f4f0;
-        color: #1a2e1a;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .custom-table tr:hover td {
-        background: #fbfdfb;
+        background: var(--bg-fbfdfb, #fbfdfb);
     }
 
     .status-badge {
@@ -221,18 +221,18 @@
     }
 
     .status-badge.approved {
-        background: #edf7f2;
-        color: #1e9e62;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .status-badge.pending {
-        background: #fef7ed;
-        color: #c07818;
+        background: var(--bg-fef7ed, #fef7ed);
+        color: var(--fg-c07818, #c07818);
     }
 
     .status-badge.rejected {
-        background: #fdf0ee;
-        color: #d04030;
+        background: var(--bg-fdf0ee, #fdf0ee);
+        color: var(--fg-d04030, #d04030);
     }
 
     .btn-table-action {
@@ -243,8 +243,8 @@
         border-radius: 6px;
         font-size: 12px;
         font-weight: 600;
-        color: #1e9e62;
-        background: #edf7f2;
+        color: var(--fg-1e9e62, #1e9e62);
+        background: var(--bg-edf7f2, #edf7f2);
         text-decoration: none;
         transition: all 0.15s ease;
     }
@@ -266,7 +266,7 @@
         align-items: center;
         gap: 14px;
         padding: 10px 12px;
-        border-bottom: 1px solid #f0f4f0;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
         font-size: 13px;
         border-radius: 8px;
     }
@@ -276,15 +276,15 @@
     }
 
     .contributor-row.is-me {
-        background: #edf7f2;
+        background: var(--bg-edf7f2, #edf7f2);
     }
 
     .contributor-rank {
         width: 26px;
         height: 26px;
         border-radius: 50%;
-        background: #f5f7f6;
-        color: #1e9e62;
+        background: var(--bg-f5f7f6, #f5f7f6);
+        color: var(--fg-1e9e62, #1e9e62);
         font-weight: 800;
         font-size: 12px;
         display: flex;
@@ -301,7 +301,7 @@
     .contributor-name {
         flex: 1;
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -327,7 +327,7 @@
     .contributor-count {
         font-size: 12px;
         font-weight: 700;
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
         white-space: nowrap;
     }
 
@@ -558,7 +558,7 @@
             <div style="text-align: center; padding: 40px 20px; color: #7a9a7a;">
                 <i class="bi bi-bounding-box" style="font-size: 36px; display: block; margin-bottom: 10px; color: #b8d9c6;"></i>
                 <p style="margin: 0; font-size: 14px;">{{ auth()->user()->isExpert() ? 'No resident delineations are available to review yet.' : "You haven't submitted any zone delineations yet." }}</p>
-                <a href="{{ auth()->user()->isExpert() ? route('expert.delineate') : route('delineate') }}" style="display: inline-block; margin-top: 12px; color: #1e9e62; font-weight: 700; text-decoration: none;">
+                <a href="{{ auth()->user()->isExpert() ? route('expert.delineate') : route('delineate') }}" style="display: inline-block; margin-top: 12px; color: var(--fg-1e9e62, #1e9e62); font-weight: 700; text-decoration: none;">
                     Start drawing your first boundary &rarr;
                 </a>
             </div>
@@ -584,13 +584,13 @@
                             @endphp
                             <tr>
                                 <td>
-                                    <div style="font-weight: 700; color: #1a2e1a;">{{ $d['name'] ?? 'Unnamed zone' }}</div>
+                                    <div style="font-weight: 700; color: var(--fg-1a2e1a, #1a2e1a);">{{ $d['name'] ?? 'Unnamed zone' }}</div>
                                     @if(!empty($d['notes']))
                                         <div style="font-size: 11px; color: #7a9a7a; margin-top: 2px;">{{ Str::limit($d['notes'], 60) }}</div>
                                     @endif
                                 </td>
                                 <td>
-                                    <span style="font-size: 12px; color: #4a6a4a; font-weight: 600;">
+                                    <span style="font-size: 12px; color: var(--fg-4a6a4a, #4a6a4a); font-weight: 600;">
                                         <i class="bi bi-layers me-1"></i> {{ $featureCount }} {{ Str::plural('geometry', $featureCount) }}
                                     </span>
                                 </td>
@@ -639,7 +639,8 @@
                         data: data,
                         backgroundColor: ['#1e9e62', '#16a34a', '#5ab8de', '#c07818', '#e6a23c', '#909399'],
                         borderWidth: 2,
-                        borderColor: '#fff'
+                        // Matches the card background in either theme (re-read on chart.update()).
+                        borderColor: () => (window.MangroveTheme?.get() === 'dark' ? '#141d18' : '#fff')
                     }]
                 },
                 options: {
@@ -693,7 +694,7 @@
                     scales: {
                         y: {
                             beginAtZero: false,
-                            grid: { color: '#f0f4f0' },
+                            grid: { color: () => (window.MangroveTheme?.get() === 'dark' ? 'rgba(255, 255, 255, 0.07)' : '#f0f4f0') },
                             ticks: { font: { family: 'Manrope', size: 11 } }
                         },
                         x: {

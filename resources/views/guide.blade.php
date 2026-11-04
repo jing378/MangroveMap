@@ -77,9 +77,9 @@
     .guide-toc a {
         padding: 7px 12px;
         border-radius: 999px;
-        border: 1px solid #d4dfd4;
-        background: #fff;
-        color: #365a45;
+        border: 1px solid var(--bd-d4dfd4, #d4dfd4);
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-365a45, #365a45);
         font-size: 12.5px;
         font-weight: 700;
         text-decoration: none;
@@ -87,12 +87,12 @@
 
     .guide-toc a:hover {
         border-color: #1e9e62;
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .guide-section {
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 16px;
         padding: 22px 24px;
         margin-bottom: 16px;
@@ -105,29 +105,29 @@
         gap: 10px;
         font-size: 18px;
         font-weight: 800;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         margin-bottom: 4px;
     }
 
     .guide-section h2 i {
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .guide-section h3 {
         font-size: 14.5px;
         font-weight: 800;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         margin: 16px 0 6px;
     }
 
     .guide-section p,
     .guide-section li {
         font-size: 14px;
-        color: #2f4a3a;
+        color: var(--fg-2f4a3a, #2f4a3a);
     }
 
     .guide-lead {
-        color: #5b7864 !important;
+        color: var(--fg-5b7864, #5b7864) !important;
         margin-bottom: 8px;
     }
 
@@ -145,8 +145,8 @@
         margin-left: auto;
         padding: 3px 9px;
         border-radius: 999px;
-        background: #edf7f2;
-        color: #1e7a4f;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e7a4f, #1e7a4f);
         font-size: 11px;
         font-weight: 800;
         text-transform: uppercase;
@@ -163,14 +163,14 @@
 
     .guide-tip {
         border-left: 4px solid #1e9e62;
-        background: #f3faf6;
-        color: #2f4a3a;
+        background: var(--bg-f3faf6, #f3faf6);
+        color: var(--fg-2f4a3a, #2f4a3a);
     }
 
     .guide-warn {
         border-left: 4px solid #d08a30;
-        background: #fdf7ee;
-        color: #5a4020;
+        background: var(--bg-fdf7ee, #fdf7ee);
+        color: var(--fg-5a4020, #5a4020);
     }
 
     .guide-link {
@@ -201,15 +201,15 @@
 
     .guide-status dt {
         font-weight: 800;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .guide-status dd {
-        color: #2f4a3a;
+        color: var(--fg-2f4a3a, #2f4a3a);
     }
 
     .guide-faq details {
-        border-top: 1px solid #eef2ee;
+        border-top: 1px solid var(--bd-eef2ee, #eef2ee);
         padding: 10px 0;
     }
 
@@ -221,7 +221,7 @@
         cursor: pointer;
         font-weight: 700;
         font-size: 14px;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .guide-faq details p {
@@ -230,10 +230,10 @@
 
     kbd {
         padding: 1px 6px;
-        border: 1px solid #c8d4cb;
+        border: 1px solid var(--bd-c8d4cb, #c8d4cb);
         border-bottom-width: 2px;
         border-radius: 5px;
-        background: #f8faf7;
+        background: var(--bg-f8faf7, #f8faf7);
         font-family: inherit;
         font-size: 12px;
     }
@@ -241,7 +241,7 @@
     .guide-footer {
         text-align: center;
         font-size: 13px;
-        color: #7a8a7f;
+        color: var(--fg-7a8a7f, #7a8a7f);
         margin: 8px 0 12px;
     }
 

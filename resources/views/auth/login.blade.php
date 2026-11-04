@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    @include('partials.theme')
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Login - Web-Based Mangrove Extent Mapping, Genus Classification, and Expert-Based Planting Suitability Recommendation System</title>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
@@ -18,10 +19,10 @@
             font-family: 'Manrope', system-ui, -apple-system, Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             display: flex;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             background: radial-gradient(900px 500px at 10% 10%, rgba(16, 185, 129, 0.12), transparent 55%),
                 radial-gradient(900px 500px at 90% 20%, rgba(59, 130, 246, 0.10), transparent 55%),
-                #f5f7f6;
+                var(--bg-f5f7f6, #f5f7f6);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
@@ -45,7 +46,7 @@
         }
 
         .login-card {
-            background: rgba(255, 255, 255, 0.82);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.82);
             border-radius: 18px;
             padding: 38px 34px;
             box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
@@ -73,7 +74,7 @@
             border-radius: 10px;
             padding: 8px 8px;
             cursor: pointer;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -88,7 +89,7 @@
         .back-btn:hover {
             border-color: #1e9e62;
             background: rgba(30, 158, 98, 0.08);
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
         }
 
         .back-btn:active {
@@ -98,13 +99,13 @@
         .logo-text {
             font-size: 24px;
             font-weight: 800;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             letter-spacing: -0.02em;
         }
 
         .login-subtitle {
             font-size: 12px;
-            color: #5b7864;
+            color: var(--fg-5b7864, #5b7864);
             margin-top: 8px;
             line-height: 1.45;
         }
@@ -117,7 +118,7 @@
             display: block;
             font-size: 12px;
             font-weight: 800;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
             margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -130,13 +131,13 @@
             border-radius: 12px;
             font-family: inherit;
             font-size: 14px;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             transition: all 0.2s ease;
-            background: rgba(255, 255, 255, 0.85);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.85);
         }
 
         .form-input:hover {
-            border-color: #c0e8d0;
+            border-color: var(--bd-c0e8d0, #c0e8d0);
         }
 
         .form-input:focus {
@@ -171,16 +172,16 @@
         .password-toggle svg {
             width: 20px;
             height: 20px;
-            color: #6b7280;
+            color: var(--fg-6b7280, #6b7280);
         }
 
         .password-toggle:hover svg {
-            color: #374151;
+            color: var(--fg-374151, #374151);
         }
 
         .error-message {
             font-size: 12px;
-            color: #d04030;
+            color: var(--fg-d04030, #d04030);
             margin-top: 6px;
             display: flex;
             align-items: center;
@@ -203,9 +204,9 @@
 
         .status-message {
             font-size: 13px;
-            color: #155724;
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
+            color: var(--fg-155724, #155724);
+            background: var(--bg-d4edda, #d4edda);
+            border: 1px solid var(--bd-c3e6cb, #c3e6cb);
             border-radius: 12px;
             padding: 14px 16px;
             margin-bottom: 18px;
@@ -257,7 +258,7 @@
             width: 16px;
             height: 16px;
             border: 2px solid rgba(255, 255, 255, 0.45);
-            border-top-color: #fff;
+            border-top-color: var(--bd-ffffff, #fff);
             border-radius: 50%;
             animation: submit-spin 0.7s linear infinite;
         }
@@ -280,14 +281,14 @@
         }
 
         .login-footer a {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
             text-decoration: none;
             font-weight: 600;
             transition: color 0.2s ease;
         }
 
         .login-footer a:hover {
-            color: #16a34a;
+            color: var(--fg-16a34a, #16a34a);
             text-decoration: underline;
         }
 
@@ -573,7 +574,7 @@
                 </form>
 
                 <div class="login-footer">
-                    <a href="{{ route('password.request') }}" style="display:block; margin-bottom:12px; color:#1e9e62; text-decoration:none; font-weight:600;">Forgot your password?</a>
+                    <a href="{{ route('password.request') }}" style="display:block; margin-bottom:12px; color:var(--fg-1e9e62, #1e9e62); text-decoration:none; font-weight:600;">Forgot your password?</a>
                     Don't have an account? <a href="/register" onclick="console.log('Register link clicked');">Create one here</a>
                 </div>
             </div>
@@ -635,6 +636,7 @@
             }
         });
     </script>
+    @include('partials.theme-toggle', ['floating' => true])
 </body>
 
 </html>

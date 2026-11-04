@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
+  @include('partials.theme')
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1e9e62">
   <meta name="mobile-web-app-capable" content="yes">
@@ -26,6 +27,7 @@
   {{-- Page-specific scripts --}}
   @yield('scripts')
   @stack('scripts')
+  @include('partials.theme-toggle', ['floating' => true])
 </body>
 
 </html>

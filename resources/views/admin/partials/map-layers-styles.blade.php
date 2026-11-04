@@ -13,15 +13,15 @@
     }
 
     .page-alert-success {
-        background: #ecf9f0;
-        color: #145a33;
-        border: 1px solid #b8e0c4;
+        background: var(--bg-ecf9f0, #ecf9f0);
+        color: var(--fg-145a33, #145a33);
+        border: 1px solid var(--bd-b8e0c4, #b8e0c4);
     }
 
     .page-alert-error {
-        background: #fdf0ee;
-        color: #d04030;
-        border: 1px solid #e8b8b0;
+        background: var(--bg-fdf0ee, #fdf0ee);
+        color: var(--fg-d04030, #d04030);
+        border: 1px solid var(--bd-e8b8b0, #e8b8b0);
     }
 
     .preview-label {
@@ -34,14 +34,14 @@
     .preview-map {
         height: 380px;
         border-radius: 10px;
-        border: 1px solid #e0e8e0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         z-index: 0;
     }
 
     .tabs {
         display: flex;
         gap: 4px;
-        border-bottom: 1px solid #e0e8e0;
+        border-bottom: 1px solid var(--bd-e0e8e0, #e0e8e0);
         margin-bottom: 18px;
     }
 
@@ -59,11 +59,11 @@
     }
 
     .tab:hover {
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .tab.active {
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
         border-bottom-color: #1e9e62;
     }
 
@@ -78,12 +78,12 @@
     .search-input,
     .filter-select {
         padding: 10px 14px;
-        border: 1px solid #e0e8e0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 8px;
         font-family: 'Manrope', sans-serif;
         font-size: 12px;
-        background: #fff;
-        color: #3a5a3a;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-3a5a3a, #3a5a3a);
     }
 
     .search-input {
@@ -103,7 +103,7 @@
     }
 
     .layer-row.previewing {
-        background: #edf7f2 !important;
+        background: var(--bg-edf7f2, #edf7f2) !important;
     }
 
     .clamp {
@@ -139,8 +139,8 @@
 
     .action-btn.delete:hover {
         border-color: #d04030;
-        background: #fdf0ee;
-        color: #d04030;
+        background: var(--bg-fdf0ee, #fdf0ee);
+        color: var(--fg-d04030, #d04030);
     }
 
     .empty-row {
@@ -159,19 +159,19 @@
 
     .pagination-btn {
         padding: 8px 16px;
-        border: 1px solid #e0e8e0;
-        background: #fff;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        background: var(--bg-ffffff, #fff);
         border-radius: 8px;
         font-size: 12px;
         font-weight: 600;
-        color: #3a5a3a;
+        color: var(--fg-3a5a3a, #3a5a3a);
         text-decoration: none;
     }
 
     a.pagination-btn:hover {
         border-color: #1e9e62;
-        background: #edf7f2;
-        color: #1e9e62;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .pagination-btn.disabled {
@@ -180,7 +180,7 @@
 
     .pagination-info {
         font-size: 12px;
-        color: #6a8a6a;
+        color: var(--fg-6a8a6a, #6a8a6a);
         font-weight: 500;
     }
 
@@ -202,7 +202,7 @@
 
     .layer-dialog {
         width: min(480px, calc(100vw - 32px));
-        border: 1px solid #e0e8e0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 14px;
         padding: 0;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
@@ -222,24 +222,24 @@
     .layer-dialog h3 {
         margin: 0 0 4px;
         font-size: 18px;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
     }
 
     .layer-dialog label {
         font-size: 12px;
         font-weight: 700;
-        color: #3a5a3a;
+        color: var(--fg-3a5a3a, #3a5a3a);
         margin-top: 6px;
     }
 
     .layer-dialog input,
     .layer-dialog textarea {
         padding: 10px 12px;
-        border: 1px solid #e0e8e0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 8px;
         font-family: 'Manrope', sans-serif;
         font-size: 13px;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         resize: vertical;
     }
 
@@ -254,7 +254,7 @@
         margin: 0;
         font-size: 12px;
         line-height: 1.5;
-        color: #6a8a6a;
+        color: var(--fg-6a8a6a, #6a8a6a);
     }
 
     .dialog-actions {

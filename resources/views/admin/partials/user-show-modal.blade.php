@@ -46,7 +46,7 @@
     </div>
 
     @if(isset($userActivities) && $userActivities->isNotEmpty())
-    <h4 style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#1a2e1a;">Recent activity</h4>
+    <h4 style="margin:16px 0 8px;font-size:13px;font-weight:700;color:var(--fg-1a2e1a, #1a2e1a);">Recent activity</h4>
     <div class="table-container">
         <table class="table">
             <thead>

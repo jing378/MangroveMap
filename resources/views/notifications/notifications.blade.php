@@ -43,14 +43,14 @@ if ($currentUser && $currentUser->role === 'admin') {
     .notifications-header h1 {
         font-size: 24px;
         font-weight: 800;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         display: flex;
         align-items: center;
         gap: 10px;
     }
 
     .notifications-header h1 i {
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .mark-all-read-btn {
@@ -58,10 +58,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         align-items: center;
         gap: 6px;
         padding: 8px 14px;
-        border: 1px solid #c8e6d4;
+        border: 1px solid var(--bd-c8e6d4, #c8e6d4);
         border-radius: 8px;
-        background: #fff;
-        color: #1e9e62;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-1e9e62, #1e9e62);
         font-size: 13px;
         font-weight: 600;
         cursor: pointer;
@@ -70,7 +70,7 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .mark-all-read-btn:hover {
-        background: #edf7f2;
+        background: var(--bg-edf7f2, #edf7f2);
         border-color: #1e9e62;
     }
 
@@ -79,10 +79,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         align-items: center;
         gap: 6px;
         padding: 8px 14px;
-        border: 1px solid #e0e8e0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 8px;
-        background: #fff;
-        color: #4b5f56;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-4b5f56, #4b5f56);
         font-size: 13px;
         font-weight: 600;
         cursor: pointer;
@@ -92,15 +92,15 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .back-btn:hover {
-        background: #f8fcfa;
+        background: var(--bg-f8fcfa, #f8fcfa);
         border-color: #1e9e62;
-        color: #1e9e62;
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .unread-banner {
-        background: #edf7f2;
-        border: 1px solid #c8e6d4;
-        color: #1a5c3a;
+        background: var(--bg-edf7f2, #edf7f2);
+        border: 1px solid var(--bd-c8e6d4, #c8e6d4);
+        color: var(--fg-1a5c3a, #1a5c3a);
         padding: 12px 16px;
         border-radius: 10px;
         margin-bottom: 20px;
@@ -111,8 +111,8 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .notification-card {
-        background: #fff;
-        border: 1px solid #e0e8e0;
+        background: var(--bg-ffffff, #fff);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 12px;
         padding: 16px;
         margin-bottom: 12px;
@@ -124,14 +124,14 @@ if ($currentUser && $currentUser->role === 'admin') {
 
     .notification-card.unread {
         border-left: 4px solid #1e9e62;
-        background: #f8fcfa;
+        background: var(--bg-f8fcfa, #f8fcfa);
     }
 
     .notification-card-icon {
         width: 40px;
         height: 40px;
         border-radius: 8px;
-        background: #edf7f2;
+        background: var(--bg-edf7f2, #edf7f2);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -147,24 +147,24 @@ if ($currentUser && $currentUser->role === 'admin') {
     .notification-card-title {
         font-size: 15px;
         font-weight: 700;
-        color: #1a2e1a;
+        color: var(--fg-1a2e1a, #1a2e1a);
         margin-bottom: 4px;
     }
 
     .notification-card.unread .notification-card-title {
-        color: #0d4a2d;
+        color: var(--fg-0d4a2d, #0d4a2d);
     }
 
     .notification-card-message {
         font-size: 13px;
-        color: #6a8a6a;
+        color: var(--fg-6a8a6a, #6a8a6a);
         line-height: 1.5;
         margin-bottom: 8px;
     }
 
     .notification-card-detail {
         font-size: 12px;
-        color: #4b5f56;
+        color: var(--fg-4b5f56, #4b5f56);
         margin: 2px 0 6px;
     }
 
@@ -185,10 +185,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         align-items: center;
         gap: 4px;
         padding: 6px 12px;
-        border: 1px solid #c8e6d4;
+        border: 1px solid var(--bd-c8e6d4, #c8e6d4);
         border-radius: 6px;
-        background: #fff;
-        color: #1e9e62;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-1e9e62, #1e9e62);
         font-size: 12px;
         font-weight: 600;
         cursor: pointer;
@@ -208,10 +208,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         align-items: center;
         gap: 4px;
         padding: 6px 12px;
-        border: 1px solid #f0d0d0;
+        border: 1px solid var(--bd-f0d0d0, #f0d0d0);
         border-radius: 6px;
-        background: #fff;
-        color: #d04030;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-d04030, #d04030);
         font-size: 12px;
         font-weight: 600;
         cursor: pointer;
@@ -221,7 +221,7 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .btn-delete:hover {
-        background: #fef2f2;
+        background: var(--bg-fef2f2, #fef2f2);
         border-color: #d04030;
     }
 
@@ -243,9 +243,9 @@ if ($currentUser && $currentUser->role === 'admin') {
         width: 100%;
         padding: 10px 14px;
         border-radius: 10px;
-        border: 1px solid #c8e6d4;
-        background: #fff;
-        color: #1e9e62;
+        border: 1px solid var(--bd-c8e6d4, #c8e6d4);
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-1e9e62, #1e9e62);
         cursor: pointer;
         font-size: 13px;
         font-weight: 700;
@@ -255,9 +255,9 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .btn-view-delineation:hover {
-        background: #edf7f2;
+        background: var(--bg-edf7f2, #edf7f2);
         border-color: #1e9e62;
-        color: #178a54;
+        color: var(--fg-178a54, #178a54);
     }
 
     .btn-approve,
@@ -289,20 +289,20 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .btn-reject {
-        background: #fff;
-        color: #d04030;
-        border: 1px solid #f0d0d0;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-d04030, #d04030);
+        border: 1px solid var(--bd-f0d0d0, #f0d0d0);
     }
 
     .btn-reject:hover {
-        background: #fef2f2;
+        background: var(--bg-fef2f2, #fef2f2);
     }
 
     .notification-reject-form {
         display: none;
-        background: #fff5f5;
+        background: var(--bg-fff5f5, #fff5f5);
         padding: 12px;
-        border: 1px solid #f7d6d6;
+        border: 1px solid var(--bd-f7d6d6, #f7d6d6);
         border-radius: 10px;
     }
 
@@ -315,7 +315,7 @@ if ($currentUser && $currentUser->role === 'admin') {
         min-height: 80px;
         margin-bottom: 10px;
         padding: 10px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--bd-e2e8f0, #e2e8f0);
         border-radius: 8px;
         resize: vertical;
         font-family: inherit;

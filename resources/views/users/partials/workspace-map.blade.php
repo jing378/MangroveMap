@@ -130,7 +130,7 @@
             @endif
             <div class="div"></div>
             <div id="delineationGenusEditor" style="margin-bottom:12px;">
-              <label style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Mangrove Genus Present</label>
+              <label style="display:block;font-size:12px;color:var(--fg-556b56, #556b56);margin-bottom:6px;">Mangrove Genus Present</label>
               <div id="genusQuickSelector" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                 <button type="button" class="genus-pill-btn" data-genus="Rhizophora" onclick="toggleGenusSelection('Rhizophora')"><i class="bi bi-plus"></i> Rhizophora <span class="genus-local-name">(Bakawan)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Avicennia" onclick="toggleGenusSelection('Avicennia')"><i class="bi bi-plus"></i> Avicennia <span class="genus-local-name">(Bungalon)</span></button>
@@ -142,7 +142,7 @@
               </div>
               <div style="display:flex;gap:6px;">
                 <input id="delineationCustomGenusInput" type="text"
-                  style="flex:1;padding:8px 10px;border:1px solid #d4dfd4;border-radius:8px;background:#f8faf7;color:#182918;font-size:12px;"
+                  style="flex:1;padding:8px 10px;border:1px solid var(--bd-d4dfd4, #d4dfd4);border-radius:8px;background:var(--bg-f8faf7, #f8faf7);color:var(--fg-182918, #182918);font-size:12px;"
                   placeholder="Or type other genus and press Enter..." />
                 <button type="button" id="addCustomGenusBtn" onclick="addCustomGenusFromInput()" class="btn btn-g" style="padding:7px 12px;font-size:12px;border-radius:8px;white-space:nowrap;">
                   <i class="bi bi-plus-lg"></i> Add
@@ -152,9 +152,9 @@
             </div>
             <div id="delineationNotesEditor" style="margin-bottom:12px;">
               <label for="delineationNotes"
-                style="display:block;font-size:12px;color:#556b56;margin-bottom:6px;">Notes</label>
+                style="display:block;font-size:12px;color:var(--fg-556b56, #556b56);margin-bottom:6px;">Notes</label>
               <textarea id="delineationNotes" rows="4"
-                style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;overflow-y:auto;"
+                style="width:100%;padding:10px;border:1px solid var(--bd-d4dfd4, #d4dfd4);border-radius:10px;background:var(--bg-f8faf7, #f8faf7);color:var(--fg-182918, #182918);resize:none;overflow-y:auto;"
                 placeholder="Fill in information about this delineated feature"></textarea>
             </div>
             @if(Auth::user()->isExpert())
@@ -162,7 +162,7 @@
                 <div class="div"></div>
                 <div id="expertRejectionNotesSection" style="display:none;margin-bottom:8px;">
                   <textarea id="expertRejectionNotes" rows="3" aria-label="Rejection notes (required)"
-                    style="width:100%;padding:10px;border:1px solid #d4dfd4;border-radius:10px;background:#f8faf7;color:#182918;resize:none;"
+                    style="width:100%;padding:10px;border:1px solid var(--bd-d4dfd4, #d4dfd4);border-radius:10px;background:var(--bg-f8faf7, #f8faf7);color:var(--fg-182918, #182918);resize:none;"
                     placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:8px;">
@@ -171,7 +171,7 @@
                     <i class="bi bi-check-circle"></i> Approve
                   </button>
                   <button type="button" id="expertRejectBtn" class="btn"
-                    style="flex:1;min-width:0;padding:8px 4px;font-size:12px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;">
+                    style="flex:1;min-width:0;padding:8px 4px;font-size:12px;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);">
                     <i class="bi bi-x-circle"></i> Reject
                   </button>
                 </div>
@@ -245,7 +245,7 @@
             </button>
           </div>
           <button id="removeDelineationBtn" class="btn"
-            style="width:100%;margin-top:8px;margin-bottom:14px;background:#fdf0ee;color:#d04030;border-color:#e8b8b0;"
+            style="width:100%;margin-top:8px;margin-bottom:14px;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);"
             onclick="window.removeCurrentDelineation()">Remove delineation</button>
           <div id="zoneDetailsContent">
             <div class="d-card">
@@ -258,12 +258,12 @@
             @if (Auth::user()->isExpert())
             <div class="div"></div>
             <div class="sec" id="genusDistributionTitle">Genus Distribution</div>
-            <div id="genusDistributionEmpty" style="font-size:11px;color:#6a8a6a;margin-bottom:8px;">No verified genus data for this zone.</div>
+            <div id="genusDistributionEmpty" style="font-size:11px;color:var(--fg-6a8a6a, #6a8a6a);margin-bottom:8px;">No verified genus data for this zone.</div>
             <div class="cw" style="height:148px"><canvas id="pieC"></canvas></div>
             <div class="div"></div>
             <div class="div"></div>
             <div class="sec">Coverage Trend (ha)</div>
-            <div id="coverageTrendEmpty" style="font-size:11px;color:#6a8a6a;margin-bottom:8px;">No annual measurements for this zone.</div>
+            <div id="coverageTrendEmpty" style="font-size:11px;color:var(--fg-6a8a6a, #6a8a6a);margin-bottom:8px;">No annual measurements for this zone.</div>
             <div class="cw" style="height:108px"><canvas id="trendC"></canvas></div>
             @endif
           </div>

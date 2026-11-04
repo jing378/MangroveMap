@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
+  @include('partials.theme')
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#144a2b">
   <meta name="mobile-web-app-capable" content="yes">
@@ -53,13 +54,29 @@
       --radius-xl: 28px;
     }
 
+    /* Dark theme (partials.theme). These variables are only used for text, borders and one tint. */
+    html[data-theme="dark"] {
+      --primary-forest: #d8efe2;
+      --primary-dark: #9fe0bd;
+      --primary-mint: #173326;
+      --earth-sand: #161f1a;
+      --earth-border: #2a3a31;
+      --earth-card: #16211b;
+      --text-dark: #e3ece6;
+      --text-muted: #a3b9ab;
+      --text-subtle: #84998c;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+      --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
+
     html {
       scroll-behavior: smooth;
     }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: #f7faf7;
+      background-color: var(--bg-f7faf7, #f7faf7);
       color: var(--text-dark);
       line-height: 1.5;
       min-height: 100vh;
@@ -75,7 +92,7 @@
       top: 0;
       width: 100%;
       height: 68px;
-      background: rgba(255, 255, 255, 0.96);
+      background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.96);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(30, 158, 98, 0.18);
@@ -153,7 +170,7 @@
       text-decoration: none;
       font-size: 14px;
       font-weight: 500;
-      color: #375342;
+      color: var(--fg-375342, #375342);
       transition: color 0.15s ease;
       display: flex;
       align-items: center;
@@ -197,7 +214,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: #f0f7f2;
+      background: var(--bg-f0f7f2, #f0f7f2);
       color: var(--primary-dark) !important;
       font-size: 13.5px;
       font-weight: 600;
@@ -209,7 +226,7 @@
     }
 
     .nav-btn-login:hover {
-      background: #e3f2e8;
+      background: var(--bg-e3f2e8, #e3f2e8);
       border-color: var(--primary-green);
     }
 
@@ -304,7 +321,7 @@
     }
 
     .hero-title-highlight {
-      background: linear-gradient(120deg, #4ade80 0%, #22c55e 50%, #86efac 100%);
+      background: linear-gradient(120deg, #4ade80 0%, #22c55e 50%, var(--bg-86efac, #86efac) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       display: inline-block;
@@ -375,7 +392,7 @@
 
     .btn-hero-secondary:hover {
       background: rgba(255, 255, 255, 0.22);
-      border-color: rgba(255, 255, 255, 0.5);
+      border-color: rgba(var(--bd-ffffff-rgb, 255, 255, 255), 0.5);
       transform: translateY(-2px);
       color: #ffffff;
     }
@@ -419,7 +436,7 @@
     }
 
     .stat-val span {
-      color: #4ade80;
+      color: var(--fg-4ade80, #4ade80);
       font-size: 0.75em;
       margin-left: 2px;
     }
@@ -484,7 +501,7 @@
     }
 
     .feature-card {
-      background: #ffffff;
+      background: var(--bg-ffffff, #ffffff);
       border: 1px solid var(--earth-border);
       border-radius: var(--radius-lg);
       padding: 34px 28px;
@@ -522,7 +539,7 @@
       width: 58px;
       height: 58px;
       border-radius: var(--radius-md);
-      background: linear-gradient(135deg, #eaf6ef 0%, #d8eee1 100%);
+      background: linear-gradient(135deg, var(--bg-eaf6ef, #eaf6ef) 0%, var(--bg-d8eee1, #d8eee1) 100%);
       border: 1px solid rgba(30, 158, 98, 0.2);
       display: flex;
       align-items: center;
@@ -560,14 +577,14 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      border-top: 1px solid #f0f4f0;
+      border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
       padding-top: 18px;
     }
 
     .feature-points li {
       font-size: 13px;
       font-weight: 500;
-      color: #3b5445;
+      color: var(--fg-3b5445, #3b5445);
       display: flex;
       align-items: center;
       gap: 9px;
@@ -580,7 +597,7 @@
 
     /* Interactive GIS Map Section Frame */
     .map-section {
-      background: #ffffff;
+      background: var(--bg-ffffff, #ffffff);
       border-top: 1px solid var(--earth-border);
       border-bottom: 1px solid var(--earth-border);
       padding: 70px 24px 80px 24px;
@@ -592,7 +609,7 @@
     }
 
     .map-browser-frame {
-      background: #ffffff;
+      background: var(--bg-ffffff, #ffffff);
       border: 1px solid rgba(30, 158, 98, 0.22);
       border-radius: var(--radius-xl);
       box-shadow: 0 18px 50px rgba(14, 56, 32, 0.12);
@@ -602,8 +619,8 @@
     }
 
     .map-frame-toolbar {
-      background: #f7faf8;
-      border-bottom: 1px solid #e0ebe2;
+      background: var(--bg-f7faf8, #f7faf8);
+      border-bottom: 1px solid var(--bd-e0ebe2, #e0ebe2);
       padding: 14px 20px;
       display: flex;
       align-items: center;
@@ -622,13 +639,13 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: #e6f6ee;
-      border: 1px solid #bce6cf;
+      background: var(--bg-e6f6ee, #e6f6ee);
+      border: 1px solid var(--bd-bce6cf, #bce6cf);
       padding: 4px 10px;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 600;
-      color: #147a46;
+      color: var(--fg-147a46, #147a46);
     }
 
     .live-status-pill .indicator-dot {
@@ -655,9 +672,9 @@
       font-family: inherit;
       font-size: 13px;
       font-weight: 600;
-      border: 1px solid #cedecf;
-      background: #ffffff;
-      color: #3d5e49;
+      border: 1px solid var(--bd-cedecf, #cedecf);
+      background: var(--bg-ffffff, #ffffff);
+      color: var(--fg-3d5e49, #3d5e49);
       padding: 6px 14px;
       border-radius: var(--radius-sm);
       cursor: pointer;
@@ -668,7 +685,7 @@
     }
 
     .view-switch-btn:hover {
-      background: #edf6f0;
+      background: var(--bg-edf6f0, #edf6f0);
       border-color: var(--primary-green);
     }
 
@@ -689,9 +706,9 @@
       font-family: inherit;
       font-size: 13px;
       font-weight: 500;
-      border: 1px solid #d5e5d8;
-      background: #ffffff;
-      color: #3b5847;
+      border: 1px solid var(--bd-d5e5d8, #d5e5d8);
+      background: var(--bg-ffffff, #ffffff);
+      color: var(--fg-3b5847, #3b5847);
       padding: 6px 12px;
       border-radius: var(--radius-sm);
       cursor: pointer;
@@ -703,7 +720,7 @@
     }
 
     .map-action-btn:hover {
-      background: #eef6f0;
+      background: var(--bg-eef6f0, #eef6f0);
       color: var(--primary-forest);
       border-color: var(--primary-green);
     }
@@ -713,7 +730,7 @@
       position: relative;
       width: 100%;
       height: 720px;
-      background: #eaf1eb;
+      background: var(--bg-eaf1eb, #eaf1eb);
       overflow: hidden;
       display: flex;
     }
@@ -752,7 +769,7 @@
     #mainMap {
       width: 100%;
       height: 100%;
-      background: #d8e5db;
+      background: var(--bg-d8e5db, #d8e5db);
     }
 
     /* Constrain Leaflet Controls safely below Header Banner */
@@ -772,7 +789,7 @@
     }
 
     .app-embed .leaflet-control-zoom a {
-      background: #ffffff !important;
+      background: var(--bg-ffffff, #ffffff) !important;
       color: var(--primary-forest) !important;
       font-weight: 700 !important;
       width: 32px !important;
@@ -782,7 +799,7 @@
     }
 
     .app-embed .leaflet-control-zoom a:hover {
-      background: #eef7f2 !important;
+      background: var(--bg-eef7f2, #eef7f2) !important;
       color: var(--primary-green) !important;
     }
 
@@ -792,7 +809,7 @@
       bottom: 24px;
       left: 18px;
       z-index: 450 !important;
-      background: rgba(255, 255, 255, 0.94);
+      background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.94);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       border: 1px solid rgba(30, 158, 98, 0.25);
@@ -817,7 +834,7 @@
       font-size: 12.5px;
       font-weight: 500;
       margin: 4px 0;
-      color: #244130;
+      color: var(--fg-244130, #244130);
     }
 
     .leg-dot {
@@ -871,12 +888,12 @@
     }
 
     .leg-toggle small {
-      color: #6a8a6a;
+      color: var(--fg-6a8a6a, #6a8a6a);
       font-size: 11px;
     }
 
     .leg-pin {
-      color: #1e9e62;
+      color: var(--fg-1e9e62, #1e9e62);
       font-size: 14px;
       width: 12px;
       text-align: center;
@@ -888,9 +905,9 @@
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: #fff;
+      background: var(--bg-ffffff, #fff);
       border: 2px solid #7cb342;
-      color: #7cb342;
+      color: var(--fg-7cb342, #7cb342);
       font-size: 9px;
     }
 
@@ -899,7 +916,7 @@
       gap: 3px;
       margin: 4px 0 0 22px;
       font-size: 11px;
-      color: #4a6a4a;
+      color: var(--fg-4a6a4a, #4a6a4a);
     }
 
     .leg-suitability span {
@@ -931,8 +948,8 @@
     .map-pin i {
       font-size: 30px;
       line-height: 1;
-      color: #1e9e62;
-      -webkit-text-stroke: 1px #fff;
+      color: var(--fg-1e9e62, #1e9e62);
+      -webkit-text-stroke: 1px var(--bg-ffffff, #fff);
     }
 
     /* Planting recommendation marker, colored by suitability */
@@ -942,7 +959,7 @@
       width: 26px;
       height: 26px;
       border-radius: 50%;
-      background: #fff;
+      background: var(--bg-ffffff, #fff);
       border: 2.5px solid var(--rec-color, #7a9a7a);
       color: var(--rec-color, #7a9a7a);
       font-size: 13px;
@@ -951,7 +968,7 @@
 
     .rec-popup {
       font-size: 12.5px;
-      color: #2f4a3a;
+      color: var(--fg-2f4a3a, #2f4a3a);
       line-height: 1.45;
       min-width: 200px;
     }
@@ -983,18 +1000,18 @@
     }
 
     .d-rec {
-      border: 1px solid #e0ece4;
+      border: 1px solid var(--bd-e0ece4, #e0ece4);
       border-left: 4px solid var(--rec-color, #7a9a7a);
       border-radius: 8px;
       padding: 8px 10px;
       margin-bottom: 8px;
       font-size: 12px;
-      color: #2f4a3a;
+      color: var(--fg-2f4a3a, #2f4a3a);
     }
 
     .d-rec strong {
       display: block;
-      color: var(--rec-color, #1a3324);
+      color: var(--rec-color, var(--fg-1a3324, #1a3324));
       margin-bottom: 4px;
     }
 
@@ -1011,7 +1028,7 @@
       z-index: 450 !important;
       display: inline-flex;
       flex-direction: column;
-      background: rgba(255, 255, 255, 0.96);
+      background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.96);
       border: 1px solid rgba(30, 158, 98, 0.28);
       border-radius: var(--radius-sm);
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
@@ -1026,7 +1043,7 @@
       justify-content: center;
       width: 40px;
       height: 38px;
-      background: #ffffff;
+      background: var(--bg-ffffff, #ffffff);
       color: var(--primary-forest);
       font-size: 18px;
       border-radius: var(--radius-sm);
@@ -1034,7 +1051,7 @@
     }
 
     .map-layer-control > button:hover {
-      background: #eef7f2;
+      background: var(--bg-eef7f2, #eef7f2);
       color: var(--primary-green);
     }
 
@@ -1046,7 +1063,7 @@
       flex-direction: column;
       min-width: 140px;
       margin-right: 6px;
-      background: #ffffff;
+      background: var(--bg-ffffff, #ffffff);
       border: 1px solid rgba(30, 158, 98, 0.25);
       border-radius: var(--radius-sm);
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
@@ -1063,7 +1080,7 @@
       font-size: 12.5px;
       font-weight: 500;
       text-align: left;
-      color: #375342;
+      color: var(--fg-375342, #375342);
       padding: 8px 10px;
       border-radius: 6px;
       border: none;
@@ -1073,12 +1090,12 @@
     }
 
     .layer-option:hover {
-      background: #eef7f2;
+      background: var(--bg-eef7f2, #eef7f2);
       color: var(--primary-forest);
     }
 
     .layer-option.active {
-      background: #e4f5eb;
+      background: var(--bg-e4f5eb, #e4f5eb);
       color: var(--primary-green);
       font-weight: 700;
     }
@@ -1092,8 +1109,8 @@
       width: 360px;
       max-width: 92vw;
       height: 100%;
-      background: #ffffff;
-      border-left: 1px solid #d5e5d8;
+      background: var(--bg-ffffff, #ffffff);
+      border-left: 1px solid var(--bd-d5e5d8, #d5e5d8);
       box-shadow: -6px 0 28px rgba(0, 0, 0, 0.15);
       z-index: 500 !important;
       display: flex;
@@ -1123,14 +1140,14 @@
       position: absolute;
       top: 16px;
       right: 16px;
-      background: #f0f5f1;
-      border: 1px solid #d8e5dc;
+      background: var(--bg-f0f5f1, #f0f5f1);
+      border: 1px solid var(--bd-d8e5dc, #d8e5dc);
       border-radius: 50%;
       width: 32px;
       height: 32px;
       font-size: 14px;
       cursor: pointer;
-      color: #4b6655;
+      color: var(--fg-4b6655, #4b6655);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1139,7 +1156,7 @@
     }
 
     .panel-close-btn:hover {
-      background: #e2ece5;
+      background: var(--bg-e2ece5, #e2ece5);
       color: var(--primary-forest);
     }
 
@@ -1148,13 +1165,13 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #5d7e6c;
+      color: var(--fg-5d7e6c, #5d7e6c);
       margin-bottom: 12px;
     }
 
     .d-card {
-      background: #f8faf8;
-      border: 1px solid #e0ebe2;
+      background: var(--bg-f8faf8, #f8faf8);
+      border: 1px solid var(--bd-e0ebe2, #e0ebe2);
       border-radius: var(--radius-md);
       padding: 16px;
       margin-bottom: 16px;
@@ -1172,7 +1189,7 @@
       justify-content: space-between;
       font-size: 13px;
       padding: 6px 0;
-      border-bottom: 1px solid #edf4ef;
+      border-bottom: 1px solid var(--bd-edf4ef, #edf4ef);
     }
 
     .d-row:last-child {
@@ -1180,12 +1197,12 @@
     }
 
     .d-key {
-      color: #6a8c79;
+      color: var(--fg-6a8c79, #6a8c79);
     }
 
     .d-val {
       font-weight: 600;
-      color: #1a3324;
+      color: var(--fg-1a3324, #1a3324);
       text-align: right;
     }
 
@@ -1199,16 +1216,16 @@
     .d-genera span {
       padding: 4px 10px;
       border-radius: 999px;
-      background: #edf7f2;
-      border: 1px solid #bce6cf;
-      color: #147a46;
+      background: var(--bg-edf7f2, #edf7f2);
+      border: 1px solid var(--bd-bce6cf, #bce6cf);
+      color: var(--fg-147a46, #147a46);
       font-size: 12px;
       font-weight: 700;
     }
 
     .d-empty {
       font-size: 12px;
-      color: #6a8a6a;
+      color: var(--fg-6a8a6a, #6a8a6a);
       margin-bottom: 6px;
     }
 
@@ -1222,19 +1239,19 @@
     }
 
     .tg {
-      background: #edf7f2;
-      border-color: #b0e0c0;
-      color: #1e9e62;
+      background: var(--bg-edf7f2, #edf7f2);
+      border-color: var(--bd-b0e0c0, #b0e0c0);
+      color: var(--fg-1e9e62, #1e9e62);
     }
 
     .tb {
-      background: #eef4ff;
-      border-color: #b0c8f0;
-      color: #3060b0;
+      background: var(--bg-eef4ff, #eef4ff);
+      border-color: var(--bd-b0c8f0, #b0c8f0);
+      color: var(--fg-3060b0, #3060b0);
     }
 
     .div {
-      border-top: 1px solid #e8efe9;
+      border-top: 1px solid var(--bd-e8efe9, #e8efe9);
       margin: 16px 0;
     }
 
@@ -1277,7 +1294,7 @@
 
     .impact-icon {
       font-size: 28px;
-      color: #4ade80;
+      color: var(--fg-4ade80, #4ade80);
       margin-bottom: 16px;
     }
 
@@ -1340,7 +1357,7 @@
     }
 
     .footer-nav a:hover {
-      color: #4ade80;
+      color: var(--fg-4ade80, #4ade80);
     }
 
     .footer-bottom {
@@ -1389,7 +1406,7 @@
       top: 68px;
       left: 0;
       right: 0;
-      background: #ffffff;
+      background: var(--bg-ffffff, #ffffff);
       border-bottom: 1px solid var(--earth-border);
       padding: 20px 24px;
       flex-direction: column;
@@ -1408,7 +1425,7 @@
       font-size: 16px;
       font-weight: 600;
       padding: 8px 0;
-      border-bottom: 1px solid #f0f4f0;
+      border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
     }
 
     /* Responsive Media Queries */
@@ -1534,6 +1551,8 @@
           <i class="bi bi-box-arrow-in-right"></i> Login
         </a>
       @endguest
+
+      @include('partials.theme-toggle')
 
       <!-- Mobile Hamburger Toggle -->
       <button class="nav-mobile-toggle" id="mobileMenuBtn" aria-label="Toggle navigation menu">
@@ -1697,7 +1716,7 @@
               <i class="bi bi-layers"></i> Basemap
             </button>
             @auth
-              <a href="{{ route('map') }}" class="map-action-btn" style="background:#eef7f2; border-color:#bce6cf; color:#147a46; font-weight:600;">
+              <a href="{{ route('map') }}" class="map-action-btn" style="background:var(--bg-eef7f2, #eef7f2); border-color:var(--bd-bce6cf, #bce6cf); color:var(--fg-147a46, #147a46); font-weight:600;">
                 <i class="bi bi-pencil-square"></i> Open Full Editor
               </a>
             @else
@@ -1796,7 +1815,7 @@
                     </div>
                     <div class="d-row" id="dNotesRow" style="flex-direction: column; align-items: flex-start; gap: 4px;">
                       <span class="d-key">Notes</span>
-                      <span class="d-val" id="dNotes" style="font-weight: 400; font-size: 12px; color: #3a5a3a; line-height: 1.4; word-break: break-word;">-</span>
+                      <span class="d-val" id="dNotes" style="font-weight: 400; font-size: 12px; color: var(--fg-3a5a3a, #3a5a3a); line-height: 1.4; word-break: break-word;">-</span>
                     </div>
                   </div>
                   <div class="div"></div>

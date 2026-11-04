@@ -143,12 +143,12 @@
     .search-input,
     .filter-select {
         padding: 10px 14px;
-        border: 1px solid #e0e8e0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 8px;
         font-family: 'Manrope', sans-serif;
         font-size: 12px;
-        background: #fff;
-        color: #3a5a3a;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-3a5a3a, #3a5a3a);
     }
 
     .search-input {
@@ -189,10 +189,10 @@
         padding: 6px 12px;
         margin-bottom: 16px;
         border-radius: 999px;
-        background: #edf7f2;
-        border: 1px solid #b0e0c0;
+        background: var(--bg-edf7f2, #edf7f2);
+        border: 1px solid var(--bd-b0e0c0, #b0e0c0);
         font-size: 12px;
-        color: #145a33;
+        color: var(--fg-145a33, #145a33);
     }
 
     .filter-chip a {
@@ -231,19 +231,19 @@
 
     .pagination-btn {
         padding: 8px 16px;
-        border: 1px solid #e0e8e0;
-        background: #fff;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        background: var(--bg-ffffff, #fff);
         border-radius: 8px;
         font-size: 12px;
         font-weight: 600;
-        color: #3a5a3a;
+        color: var(--fg-3a5a3a, #3a5a3a);
         text-decoration: none;
     }
 
     a.pagination-btn:hover {
         border-color: #1e9e62;
-        background: #edf7f2;
-        color: #1e9e62;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
     }
 
     .pagination-btn.disabled {
@@ -253,7 +253,7 @@
 
     .pagination-info {
         font-size: 12px;
-        color: #6a8a6a;
+        color: var(--fg-6a8a6a, #6a8a6a);
         font-weight: 500;
     }
 

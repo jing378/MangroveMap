@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    @include('partials.theme')
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Register - Web-Based Mangrove Extent Mapping, Genus Classification, and Expert-Based Planting Suitability Recommendation System</title>
     <link rel="icon" type="image/png" href="/icon-192.png" />
@@ -26,10 +27,10 @@
             height: 100vh;
             height: 100dvh;
             display: flex;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             background: radial-gradient(900px 500px at 10% 10%, rgba(16, 185, 129, 0.12), transparent 55%),
                 radial-gradient(900px 500px at 90% 20%, rgba(59, 130, 246, 0.10), transparent 55%),
-                #f5f7f6;
+                var(--bg-f5f7f6, #f5f7f6);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
@@ -62,7 +63,7 @@
         }
 
         .register-card {
-            background: rgba(255, 255, 255, 0.82);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.82);
             border-radius: 18px;
             padding: 28px 30px 24px;
             box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
@@ -90,7 +91,7 @@
             border-radius: 10px;
             padding: 8px 8px;
             cursor: pointer;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -105,7 +106,7 @@
         .back-btn:hover {
             border-color: #1e9e62;
             background: rgba(30, 158, 98, 0.08);
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
         }
 
         .back-btn:active {
@@ -115,13 +116,13 @@
         .logo-text {
             font-size: 24px;
             font-weight: 800;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             letter-spacing: -0.02em;
         }
 
         .register-subtitle {
             font-size: 12px;
-            color: #5b7864;
+            color: var(--fg-5b7864, #5b7864);
             margin-top: 0;
             line-height: 1.45;
         }
@@ -134,7 +135,7 @@
             display: block;
             font-size: 12px;
             font-weight: 800;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
             margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -147,13 +148,13 @@
             border-radius: 12px;
             font-family: inherit;
             font-size: 14px;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             transition: all 0.2s ease;
-            background: rgba(255, 255, 255, 0.85);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.85);
         }
 
         .form-input:hover {
-            border-color: #c0e8d0;
+            border-color: var(--bd-c0e8d0, #c0e8d0);
         }
 
         .form-input:focus {
@@ -190,7 +191,7 @@
             grid-template-columns: 1fr 1fr;
             gap: 4px 12px;
             font-size: 11.5px;
-            color: #7a8a7f;
+            color: var(--fg-7a8a7f, #7a8a7f);
         }
 
         .password-rules.is-visible {
@@ -215,12 +216,12 @@
             height: 12px;
             flex: none;
             border-radius: 50%;
-            border: 1.5px solid #b8c4bc;
+            border: 1.5px solid var(--bd-b8c4bc, #b8c4bc);
             box-sizing: border-box;
         }
 
         .password-rules li.met {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
         }
 
         .password-rules li.met::before {
@@ -229,7 +230,7 @@
         }
 
         .password-rules li.unmet {
-            color: #d04030;
+            color: var(--fg-d04030, #d04030);
         }
 
         .password-rules li.unmet::before {
@@ -303,7 +304,7 @@
             transform: translateY(-50%);
             font-size: 14px;
             font-weight: 700;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             pointer-events: none;
             user-select: none;
         }
@@ -331,11 +332,11 @@
         .password-toggle svg {
             width: 20px;
             height: 20px;
-            color: #6b7280;
+            color: var(--fg-6b7280, #6b7280);
         }
 
         .password-toggle:hover svg {
-            color: #374151;
+            color: var(--fg-374151, #374151);
         }
 
         .form-input.error-input {
@@ -350,7 +351,7 @@
 
         .error-message {
             font-size: 12px;
-            color: #d04030;
+            color: var(--fg-d04030, #d04030);
             margin-top: 6px;
             display: flex;
             align-items: center;
@@ -383,7 +384,7 @@
             border: 1.5px solid rgba(148, 163, 184, 0.45);
             border-radius: 12px;
             padding: 12px 13px;
-            background: rgba(255, 255, 255, 0.6);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.6);
         }
 
         .expert-apply-toggle {
@@ -404,14 +405,14 @@
         .expert-apply-toggle strong {
             display: block;
             font-size: 13px;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
         }
 
         .expert-apply-toggle small {
             display: block;
             font-size: 11.5px;
             line-height: 1.45;
-            color: #5b7864;
+            color: var(--fg-5b7864, #5b7864);
             margin-top: 2px;
         }
 
@@ -444,7 +445,7 @@
             cursor: pointer;
             font-size: 12.5px;
             line-height: 1.45;
-            color: #365a45;
+            color: var(--fg-365a45, #365a45);
         }
 
         .terms-agree-toggle input {
@@ -456,7 +457,7 @@
         }
 
         .terms-agree-toggle a {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
             font-weight: 700;
         }
 
@@ -505,7 +506,7 @@
             width: 16px;
             height: 16px;
             border: 2px solid rgba(255, 255, 255, 0.45);
-            border-top-color: #fff;
+            border-top-color: var(--bd-ffffff, #fff);
             border-radius: 50%;
             animation: submit-spin 0.7s linear infinite;
         }
@@ -528,14 +529,14 @@
         }
 
         .register-footer a {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
             text-decoration: none;
             font-weight: 600;
             transition: color 0.2s ease;
         }
 
         .register-footer a:hover {
-            color: #16a34a;
+            color: var(--fg-16a34a, #16a34a);
             text-decoration: underline;
         }
 
@@ -764,7 +765,7 @@
         }
 
         .loading-content {
-            background: #fff;
+            background: var(--bg-ffffff, #fff);
             border-radius: 18px;
             padding: 48px 40px;
             max-width: 420px;
@@ -789,7 +790,7 @@
         .loading-spinner {
             width: 60px;
             height: 60px;
-            border: 4px solid #e0e8e0;
+            border: 4px solid var(--bd-e0e8e0, #e0e8e0);
             border-top-color: #1e9e62;
             border-radius: 50%;
             margin: 0 auto 24px;
@@ -805,7 +806,7 @@
         .loading-title {
             font-size: 22px;
             font-weight: 800;
-            color: #1a2e1a;
+            color: var(--fg-1a2e1a, #1a2e1a);
             margin-bottom: 12px;
         }
 
@@ -817,17 +818,17 @@
         }
 
         .loading-info {
-            background: #edf7f2;
-            border: 1px solid #b0e0c0;
+            background: var(--bg-edf7f2, #edf7f2);
+            border: 1px solid var(--bd-b0e0c0, #b0e0c0);
             border-radius: 10px;
             padding: 16px;
             font-size: 12px;
-            color: #3a5a3a;
+            color: var(--fg-3a5a3a, #3a5a3a);
             line-height: 1.6;
         }
 
         .loading-info strong {
-            color: #1e9e62;
+            color: var(--fg-1e9e62, #1e9e62);
             display: block;
             margin-bottom: 6px;
         }
@@ -1401,6 +1402,7 @@
                 });
         });
     </script>
+    @include('partials.theme-toggle', ['floating' => true])
 </body>
 
 </html>
