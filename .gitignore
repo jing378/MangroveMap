@@ -44,4 +44,29 @@ bootstrap/cache/
 
 # Editor language-server helper files
 /storage/framework/lsp-*.php
-/tile
+/tiles/
+
+# Secrets / credentials
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+credentials.json
+service-account*.json
+/.claude/settings.local.json
+
+# Local databases
+*.sqlite
+*.sqlite3
+
+# Private uploads (keep the .gitignore placeholders Laravel ships)
+/storage/app/private/*
+!/storage/app/private/.gitignore
+
+# Stray local dumps / logs
+/dlf
+recent-laravel-log.txt
+*.log.txt
