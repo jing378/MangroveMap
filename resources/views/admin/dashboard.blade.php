@@ -347,6 +347,36 @@
             padding: 16px;
             margin-bottom: 16px;
         }
+
+        .stat-card {
+            padding: 14px;
+            min-width: 0;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            margin-bottom: 4px;
+            overflow-wrap: anywhere;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            margin-bottom: 6px;
+        }
+
+        .stat-change {
+            font-size: 11px;
+        }
+
+        .section-title {
+            flex-wrap: wrap;
+        }
+    }
+
+    @media (max-width: 360px) {
+        .grid.cols-4 {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 @endsection

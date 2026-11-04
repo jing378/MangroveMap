@@ -69,11 +69,12 @@
     /* KPI Grid */
     .kpi-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
         gap: 16px;
     }
 
     .kpi-card {
+        min-width: 0;
         background: #fff;
         border: 1px solid #e0e8e0;
         border-radius: 12px;
@@ -98,6 +99,7 @@
 
     .kpi-info {
         flex: 1;
+        min-width: 0;
     }
 
     .kpi-val {
@@ -129,11 +131,12 @@
     /* Visual Charts Section */
     .charts-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
         gap: 20px;
     }
 
     .chart-card {
+        min-width: 0;
         background: #fff;
         border: 1px solid #e0e8e0;
         border-radius: 14px;
@@ -329,14 +332,88 @@
     }
 
     @media (max-width: 768px) {
+        .dash-container {
+            gap: 18px;
+        }
+
         .dash-hero {
-            padding: 24px;
+            padding: 22px 20px;
+        }
+
+        .hero-content h1 {
+            font-size: 21px;
+            overflow-wrap: anywhere;
+        }
+
+        .hero-content p {
+            font-size: 13px;
         }
 
         .contributor-role {
             display: none;
         }
+
+        /* KPI cards: compact 2-column tiles, icon above text */
+        .kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .kpi-card {
+            flex-direction: column;
+            gap: 10px;
+            padding: 14px;
+        }
+
+        .kpi-card:last-child:nth-child(odd) {
+            grid-column: 1 / -1;
+        }
+
+        .kpi-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 17px;
+        }
+
+        .kpi-val {
+            font-size: 19px;
+            overflow-wrap: anywhere;
+        }
+
+        .kpi-badge {
+            white-space: normal;
+            line-height: 1.35;
+        }
+
         .charts-grid {
+            grid-template-columns: 1fr;
+            gap: 18px;
+        }
+
+        .chart-card,
+        .table-card {
+            padding: 16px;
+        }
+
+        .chart-header,
+        .table-header {
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .chart-canvas-wrap {
+            height: 220px;
+        }
+
+        .contributor-row {
+            gap: 10px;
+            padding: 10px 8px;
+        }
+    }
+
+    @media (max-width: 360px) {
+        .kpi-grid {
             grid-template-columns: 1fr;
         }
     }
