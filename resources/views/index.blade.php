@@ -1820,6 +1820,13 @@
                       <span class="leg-rec-icon"><i class="bi bi-flower1" aria-hidden="true"></i></span>
                       Planting recommendations <small>({{ count($plantingRecommendations ?? []) }})</small>
                     </label>
+                    @if (count($droneImagery ?? []))
+                      <label class="leg-row leg-toggle">
+                        <input type="checkbox" id="toggleDroneImagery" checked>
+                        <i class="bi bi-camera-fill leg-pin" aria-hidden="true"></i>
+                        Drone imagery <small>({{ count($droneImagery) }})</small>
+                      </label>
+                    @endif
                     <div class="leg-suitability" aria-label="Planting suitability colors">
                       @foreach ($suitabilityLevels ?? [] as $key => $label)
                         <span><i class="leg-swatch" data-suitability-swatch="{{ $key }}"></i>{{ $label }}</span>
@@ -1999,24 +2006,32 @@
     }
 
     // GIS Basemap Tile Layers
+    // Base maps are upscaled past their native zoom so the map stays filled when zooming into drone imagery.
     const satL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 18,
+      maxNativeZoom: 18,
+      maxZoom: 22,
       attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
     const osmL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
+      maxNativeZoom: 18,
+      maxZoom: 22,
       attribution: '&copy; OpenStreetMap contributors'
     });
     const topoL = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      maxZoom: 17,
+      maxNativeZoom: 17,
+      maxZoom: 22,
       attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap'
     });
 
     let curBase = satL;
     let mainMap = L.map('mainMap', {
       zoomControl: true,
+      maxZoom: 22,
       layers: [satL]
     }).setView([10.358, 124.973], 13);
+
+    @include('partials.map-place-labels')
+    attachPlaceLabels(mainMap, [satL]);
 
     let polys = [];
     zones.forEach((z, i) => {
@@ -2260,8 +2275,19 @@
       return null;
     }
 
+    // Rough size used to pick which shape gets the record's pin.
+    function shapeSize(feature, shape) {
+      if (Number(feature.area_ha) > 0) return Number(feature.area_ha);
+      if (!shape || !shape.getBounds) return 0;
+      const b = shape.getBounds();
+      return Math.abs((b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest()));
+    }
+
     function drawSavedDelineations() {
       (Array.isArray(savedDelineations) ? savedDelineations : []).forEach((record) => {
+        // One pin per delineation (AI delineations can have many small areas), on its largest shape.
+        let pinTarget = null;
+
         (Array.isArray(record.features) ? record.features : []).forEach((feature) => {
           let shape = null;
           if (feature.type === 'line') {
@@ -2270,19 +2296,31 @@
             shape = L.polygon(feature.coords, { color: '#1e9e62', fillColor: '#1e9e62', fillOpacity: 0.28, weight: 2 }).addTo(delineationLayer);
           }
 
-          const position = pinPosition(feature, shape);
-          const pin = position
-            ? L.marker(position, { icon: pinIcon, title: record.name || 'Approved delineation', riseOnHover: true }).addTo(pinLayer)
-            : null;
-          if (pin) pin.bindTooltip(record.name || 'Approved delineation', { direction: 'top' });
-
-          [shape, pin].filter(Boolean).forEach(layer => {
-            layer.bindPopup(delineationPopup(record, feature));
-            layer.on('click', (e) => {
+          if (shape) {
+            shape.bindPopup(delineationPopup(record, feature));
+            shape.on('click', (e) => {
               if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
-              showDelineationDetails(record, feature, shape || pin);
+              showDelineationDetails(record, feature, shape);
             });
-          });
+          }
+
+          const position = pinPosition(feature, shape);
+          const size = shapeSize(feature, shape);
+          if (position && (!pinTarget || size > pinTarget.size)) {
+            pinTarget = { feature, shape, position, size };
+          }
+        });
+
+        if (!pinTarget) return;
+        const { feature, shape, position } = pinTarget;
+        // The pin stands for the whole record, so show the record's total area.
+        const pinFeature = Number(record.area_ha) > 0 ? { ...feature, area_ha: record.area_ha } : feature;
+        const pin = L.marker(position, { icon: pinIcon, title: record.name || 'Approved delineation', riseOnHover: true }).addTo(pinLayer);
+        pin.bindTooltip(record.name || 'Approved delineation', { direction: 'top' });
+        pin.bindPopup(delineationPopup(record, pinFeature));
+        pin.on('click', (e) => {
+          if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+          showDelineationDetails(record, pinFeature, shape || pin);
         });
       });
     }
@@ -2318,6 +2356,32 @@
       });
     }
 
+    // Approved drone imagery (GeoTIFF tiles) under the delineations; upscaled past its native zoom.
+    const droneImagery = @json($droneImagery ?? []);
+    const droneImageryLayer = L.layerGroup().addTo(mainMap);
+    const droneImageryBounds = L.latLngBounds([]);
+
+    function drawDroneImagery() {
+      droneImagery.forEach(layer => {
+        const b = layer.bounds || {};
+        if (![b.south, b.west, b.north, b.east].every(Number.isFinite)) return;
+        const bounds = L.latLngBounds([b.south, b.west], [b.north, b.east]);
+        droneImageryBounds.extend(bounds);
+        L.tileLayer(`${layer.tile_url}?v=${encodeURIComponent(layer.version || '')}`, {
+          bounds,
+          opacity: Number(layer.opacity) || 0.78,
+          minNativeZoom: layer.zoom_min,
+          maxNativeZoom: layer.zoom_max,
+          maxZoom: 22,
+          updateWhenZooming: false,
+          updateWhenIdle: true,
+          keepBuffer: 2,
+          zIndex: 5,
+        }).addTo(droneImageryLayer);
+      });
+    }
+
+    drawDroneImagery();
     drawSavedDelineations();
     drawPlantingRecommendations();
 
@@ -2327,6 +2391,7 @@
       [delineationLayer, pinLayer, recommendationLayer].forEach(group => {
         if (group.getLayers().length) bounds.extend(group.getBounds());
       });
+      if (droneImageryBounds.isValid()) bounds.extend(droneImageryBounds);
       if (bounds.isValid()) mainMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
     })();
 
@@ -2335,6 +2400,7 @@
       ['toggleDelineations', delineationLayer],
       ['togglePins', pinLayer],
       ['toggleRecommendations', recommendationLayer],
+      ['toggleDroneImagery', droneImageryLayer],
     ].forEach(([id, layer]) => {
       document.getElementById(id)?.addEventListener('change', (event) => {
         event.target.checked ? layer.addTo(mainMap) : layer.remove();

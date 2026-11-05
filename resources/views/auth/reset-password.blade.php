@@ -39,9 +39,11 @@
             padding: 36px 32px;
             box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
             border: 1px solid rgba(148, 163, 184, 0.30);
+            position: relative;
         }
 
         .title {
+            text-align: center;
             font-size: 26px;
             font-weight: 800;
             color: var(--fg-1a2e1a, #1a2e1a);
@@ -50,6 +52,7 @@
         }
 
         .subtitle {
+            text-align: center;
             font-size: 13px;
             line-height: 1.6;
             color: var(--fg-5b7864, #5b7864);
@@ -157,6 +160,75 @@
             margin-top: 8px;
         }
 
+        .alert-error {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--fg-b42318, #b42318);
+            background: var(--bg-fdf0ee, #fdf0ee);
+            border: 1px solid var(--bd-e8b8b0, #e8b8b0);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 18px;
+        }
+
+        .alert-error a {
+            display: block;
+            margin-top: 6px;
+            color: inherit;
+            font-weight: 800;
+        }
+
+        .password-rules {
+            list-style: none;
+            margin: 10px 0 0;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 12px;
+            font-size: 11.5px;
+            color: var(--fg-7a8a7f, #7a8a7f);
+        }
+
+        .password-rules li {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .password-rules li::before {
+            content: "";
+            width: 12px;
+            height: 12px;
+            flex: none;
+            border-radius: 50%;
+            border: 1.5px solid var(--bd-b8c4bc, #b8c4bc);
+        }
+
+        .password-rules li.met {
+            color: var(--fg-1e9e62, #1e9e62);
+        }
+
+        .password-rules li.met::before {
+            border-color: #1e9e62;
+            background: #1e9e62 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6.2l2 2 4-4.4' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px no-repeat;
+        }
+
+        .password-rules li.unmet {
+            color: var(--fg-d04030, #d04030);
+        }
+
+        .password-rules li.unmet::before {
+            border-color: #d04030;
+        }
+
+        @media (max-width: 330px) {
+            .password-rules {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @include('auth.partials.submit-loading-styles')
+
         .footer {
             text-align: center;
             margin-top: 20px;
@@ -179,6 +251,8 @@
 
 <body>
     <div class="card">
+        @include('auth.partials.back-button', ['href' => route('login'), 'title' => 'Back to sign in'])
+        @include('auth.partials.brand')
         <h1 class="title">Reset Password</h1>
         <p class="subtitle">Set a new password for your account.</p>
 
@@ -194,18 +268,33 @@
         </script>
         @endif
 
-        <form method="POST" action="{{ route('password.update') }}">
+        {{-- The email is a hidden field, so its errors (expired or already-used link, unknown email) are shown here. --}}
+        @error('email')
+        <div class="alert-error" role="alert">
+            {{ $message }}
+            <a href="{{ route('password.request') }}">Request a new reset link</a>
+        </div>
+        @enderror
+
+        <form method="POST" action="{{ route('password.update') }}" id="resetForm">
             @csrf
 
             <input type="hidden" name="token" value="{{ $token }}">
-            <input type="hidden" name="email" value="{{ old('email', $email ?? '') }}">
+            {{-- Lets password managers save the new password under the right account. --}}
+            <input type="email" name="email" value="{{ old('email', $email ?? '') }}" autocomplete="username" hidden readonly>
 
             <div class="form-group">
                 <label for="password" class="form-label">New Password</label>
                 <div class="password-wrapper">
-                    <input id="password" type="password" name="password" class="form-input" required>
+                    <input id="password" type="password" name="password" class="form-input" required autocomplete="new-password" aria-describedby="passwordRules">
                     <button type="button" class="password-toggle" aria-label="Show password" title="Show password"></button>
                 </div>
+                <ul class="password-rules" id="passwordRules" aria-live="polite">
+                    <li data-rule="length">At least 8 characters</li>
+                    <li data-rule="upper">One uppercase letter</li>
+                    <li data-rule="lower">One lowercase letter</li>
+                    <li data-rule="number">One number</li>
+                </ul>
                 @error('password')
                 <div class="error-message">{{ $message }}</div>
                 @enderror
@@ -214,12 +303,15 @@
             <div class="form-group">
                 <label for="password_confirmation" class="form-label">Confirm Password</label>
                 <div class="password-wrapper">
-                    <input id="password_confirmation" type="password" name="password_confirmation" class="form-input" required>
+                    <input id="password_confirmation" type="password" name="password_confirmation" class="form-input" required autocomplete="new-password">
                     <button type="button" class="password-toggle" aria-label="Show password" title="Show password"></button>
                 </div>
             </div>
 
-            <button type="submit" class="submit-btn">Reset Password</button>
+            <button type="submit" class="submit-btn" id="resetSubmitBtn">
+                <span class="submit-spinner" aria-hidden="true"></span>
+                <span class="submit-label">Reset Password</span>
+            </button>
         </form>
 
         <div class="footer">
@@ -261,6 +353,27 @@
 
                 updateToggleVisibility();
             });
+
+            // Live checklist for the same rules the server enforces (shared with sign-up).
+            const passwordInput = document.getElementById('password');
+            const updateRules = () => {
+                const value = passwordInput.value;
+                const results = {
+                    length: value.length >= 8,
+                    upper: /[A-Z]/.test(value),
+                    lower: /[a-z]/.test(value),
+                    number: /[0-9]/.test(value),
+                };
+                document.querySelectorAll('#passwordRules li').forEach(item => {
+                    const met = !!results[item.dataset.rule];
+                    item.classList.toggle('met', met);
+                    item.classList.toggle('unmet', !met && value !== '');
+                });
+            };
+            passwordInput.addEventListener('input', updateRules);
+            updateRules();
+
+            @include('auth.partials.submit-loading-script', ['formId' => 'resetForm', 'buttonId' => 'resetSubmitBtn', 'busyLabel' => 'Resetting...'])
         });
     </script>
     @include('partials.theme-toggle', ['floating' => true])

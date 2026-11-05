@@ -76,6 +76,9 @@
       layers: [satL],
     }).setView([10.358, 124.973], 13);
 
+    @include('partials.map-place-labels')
+    attachPlaceLabels(mainMap, [satL, mangroveL]);
+
     const droneImageryLayersElement = document.getElementById('droneImageryLayers');
     const droneImageryMessageElement = document.getElementById('droneImageryMessage');
     const droneImageryTileLayers = new Map();
@@ -157,6 +160,23 @@
 
     function buildDroneReviewLink(layer) {
       if (!layer.review_url) return null;
+      if (layer.review_state === 'approved') { // approved by an expert: show it here on the map
+        const view = document.createElement('button');
+        view.type = 'button';
+        view.className = 'drone-imagery-ai-button';
+        view.textContent = 'View';
+        view.title = 'Show this imagery on the map and zoom to it';
+        view.addEventListener('click', () => {
+          const tileLayer = droneImageryTileLayers.get(layer.id);
+          if (!tileLayer) return;
+          if (!mainMap.hasLayer(tileLayer)) tileLayer.addTo(mainMap);
+          const checkbox = view.closest('.drone-imagery-layer')?.querySelector('input[type="checkbox"]');
+          if (checkbox) checkbox.checked = true;
+          zoomToDroneImagery(layer, tileLayer);
+          document.getElementById('droneImageryMenu')?.classList.remove('show');
+        });
+        return view;
+      }
       const link = document.createElement('a');
       link.href = layer.review_url;
       link.className = `drone-imagery-ai-button${layer.status === 'ready' ? '' : ' primary'}`;

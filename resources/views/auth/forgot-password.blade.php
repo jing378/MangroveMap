@@ -39,9 +39,11 @@
             padding: 36px 32px;
             box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
             border: 1px solid rgba(148, 163, 184, 0.30);
+            position: relative;
         }
 
         .title {
+            text-align: center;
             font-size: 26px;
             font-weight: 800;
             color: var(--fg-1a2e1a, #1a2e1a);
@@ -50,6 +52,7 @@
         }
 
         .subtitle {
+            text-align: center;
             font-size: 13px;
             line-height: 1.6;
             color: var(--fg-5b7864, #5b7864);
@@ -124,6 +127,8 @@
             margin-top: 8px;
         }
 
+        @include('auth.partials.submit-loading-styles')
+
         .footer {
             text-align: center;
             margin-top: 20px;
@@ -146,6 +151,8 @@
 
 <body>
     <div class="card">
+        @include('auth.partials.back-button', ['href' => route('login'), 'title' => 'Back to sign in'])
+        @include('auth.partials.brand')
         <h1 class="title">Forgot Password</h1>
         <p class="subtitle">Enter your email address and we will send you a link to reset your password.</p>
 
@@ -153,24 +160,32 @@
         <div class="message">{{ session('status') }}</div>
         @endif
 
-        <form method="POST" action="{{ route('password.email') }}">
+        <form method="POST" action="{{ route('password.email') }}" id="forgotForm">
             @csrf
 
             <div class="form-group">
                 <label for="email" class="form-label">Email Address</label>
-                <input id="email" type="email" name="email" class="form-input" value="{{ old('email') }}" required autofocus>
+                <input id="email" type="email" name="email" class="form-input" placeholder="your@email.com" value="{{ old('email') }}" required autofocus autocomplete="email">
                 @error('email')
                 <div class="error-message">{{ $message }}</div>
                 @enderror
             </div>
 
-            <button type="submit" class="submit-btn">Send Reset Link</button>
+            <button type="submit" class="submit-btn" id="forgotSubmitBtn">
+                <span class="submit-spinner" aria-hidden="true"></span>
+                <span class="submit-label">Send Reset Link</span>
+            </button>
         </form>
 
         <div class="footer">
             Remembered your password? <a href="{{ route('login') }}">Sign in</a>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            @include('auth.partials.submit-loading-script', ['formId' => 'forgotForm', 'buttonId' => 'forgotSubmitBtn', 'busyLabel' => 'Sending...'])
+        });
+    </script>
     @include('partials.theme-toggle', ['floating' => true])
 </body>
 

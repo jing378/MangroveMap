@@ -19,9 +19,12 @@ vendor/bin/pint                   # format (Laravel Pint)
 
 # Drone imagery needs its own worker (composer dev's queue:listen does NOT cover it)
 php artisan queue:work drone_imagery --queue=drone-imagery --timeout=7200 --tries=1
+# queue:work keeps the code it started with: restart this worker after changing jobs/services it runs
 
 php artisan boundaries:import --path=<geojson>   # load barangay boundaries into admin_boundaries
 php artisan delineations:repair-features --dry-run
+php artisan delineations:resolve-locations --dry-run [--id=N]   # fill in barangays for areas not matched yet
+php artisan map:sync-place-labels                # re-download OpenStreetMap place names for the satellite map labels
 ```
 
 ML environment: `ml/.venv` (from `ml/requirements.txt`). `config/ml.php` automatically uses `ml/.venv/Scripts/python.exe` if it exists. Otherwise set `ML_PYTHON`.
@@ -34,7 +37,7 @@ ML environment: `ml/.venv` (from `ml/requirements.txt`). `config/ml.php` automat
 ### Delineation lifecycle
 `Delineation` stores GeoJSON in the `features` JSON column. Review state is tracked by the `is_approved`/`is_rejected` flags (there is no status enum). The flow is:
 1. A resident submits a delineation. `DelineationSubmittedForReview` notifies experts.
-2. An expert approves or rejects it. A resident can revise a rejected record (`delineations.revise`), and revisions are kept in `DelineationRevision`.
+2. An expert approves or rejects it. A resident can revise a rejected record (`delineations.revise`), and revisions are kept in `DelineationRevision`. The resident has `Delineation::REJECTED_REMOVAL_GRACE_DAYS` (7) from `rejected_at` to do so. After that an expert may delete it (`expert.delineations.destroy`, `DelineationRemoved` notifies the resident). The rejection notice, map panel and dashboard show the deadline (`removable_after` in the map payload).
 3. Experts can also add yearly observations and planting recommendations (`PlantingRecommendation`). There is no separate observation form. When an expert saves a boundary edit (`delineations.boundary.update`) with `record_as=observation`, `DelineationObservationRecorder` creates or updates that year's `DelineationAnnualObservation`, with hectares computed from the polygon, genera taken from the features, and a boundary revision. The first observation also stores a baseline year from the original boundary. A `record_as=correction` edit (the default) only adds a `DelineationRevision`. `DelineationAnnualObservationController::index` is read-only and feeds the map's "Changes over time" timeline.
 
 Deleting a delineation also removes its review notifications (a model `deleting` hook). Map queries are capped by `Delineation::MAP_QUERY_LIMIT*`.
@@ -54,7 +57,7 @@ Keep `GDAL_QUEUE_RETRY_AFTER` (7260) above the job timeout (7200). Above that, `
 `MangroveSegmentationService` shells out to `ml/predict.py`. The script has three modes, `--image`, `--raster`, and `--validate-weights`, and prints JSON as its last stdout line. The weights come from the newest active `AIModel` (`model_type=segmentation`, a `.pth` file that exists on disk). If there is none, it falls back to `ML_MODEL_PATH`. Admins upload new models via `AdminController::uploadModel`, which validates them first. Under Apache on Windows, the service and the script both patch `SystemRoot`/`PATH`. Without that, importing torch fails with WinError 10106. Keep those workarounds.
 
 ### Frontend
-Blade views with Leaflet 1.9.4 from a CDN. Most map code is inline JS in Blade partials under `resources/views/users/partials/` (`workspace-*`, `map-base-scripts`, `recommendation-scripts`), not in `resources/js`. Layouts: `layouts/enduser`, `layouts/admin`, `layouts/app`.
+Blade views with Leaflet 1.9.4 from a CDN. Satellite basemaps get Google-hybrid-style labels from `partials/map-place-labels` (`attachPlaceLabels(map, imageryLayers)`): Esri roads plus OpenStreetMap place names from `OsmPlaceLabelService` (Overpass, stored in `storage/app/private/map/`, bbox in `config/map.php`, decluttered client-side by rank). Most map code is inline JS in Blade partials under `resources/views/users/partials/` (`workspace-*`, `map-base-scripts`, `recommendation-scripts`), not in `resources/js`. Layouts: `layouts/enduser`, `layouts/admin`, `layouts/app`.
 
 Dark mode: `partials/theme` (included first in every page `<head>`) sets `<html data-theme="light|dark">` from localStorage or the OS setting, and `partials/theme-toggle` is the header button. View CSS colors are written as `var(--bg-xxxxxx, #xxxxxx)` (prefix `bg`/`fg`/`bd` = role); light mode uses the fallback and the dark values live in the generated `partials/theme-palette`. After adding styles with literal colors, run `node scripts/theme/build-dark-theme.mjs` (`--check` lists views that still need it). It skips `<script>` blocks and `--custom-properties`, so colors in JS-built HTML or page-level CSS variables need a dark value by hand (see the `html[data-theme="dark"]` block in `index.blade.php`).
 

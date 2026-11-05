@@ -72,9 +72,15 @@ class DroneImageryDelineationPublisher
 
         $owner = $layer->user;
         $isExpert = (bool) $owner?->isExpert();
-        // Details are cleared with the insert, so a failure keeps them for another try.
+        // Details are cleared with the insert, so a failure keeps them for another try. The layer row is
+        // locked and re-checked: the job and a page load (DroneImageryController::index) may race to submit.
         $delineation = DB::transaction(function () use ($layer, $details, $features, $isExpert, $owner) {
-            $layer->update(['delineation_details' => null]);
+            $locked = DroneImageryLayer::query()->lockForUpdate()->find($layer->id);
+            if ($locked === null || $locked->delineation_details === null || $locked->delineation()->exists()) {
+                return null;
+            }
+            $locked->update(['delineation_details' => null]);
+            $layer->setRawAttributes($locked->getAttributes(), true);
 
             return Delineation::create([
                 'user_id' => $layer->user_id,
@@ -85,6 +91,9 @@ class DroneImageryDelineationPublisher
                 ...($isExpert ? ['is_approved' => true, 'approved_at' => now(), 'approved_by' => $owner->id] : []),
             ]);
         });
+        if ($delineation === null) {
+            return null; // submitted by the other caller in the meantime
+        }
 
         if ($isExpert) {
             UserActivity::recordDelineationPublished($delineation, $owner);

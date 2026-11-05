@@ -97,7 +97,10 @@ class DroneImageryRoleFlowTest extends TestCase
 
         $layer->refresh();
         $this->assertSame('finalizing', $layer->status);
-        $this->assertSame(['name' => 'Cabalian mangroves', 'genera' => ['Rhizophora', 'Avicennia'], 'notes' => null], $layer->delineation_details);
+        $details = $layer->delineation_details;
+        $this->assertNotEmpty($details['submitted_at'] ?? null, 'Confirm marks the details as a real submission.');
+        unset($details['submitted_at']);
+        $this->assertSame(['name' => 'Cabalian mangroves', 'genera' => ['Rhizophora', 'Avicennia'], 'notes' => null], $details);
         Queue::assertPushed(FinalizeDroneImagery::class);
     }
 
@@ -136,6 +139,159 @@ class DroneImageryRoleFlowTest extends TestCase
         $this->actingAs($resident)->get(route('drone-imagery.edit', $layer->id))
             ->assertOk()
             ->assertSee('"delineation_draft":{"name":"Cabalian mangroves","genera":["Rhizophora","Lumnitzera"],"notes":null}', false);
+    }
+
+    public function test_the_name_typed_in_the_editor_renames_the_imagery_on_drone_upload(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $layer = $this->withAreas($this->layer($resident, 'awaiting_review'));
+        $edits = ['mode' => 'remove', 'polygons' => [], 'offset' => ['east_m' => 0, 'north_m' => 0], 'opacity' => 0.8];
+
+        // Save draft.
+        $this->actingAs($resident)
+            ->putJson(route('drone-imagery.edits.update', $layer->id), [
+                ...$edits,
+                'delineation' => ['name' => ' Cabalian mangroves ', 'genera' => [], 'notes' => ''],
+            ])
+            ->assertOk()
+            ->assertJsonPath('name', 'Cabalian mangroves');
+        $this->assertSame('Cabalian mangroves', $this->layersFor($resident)[$layer->id]['name']);
+
+        // A blank name keeps the current one.
+        $this->actingAs($resident)
+            ->putJson(route('drone-imagery.edits.update', $layer->id), [
+                ...$edits,
+                'delineation' => ['name' => '  ', 'genera' => [], 'notes' => ''],
+            ])
+            ->assertOk();
+        $this->assertSame('Cabalian mangroves', $layer->fresh()->name);
+
+        // Confirm & submit.
+        $this->actingAs($resident)
+            ->postJson(route('drone-imagery.confirm', $layer->id), [
+                ...$edits,
+                'delineation' => ['name' => 'San Roque mangroves', 'genera' => ['Rhizophora'], 'notes' => ''],
+            ])
+            ->assertAccepted();
+        $this->assertSame('San Roque mangroves', $layer->fresh()->name);
+    }
+
+    public function test_renaming_the_delineation_renames_its_imagery(): void
+    {
+        Storage::fake('local');
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $layer = $this->layer($resident);
+        $delineation = $this->submittedDelineation($layer);
+
+        $delineation->update(['name' => 'Renamed on the map']);
+        $this->assertSame('Renamed on the map', $layer->fresh()->name);
+
+        $delineation->update(['name' => '', 'notes' => 'Other change']);
+        $this->assertSame('Renamed on the map', $layer->fresh()->name, 'A cleared name keeps the imagery name.');
+    }
+
+    public function test_a_confirmed_submission_stranded_without_its_delineation_is_submitted_when_uploads_load(): void
+    {
+        // E.g. a drone worker still running code from before the submit step: the layer ends "ready" with the
+        // confirmed details but no delineation. Loading the uploads (Drone Upload polls index) submits it.
+        Storage::fake('local');
+        Notification::fake();
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        $stranded = $this->withAreas($this->layer($resident, 'ready', [
+            'delineation_details' => ['name' => 'Stranded', 'genera' => ['Rhizophora'], 'notes' => null, 'submitted_at' => now()->toIso8601String()],
+        ]));
+        // A draft with a genus that was never confirmed must not be submitted.
+        $draftOnly = $this->withAreas($this->layer($resident, 'ready', [
+            'delineation_details' => ['name' => 'Draft only', 'genera' => ['Avicennia'], 'notes' => null],
+        ]));
+
+        $layers = $this->layersFor($resident);
+
+        $this->assertSame('pending', $layers[$stranded->id]['review_state']);
+        $this->assertNull($layers[$draftOnly->id]['review_state']);
+        $delineation = Delineation::sole();
+        $this->assertSame($stranded->id, $delineation->drone_imagery_layer_id);
+        $this->assertFalse((bool) $delineation->is_approved);
+        Notification::assertSentTo($expert, DelineationSubmittedForReview::class);
+
+        // Loading again does not submit it twice.
+        $this->layersFor($resident);
+        $this->assertSame(1, Delineation::count());
+    }
+
+    public function test_editor_panel_shows_the_submitted_genus_notes_and_location(): void
+    {
+        Storage::fake('local');
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $layer = $this->layer($resident);
+        $this->submittedDelineation($layer, [
+            'name' => 'Mac Mangroves',
+            'notes' => 'Dense stand near the river mouth',
+            'features' => [
+                ['type' => 'area', 'coords' => self::AREA, 'genera' => ['Rhizophora', 'Sonneratia'],
+                    'location' => 'Mac, Sogod, Southern Leyte', 'location_status' => 'matched'],
+                ['type' => 'area', 'coords' => self::AREA, 'genera' => ['Rhizophora'],
+                    'location' => 'Mac, Sogod, Southern Leyte', 'location_status' => 'matched'],
+            ],
+        ]);
+
+        $this->actingAs($resident)->get(route('drone-imagery.edit', $layer->id))
+            ->assertOk()
+            ->assertSee('2. Submitted delineation')
+            ->assertSee('Awaiting expert review')
+            ->assertSee('Mac, Sogod, Southern Leyte')
+            ->assertSeeInOrder(['Mangrove Genus Present', 'Rhizophora', 'Sonneratia'])
+            ->assertSee('Dense stand near the river mouth')
+            ->assertDontSee('id="droneEditorGenera"', false);
+    }
+
+    public function test_editor_reports_the_location_of_the_areas_before_submitting(): void
+    {
+        Storage::fake('local');
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $layer = $this->withAreas($this->layer($resident, 'awaiting_review'));
+
+        // SQLite has no spatial lookup, so the resolver reports "pending" (MySQL resolves the barangay).
+        $this->actingAs($resident)->get(route('drone-imagery.edit', $layer->id))
+            ->assertOk()
+            ->assertSee('id="droneEditorLocation"', false)
+            ->assertSee('"location":{"text":null,"status":"pending"}', false);
+    }
+
+    public function test_approved_imagery_opens_view_only_and_refuses_edits(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        $layer = $this->withAreas($this->layer($resident));
+        $this->submittedDelineation($layer, ['is_approved' => true, 'approved_by' => $expert->id, 'approved_at' => now()]);
+        $edits = ['mode' => 'remove', 'polygons' => [], 'offset' => ['east_m' => 0, 'north_m' => 0], 'opacity' => 0.5];
+        $area = [[124.05, 9.95], [124.06, 9.95], [124.06, 9.96]];
+
+        $this->actingAs($resident)->get(route('drone-imagery.edit', $layer->id))
+            ->assertOk()
+            ->assertSee('"read_only":true', false)
+            ->assertSee('view-only');
+
+        $this->actingAs($resident)->putJson(route('drone-imagery.edits.update', $layer->id), $edits)->assertConflict();
+        $this->actingAs($resident)->postJson(route('drone-imagery.confirm', $layer->id), $edits)->assertConflict();
+        $this->actingAs($resident)
+            ->putJson(route('drone-imagery.segmentation.update', $layer->id), ['areas' => [$area], 'offset' => ['east_m' => 0, 'north_m' => 0]])
+            ->assertConflict();
+        $this->actingAs($resident)->postJson(route('drone-imagery.segmentation.store', $layer->id))->assertConflict();
+        Queue::assertNothingPushed();
+
+        // Pending (not approved yet): still editable.
+        $pending = $this->withAreas($this->layer($resident));
+        $this->submittedDelineation($pending);
+        $this->actingAs($resident)->get(route('drone-imagery.edit', $pending->id))
+            ->assertOk()
+            ->assertSee('"read_only":false', false);
+        $this->actingAs($resident)->putJson(route('drone-imagery.edits.update', $pending->id), $edits)->assertOk();
     }
 
     public function test_a_draft_without_a_genus_is_never_turned_into_a_delineation(): void
@@ -245,6 +401,52 @@ class DroneImageryRoleFlowTest extends TestCase
         }
         $this->actingAs($otherResident)->get($tile)->assertOk();
         $this->assertTrue(Delineation::approved()->whereKey($delineation->id)->exists());
+    }
+
+    public function test_an_approved_drone_delineation_is_sent_to_other_users_maps(): void
+    {
+        Storage::fake('local');
+        $expert = User::factory()->create(['role' => 'expert']);
+        $otherExpert = User::factory()->create(['role' => 'expert']);
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $layer = $this->layer($expert);
+        $delineation = $this->submittedDelineation($layer, [
+            'is_approved' => true,
+            'approved_at' => now(),
+            'approved_by' => $expert->id,
+        ]);
+
+        // Experts' maps otherwise list residents' submissions only; the approved list carries other experts' areas.
+        $hasDelineation = fn ($records) => collect($records)->contains(fn ($record) => (int) $record['id'] === $delineation->id);
+        $this->actingAs($otherExpert)->get(route('expert.map'))->assertOk()
+            ->assertViewHas('approvedDelineationsForMap', $hasDelineation);
+        $this->actingAs($resident)->get(route('map'))->assertOk()
+            ->assertViewHas('approvedDelineationsForMap', $hasDelineation);
+        foreach ([$otherExpert, $resident] as $viewer) {
+            $this->assertTrue($this->layersFor($viewer)[$layer->id]['auto_show']);
+        }
+    }
+
+    public function test_the_landing_page_shows_approved_imagery_to_guests_only_once_approved(): void
+    {
+        Storage::fake('local');
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $layer = $this->layer($resident);
+        Storage::disk('local')->put("{$layer->tiles_path}/12/3458/1933.png", 'tile');
+        $delineation = $this->submittedDelineation($layer);
+        $tile = route('public.drone-imagery.tile', [$layer->id, 12, 3458, 1933]);
+        $listsLayer = fn ($layers) => collect($layers)->contains(fn ($listed) => $listed['id'] === $layer->id);
+
+        // Pending review: neither the imagery nor its tiles are public.
+        $this->get(route('index'))->assertOk()->assertViewHas('droneImagery', fn ($layers) => ! $listsLayer($layers));
+        $this->get($tile)->assertNotFound();
+
+        $delineation->update(['is_approved' => true, 'approved_at' => now()]);
+
+        $this->get(route('index'))->assertOk()
+            ->assertViewHas('droneImagery', $listsLayer)
+            ->assertViewHas('delineations', fn ($records) => collect($records)->contains(fn ($record) => $record['id'] === $delineation->id));
+        $this->get($tile)->assertOk()->assertHeader('Content-Type', 'image/png');
     }
 
     public function test_rejected_resident_imagery_stays_private(): void

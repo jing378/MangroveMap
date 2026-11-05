@@ -28,12 +28,12 @@
         }
 
         /* Left Panel - Login Form */
+        /* Same light backdrop and white card as forgot/reset password and verify email. */
         .login-left {
             flex: 1;
-            background:
-                radial-gradient(900px 420px at 70% 90%, rgba(93, 115, 99, 0.15), transparent 60%),
-                radial-gradient(900px 520px at 10% 30%, rgba(107, 122, 112, 0.12), transparent 60%),
-                linear-gradient(135deg, #4a5d52 0%, #556159 100%);
+            background: radial-gradient(700px 420px at 15% 10%, rgba(16, 185, 129, 0.12), transparent 60%),
+                radial-gradient(700px 420px at 90% 90%, rgba(59, 130, 246, 0.08), transparent 60%),
+                var(--bg-f5f7f6, #f5f7f6);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -46,17 +46,26 @@
         }
 
         .login-card {
-            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.82);
-            border-radius: 18px;
-            padding: 38px 34px;
-            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            backdrop-filter: blur(10px);
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.92);
+            border-radius: 22px;
+            padding: 34px 34px;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
+            border: 1px solid rgba(148, 163, 184, 0.30);
             position: relative;
         }
 
+        .remember-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--fg-365a45, #365a45);
+        }
+
         .login-header {
-            margin-bottom: 32px;
+            margin-bottom: 28px;
             text-align: center;
         }
 
@@ -82,7 +91,8 @@
             width: 36px;
             height: 36px;
             position: absolute;
-            top: 34px;
+            /* Level with the brand row at the top of the card. */
+            top: 33px;
             left: 34px;
         }
 
@@ -389,11 +399,12 @@
             }
 
             /* Left panel takes full width and full height */
+            /* Top padding keeps the card clear of the floating dark-mode button. */
             .login-left {
                 flex: none;
                 width: 100%;
                 min-height: 100vh;
-                padding: 40px 20px;
+                padding: 72px 20px 40px;
             }
 
             /* Adjust card styling for better mobile experience */
@@ -417,7 +428,7 @@
         /* Extra small devices (phones under 480px) - fine-tune spacing */
         @media (max-width: 480px) {
             .login-left {
-                padding: 30px 16px;
+                padding: 72px 16px 30px;
             }
 
             .login-card {
@@ -425,8 +436,8 @@
             }
 
             .back-btn {
-                top: 22px;
-                left: 22px;
+                top: 27px;
+                left: 18px;
                 width: 34px;
                 height: 34px;
             }
@@ -458,7 +469,7 @@
         @media (max-width: 768px) and (orientation: landscape) {
             .login-left {
                 min-height: 100vh;
-                padding: 20px;
+                padding: 64px 20px 20px;
             }
 
             .login-card {
@@ -466,7 +477,7 @@
             }
 
             .back-btn {
-                top: 16px;
+                top: 19px;
                 left: 16px;
             }
         }
@@ -498,8 +509,7 @@
             <div class="hero-photo" aria-hidden="true"></div>
             <div class="hero-copy" role="note" aria-label="Project overview">
                 <div class="hero-title">
-                    Web-Based Mangrove Extent Mapping, Genus Classification,<br>
-                    and Expert-Based Planting Suitability Recommendation System
+                    Web-Based Mangrove Extent Mapping, Genus Classification, and Expert-Based Planting Suitability Recommendation System
                 </div>
                 <div class="hero-sub">
                     A single platform for mapping mangrove extent, classifying genus, and providing expert-based
@@ -523,6 +533,7 @@
                         <path d="M12.5 16.25L5.75 9.5L12.5 2.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
+                @include('auth.partials.brand')
                 <div class="login-header">
                     <div class="logo-section">
                         <div class="logo-text">Sign In</div>
@@ -534,21 +545,21 @@
                 <div class="status-message">{{ session('status') }}</div>
                 @endif
 
-                <form method="POST" action="/login" id="loginForm">
+                <form method="POST" action="{{ route('login') }}" id="loginForm">
                     @csrf
 
                     <div class="form-group">
-                        <label class="form-label">Email Address</label>
-                        <input type="email" name="email" class="form-input" placeholder="your@email.com" required value="{{ old('email') }}">
+                        <label class="form-label" for="email">Email Address</label>
+                        <input id="email" type="email" name="email" class="form-input" placeholder="your@email.com" required autocomplete="email" value="{{ old('email') }}" @error('email') aria-invalid="true" aria-describedby="emailError" @enderror>
                         @error('email')
-                        <div class="error-message">{{ $message }}</div>
+                        <div class="error-message" id="emailError" role="alert">{{ $message }}</div>
                         @enderror
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Password</label>
+                        <label class="form-label" for="password">Password</label>
                         <div class="password-wrapper">
-                            <input id="password" type="password" name="password" class="form-input" placeholder="••••••••" required>
+                            <input id="password" type="password" name="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
                             <button id="password-toggle" type="button" class="password-toggle" aria-label="Show password" title="Show password">
                                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z" />
@@ -561,9 +572,9 @@
                     </div>
 
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label class="form-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <label class="remember-label" for="remember">
                             <input type="checkbox" name="remember" id="remember" style="margin: 0; width: 16px; height: 16px; accent-color: #1e9e62;">
-                            Remember Me
+                            Remember me
                         </label>
                     </div>
 
@@ -575,7 +586,7 @@
 
                 <div class="login-footer">
                     <a href="{{ route('password.request') }}" style="display:block; margin-bottom:12px; color:var(--fg-1e9e62, #1e9e62); text-decoration:none; font-weight:600;">Forgot your password?</a>
-                    Don't have an account? <a href="/register" onclick="console.log('Register link clicked');">Create one here</a>
+                    Don't have an account? <a href="{{ route('register') }}">Create one here</a>
                 </div>
             </div>
         </div>
@@ -584,10 +595,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             const passwordInput = document.getElementById('password');
             const toggleButton = document.getElementById('password-toggle');
-
-            function updateToggleVisibility() {
-                toggleButton.style.display = passwordInput.value ? 'inline-flex' : 'none';
-            }
 
             passwordInput.addEventListener('input', updateToggleVisibility);
             toggleButton.addEventListener('click', function() {
@@ -628,12 +635,17 @@
                 if (event.persisted) setSubmitting(false);
             });
 
-            const inlineErrors = document.querySelectorAll('.error-message');
-            if (inlineErrors.length) {
-                setTimeout(() => {
-                    inlineErrors.forEach(el => el.remove());
-                }, 3000);
-            }
+            // Errors stay on screen until the user edits the field they belong to.
+            document.querySelectorAll('.form-group').forEach(group => {
+                const input = group.querySelector('.form-input');
+                const error = group.querySelector('.error-message');
+                if (!input || !error) return;
+                input.addEventListener('input', () => {
+                    error.remove();
+                    input.removeAttribute('aria-invalid');
+                    input.removeAttribute('aria-describedby');
+                }, { once: true });
+            });
         });
     </script>
     @include('partials.theme-toggle', ['floating' => true])

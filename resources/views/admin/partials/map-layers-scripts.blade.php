@@ -5,11 +5,13 @@
         const DEFAULT_VIEW = [10.25, 125.1];
 
         const previewMap = L.map('layerPreviewMap', { maxZoom: MAP_MAX_ZOOM }).setView(DEFAULT_VIEW, 9);
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        const previewImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: MAP_MAX_ZOOM,
             maxNativeZoom: 18,
             attribution: 'Imagery &copy; Esri',
         }).addTo(previewMap);
+        @include('partials.map-place-labels')
+        attachPlaceLabels(previewMap, [previewImagery]);
 
         const previewGroup = L.layerGroup().addTo(previewMap);
         const previewLabel = document.getElementById('previewLabel');

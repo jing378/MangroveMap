@@ -622,6 +622,16 @@
                                         <span class="status-badge approved"><i class="bi bi-check-circle-fill"></i> Approved</span>
                                     @elseif($isRej)
                                         <span class="status-badge rejected"><i class="bi bi-x-circle-fill"></i> Rejected</span>
+                                        @if(!auth()->user()->isExpert() && !empty($d['removable_after']))
+                                            @php $removableAt = \Carbon\Carbon::parse($d['removable_after'])->timezone(config('app.timezone')); @endphp
+                                            <div style="font-size: 11px; color: var(--fg-d04030, #d04030); margin-top: 4px;">
+                                                @if($removableAt->isFuture())
+                                                    Revise by {{ $removableAt->format('M d, Y') }} or an expert may remove it
+                                                @else
+                                                    Revision period over, so an expert may remove it
+                                                @endif
+                                            </div>
+                                        @endif
                                     @else
                                         <span class="status-badge pending"><i class="bi bi-hourglass-split"></i> Under Review</span>
                                     @endif

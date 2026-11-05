@@ -123,6 +123,19 @@ class FinalizeDroneImagery implements ShouldQueue
                 && $localDisk->exists($layer->segmentation_path);
             $aiStats = $hasAiResult ? $this->alignAiResult($layer, $edits['offset'] ?? []) : null;
 
+            // "Confirm & submit/publish": the (aligned) mangrove areas become the delineation. Pending expert
+            // review for residents, published for experts. Done before the layer turns "ready", so the Drone
+            // Upload page never sees it ready without its submission (it stops polling once it is ready).
+            // If this fails, the details are kept and DroneImageryController::index submits them later.
+            try {
+                app(DroneImageryDelineationPublisher::class)->publish($layer->fresh());
+            } catch (Throwable $exception) {
+                Log::error('Unable to create the delineation from drone imagery.', [
+                    'layer_id' => $layer->id,
+                    'exception' => $exception,
+                ]);
+            }
+
             $layer->update([
                 'status' => 'ready',
                 'bounds' => $bounds,
@@ -146,17 +159,6 @@ class FinalizeDroneImagery implements ShouldQueue
             // Only when there is no AI delineation yet (never ran, or failed).
             if (! $hasAiResult && ! $layer->isSegmenting() && config('ml.drone.auto_segment')) {
                 $this->queueSegmentation($layer);
-            }
-
-            // "Confirm & submit/publish": the (aligned) mangrove areas become the delineation now that the
-            // imagery can be shown next to it. Pending expert review for residents, published for experts.
-            try {
-                app(DroneImageryDelineationPublisher::class)->publish($layer->fresh());
-            } catch (Throwable $exception) {
-                Log::error('Unable to create the delineation from drone imagery.', [
-                    'layer_id' => $layer->id,
-                    'exception' => $exception,
-                ]);
             }
         } catch (Throwable $exception) {
             // Keep the mosaic, preview and AI delineation so the owner can adjust the edits and confirm again.

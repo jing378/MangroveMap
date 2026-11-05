@@ -31,8 +31,9 @@ class DelineationRejected extends Notification
         }
 
         return $mail
-            ->action('View Dashboard', route('dashboard'))
-            ->line('You can draw and submit a revised delineation from your dashboard.');
+            ->action('Revise Delineation', $this->reviseUrl())
+            ->line('You can edit it and resubmit it for review from the Delineate page.')
+            ->line($this->removalNotice());
     }
 
     public function toArray(object $notifiable): array
@@ -40,13 +41,31 @@ class DelineationRejected extends Notification
         return [
             'title' => 'Delineation rejected',
             'message' => 'Your delineation "' . $this->delineation->name . '" needs revision.'
-                . ($this->delineation->rejection_notes ? ' Notes: ' . $this->delineation->rejection_notes : ''),
+                . ($this->delineation->rejection_notes ? ' Notes: ' . $this->delineation->rejection_notes : '')
+                . ' ' . $this->removalNotice(),
             'type' => 'delineation_rejected',
             'icon' => 'bi-x-circle',
             'delineation_id' => $this->delineation->id,
             'delineation_name' => $this->delineation->name,
             'url' => $this->delineation->mapDashboardUrlFor($notifiable),
             'actionLabel' => 'View on map',
+            'removable_after' => $this->delineation->rejectedRemovableAt()?->toIso8601String(),
         ];
+    }
+
+    private function reviseUrl(): string
+    {
+        return route('delineate', ['delineation' => $this->delineation->id]);
+    }
+
+    private function removalNotice(): string
+    {
+        $removableAt = $this->delineation->rejectedRemovableAt();
+        $deadline = $removableAt
+            ? ' (' . $removableAt->timezone(config('app.timezone'))->format('M j, Y') . ')'
+            : '';
+
+        return 'If it is not revised within ' . Delineation::REJECTED_REMOVAL_GRACE_DAYS . ' days' . $deadline
+            . ', experts may remove it.';
     }
 }

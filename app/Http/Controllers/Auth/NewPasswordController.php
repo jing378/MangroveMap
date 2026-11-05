@@ -11,11 +11,12 @@ class NewPasswordController extends Controller
 {
     public function store(Request $request)
     {
+        // Same password rules as sign-up, so a reset can't set a weaker password.
         $request->validate([
             'token' => 'required',
             'email' => 'required|email',
-            'password' => 'required|confirmed|min:8',
-        ]);
+            'password' => RegisteredUserController::passwordRules(),
+        ], RegisteredUserController::passwordMessages());
 
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),

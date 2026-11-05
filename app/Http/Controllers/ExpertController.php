@@ -6,6 +6,7 @@ use App\Models\Delineation;
 use App\Models\UserActivity;
 use App\Notifications\DelineationApproved;
 use App\Notifications\DelineationRejected;
+use App\Notifications\DelineationRemoved;
 use App\Http\Controllers\EndUserController;
 use App\Models\User;
 use App\Services\BoundaryResolver;
@@ -185,11 +186,47 @@ class ExpertController extends Controller
         $message = 'Delineation rejected. The resident has been notified with your notes.';
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => $message, 'unreadCount' => $unreadCount], 200);
+            return response()->json([
+                'message' => $message,
+                'unreadCount' => $unreadCount,
+                'removable_after' => $delineation->rejectedRemovableAt()?->toIso8601String(),
+            ], 200);
         }
         return redirect()
             ->route('expert.dashboard')
             ->with('success', $message);
+    }
+
+    /** Experts may delete a resident's delineation only once it has been rejected (never pending or approved ones). */
+    public function destroyRejected(Request $request, Delineation $delineation)
+    {
+        if (! $delineation->is_rejected || $delineation->is_approved) {
+            return response()->json([
+                'message' => 'Only rejected delineations can be removed.',
+            ], 422);
+        }
+
+        // The resident keeps a grace period to revise and resubmit before experts can remove it.
+        if (! $delineation->canBeRemovedByExpert()) {
+            return response()->json([
+                'message' => 'The resident still has time to revise this delineation. It can be removed after '
+                    . $delineation->rejectedRemovableAt()->timezone(config('app.timezone'))->format('M j, Y g:i A') . '.',
+            ], 422);
+        }
+
+        $delineation->load('user');
+        $owner = $delineation->user;
+        $name = $delineation->name ?: 'Delineation #' . $delineation->id;
+
+        $delineation->delete();
+
+        if ($owner && (int) $owner->id !== (int) Auth::id()) {
+            $this->notifyUserSafely($owner, new DelineationRemoved($name));
+        }
+
+        return response()->json([
+            'message' => 'Rejected delineation removed. The resident has been notified.',
+        ]);
     }
 
     private function notifyUserSafely(?User $user, Notification $notification): void

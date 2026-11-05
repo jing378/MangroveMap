@@ -18,6 +18,18 @@ class Delineation extends Model
         static::deleting(function (Delineation $delineation) {
             $delineation->deleteReviewNotifications();
         });
+
+        // A delineation from drone imagery shares its name with the imagery (listed on Drone Upload).
+        static::saved(function (Delineation $delineation) {
+            $name = trim((string) $delineation->name);
+            if ($delineation->drone_imagery_layer_id === null || $name === '' || ! $delineation->wasChanged('name')) {
+                return;
+            }
+            DroneImageryLayer::query()
+                ->whereKey($delineation->drone_imagery_layer_id)
+                ->where('name', '!=', $name)
+                ->update(['name' => $name]);
+        });
     }
 
     protected $fillable = [
@@ -44,6 +56,29 @@ class Delineation extends Model
         'rejected_at' => 'datetime',
         'hidden_at' => 'datetime',
     ];
+
+    /** Days a rejected delineation is kept for the resident to revise before experts may remove it. */
+    public const REJECTED_REMOVAL_GRACE_DAYS = 7;
+
+    /** When experts may remove this rejected delineation (null when it is not rejected). */
+    public function rejectedRemovableAt(): ?\Illuminate\Support\Carbon
+    {
+        if (! $this->is_rejected || $this->is_approved) {
+            return null;
+        }
+
+        // Older rejections may predate rejected_at; fall back to the last update.
+        $rejectedAt = $this->rejected_at ?? $this->updated_at ?? now();
+
+        return $rejectedAt->copy()->addDays(self::REJECTED_REMOVAL_GRACE_DAYS);
+    }
+
+    public function canBeRemovedByExpert(): bool
+    {
+        $removableAt = $this->rejectedRemovableAt();
+
+        return $removableAt !== null && ! $removableAt->isFuture();
+    }
 
     public function hiddenBy()
     {

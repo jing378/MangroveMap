@@ -123,6 +123,7 @@
             <div id="delineationRejectionBox" class="delineation-rejection-box" style="display:none;">
               <strong>Expert feedback</strong>
               <p id="delineationRejectionNotes" style="margin:0;"></p>
+              <p id="delineationRejectionHint" style="display:none;margin:8px 0 0;font-size:12px;"></p>
             </div>
             @if(Auth::user()->isExpert())
               <div class="d-row" id="delineationSubmitterRow" style="display:none;"><span class="d-key">Submitted

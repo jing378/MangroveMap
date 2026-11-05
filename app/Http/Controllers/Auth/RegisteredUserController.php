@@ -17,6 +17,22 @@ class RegisteredUserController extends Controller
 {
     public const EMAIL_TAKEN_MESSAGE = 'This email address is already associated with an account. Please log in or use a different email.';
 
+    /** Password rules shared by sign-up and password reset (the forms show the same checklist). */
+    public static function passwordRules(): array
+    {
+        return ['required', 'string', 'min:8', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'confirmed'];
+    }
+
+    public static function passwordMessages(): array
+    {
+        return [
+            'password.required' => 'Password is required.',
+            'password.min' => 'Password must be at least 8 characters long.',
+            'password.regex' => 'Password must include an uppercase letter, a lowercase letter, and a number.',
+            'password.confirmed' => 'Password confirmation does not match.',
+        ];
+    }
+
     /**
      * Live availability check used by the sign-up form while the user types.
      */
@@ -65,17 +81,9 @@ class RegisteredUserController extends Controller
             'apply_as_expert' => ['nullable', 'boolean'],
             'organization' => ['exclude_unless:apply_as_expert,1,true', 'required', 'string', 'max:255'],
             'expert_qualifications' => ['exclude_unless:apply_as_expert,1,true', 'required', 'string', 'min:20', 'max:2000'],
-            'password' => [
-                'required',
-                'string',
-                'min:8',
-                'regex:/[a-z]/',
-                'regex:/[A-Z]/',
-                'regex:/[0-9]/',
-                'confirmed',
-            ],
+            'password' => self::passwordRules(),
             'terms' => ['accepted'],
-        ], [
+        ], self::passwordMessages() + [
             'email.unique' => self::EMAIL_TAKEN_MESSAGE,
             'email.email' => 'Please enter a valid email address.',
             'email.required' => 'Email address is required.',
@@ -84,10 +92,6 @@ class RegisteredUserController extends Controller
             'middle_name.max' => 'Middle name must be 100 characters or fewer.',
             'suffix.max' => 'Suffix must be 10 characters or fewer (e.g. Jr., Sr., III).',
             'suffix.regex' => 'Suffix can only contain letters and periods (e.g. Jr., Sr., III).',
-            'password.required' => 'Password is required.',
-            'password.min' => 'Password must be at least 8 characters long.',
-            'password.regex' => 'Password must include an uppercase letter, a lowercase letter, and a number.',
-            'password.confirmed' => 'Password confirmation does not match.',
             'phone.digits' => 'Enter the 9 digits after 09 (e.g. 09123456789).',
             'organization.required' => 'Organization or affiliation is required for an expert application.',
             'expert_qualifications.required' => 'Describe your expertise so an administrator can review your application.',

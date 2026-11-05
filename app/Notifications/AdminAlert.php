@@ -108,6 +108,7 @@ class AdminAlert extends Notification implements ShouldQueue
             'system_alert' => 'bi-bell',
             'data_update' => 'bi-arrow-repeat',
             'user_action' => 'bi-check-circle',
+            'feedback' => 'bi-chat-left-text',
             default => 'bi-info-circle',
         };
     }

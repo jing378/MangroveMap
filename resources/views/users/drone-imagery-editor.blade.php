@@ -239,6 +239,20 @@
             color: #fff;
         }
 
+        /* A link styled as a full-width panel button (no link underline). */
+        .drone-editor-link-btn {
+            display: flex;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 4px;
+            text-decoration: none;
+        }
+
+        .drone-editor-link-btn:hover,
+        .drone-editor-link-btn:focus-visible {
+            text-decoration: none;
+        }
+
         .drone-editor-btn.primary {
             background: #1e9e62;
             border-color: #1e9e62;
@@ -503,6 +517,55 @@
             line-height: 1.2;
         }
 
+        .drone-editor-location {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--fg-182918, #182918);
+        }
+
+        .drone-editor-location.is-muted {
+            font-weight: 400;
+            color: var(--fg-6b8a78, #6b8a78);
+        }
+
+        .drone-editor-summary {
+            display: grid;
+            gap: 8px;
+            margin: 0 0 10px;
+            font-size: 13px;
+        }
+
+        .drone-editor-summary dt {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--fg-4c6b5d, #4c6b5d);
+            margin-bottom: 2px;
+        }
+
+        .drone-editor-summary dd {
+            margin: 0;
+            color: var(--fg-182918, #182918);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            overflow-wrap: anywhere;
+        }
+
+        .drone-editor-summary-notes {
+            white-space: pre-line;
+        }
+
+        .drone-editor-state {
+            padding: 2px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .drone-editor-state.is-pending { background: var(--bg-e6f0ff, #e6f0ff); color: var(--fg-1d4fa3, #1d4fa3); }
+        .drone-editor-state.is-approved { background: var(--bg-e3f6ec, #e3f6ec); color: var(--fg-16824f, #16824f); }
+        .drone-editor-state.is-rejected { background: var(--bg-fdecea, #fdecea); color: var(--fg-b42318, #b42318); }
+
         .drone-editor-selected-genus button {
             all: unset;
             cursor: pointer;
@@ -701,19 +764,34 @@
             /* Save draft / Confirm float at the bottom of the sheet while the content scrolls, like the
                floating save button of the Planting Recommendation / Delineate panels
                (#mapRightPanel .delineation-save-btn in workspace-styles). */
+            /* Flush with the bottom of the sheet: the negative margins cancel the body's side/bottom padding,
+               so the bar spans the sheet and nothing scrolls visibly underneath it. The two buttons sit side
+               by side (the message, when shown, takes the row above them); room is kept for the home
+               indicator on phones without a home button. */
             .drone-editor-actions {
                 position: sticky;
-                bottom: -10px;
+                bottom: -20px;
                 z-index: 2;
-                margin-top: 8px;
-                padding-top: 8px;
+                grid-template-columns: 1fr 1fr;
+                margin: 8px -14px -20px;
+                padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
                 background: var(--bg-ffffff, #fff);
-                box-shadow: 0 -6px 12px rgba(var(--bd-f7faf7-rgb, 247, 250, 247), .95);
+                border-top: 1px solid var(--bd-edf2ed, #edf2ed);
+                box-shadow: 0 -4px 12px rgba(0, 0, 0, .06);
+            }
+
+            .drone-editor-actions .drone-editor-message {
+                grid-column: 1 / -1;
             }
 
             .drone-editor-actions .drone-editor-btn {
-                padding: 10px;
+                min-width: 0;
+                min-height: 44px;
+                padding: 10px 8px;
                 border-radius: 8px;
+                font-size: 13px;
+                line-height: 1.2;
+                text-align: center;
             }
 
             .drone-editor-message:empty {
@@ -733,7 +811,7 @@
         <div class="drone-editor-map">
             <div id="droneEditorMap" aria-label="Drone imagery preview map"></div>
             {{-- Top toolbar like the manual delineation: tool toggles, then Undo / Redo. --}}
-            <div class="drone-editor-toolbar">
+            <div class="drone-editor-toolbar" @if ($editor['read_only']) style="display:none" @endif>
                 <div class="drone-editor-tools-bar" role="group" aria-label="Mangrove area tools">
                     <button type="button" class="drone-editor-tool" id="droneEditorDrawToggle" aria-pressed="false" title="Draw mangrove areas (click again to stop)">
                         <i class="bi bi-pentagon"></i><span>Draw area</span>
@@ -772,36 +850,24 @@
             <section class="drone-editor-section" aria-labelledby="droneEditorAiTitle">
                 <h2 id="droneEditorAiTitle">1. Mangrove areas (AI delineation)</h2>
                 <div id="droneEditorAiStatus" class="drone-editor-ai-status" aria-live="polite"></div>
+                @if ($editor['read_only'])
+                <p class="drone-editor-hint">Green shapes are the mangrove areas. This imagery was approved by an expert, so it is
+                    view-only. Click an area, or one in the list, to see it.</p>
+                @else
                 <p class="drone-editor-hint">Green shapes are the mangrove areas. Use the toolbar at the top of the map:
                     <i class="bi bi-pentagon"></i> <strong>Draw area</strong> adds areas the AI missed, <i class="bi bi-pencil"></i>
                     <strong>Edit</strong> lets you drag corners (<strong>double-click</strong> a corner to delete it), and
                     Undo / Redo step through your changes. Click an area to remove it.</p>
+                @endif
                 <ul id="droneEditorAiList" class="drone-editor-shapes" aria-label="Mangrove areas" hidden></ul>
                 <div class="drone-editor-tools">
                     <button type="button" class="drone-editor-btn" id="droneEditorAiRun" hidden><i class="bi bi-cpu"></i> Run AI detection</button>
                 </div>
             </section>
 
-            <section class="drone-editor-section" aria-labelledby="droneEditorLookTitle">
-                <h2 id="droneEditorLookTitle">2. Appearance</h2>
-                <div class="drone-editor-row">
-                    <label for="droneEditorOpacity">Opacity</label>
-                    <input type="range" id="droneEditorOpacity" min="10" max="100" step="5">
-                    <output id="droneEditorOpacityValue" for="droneEditorOpacity"></output>
-                </div>
-                <div class="drone-editor-row" style="margin-top:10px">
-                    <label for="droneEditorBase">Base map</label>
-                    <select id="droneEditorBase">
-                        <option value="sat">Satellite</option>
-                        <option value="osm">Street</option>
-                        <option value="topo">Topo</option>
-                    </select>
-                </div>
-            </section>
-
             @if ($editor['needs_delineation'])
                 <section class="drone-editor-section" aria-labelledby="droneEditorDelineationTitle">
-                    <h2 id="droneEditorDelineationTitle">3. Delineation details</h2>
+                    <h2 id="droneEditorDelineationTitle">2. Delineation details</h2>
                     <p class="drone-editor-hint">
                         @if ($editor['needs_expert_review'])
                             The mangrove areas are submitted as a delineation with this imagery. An expert reviews them;
@@ -810,6 +876,10 @@
                             The mangrove areas are published as a delineation with this imagery as soon as it is processed.
                         @endif
                     </p>
+                    <div class="drone-editor-field">
+                        <span>Location</span>
+                        <div class="drone-editor-location" id="droneEditorLocation" aria-live="polite"></div>
+                    </div>
                     <label class="drone-editor-field">
                         <span>Name</span>
                         <input type="text" id="droneEditorDelineationName" maxlength="191" value="{{ $layer->name }}">
@@ -844,9 +914,74 @@
                         <textarea id="droneEditorDelineationNotes" rows="3" maxlength="5000" placeholder="Anything the reviewer should know about this area"></textarea>
                     </label>
                 </section>
+            @elseif ($submitted = $editor['submitted_delineation'])
+                {{-- Already submitted: what was sent, read-only. It is edited on the map like any delineation. --}}
+                <section class="drone-editor-section" aria-labelledby="droneEditorSubmittedTitle">
+                    <h2 id="droneEditorSubmittedTitle">2. Submitted delineation</h2>
+                    <dl class="drone-editor-summary">
+                        <div>
+                            <dt>Name</dt>
+                            <dd>{{ $submitted['name'] }}</dd>
+                        </div>
+                        <div>
+                            <dt>Status</dt>
+                            <dd>
+                                @switch($submitted['review_state'])
+                                    @case('approved')
+                                        <span class="drone-editor-state is-approved">Approved · on the map</span>
+                                        @break
+                                    @case('rejected')
+                                        <span class="drone-editor-state is-rejected">Not approved</span>
+                                        @break
+                                    @default
+                                        <span class="drone-editor-state is-pending">Awaiting expert review</span>
+                                @endswitch
+                            </dd>
+                        </div>
+                        @if ($submitted['rejection_notes'])
+                            <div>
+                                <dt>Expert feedback</dt>
+                                <dd>{{ $submitted['rejection_notes'] }}</dd>
+                            </div>
+                        @endif
+                        <div>
+                            <dt>Location</dt>
+                            <dd>
+                                @if ($submitted['location']['text'])
+                                    {{ $submitted['location']['text'] }}
+                                @elseif ($submitted['location']['status'] === 'pending')
+                                    Location pending boundary import
+                                @else
+                                    Outside loaded barangay boundaries
+                                @endif
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Mangrove areas</dt>
+                            <dd>{{ $submitted['area_count'] }}</dd>
+                        </div>
+                        <div>
+                            <dt>Mangrove Genus Present</dt>
+                            <dd>
+                                @forelse ($submitted['genera'] as $genus)
+                                    <span class="drone-editor-selected-genus">{{ $genus }}</span>
+                                @empty
+                                    —
+                                @endforelse
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Notes</dt>
+                            <dd class="drone-editor-summary-notes">{{ $submitted['notes'] ?: '—' }}</dd>
+                        </div>
+                    </dl>
+                    <p class="drone-editor-hint">Changes to the submitted areas, genus or notes are made on the map, like any delineation.</p>
+                    <a href="{{ $submitted['url'] }}" class="drone-editor-btn drone-editor-link-btn"><i class="bi bi-geo-alt"></i> Open delineation on the map</a>
+                </section>
             @endif
 
-            <div class="drone-editor-actions">
+            {{-- View-only (approved): kept in the page for the script, but nothing to save or confirm. --}}
+            <div class="drone-editor-actions" @if ($editor['read_only']) style="display:none" @endif>
                 <div id="droneEditorMessage" class="drone-editor-message" role="status" aria-live="polite"></div>
                 <button type="button" class="drone-editor-btn" id="droneEditorSave"><i class="bi bi-floppy"></i> Save draft</button>
                 <button type="button" class="drone-editor-btn primary" id="droneEditorConfirm">

@@ -186,6 +186,8 @@ class EndUserController extends Controller
             'approved_by_name' => $delineation->approvedBy?->name ?? $delineation->approved_by_name ?? null,
             'last_revised_by_name' => $latestRevision?->reviser?->name,
             'last_revised_at' => $latestRevision?->created_at?->toIso8601String(),
+            // Rejected delineations: experts may remove them from this moment on (the resident is told).
+            'removable_after' => $delineation->rejectedRemovableAt()?->toIso8601String(),
         ]);
 
         if ($delineation->relationLoaded('user') || $delineation->user !== null) {

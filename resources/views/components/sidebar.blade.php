@@ -27,6 +27,17 @@
             <span>Activity Logs</span>
         </a>
 
+        @php($newFeedbackCount = \App\Models\Feedback::where('status', 'new')->count())
+        <a href="{{ route('admin.feedback.index') }}" class="sidebar-item {{ request()->routeIs('admin.feedback.*') ? 'active' : '' }} {{ $newFeedbackCount > 0 ? 'has-unread' : '' }}">
+            <span class="sidebar-notification-icon">
+                <i class="bi bi-chat-left-text"></i>
+                @if($newFeedbackCount > 0)
+                    <span class="sidebar-notification-badge" aria-label="{{ $newFeedbackCount }} new feedback">{{ $newFeedbackCount }}</span>
+                @endif
+            </span>
+            <span>Feedback</span>
+        </a>
+
     </div>
 
     <div class="sidebar-section">
@@ -49,14 +60,24 @@
             </span>
             <span>Notifications</span>
         </a>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-title">Support</div>
 
         <a href="{{ route('guide') }}" class="sidebar-item {{ request()->routeIs('guide') ? 'active' : '' }}">
             <i class="bi bi-question-circle"></i>
             <span>Help &amp; Guide</span>
         </a>
+
+        <button type="button" class="sidebar-item" data-feedback-open>
+            <i class="bi bi-chat-left-text"></i>
+            <span>Send Feedback</span>
+        </button>
     </div>
 
     @php($currentUser = auth()->user())
+    <div class="sidebar-version">Version {{ config('app.version') }}</div>
     <div class="sidebar-profile-footer">
         <a href="{{ route('profile.show') }}" class="sidebar-profile-link" aria-label="View profile for {{ $currentUser->name }}">
             <span class="sidebar-profile-avatar">

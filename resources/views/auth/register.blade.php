@@ -36,12 +36,12 @@
         }
 
         /* Left Panel - Register Form */
+        /* Same light backdrop and white card as login, forgot/reset password and verify email. */
         .register-left {
             flex: 1;
-            background:
-                radial-gradient(900px 420px at 70% 90%, rgba(93, 115, 99, 0.15), transparent 60%),
-                radial-gradient(900px 520px at 10% 30%, rgba(107, 122, 112, 0.12), transparent 60%),
-                linear-gradient(135deg, #4a5d52 0%, #556159 100%);
+            background: radial-gradient(700px 420px at 15% 10%, rgba(16, 185, 129, 0.12), transparent 60%),
+                radial-gradient(700px 420px at 90% 90%, rgba(59, 130, 246, 0.08), transparent 60%),
+                var(--bg-f5f7f6, #f5f7f6);
             display: flex;
             padding: 24px 20px;
             height: 100%;
@@ -63,12 +63,11 @@
         }
 
         .register-card {
-            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.82);
-            border-radius: 18px;
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.92);
+            border-radius: 22px;
             padding: 28px 30px 24px;
-            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
+            border: 1px solid rgba(148, 163, 184, 0.30);
             position: relative;
         }
 
@@ -99,7 +98,8 @@
             width: 34px;
             height: 34px;
             position: absolute;
-            top: 24px;
+            /* Level with the brand row at the top of the card. */
+            top: 28px;
             left: 24px;
         }
 
@@ -637,10 +637,11 @@
             }
 
             /* Left panel takes full width and full height */
+            /* Top padding keeps the card clear of the floating dark-mode button. */
             .register-left {
                 flex: none;
                 width: 100%;
-                padding: 20px 16px;
+                padding: 72px 16px 20px;
             }
 
             /* Adjust card styling for better mobile experience */
@@ -655,7 +656,7 @@
 
             /* Adjust back button position for smaller screens */
             .back-btn {
-                top: 20px;
+                top: 24px;
                 left: 20px;
             }
         }
@@ -663,7 +664,7 @@
         /* Extra small devices (phones under 480px) - fine-tune spacing */
         @media (max-width: 480px) {
             .register-left {
-                padding: 16px 12px;
+                padding: 72px 12px 16px;
             }
 
             .register-card {
@@ -671,7 +672,7 @@
             }
 
             .back-btn {
-                top: 18px;
+                top: 23px;
                 left: 16px;
                 width: 32px;
                 height: 32px;
@@ -716,7 +717,7 @@
         /* Landscape orientation on mobile - keep right panel hidden */
         @media (max-width: 768px) and (orientation: landscape) {
             .register-left {
-                padding: 12px 20px;
+                padding: 64px 20px 12px;
             }
 
             .register-card {
@@ -724,7 +725,7 @@
             }
 
             .back-btn {
-                top: 16px;
+                top: 20px;
                 left: 16px;
             }
         }
@@ -843,8 +844,7 @@
             <div class="hero-photo" aria-hidden="true"></div>
             <div class="hero-copy" role="note" aria-label="Project overview">
                 <div class="hero-title">
-                    Web-Based Mangrove Extent Mapping, Genus Classification,<br>
-                    and Expert-Based Planting Suitability Recommendation System
+                    Web-Based Mangrove Extent Mapping, Genus Classification, and Expert-Based Planting Suitability Recommendation System
                 </div>
                 <div class="hero-sub">
                     A single platform for mapping mangrove extent, classifying genus, and providing expert-based
@@ -868,6 +868,7 @@
                         <path d="M12.5 16.25L5.75 9.5L12.5 2.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
+                @include('auth.partials.brand')
                 <div class="register-header">
                     <div class="logo-section">
                         <div class="logo-text">Create Account</div>

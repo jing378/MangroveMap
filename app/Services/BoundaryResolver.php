@@ -5,11 +5,20 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
-use RuntimeException;
 
 class BoundaryResolver
 {
     private const PROJECTED_SRID = 32651;
+
+    /**
+     * Mangroves grow on the shoreline and tidal flats, often just seaward of the barangay polygons (which
+     * follow the coastline). A shape that overlaps no barangay is assigned to the nearest one within this
+     * distance, flagged as a coastal match in location_details.
+     */
+    public const COASTAL_TOLERANCE_METRES = 1000;
+
+    /** Rough degrees for the search box around the shape (1 km is ~0.009° at this latitude). */
+    private const COASTAL_SEARCH_DEGREES = 0.012;
 
     /**
      * @param  array<int, array<string, mixed>>  $features
@@ -24,6 +33,7 @@ class BoundaryResolver
                 $features[$index]['location'] = null;
                 $features[$index]['location_status'] = 'pending';
                 $features[$index]['location_details'] = null;
+
                 continue;
             }
 
@@ -52,7 +62,7 @@ class BoundaryResolver
             throw ValidationException::withMessages(['features' => 'A valid point, line, or area is required.']);
         }
 
-        $positions = array_map(fn($position) => $this->position($position), $coords);
+        $positions = array_map(fn ($position) => $this->position($position), $coords);
         $minimumPositions = $type === 'line' ? 2 : 3;
         if (count($positions) < $minimumPositions) {
             throw ValidationException::withMessages(['features' => 'The boundary has too few coordinates.']);
@@ -119,13 +129,13 @@ class BoundaryResolver
         $bindings = [$geoJson, $geoJson];
 
         if ($type === 'point') {
-            $sql = "SELECT boundary.adm4_pcode, boundary.adm4_name, boundary.adm3_pcode, boundary.adm3_name, "
-                . "boundary.adm2_pcode, boundary.adm2_name, boundary.dataset_version, boundary.dataset_valid_on, "
-                . "ST_Contains({$projectedBoundary}, input_shape.projected_geom) AS contains_point "
-                . "FROM admin_boundaries AS boundary {$inputShape} "
-                . 'WHERE MBRIntersects(boundary.geom, input_shape.geom) '
-                . "AND ST_Intersects({$projectedBoundary}, input_shape.projected_geom) "
-                . 'ORDER BY contains_point DESC, boundary.adm4_pcode ASC LIMIT 1';
+            $sql = 'SELECT boundary.adm4_pcode, boundary.adm4_name, boundary.adm3_pcode, boundary.adm3_name, '
+                .'boundary.adm2_pcode, boundary.adm2_name, boundary.dataset_version, boundary.dataset_valid_on, '
+                ."ST_Contains({$projectedBoundary}, input_shape.projected_geom) AS contains_point "
+                ."FROM admin_boundaries AS boundary {$inputShape} "
+                .'WHERE MBRIntersects(boundary.geom, input_shape.geom) '
+                ."AND ST_Intersects({$projectedBoundary}, input_shape.projected_geom) "
+                .'ORDER BY contains_point DESC, boundary.adm4_pcode ASC LIMIT 1';
         } else {
             $measure = $type === 'line' ? 'ST_Length' : 'ST_Area';
             $intersectionMeasure = "{$measure}(ST_Intersection({$projectedBoundary}, input_shape.projected_geom))";
@@ -138,21 +148,75 @@ class BoundaryResolver
                 throw ValidationException::withMessages(['features' => 'A delineation must have non-zero length or area.']);
             }
 
-            $sql = "SELECT boundary.adm4_pcode, boundary.adm4_name, boundary.adm3_pcode, boundary.adm3_name, "
-                . "boundary.adm2_pcode, boundary.adm2_name, boundary.dataset_version, boundary.dataset_valid_on, "
-                . "{$intersectionMeasure} AS overlap_measure, {$inputMeasure} AS input_measure "
-                . "FROM admin_boundaries AS boundary {$inputShape} "
-                . 'WHERE MBRIntersects(boundary.geom, input_shape.geom) '
-                . "AND ST_Intersects({$projectedBoundary}, input_shape.projected_geom) "
-                . "AND {$intersectionMeasure} > 0 "
-                . 'ORDER BY overlap_measure DESC, boundary.adm4_pcode ASC';
+            $sql = 'SELECT boundary.adm4_pcode, boundary.adm4_name, boundary.adm3_pcode, boundary.adm3_name, '
+                .'boundary.adm2_pcode, boundary.adm2_name, boundary.dataset_version, boundary.dataset_valid_on, '
+                ."{$intersectionMeasure} AS overlap_measure, {$inputMeasure} AS input_measure "
+                ."FROM admin_boundaries AS boundary {$inputShape} "
+                .'WHERE MBRIntersects(boundary.geom, input_shape.geom) '
+                ."AND ST_Intersects({$projectedBoundary}, input_shape.projected_geom) "
+                ."AND {$intersectionMeasure} > 0 "
+                .'ORDER BY overlap_measure DESC, boundary.adm4_pcode ASC';
         }
 
         $matches = DB::select($sql, $bindings);
         if ($matches === []) {
+            return $this->nearestCoastalBoundary($geoJson);
+        }
+
+        return $this->locationFromMatches($matches, $type);
+    }
+
+    /** Nearest barangay within COASTAL_TOLERANCE_METRES of a shape that overlaps none (shoreline / tidal flat). */
+    private function nearestCoastalBoundary(string $geoJson): ?array
+    {
+        $geometry = json_decode($geoJson, true);
+        $positions = match ($geometry['type'] ?? null) {
+            'Point' => [$geometry['coordinates']],
+            'LineString' => $geometry['coordinates'],
+            'Polygon' => $geometry['coordinates'][0] ?? [],
+            default => [],
+        };
+        if ($positions === []) {
             return null;
         }
 
+        // Search box around the shape, so only nearby boundaries are measured.
+        $margin = self::COASTAL_SEARCH_DEGREES;
+        $lngs = array_column($positions, 0);
+        $lats = array_column($positions, 1);
+        [$west, $east, $south, $north] = [min($lngs) - $margin, max($lngs) + $margin, min($lats) - $margin, max($lats) + $margin];
+        $searchBox = json_encode(['type' => 'Polygon', 'coordinates' => [[
+            [$west, $south], [$east, $south], [$east, $north], [$west, $north], [$west, $south],
+        ]]], JSON_THROW_ON_ERROR);
+
+        $projectedSrid = self::PROJECTED_SRID;
+        $nearest = DB::selectOne(
+            'SELECT boundary.adm4_pcode, boundary.adm4_name, boundary.adm3_pcode, boundary.adm3_name, '
+            .'boundary.adm2_pcode, boundary.adm2_name, boundary.dataset_version, boundary.dataset_valid_on, '
+            ."ST_Distance(ST_Transform(boundary.geom, {$projectedSrid}), input_shape.projected_geom) AS distance_m "
+            .'FROM admin_boundaries AS boundary '
+            ."CROSS JOIN (SELECT ST_Transform(ST_GeomFromGeoJSON(?, 1, 4326), {$projectedSrid}) AS projected_geom, "
+            .'ST_GeomFromGeoJSON(?, 1, 4326) AS search_box) AS input_shape '
+            .'WHERE MBRIntersects(boundary.geom, input_shape.search_box) '
+            .'ORDER BY distance_m ASC, boundary.adm4_pcode ASC LIMIT 1',
+            [$geoJson, $searchBox],
+        );
+        if ($nearest === null || (float) $nearest->distance_m > self::COASTAL_TOLERANCE_METRES) {
+            return null;
+        }
+
+        $resolved = $this->locationFromMatches([$nearest], 'point');
+        $resolved['details']['overlap_percent'] = 0.0;
+        $resolved['details']['matches'][0]['overlap_percent'] = 0.0;
+        $resolved['details']['coastal_match'] = true;
+        $resolved['details']['distance_m'] = round((float) $nearest->distance_m, 1);
+
+        return $resolved;
+    }
+
+    /** @param  array<int, object>  $matches  boundary rows, dominant first */
+    private function locationFromMatches(array $matches, string $type): array
+    {
         $dominant = $matches[0];
         $locations = array_map(function ($match) use ($type) {
             $overlapPercent = $type === 'point'

@@ -11,6 +11,7 @@ use App\Http\Controllers\DroneImageryController;
 use App\Http\Controllers\EndUserController;
 use App\Http\Controllers\MapLayerController;
 use App\Http\Controllers\ExpertController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlantingRecommendationController;
 use App\Http\Controllers\ProfileController;
@@ -121,6 +122,16 @@ Route::get('/', function () {
 
 Route::view('/terms', 'terms')->name('terms');
 
+// Landing page map: tiles of published (expert-approved) drone imagery only.
+Route::get('/imagery/{layerId}/tiles/{z}/{x}/{y}', [DroneImageryController::class, 'publicTile'])
+    ->whereNumber(['layerId', 'z', 'x', 'y'])
+    ->name('public.drone-imagery.tile');
+
+// OpenStreetMap place names drawn on the satellite basemap (every map, including the landing page).
+Route::get('/map/place-labels', \App\Http\Controllers\MapPlaceLabelController::class)
+    ->middleware('throttle:60,1')
+    ->name('map.place-labels');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     // Drone Upload tab: upload GeoTIFFs, then review and manage them
     Route::get('/drone-upload', [DroneImageryController::class, 'page'])->name('drone-imagery.page');
@@ -173,6 +184,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Help & user guide (sections shown depend on the user's role)
     Route::view('/guide', 'guide')->name('guide');
 
+    // "Send Feedback" pop-up in the sidebar; admins review it under /admin/feedback.
+    Route::post('/feedback', [FeedbackController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('feedback.store');
+
     // Map viewer & Delineate studio (accessible to authenticated users)
     Route::get('/map', [EndUserController::class, 'map'])->name('map');
     Route::get('/delineate', [EndUserController::class, 'delineate'])->name('delineate');
@@ -205,6 +221,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/delineations', [ExpertController::class, 'storeDelineation'])->name('expert.delineations.store');
         Route::post('/delineations/{delineation}/approve', [ExpertController::class, 'approve'])->name('expert.delineations.approve');
         Route::post('/delineations/{delineation}/reject', [ExpertController::class, 'reject'])->name('expert.delineations.reject');
+        Route::delete('/delineations/{delineation}', [ExpertController::class, 'destroyRejected'])->name('expert.delineations.destroy');
         Route::get('/recommendations', [PlantingRecommendationController::class, 'index'])
             ->name('expert.recommendations.index');
         Route::post('/recommendations', [PlantingRecommendationController::class, 'store'])
@@ -251,5 +268,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.expert-applications.approve');
         Route::post('/users/{user}/expert-application/reject', [AdminController::class, 'rejectExpertApplication'])
             ->name('admin.expert-applications.reject');
+        Route::get('/feedback', [FeedbackController::class, 'index'])->name('admin.feedback.index');
+        Route::put('/feedback/{feedback}', [FeedbackController::class, 'update'])
+            ->whereNumber('feedback')
+            ->name('admin.feedback.update');
+        Route::delete('/feedback/{feedback}', [FeedbackController::class, 'destroy'])
+            ->whereNumber('feedback')
+            ->name('admin.feedback.destroy');
+        Route::get('/feedback/{feedback}/screenshot', [FeedbackController::class, 'screenshot'])
+            ->whereNumber('feedback')
+            ->name('admin.feedback.screenshot');
     });
 });

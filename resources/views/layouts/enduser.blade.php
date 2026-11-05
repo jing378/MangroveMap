@@ -477,6 +477,18 @@
             color: var(--fg-a52f21, #a52f21);
         }
 
+        .sidebar-version {
+            margin-top: auto;
+            padding: 0 16px 8px;
+            color: #7a9a7a;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .sidebar-version + .sidebar-profile-footer {
+            margin-top: 0;
+        }
+
         .main-content {
             flex: 1;
             display: flex;
@@ -590,6 +602,7 @@
         <div class="header-left">
             <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation menu">
                 <i class="bi bi-list"></i>
+                @include('partials.mobile-menu-badge')
             </button>
             <div class="logo">
                 <div class="logo-mark"><img src="/icon-192.png" alt=""></div>
@@ -655,13 +668,22 @@
                     </span>
                     <span>Notifications</span>
                 </a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">SUPPORT</div>
                 <a href="{{ route('guide') }}"
                     class="sidebar-item {{ request()->routeIs('guide') ? 'active' : '' }}">
                     <i class="bi bi-question-circle"></i>
                     <span>Help &amp; Guide</span>
                 </a>
+                <button type="button" class="sidebar-item" data-feedback-open>
+                    <i class="bi bi-chat-left-text"></i>
+                    <span>Send Feedback</span>
+                </button>
             </div>
             @php($currentUser = auth()->user())
+            <div class="sidebar-version">Version {{ config('app.version') }}</div>
             <div class="sidebar-profile-footer">
                 <a href="{{ route('profile.show') }}" class="sidebar-profile-link" aria-label="View profile for {{ $currentUser->name }}">
                     <span class="sidebar-profile-avatar">
@@ -692,6 +714,8 @@
             </div>
         </div>
     </div>
+
+    @include('partials.feedback-modal')
 
     @yield('scripts')
     @stack('scripts')

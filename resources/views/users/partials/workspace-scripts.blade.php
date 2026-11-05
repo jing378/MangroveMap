@@ -8,6 +8,7 @@
     const updateBoundaryUrlTemplate = @json(route('delineations.boundary.update', ['delineation' => '__DELINEATION_ID__']));
     const resolveDelineationLocationUrl = @json(route('delineations.location-preview'));
     const deleteDelineationBaseUrl = "{{ url('/delineations') }}";
+    const expertDeleteDelineationBaseUrl = @json(url('/expert/delineations'));
     const annualObservationBaseUrl = @json(url('/delineations'));
     const isExpertUser = {{ Auth::check() && Auth::user()->isExpert() ? 'true' : 'false' }};
     const savedDelineations = @json($delineations);
@@ -62,8 +63,10 @@
       return [...byId.values()];
     }
 
+    // Experts also get every approved delineation (e.g. another expert's drone/AI delineation, approved on
+    // submit), so it is on the map next to its GeoTIFF, which the drone panel shows for everyone once approved.
     const allDelineations = isExpertUser
-      ? mergeDelineationsById(savedDelineations, residentDelineations)
+      ? mergeDelineationsById(savedDelineations, residentDelineations, approvedDelineations)
       : mergeDelineationsById(savedDelineations, approvedDelineations);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
@@ -383,8 +386,12 @@
       : [];
 
     const zones = zoneRecords.map(record => {
-      const feature = Array.isArray(record.features) ? record.features[0] : null;
-      const [lat, lng] = getFeatureCenter(feature);
+      const features = Array.isArray(record.features) ? record.features : [];
+      const feature = features[0] || null;
+      // The record's single pin sits on its largest area (AI delineations can start with a tiny patch).
+      const featureSize = f => Number(f?.area_ha) || extractPoints(f?.coords).length * 1e-9;
+      const pinFeature = features.reduce((best, f) => (!best || featureSize(f) > featureSize(best) ? f : best), null) || feature;
+      const [lat, lng] = getFeatureCenter(pinFeature);
       const review = getDelineationStatus(record);
       return {
         id: record.id,
@@ -647,11 +654,13 @@
 
     function ensurePlantMap() {
       if (plantMap) return plantMap;
+      const plantImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', tileLayerOpts);
       plantMap = L.map('plantMap', {
         zoomControl: true,
         preferCanvas: true,
-        layers: [L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', tileLayerOpts)],
+        layers: [plantImagery],
       }).setView([10.358, 124.973], 13);
+      attachPlaceLabels(plantMap, [plantImagery]);
       zones.forEach(z => {
         L.circleMarker([z.lat, z.lng], {
           radius: 4,
@@ -813,6 +822,7 @@
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
           rejection_notes: record.rejection_notes || null,
+          removable_after: record.removable_after || null,
           last_revised_by_name: record.last_revised_by_name || null,
           last_revised_at: record.last_revised_at || null,
           is_own: !!options.is_own,
@@ -836,7 +846,9 @@
             created_by: record.user?.name || 'Resident',
           });
         });
-      } else if (Array.isArray(approvedDelineations)) {
+      }
+      // Approved delineations for everyone (experts too); records already loaded above are skipped by key.
+      if (Array.isArray(approvedDelineations)) {
         approvedDelineations.forEach(record => {
           pushDelineationFeatures(record, {
             is_own: false,
@@ -1166,8 +1178,11 @@
       if (removeBtn) {
         const isUnsaved = !feature.delineation_id;
         // Unsaved shapes (hand-drawn or AI draft areas) can be dropped one by one before saving.
-        removeBtn.style.display = ((isUnsaved || feature.is_own) && !feature.is_approved && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
-        removeBtn.textContent = isUnsaved ? 'Remove this area' : 'Remove delineation';
+        // Experts can also clear out a resident's rejected delineation, once the resident's week to revise it is over.
+        const canExpertRemove = isExpertUser && !feature.is_own && feature.delineation_id && feature.is_rejected
+          && rejectedRemovalOpen(feature);
+        removeBtn.style.display = ((isUnsaved || feature.is_own || canExpertRemove) && !feature.is_approved && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
+        removeBtn.textContent = isUnsaved ? 'Remove this area' : (canExpertRemove ? 'Remove rejected delineation' : 'Remove delineation');
       }
       updateBoundaryEditActions(feature);
       const lastEditedRow = document.getElementById('delineationLastEditedRow');
@@ -1234,6 +1249,7 @@
         rejectionBox.style.display = 'none';
         rejectionNotes.textContent = '';
       }
+      renderRejectionHint(feature);
 
       const submitterRow = document.getElementById('delineationSubmitterRow');
       const submitterEl = document.getElementById('delineationSubmitter');
@@ -1272,6 +1288,60 @@
             console.warn('flyToBounds error:', err);
           }
         }
+      }
+    }
+
+    // Tells the owner of a rejected delineation it can still be fixed and resubmitted (the revise buttons only exist
+    // on the Delineate page, so the Map page links there), and tells experts they may remove it.
+    // Rejected delineations get REJECTED_REMOVAL_GRACE_DAYS (server side, 7) for the resident to revise them;
+    // `removable_after` is when that ends. Without it (older payloads) the server decides when Remove is pressed.
+    function rejectedRemovalDate(feature) {
+      const date = feature?.removable_after ? new Date(feature.removable_after) : null;
+      return date && !isNaN(date) ? date : null;
+    }
+
+    function rejectedRemovalOpen(feature) {
+      const date = rejectedRemovalDate(feature);
+      return !date || date.getTime() <= Date.now();
+    }
+
+    function formatRemovalDate(date) {
+      return date.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function renderRejectionHint(feature) {
+      const hint = document.getElementById('delineationRejectionHint');
+      if (!hint) return;
+      hint.replaceChildren();
+      const rejected = feature.delineation_id && feature.is_rejected && !feature.is_approved;
+      const ownRejected = rejected && feature.is_own && !isExpertUser;
+      const expertView = rejected && isExpertUser && !feature.is_own;
+      hint.style.display = ownRejected || expertView ? 'block' : 'none';
+      const removalDate = rejectedRemovalDate(feature);
+
+      if (expertView) {
+        hint.textContent = rejectedRemovalOpen(feature)
+          ? 'The resident\'s week to revise this delineation is over. If it is no longer needed, use "Remove rejected delineation" below to delete it.'
+          : `The resident has until ${formatRemovalDate(removalDate)} to revise and resubmit this delineation. After that you can remove it.`;
+        return;
+      }
+      if (!ownRejected) return;
+
+      const deadline = document.createElement('strong');
+      deadline.textContent = removalDate
+        ? (rejectedRemovalOpen(feature)
+          ? 'Your week to revise it has passed, and an expert may remove it at any time.'
+          : `Revise it by ${formatRemovalDate(removalDate)}, or an expert may remove it.`)
+        : 'If it is not revised within a week, an expert may remove it.';
+
+      if (APP_PAGE === 'delineate') {
+        hint.append('This delineation can still be edited. Use "Revise rejected delineation" below to fix it and resubmit it for review. ', deadline);
+      } else {
+        hint.append('This delineation can still be edited and resubmitted. ');
+        const link = document.createElement('a');
+        link.href = `${delineatePageUrl}?delineation=${encodeURIComponent(feature.delineation_id)}`;
+        link.textContent = 'Revise it on the Delineate page';
+        hint.append(link, '. ', deadline);
       }
     }
 
@@ -1890,19 +1960,24 @@
 
       // If this feature came from a saved delineation record, deleting it must happen server-side.
       // Otherwise it will reappear on refresh (because it is loaded again from the DB).
-      if (delineationId && feature?.is_own && !feature?.is_approved) {
+      const expertRemovesRejected = isExpertUser && !feature?.is_own && !!feature?.is_rejected && !feature?.is_approved
+        && rejectedRemovalOpen(feature);
+      if (delineationId && ((feature?.is_own && !feature?.is_approved) || expertRemovesRejected)) {
         // Confirmation → Processing → Success or Error (partials.action-feedback).
         const outcome = await window.AppActions.run({
           confirm: {
-            title: 'Remove this delineation?',
-            message: `"${feature.label || 'This delineation'}" is permanently deleted. This cannot be undone.`,
+            title: expertRemovesRejected ? 'Remove this rejected delineation?' : 'Remove this delineation?',
+            message: expertRemovesRejected
+              ? `"${feature.label || 'This delineation'}" is permanently deleted and the resident can no longer revise it. They are notified. This cannot be undone.`
+              : `"${feature.label || 'This delineation'}" is permanently deleted. This cannot be undone.`,
             confirmLabel: 'Remove',
             tone: 'danger',
           },
           button: document.getElementById('removeDelineationBtn'),
           busyLabel: 'Removing...',
           task: async () => {
-            const response = await fetch(`${deleteDelineationBaseUrl}/${delineationId}`, {
+            const baseUrl = expertRemovesRejected ? expertDeleteDelineationBaseUrl : deleteDelineationBaseUrl;
+            const response = await fetch(`${baseUrl}/${delineationId}`, {
               method: 'DELETE',
               headers: {
                 'Accept': 'application/json',
@@ -2389,6 +2464,7 @@
             is_approved: false,
             is_rejected: true,
             rejection_notes: rejectionNotes,
+            removable_after: payload.removable_after || null,
           });
         }
 
@@ -2398,6 +2474,16 @@
         if (selectedDrawnIndex >= 0) {
           selectDrawnFeature(selectedDrawnIndex);
         }
+        // Reload once the message has been seen so the reviewed delineation is shown everywhere with its new
+        // status (approved ones join the community layers and zone list), reopened on the same delineation.
+        if (approveBtn) approveBtn.disabled = true;
+        if (rejectBtn) rejectBtn.disabled = true;
+        setTimeout(() => {
+          const reloadUrl = new URL(window.location.href);
+          reloadUrl.searchParams.set('delineation', String(delineationId));
+          reloadUrl.searchParams.delete('ai_layer');
+          window.location.replace(reloadUrl.toString());
+        }, 1200);
       } catch (error) {
         restoreReviewButtons();
         window.AppActions.notify(error.message || 'Unable to complete review.', 'error');

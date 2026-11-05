@@ -7,6 +7,7 @@ use App\Jobs\ProcessDroneImagery;
 use App\Jobs\SegmentDroneImagery;
 use App\Models\DroneImageryLayer;
 use App\Models\User;
+use App\Services\BoundaryResolver;
 use App\Services\DroneImageryDelineationPublisher;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,9 +39,13 @@ class DroneImageryController extends Controller
 
     public const MAX_OFFSET_METRES = 50;
 
+    /** Approved imagery (its delineation was approved) opens view-only and refuses edits. */
+    public const APPROVED_VIEW_ONLY_MESSAGE = 'This imagery was approved by an expert and is view-only now. Its delineation can still be changed on the map.';
+
     public function index(Request $request): JsonResponse
     {
         $viewer = $request->user();
+        $this->publishStrandedSubmissions($viewer);
         $layers = $this->visibleLayersQuery($viewer)
             ->whereDoesntHave('hiddenByUsers', fn (Builder $query) => $query->whereKey($viewer->id))
             ->with(['user:id,name,role', 'delineation:id,drone_imagery_layer_id,is_approved,is_rejected,rejection_notes'])
@@ -70,6 +75,33 @@ class DroneImageryController extends Controller
                 ...$this->segmentationPayload($layer),
             ]),
         ]);
+    }
+
+    /**
+     * FinalizeDroneImagery creates the delineation once the imagery is tiled. If that did not happen (e.g. a
+     * long-running drone worker still had the code from before it was added, or the step failed), a confirmed
+     * submission would sit at "Not submitted". Create it here, when the owner's uploads are loaded (the Drone
+     * Upload page polls this). Only details from a real confirm (submitted_at), never a saved draft.
+     */
+    private function publishStrandedSubmissions(User $viewer): void
+    {
+        DroneImageryLayer::query()
+            ->where('user_id', $viewer->id)
+            ->where('status', 'ready')
+            ->whereNotNull('delineation_details')
+            ->whereDoesntHave('delineation')
+            ->get()
+            ->filter(fn (DroneImageryLayer $layer) => ! empty($layer->delineation_details['submitted_at']))
+            ->each(function (DroneImageryLayer $layer) {
+                try {
+                    app(DroneImageryDelineationPublisher::class)->publish($layer);
+                } catch (Throwable $exception) {
+                    Log::error('Unable to create the delineation from drone imagery.', [
+                        'layer_id' => $layer->id,
+                        'exception' => $exception,
+                    ]);
+                }
+            });
     }
 
     private function reviewPayload(DroneImageryLayer $layer, User $viewer): array
@@ -147,6 +179,10 @@ class DroneImageryController extends Controller
             return response()->json([
                 'message' => 'Wait until the imagery has finished processing before running AI segmentation.',
             ], 409);
+        }
+
+        if ($layer->isApproved()) {
+            return response()->json(['message' => self::APPROVED_VIEW_ONLY_MESSAGE], 409);
         }
 
         if ($layer->isSegmenting()) {
@@ -365,8 +401,14 @@ class DroneImageryController extends Controller
                 'max_offset_m' => self::MAX_OFFSET_METRES,
                 // First confirm: ask for the delineation details (genus) and submit the areas with the imagery.
                 'needs_delineation' => self::needsDelineation($layer),
+                // Approved: the editor only shows the imagery, its areas and the submitted delineation.
+                'read_only' => $layer->isApproved(),
                 // Name / genus / notes kept by "Save draft" (null until saved once).
                 'delineation_draft' => $layer->delineation_details,
+                // Barangay of the current mangrove areas (before submitting), refreshed when they are saved.
+                'location' => self::needsDelineation($layer) ? $this->areasLocation($layer) : null,
+                // After submitting: what was submitted, shown read-only in the panel.
+                'submitted_delineation' => $this->submittedDelineationSummary($layer, $viewer),
                 'needs_expert_review' => ! $viewer->isExpert(),
                 'max_delineation_areas' => DroneImageryDelineationPublisher::MAX_AREAS,
             ],
@@ -402,14 +444,17 @@ class DroneImageryController extends Controller
         }
 
         [$edits, $opacity] = $this->validatedEdits($request, $layer);
+        $draft = $this->draftDelineationDetails($request, $layer);
         $layer->update([
             'edits' => $edits,
             'display_opacity' => $opacity,
-            ...$this->draftDelineationDetails($request, $layer),
+            ...$draft,
+            ...self::renamedLayer($draft['delineation_details'] ?? null),
         ]);
 
         return response()->json([
             'id' => $layer->id,
+            'name' => $layer->name,
             'status' => $layer->status,
             'has_pending_edits' => $layer->hasPendingEdits(),
         ]);
@@ -444,7 +489,12 @@ class DroneImageryController extends Controller
             'display_opacity' => $opacity,
             'status' => 'finalizing',
             'error_message' => null,
-            ...($delineationDetails === null ? [] : ['delineation_details' => $delineationDetails]),
+            ...self::renamedLayer($delineationDetails),
+            // submitted_at tells a real "Confirm & submit" apart from details kept by "Save draft".
+            ...($delineationDetails === null ? [] : ['delineation_details' => [
+                ...$delineationDetails,
+                'submitted_at' => now()->toIso8601String(),
+            ]]),
         ]);
 
         try {
@@ -496,6 +546,18 @@ class DroneImageryController extends Controller
         ]);
 
         return ['delineation_details' => self::normalizedDelineationDetails($validated['delineation'] ?? [])];
+    }
+
+    /**
+     * The name typed in the editor also renames the imagery, so Drone Upload lists it under that name.
+     *
+     * @return array{name?: string}
+     */
+    private static function renamedLayer(?array $details): array
+    {
+        $name = $details['name'] ?? null;
+
+        return $name === null ? [] : ['name' => $name];
     }
 
     /** @return array{name: ?string, genera: array<int, string>, notes: ?string} */
@@ -552,6 +614,79 @@ class DroneImageryController extends Controller
         return $details;
     }
 
+    /**
+     * Barangay(s) of the layer's current mangrove areas, as the delineation will get them.
+     *
+     * @return array{text: ?string, status: string} status: matched | outside_boundaries | pending | none
+     */
+    private function areasLocation(DroneImageryLayer $layer): array
+    {
+        $areas = array_slice(DroneImageryDelineationPublisher::areasOf($layer), 0, DroneImageryDelineationPublisher::MAX_AREAS);
+        if ($areas === []) {
+            return ['text' => null, 'status' => 'none'];
+        }
+
+        try {
+            $resolved = app(BoundaryResolver::class)->resolveFeatures(array_map(
+                fn (array $area) => ['type' => 'area', 'coords' => $area['coords']],
+                $areas
+            ));
+        } catch (Throwable $exception) {
+            // Invalid geometry etc.: the panel says the location could not be identified.
+            return ['text' => null, 'status' => 'outside_boundaries'];
+        }
+
+        return self::summarizeLocations($resolved);
+    }
+
+    /**
+     * One line for all areas: their matched barangays, most areas first.
+     *
+     * @return array{text: ?string, status: string}
+     */
+    private static function summarizeLocations(array $features): array
+    {
+        $locations = collect($features)
+            ->filter(fn ($feature) => ($feature['location_status'] ?? null) === 'matched' && ! empty($feature['location']))
+            ->countBy(fn ($feature) => $feature['location'])
+            ->sortDesc()
+            ->keys();
+        if ($locations->isNotEmpty()) {
+            return ['text' => $locations->implode('; '), 'status' => 'matched'];
+        }
+
+        $pending = collect($features)->contains(fn ($feature) => ($feature['location_status'] ?? null) === 'pending');
+
+        return ['text' => null, 'status' => $pending ? 'pending' : 'outside_boundaries'];
+    }
+
+    /** The delineation submitted from this imagery, for the editor panel (read-only). */
+    private function submittedDelineationSummary(DroneImageryLayer $layer, User $viewer): ?array
+    {
+        $delineation = $layer->delineation;
+        if ($delineation === null) {
+            return null;
+        }
+
+        $features = $delineation->features ?? [];
+
+        return [
+            'id' => $delineation->id,
+            'name' => $delineation->name,
+            'notes' => $delineation->notes,
+            'review_state' => $layer->reviewState(),
+            'rejection_notes' => $delineation->is_rejected ? $delineation->rejection_notes : null,
+            'genera' => collect($features)->flatMap(fn ($feature) => (array) ($feature['genera'] ?? []))
+                ->filter(fn ($genus) => is_string($genus) && trim($genus) !== '')
+                ->unique()
+                ->values()
+                ->all(),
+            'area_count' => count($features),
+            'location' => self::summarizeLocations($features),
+            'url' => $delineation->mapDashboardUrlFor($viewer),
+        ];
+    }
+
     /** No delineation has been submitted from this imagery yet (nor is one waiting to be created). */
     public static function needsDelineation(DroneImageryLayer $layer): bool
     {
@@ -602,6 +737,10 @@ class DroneImageryController extends Controller
                     ? 'This imagery is still being processed. Try again when it has finished.'
                     : 'This imagery has no preview to edit. Upload it again.',
             ], 409);
+        }
+
+        if ($layer->isApproved()) {
+            return response()->json(['message' => self::APPROVED_VIEW_ONLY_MESSAGE], 409);
         }
 
         return $layer;
@@ -751,6 +890,8 @@ class DroneImageryController extends Controller
         return response()->json([
             'id' => $layer->id,
             ...$this->segmentationPayload($layer),
+            // The corrected areas may sit in another barangay: refresh the panel's location.
+            'location' => self::needsDelineation($layer) ? $this->areasLocation($layer) : null,
         ]);
     }
 
@@ -811,6 +952,22 @@ class DroneImageryController extends Controller
             ->whereDoesntHave('hiddenByUsers', fn (Builder $query) => $query->whereKey($viewer->id))
             ->findOrFail($layerId);
 
+        return $this->tileResponse($layer, $z, $x, $y);
+    }
+
+    /**
+     * Landing page (guests): tiles of published imagery only (an expert's, or a resident's whose
+     * delineation an expert approved). Anything else is a 404, as if it did not exist.
+     */
+    public function publicTile(int $layerId, int $z, int $x, int $y): Response|BinaryFileResponse
+    {
+        $layer = DroneImageryLayer::query()->published()->findOrFail($layerId);
+
+        return $this->tileResponse($layer, $z, $x, $y);
+    }
+
+    private function tileResponse(DroneImageryLayer $layer, int $z, int $x, int $y): Response|BinaryFileResponse
+    {
         if (
             $z < $layer->zoom_min || $z > $layer->zoom_max
             || $x < 0 || $y < 0

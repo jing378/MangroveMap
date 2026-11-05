@@ -18,25 +18,30 @@
             box-sizing: border-box;
         }
 
-        html,
+        /* Same backdrop and card as the other auth pages (login, forgot and reset password). */
         body {
-            height: 100%;
-            font-family: 'Manrope', system-ui, -apple-system, Segoe UI, sans-serif;
-            background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%);
-            color: var(--fg-1a2e1a, #1a2e1a);
+            font-family: 'Manrope', system-ui, -apple-system, Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            background: radial-gradient(900px 500px at 10% 10%, rgba(16, 185, 129, 0.12), transparent 55%),
+                radial-gradient(900px 500px at 90% 20%, rgba(59, 130, 246, 0.10), transparent 55%),
+                var(--bg-f5f7f6, #f5f7f6);
+            color: var(--fg-1a2e1a, #1a2e1a);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            padding: 24px;
         }
 
         .verify-container {
-            background: var(--bg-ffffff, #fff);
-            border-radius: 14px;
-            padding: 40px;
-            max-width: 500px;
+            background: rgba(var(--bg-ffffff-rgb, 255, 255, 255), 0.92);
+            border-radius: 22px;
+            padding: 36px 32px;
+            max-width: 460px;
             width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
+            border: 1px solid rgba(148, 163, 184, 0.30);
         }
 
         .verify-header {
@@ -57,22 +62,23 @@
         }
 
         .verify-title {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 800;
             color: var(--fg-1a2e1a, #1a2e1a);
             margin-bottom: 8px;
+            letter-spacing: -0.02em;
         }
 
         .verify-subtitle {
             font-size: 13px;
-            color: #7a9a7a;
+            color: var(--fg-5b7864, #5b7864);
             line-height: 1.6;
         }
 
         .verify-content {
             background: var(--bg-f5f7f6, #f5f7f6);
             border: 1px solid var(--bd-e0e8e0, #e0e8e0);
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 20px;
             margin-bottom: 24px;
         }
@@ -123,11 +129,11 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            padding: 11px 20px;
+            padding: 13px 20px;
             border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 700;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 800;
             cursor: pointer;
             transition: all 0.15s;
             text-decoration: none;
@@ -135,15 +141,17 @@
         }
 
         .btn-primary {
-            background: #1e9e62;
+            background: linear-gradient(135deg, #1e9e62 0%, #16a34a 100%);
             color: #fff;
+            box-shadow: 0 4px 14px rgba(30, 158, 98, 0.18);
         }
 
         .btn-primary:hover {
-            background: #16a34a;
-            box-shadow: 0 4px 12px rgba(30, 158, 98, 0.3);
-            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(30, 158, 98, 0.22);
+            transform: translateY(-1px);
         }
+
+        @include('auth.partials.submit-loading-styles')
 
         .btn-secondary {
             background: var(--bg-f5f7f6, #f5f7f6);
@@ -196,6 +204,7 @@
 
 <body>
     <div class="verify-container">
+        @include('auth.partials.brand')
         <div class="verify-header">
             <div class="verify-icon"><i class="bi bi-envelope-check"></i></div>
             <h1 class="verify-title">Verify your email</h1>
@@ -222,11 +231,12 @@
         </div>
 
         <div class="verify-actions">
-            <form method="POST" action="{{ route('verification.send') }}" style="width: 100%;">
+            <form method="POST" action="{{ route('verification.send') }}" style="width: 100%;" id="resendForm">
                 @csrf
-                <button type="submit" class="btn btn-primary" style="width: 100%;">
-                    <i class="bi bi-arrow-clockwise"></i>
-                    Resend Verification Email
+                <button type="submit" class="btn btn-primary submit-btn" style="width: 100%;" id="resendSubmitBtn">
+                    <span class="submit-spinner" aria-hidden="true"></span>
+                    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                    <span class="submit-label">Resend Verification Email</span>
                 </button>
             </form>
 
@@ -241,9 +251,14 @@
         </div>
 
         <div class="verify-footer">
-            <p>Need help? <a href="#">Contact our support team</a></p>
+            <p>Still nothing after a few minutes? Press Resend above. If the email address is wrong, go to login and create a new account with the correct one.</p>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            @include('auth.partials.submit-loading-script', ['formId' => 'resendForm', 'buttonId' => 'resendSubmitBtn', 'busyLabel' => 'Sending...'])
+        });
+    </script>
     @include('partials.theme-toggle', ['floating' => true])
 </body>
 

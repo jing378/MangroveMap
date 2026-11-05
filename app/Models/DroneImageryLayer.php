@@ -95,6 +95,12 @@ class DroneImageryLayer extends Model
             || ($delineation !== null && $delineation->is_approved && ! $delineation->is_rejected);
     }
 
+    /** An expert approved the delineation submitted from it: the imagery is view-only from then on. */
+    public function isApproved(): bool
+    {
+        return $this->reviewState() === 'approved';
+    }
+
     /** null (no delineation submitted from this imagery), pending, approved or rejected. */
     public function reviewState(): ?string
     {

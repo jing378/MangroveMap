@@ -281,7 +281,10 @@
       if (ai) stateText.append(document.createElement('br'), ai);
 
       const actions = element('div', 'drone-item-actions');
-      if (layer.review_url) {
+      if (layer.review_state === 'approved' && (layer.delineation_url || layer.review_url)) {
+        // Approved by an expert: open it on the map (focused on its delineation, the imagery shown under it).
+        actions.append(linkButton(layer.delineation_url || layer.review_url, 'View', 'bi-eye'));
+      } else if (layer.review_url) {
         const label = layer.status === 'awaiting_review' ? (page.needs_expert_review ? 'Review & submit' : 'Review & publish')
           : (layer.status === 'failed' ? 'Edit & retry' : 'Edit imagery');
         actions.append(linkButton(layer.review_url, label, 'bi-pencil-square', layer.status !== 'ready' || stage.badge === 'Not submitted'));

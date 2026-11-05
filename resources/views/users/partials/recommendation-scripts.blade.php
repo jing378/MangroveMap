@@ -265,6 +265,8 @@
     function renderReferenceAreas() {
       referenceLayer.clearLayers();
       referenceAreas.forEach(area => {
+        // One pin per delineation (AI delineations can have many small areas), on its largest polygon.
+        let pinTarget = null;
         area.features.forEach(feature => {
           const polygon = L.polygon(feature.coords, {
             color: REFERENCE_COLOR,
@@ -280,13 +282,21 @@
             startDraftFromReference(area, feature, shouldFocus);
           };
           polygon.on('click', selectArea);
-          const marker = L.marker(polygon.getCenter(), { icon: locationPinIcon(REFERENCE_COLOR), title: area.name, riseOnHover: true }).addTo(referenceLayer);
-          marker.bindTooltip(`${area.name} · Approved delineation`, { direction: 'top' });
-          marker.on('click', (e) => {
-            L.DomEvent.stopPropagation(e);
-            zoomToFeatures([feature]);
-            selectArea(e, false);
-          });
+          const b = polygon.getBounds();
+          const size = Number(feature.area_ha) > 0
+            ? Number(feature.area_ha)
+            : Math.abs((b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest()));
+          if (!pinTarget || size > pinTarget.size) pinTarget = { feature, polygon, size, selectArea };
+        });
+
+        if (!pinTarget) return;
+        const { feature, polygon, selectArea } = pinTarget;
+        const marker = L.marker(polygon.getCenter(), { icon: locationPinIcon(REFERENCE_COLOR), title: area.name, riseOnHover: true }).addTo(referenceLayer);
+        marker.bindTooltip(`${area.name} · Approved delineation`, { direction: 'top' });
+        marker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          zoomToFeatures([feature]);
+          selectArea(e, false);
         });
       });
     }

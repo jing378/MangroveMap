@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Delineation;
+use App\Models\DroneImageryLayer;
 use App\Models\PlantingRecommendation;
 use App\Services\DelineationObservationRecorder;
 
@@ -10,6 +11,8 @@ class PublicController extends Controller
 {
     /** Same cap as the logged-in Map page. */
     private const RECOMMENDATIONS_LIMIT = 300;
+
+    private const DRONE_IMAGERY_LIMIT = 50;
 
     /**
      * Public landing page. Every figure comes from expert-approved delineations, in hectares.
@@ -39,8 +42,30 @@ class PublicController extends Controller
             ->map(fn(PlantingRecommendation $recommendation) => $this->publicRecommendationPayload($recommendation))
             ->values();
 
+        // Approved drone imagery (GeoTIFF tiles), drawn under its AI delineation.
+        $droneImagery = DroneImageryLayer::query()
+            ->published()
+            ->whereNotNull('tiles_path')
+            ->latest('processed_at')
+            ->limit(self::DRONE_IMAGERY_LIMIT)
+            ->get()
+            ->filter(fn(DroneImageryLayer $layer) => is_array($layer->bounds)
+                && $layer->tiles_path === "drone-imagery/tiles/{$layer->id}")
+            ->map(fn(DroneImageryLayer $layer) => [
+                'id' => $layer->id,
+                'name' => $layer->name,
+                'bounds' => $layer->bounds,
+                'zoom_min' => $layer->zoom_min,
+                'zoom_max' => $layer->zoom_max,
+                'opacity' => $layer->display_opacity,
+                'version' => $layer->processed_at?->toIso8601String(),
+                'tile_url' => url("/imagery/{$layer->id}/tiles/{z}/{x}/{y}"),
+            ])
+            ->values();
+
         return view('index', [
             'delineations' => $records->values(),
+            'droneImagery' => $droneImagery,
             'plantingRecommendations' => $recommendations,
             'suitabilityLevels' => PlantingRecommendation::SUITABILITY_LEVELS,
             'mappedAreaHa' => round($records->sum('area_ha'), 2),

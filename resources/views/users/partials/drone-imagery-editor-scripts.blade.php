@@ -11,8 +11,6 @@
 
     const statusElement = document.getElementById('droneEditorStatus');
     const messageElement = document.getElementById('droneEditorMessage');
-    const opacityInput = document.getElementById('droneEditorOpacity');
-    const opacityValue = document.getElementById('droneEditorOpacityValue');
     const saveButton = document.getElementById('droneEditorSave');
     const confirmButton = document.getElementById('droneEditorConfirm');
     const aiList = document.getElementById('droneEditorAiList');
@@ -122,6 +120,8 @@
     };
     let currentBase = baseLayers.sat;
     const map = L.map('droneEditorMap', { maxZoom: MAP_MAX_ZOOM, layers: [currentBase] });
+    @include('partials.map-place-labels')
+    attachPlaceLabels(map, [baseLayers.sat]);
 
     // The preview sits below the mangrove areas but above the base map.
     map.createPane('dronePreview');
@@ -157,13 +157,6 @@
     }
 
     map.fitBounds(previewBounds(), fitOptions(30));
-
-    document.getElementById('droneEditorBase').addEventListener('change', event => {
-      map.removeLayer(currentBase);
-      currentBase = baseLayers[event.target.value] || baseLayers.sat;
-      map.addLayer(currentBase);
-      currentBase.bringToBack();
-    });
 
     // ---- Mangrove areas (Geoman shapes) ----------------------------------------------------
     const AREA_STYLE = { color: '#1e9e62', weight: 2, fillColor: '#2fd27f', fillOpacity: 0.28 };
@@ -393,6 +386,11 @@
       box.style.cssText = 'display:grid;gap:6px;font:13px Manrope,sans-serif;min-width:180px;max-width:240px';
       const title = document.createElement('strong');
       title.textContent = `${layer.options.droneLabel} · ${ringAreaHa(outerRing(layer)).toFixed(2)} ha`;
+      if (editor.read_only) { // approved: view only, nothing to edit or remove
+        box.append(title);
+        L.popup({ closeButton: true }).setLatLng(latlng).setContent(box).openOn(map);
+        return;
+      }
       const hint = document.createElement('span');
       hint.style.color = '#4c6b5d';
       hint.textContent = 'Not mangrove? Remove it so it is left out of the delineation.';
@@ -438,7 +436,8 @@
         remove.addEventListener('click', () => removeArea(layer));
         item.addEventListener('mouseenter', () => layer.setStyle({ weight: 4 }));
         item.addEventListener('mouseleave', () => layer.setStyle({ weight: AREA_STYLE.weight }));
-        item.append(label, remove);
+        item.append(label);
+        if (!editor.read_only) item.append(remove);
         aiList.appendChild(item);
       });
       aiList.hidden = !aiList.childElementCount;
@@ -486,7 +485,7 @@
 
     function renderAi() {
       aiStatusElement.classList.toggle('is-failed', ai.status === 'failed');
-      aiRunButton.hidden = aiIsRunning();
+      aiRunButton.hidden = editor.read_only || aiIsRunning();
       if (aiRunButton.dataset.loading !== 'true') { // keep the busy label while the request runs
         aiRunButton.innerHTML = `<i class="bi bi-cpu"></i> ${ai.status === 'ready' ? 'Re-run AI' : (ai.status === 'failed' ? 'Retry AI detection' : 'Run AI detection')}`;
       }
@@ -575,14 +574,6 @@
       refresh();
     });
 
-    // ---- Opacity ---------------------------------------------------------------------------
-    opacityInput.value = String(Math.round(state.opacity * 100));
-    opacityInput.addEventListener('input', () => {
-      state.opacity = Number(opacityInput.value) / 100;
-      preview.setOpacity(state.opacity);
-      markChanged(false);
-    });
-
     // ---- Status, saving and confirming -----------------------------------------------------
     function showMessage(text, isError = false) {
       messageElement.textContent = text;
@@ -598,6 +589,8 @@
       statusElement.classList.toggle('is-failed', editor.status === 'failed');
       if (editor.status === 'failed') {
         statusElement.textContent = `Adding this imagery to the map failed: ${editor.error_message || 'unknown error'}. Confirm again to retry.`;
+      } else if (editor.read_only) {
+        statusElement.textContent = 'Approved by an expert: this imagery and its delineation are on the map. View only.';
       } else if (editor.status === 'ready' && editor.needs_delineation) {
         statusElement.textContent = 'This imagery is processed, but its mangrove areas were never submitted. Choose the genus present and confirm.';
       } else if (editor.status === 'ready') {
@@ -612,12 +605,12 @@
     }
 
     function refresh() {
-      opacityValue.textContent = `${opacityInput.value}%`;
       renderList();
       renderAi();
       renderToggles();
       renderHistoryButtons();
       renderActionButtons();
+      renderLocation();
     }
 
     // ---- 3. Delineation details (first confirm only): submitted with the imagery ------------------
@@ -761,7 +754,7 @@
       }
       // Already on the map: only a rebuild with something new is worth confirming.
       if (editor.status === 'ready' && !unsaved && !editor.has_pending_edits) {
-        return 'No changes to apply. Edit the mangrove areas or the appearance first.';
+        return 'No changes to apply. Edit the mangrove areas first.';
       }
       return null;
     }
@@ -788,8 +781,8 @@
         idleHtml: SAVE_IDLE_HTML,
         busyLabel: 'Saving draft...',
         title: unsaved ? '' : (editor.needs_delineation
-          ? 'No unsaved changes. Edit the mangrove areas, delineation details or appearance first.'
-          : 'No unsaved changes. Edit the mangrove areas or the appearance first.'),
+          ? 'No unsaved changes. Edit the mangrove areas or delineation details first.'
+          : 'No unsaved changes. Edit the mangrove areas first.'),
       });
       setActionButton(confirmButton, {
         disabled: Boolean(state.busy) || blocker !== null,
@@ -832,14 +825,34 @@
       ai.stats = body.segmentation_stats;
       ai.url = body.segmentation_url;
       saved.areas = sent;
+      if (body.location) editor.location = body.location;
+      renderLocation();
+    }
+
+    // Section 3: barangay of the mangrove areas, as the delineation will get it (resolved by the server
+    // from the saved areas; unsaved corrections are looked up on the next save).
+    function renderLocation() {
+      const locationElement = document.getElementById('droneEditorLocation'); // looked up here: refresh() can run first
+      if (!locationElement) return;
+      const location = editor.location || { text: null, status: 'none' };
+      let text = location.text;
+      if (!text) {
+        text = {
+          none: 'Identified once there are mangrove areas.',
+          pending: 'Location pending boundary import.',
+        }[location.status] || 'Outside the loaded barangay boundaries.';
+      }
+      const stale = location.status !== 'none' && areasChanged();
+      locationElement.textContent = stale ? `${text} (updates when you save)` : text;
+      locationElement.classList.toggle('is-muted', !location.text);
     }
 
     // Confirmation (partials.action-feedback) → Processing (button label) → Success or Error (message line).
     saveButton.addEventListener('click', async () => {
       if (saveButton.disabled) return;
       const what = editor.needs_delineation
-        ? 'Your mangrove area corrections, delineation details (name, genus, notes) and appearance are saved.'
-        : 'Your mangrove area corrections and appearance are saved.';
+        ? 'Your mangrove area corrections and delineation details (name, genus, notes) are saved.'
+        : 'Your mangrove area corrections are saved.';
       const confirmed = await window.AppActions.confirm({
         title: 'Save draft?',
         message: editor.needs_delineation || editor.status !== 'ready'
@@ -861,10 +874,15 @@
         });
         saved.opacity = sentOpacity;
         if (sentDetails) saved.details = JSON.stringify(sentDetails);
+        if (body.name) { // the typed name also renames the imagery
+          document.getElementById('droneEditorTitle').textContent = body.name;
+          const sheetTitle = document.querySelector('.drone-editor-sheet-title');
+          if (sheetTitle) sheetTitle.textContent = body.name;
+        }
         editor.has_pending_edits = body.has_pending_edits;
         renderStatus();
         showMessage(editor.status === 'ready' && body.has_pending_edits
-          ? 'Saved. The mangrove areas and opacity are updated; confirm to apply the other changes.'
+          ? 'Saved. The mangrove areas are updated; confirm to apply the other changes.'
           : 'Saved.');
       } catch (error) {
         showMessage(error.message, true);
