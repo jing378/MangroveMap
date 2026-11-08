@@ -70,3 +70,19 @@ service-account*.json
 /dlf
 recent-laravel-log.txt
 *.log.txt
+
+# Database dumps (contain user emails and password hashes)
+*.sql
+*.sql.gz
+
+# Local scratch: old files and personal notes
+/trash/
+/LOCATION_LOOKUP_IMPLEMENTATION.md
+/LOCATION_PREVIEW.md
+/NOTIFICATIONS_COMPLETE.md
+/NOTIFICATIONS_ICONS.md
+/NOTIFICATIONS_SETUP.md
+/NOTIFICATION_EXAMPLES.php
+/QUICK_REFERENCE.md
+/ROUTES_TO_ADD.txt
+/how_location_detection_works.md
