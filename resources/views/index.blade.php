@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.json">
   <title>MangroveMap — Mangrove Mapping & Monitoring System</title>
-  <link rel="icon" type="image/png" href="/icon-192.png" />
+  <link rel="icon" type="image/png" href="/favicon-round.png" />
   
   <!-- Leaflet GIS & Libraries -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />

@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.json">
   <title>@yield('title', config('app.name', 'Capstone'))</title>
-  <link rel="icon" type="image/png" href="/icon-192.png" />
+  <link rel="icon" type="image/png" href="/favicon-round.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
   {{-- Page-specific styles --}}
