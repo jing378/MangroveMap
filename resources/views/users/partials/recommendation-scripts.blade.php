@@ -536,6 +536,9 @@
     function openPanel() {
       panel.classList.remove('expanded');
       panel.classList.add('open');
+      document.getElementById('panelBackdrop').classList.remove('show');
+      const headerSub = document.getElementById('panelHeaderSub');
+      if (headerSub) headerSub.innerHTML = '<span>Adjust upwards for details</span> <i class="bi bi-chevron-up"></i>';
       setTimeout(() => mainMap.invalidateSize({ pan: false }), 330);
     }
 
@@ -545,15 +548,73 @@
       setTimeout(() => mainMap.invalidateSize({ pan: false }), 330);
     }
 
+    function setPanelExpanded(expanded) {
+      if (!panel.classList.contains('open')) return;
+      panel.classList.toggle('expanded', expanded);
+      document.getElementById('panelBackdrop').classList.toggle('show', expanded);
+      const headerSub = document.getElementById('panelHeaderSub');
+      if (headerSub) {
+        headerSub.innerHTML = expanded
+          ? '<span>Swipe down to collapse</span> <i class="bi bi-chevron-down"></i>'
+          : '<span>Adjust upwards for details</span> <i class="bi bi-chevron-up"></i>';
+      }
+      setTimeout(() => mainMap.invalidateSize({ pan: false }), 330);
+    }
+
     document.getElementById('panelHeader').addEventListener('click', (e) => {
       if (e.target.closest('.panel-close-btn') || window.innerWidth > 780) return;
-      const expanded = panel.classList.toggle('expanded');
-      document.getElementById('panelBackdrop').classList.toggle('show', expanded);
+      setPanelExpanded(!panel.classList.contains('expanded'));
     });
-    document.getElementById('panelBackdrop').addEventListener('click', () => {
-      panel.classList.remove('expanded');
-      document.getElementById('panelBackdrop').classList.remove('show');
-    });
+    document.getElementById('panelBackdrop').addEventListener('click', () => setPanelExpanded(false));
+
+    // Mobile bottom-sheet swipes, same as the Delineate panel: swipe up expands; swipe down collapses,
+    // or hides the panel (keeping the draft) when it is already collapsed.
+    (function initRecommendationSheetGestures() {
+      let startY = 0;
+      let currentY = 0;
+      let startTime = 0;
+      let touching = false;
+
+      panel.addEventListener('touchstart', (e) => {
+        if (window.innerWidth > 780) return;
+        if (e.target.closest('.panel-close-btn, input, textarea, select, button')) return;
+        // Expanded: the content scrolls normally; only the header drags the sheet.
+        if (panel.classList.contains('expanded') && !e.target.closest('.panel-header')) return;
+        startY = currentY = e.touches[0].clientY;
+        startTime = Date.now();
+        touching = true;
+      }, { passive: true });
+
+      panel.addEventListener('touchmove', (e) => {
+        if (touching) currentY = e.touches[0].clientY;
+      }, { passive: true });
+
+      panel.addEventListener('touchend', () => {
+        if (!touching) return;
+        touching = false;
+        const deltaY = currentY - startY;
+        const quick = Date.now() - startTime < 250;
+        if (deltaY < -20 || (deltaY < -8 && quick)) {
+          setPanelExpanded(true);
+        } else if (deltaY > 20 || (deltaY > 8 && quick)) {
+          if (panel.classList.contains('expanded')) setPanelExpanded(false);
+          else closePanelKeepDraft();
+        }
+      }, { passive: true });
+
+      // Expanded: pulling down at the top of the scrolled content collapses the sheet.
+      const scrollEl = panel.querySelector('.scroll');
+      if (scrollEl) {
+        let scrollStartY = 0;
+        scrollEl.addEventListener('touchstart', (e) => { scrollStartY = e.touches[0].clientY; }, { passive: true });
+        scrollEl.addEventListener('touchend', (e) => {
+          const deltaY = e.changedTouches[0].clientY - scrollStartY;
+          if (window.innerWidth <= 780 && scrollEl.scrollTop <= 2 && deltaY > 45 && panel.classList.contains('expanded')) {
+            setPanelExpanded(false);
+          }
+        }, { passive: true });
+      }
+    })();
     // × only hides the panel, like the Delineate side panel: a new or edited draft stays on the map (nothing
     // is discarded) and clicking it reopens the panel. Discarding is the panel's Discard button.
     function closePanelKeepDraft() {
