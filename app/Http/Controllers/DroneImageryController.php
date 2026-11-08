@@ -9,6 +9,7 @@ use App\Models\DroneImageryLayer;
 use App\Models\User;
 use App\Services\BoundaryResolver;
 use App\Services\DroneImageryDelineationPublisher;
+use App\Services\MangroveSegmentationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -393,6 +394,7 @@ class DroneImageryController extends Controller
                 ...$this->segmentationPayload($layer),
                 'status_url' => route('drone-imagery.show', $layer->id),
                 'segmentation_update_url' => route('drone-imagery.segmentation.update', $layer->id),
+                'genus_preview_url' => route('drone-imagery.segmentation.genus-preview', $layer->id),
                 'segment_url' => route('drone-imagery.segmentation.store', $layer->id),
                 'save_url' => route('drone-imagery.edits.update', $layer->id),
                 'confirm_url' => route('drone-imagery.confirm', $layer->id),
@@ -829,7 +831,7 @@ class DroneImageryController extends Controller
      * the AI result everywhere it is used (map AI extent, "Use as delineation", statistics) and are kept when
      * the imagery is confirmed, until the owner runs the AI again.
      */
-    public function updateSegmentation(Request $request, int $layerId): JsonResponse
+    public function updateSegmentation(Request $request, int $layerId, MangroveSegmentationService $segmentation): JsonResponse
     {
         $layer = $this->reviewableLayer($request, $layerId);
         if ($layer instanceof JsonResponse) {
@@ -876,6 +878,12 @@ class DroneImageryController extends Controller
             'edited' => true,
             'edited_at' => now()->toIso8601String(),
         ];
+        // The genus suggestion follows the corrected areas (recounted from the genus map of the last AI run).
+        if (array_key_exists('genus_suggestion', $previous)) {
+            $stats['genus_suggestion'] = $this->recountedGenusSuggestion(
+                $layer, $rings, $stats['offset'], $previous['genus_suggestion'], $segmentation
+            );
+        }
 
         $path = "drone-imagery/processed/{$layer->id}/ai_extent.json";
         Storage::disk('local')->put($path, json_encode(['features' => $features, 'stats' => $stats], JSON_UNESCAPED_SLASHES));
@@ -893,6 +901,97 @@ class DroneImageryController extends Controller
             // The corrected areas may sit in another barangay: refresh the panel's location.
             'location' => self::needsDelineation($layer) ? $this->areasLocation($layer) : null,
         ]);
+    }
+
+    /**
+     * Live genus suggestion while the owner edits: recounts the unsaved areas from the genus map and returns
+     * the result without saving anything (the editor calls it shortly after each change).
+     */
+    public function previewGenusSuggestion(Request $request, int $layerId, MangroveSegmentationService $segmentation): JsonResponse
+    {
+        $layer = $this->reviewableLayer($request, $layerId);
+        if ($layer instanceof JsonResponse) {
+            return $layer;
+        }
+
+        if ($layer->isSegmenting()) {
+            return response()->json([
+                'message' => 'Wait until AI detection finishes.',
+            ], 409);
+        }
+
+        $validated = $request->validate([
+            'areas' => ['present', 'array', 'max:'.self::MAX_EDIT_POLYGONS],
+            'offset' => ['required', 'array'],
+            'offset.east_m' => ['required', 'numeric', 'between:-'.self::MAX_OFFSET_METRES.','.self::MAX_OFFSET_METRES],
+            'offset.north_m' => ['required', 'numeric', 'between:-'.self::MAX_OFFSET_METRES.','.self::MAX_OFFSET_METRES],
+        ]);
+        $rings = $this->validatedRings($validated['areas'], $layer, 'areas');
+        $previous = $layer->segmentation_stats['genus_suggestion'] ?? null;
+
+        $suggestion = $this->recountedGenusSuggestion($layer, $rings, [
+            'east_m' => round((float) $validated['offset']['east_m'], 2),
+            'north_m' => round((float) $validated['offset']['north_m'], 2),
+        ], $previous, $segmentation);
+        if (is_array($suggestion)) {
+            unset($suggestion['recounted_at']);
+            $suggestion['preview'] = true; // follows the unsaved areas; stored only when they are saved
+        }
+
+        return response()->json(['genus_suggestion' => $suggestion]);
+    }
+
+    /**
+     * The genus suggestion for the owner's corrected areas: counted from the per-pixel genus map that the
+     * last AI run saved (ml/predict_genus.py --recount, no model run). Without a map (older results, no genus
+     * model) or when the recount fails, the previous suggestion is kept and marked as not following the edits.
+     *
+     * @param  array<int, array<int, array{0: float, 1: float}>>  $lngLatRings
+     * @param  array{east_m: float, north_m: float}  $offset
+     */
+    private function recountedGenusSuggestion(
+        DroneImageryLayer $layer,
+        array $lngLatRings,
+        array $offset,
+        mixed $previous,
+        MangroveSegmentationService $segmentation,
+    ): mixed {
+        if (! is_array($previous) || isset($previous['error'])) {
+            return $previous;
+        }
+
+        $disk = Storage::disk('local');
+        if (! $disk->exists($layer->genusLabelsPath()) || ! $disk->exists($layer->genusLabelsMetaPath())) {
+            return [...$previous, 'recountable' => false];
+        }
+
+        if ($lngLatRings === []) {
+            // Every area removed: nothing left to suggest a genus for.
+            return [...$previous, 'genera' => [], 'probabilities' => [], 'labeled_percent' => 0.0,
+                'probability_basis' => 'none', 'recountable' => true, 'recounted_at' => now()->toIso8601String()];
+        }
+
+        try {
+            $result = $segmentation->recountGenera(
+                $disk->path($layer->genusLabelsPath()),
+                $disk->path($layer->genusLabelsMetaPath()),
+                $lngLatRings,
+                $offset,
+            );
+        } catch (Throwable $exception) {
+            Log::warning('Recounting the genus suggestion for edited areas failed.', [
+                'layer_id' => $layer->id,
+                'exception' => $exception,
+            ]);
+
+            return [...$previous, 'recount_failed' => true];
+        }
+
+        return [
+            ...MangroveSegmentationService::genusSuggestionFromResult($result),
+            'recountable' => true,
+            'recounted_at' => now()->toIso8601String(),
+        ];
     }
 
     /** Planar ring area at survey scale (local equirectangular projection around $latitude). */

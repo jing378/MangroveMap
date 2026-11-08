@@ -88,6 +88,67 @@ class AdminMapLayersTest extends TestCase
             ->assertDontSee('Published Bay');
     }
 
+    public function test_rejected_delineations_show_the_revision_days_left_or_that_they_are_removable(): void
+    {
+        $admin = $this->admin();
+        $rejected = ['is_approved' => false, 'approved_at' => null, 'is_rejected' => true];
+        $this->delineation(['name' => 'Fresh Rejection', 'rejected_at' => now()->subDays(4)->subHour()] + $rejected);
+        $this->delineation(['name' => 'Last Day', 'rejected_at' => now()->subDays(6)->subHours(20)] + $rejected);
+        $this->delineation(['name' => 'Old Rejection', 'rejected_at' => now()->subDays(8)] + $rejected);
+
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['status' => 'rejected']))
+            ->assertOk()
+            ->assertSee('3 days left to revise')
+            ->assertSee('1 day left to revise')
+            ->assertSee('Revision period over · removable')
+            ->assertSee('data-rejected', false); // the preview draws these in red
+
+        // Published delineations keep the green preview.
+        $this->delineation(['name' => 'Published Bay']);
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['status' => 'published']))
+            ->assertSee('Published Bay')
+            ->assertDontSee('data-rejected', false);
+    }
+
+    public function test_imagery_status_filter_covers_every_dropdown_option(): void
+    {
+        $admin = $this->admin();
+        $this->imageryLayer(['name' => 'Ready Survey']);
+        $this->imageryLayer(['name' => 'Review Survey', 'status' => 'awaiting_review']);
+        $this->imageryLayer(['name' => 'Final Survey', 'status' => 'finalizing']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['tab' => 'imagery', 'status' => 'awaiting_review']))
+            ->assertOk()
+            ->assertSee('Review Survey')
+            ->assertSee('<option value="awaiting_review" selected', false)
+            ->assertDontSee('Ready Survey')
+            ->assertDontSee('Final Survey');
+
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['tab' => 'imagery', 'status' => 'finalizing']))
+            ->assertSee('Final Survey')
+            ->assertDontSee('Review Survey');
+    }
+
+    public function test_imagery_preview_urls_are_relative_and_hide_reason_is_shown(): void
+    {
+        $admin = $this->admin();
+        $layer = $this->imageryLayer(['segmentation_status' => 'ready']);
+        $this->delineation(['name' => 'Hidden Bay', 'hidden_at' => now(), 'hidden_reason' => 'Overlaps a fishpond']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['tab' => 'imagery']))
+            ->assertSee('data-tile-url="/drone-imagery/' . $layer->id . '/tiles/{z}/{x}/{y}"', false)
+            ->assertSee('data-segmentation-url="/drone-imagery/' . $layer->id . '/segmentation"', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['status' => 'hidden']))
+            ->assertSee('Reason: Overlaps a fishpond');
+    }
+
     public function test_admin_edits_delineation_details_and_keeps_a_revision(): void
     {
         $admin = $this->admin();

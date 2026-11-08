@@ -110,7 +110,21 @@
             padding: 6px 12px;
             border-radius: 8px;
             pointer-events: none;
-            white-space: nowrap;
+            width: max-content;
+            max-width: calc(100% - 24px);
+            text-align: center;
+            line-height: 1.4;
+            box-sizing: border-box;
+        }
+        .rec-draw-hint[hidden] {
+            display: none;
+        }
+        @media (max-width: 580px) {
+            .rec-draw-hint {
+                top: 54px;
+                font-size: 11.5px;
+                padding: 6px 10px;
+            }
         }
         .rec-legend {
             position: absolute;

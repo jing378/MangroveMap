@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Analysis;
 use App\Models\Delineation;
 use App\Models\DelineationAnnualObservation;
+use App\Models\DroneImageryLayer;
 use App\Models\PlantingRecommendation;
 use App\Models\User;
 use App\Models\UserActivity;
@@ -50,6 +51,28 @@ class EndUserController extends Controller
                 ]);
             }
         }
+    }
+
+    /**
+     * Dashboard "Field conditions" card, loaded after the page (the forecast may take a moment).
+     * lat/lng come from the browser when the user shares their location; without them it is the default place.
+     */
+    public function fieldConditions(Request $request, \App\Services\FieldWeatherService $weather)
+    {
+        $validated = $request->validate([
+            'lat' => ['nullable', 'numeric', 'between:-90,90', 'required_with:lng'],
+            'lng' => ['nullable', 'numeric', 'between:-180,180', 'required_with:lat'],
+        ]);
+        $hasLocation = isset($validated['lat'], $validated['lng']);
+
+        $forecast = $weather->forecast(
+            $hasLocation ? (float) $validated['lat'] : null,
+            $hasLocation ? (float) $validated['lng'] : null,
+        );
+
+        return response()
+            ->view('users.partials.field-conditions', ['forecast' => $forecast])
+            ->header('Cache-Control', 'private, max-age=300');
     }
 
     public function dashboard()
@@ -277,6 +300,14 @@ class EndUserController extends Controller
         $failedAnalyses = $userAnalyses->where('status', 'failed')->count();
         $recentAnalyses = $userAnalyses->take(5);
 
+        // The AI runs on drone uploads: count the user's uploads and those it has mapped.
+        $droneStatusCounts = DroneImageryLayer::where('user_id', $user->id)
+            ->selectRaw('segmentation_status, count(*) as total')
+            ->groupBy('segmentation_status')
+            ->pluck('total', 'segmentation_status');
+        $droneUploadCount = (int) $droneStatusCounts->sum();
+        $droneAiMappedCount = (int) ($droneStatusCounts['ready'] ?? 0);
+
         // Coverage figures come from expert-approved delineations, system-wide, in hectares.
         $coverage = app(ApprovedCoverageStats::class)->summary();
         $totalCoverage = $coverage['area_ha'];
@@ -347,6 +378,8 @@ class EndUserController extends Controller
             'pendingAnalyses' => $pendingAnalyses,
             'failedAnalyses' => $failedAnalyses,
             'recentAnalyses' => $recentAnalyses,
+            'droneUploadCount' => $droneUploadCount,
+            'droneAiMappedCount' => $droneAiMappedCount,
             'totalCoverage' => $totalCoverage,
             'approvedAreaCount' => $approvedAreaCount,
             'coverageChangePct' => $coverageChangePct,

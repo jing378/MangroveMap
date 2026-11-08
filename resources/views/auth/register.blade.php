@@ -428,6 +428,62 @@
             margin-bottom: 0;
         }
 
+        .certificate-drop {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border: 1.5px dashed rgba(148, 163, 184, 0.7);
+            border-radius: 10px;
+            background: var(--bg-ffffff, #ffffff);
+            color: var(--fg-5b7864, #5b7864);
+            font-size: 13px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .certificate-drop:hover,
+        .certificate-drop:focus-within {
+            border-color: #1e9e62;
+            background: var(--bg-f3fbf6, #f3fbf6);
+        }
+
+        .certificate-drop.has-file {
+            border-style: solid;
+            border-color: #1e9e62;
+            color: var(--fg-1a2e1a, #1a2e1a);
+        }
+
+        .certificate-drop:has(.error-input) {
+            border-color: #dc2626;
+        }
+
+        .certificate-icon {
+            width: 18px;
+            height: 18px;
+            flex: none;
+            color: var(--fg-1e9e62, #1e9e62);
+        }
+
+        .certificate-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+        /* The native input stays focusable and clickable but invisible over the drop area. */
+        .certificate-input {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            padding: 0;
+        }
+
         textarea.form-input {
             resize: vertical;
             min-height: 72px;
@@ -876,7 +932,7 @@
                     <p class="register-subtitle">Create an account to access mapping, classification, and recommendations.</p>
                 </div>
 
-                <form method="POST" action="/register" novalidate>
+                <form method="POST" action="/register" enctype="multipart/form-data" novalidate>
                     @csrf
 
                     <div class="field-row">
@@ -996,8 +1052,22 @@
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label" for="expert_qualifications">Qualifications &amp; Experience</label>
-                                <textarea id="expert_qualifications" name="expert_qualifications" class="form-input" rows="3" maxlength="2000" placeholder="Your position, field of study, and experience with mangroves.">{{ old('expert_qualifications') }}</textarea>
+                                <label class="form-label" for="expert_certificate">Certificate / Proof of Expertise</label>
+                                <label class="certificate-drop" for="expert_certificate">
+                                    <input type="file" id="expert_certificate" name="expert_certificate" class="form-input certificate-input" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" aria-describedby="expert_certificate_hint">
+                                    <svg class="certificate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    <span class="certificate-text" id="certificateText">Choose a file</span>
+                                </label>
+                                <small class="field-hint" id="expert_certificate_hint">PDF, JPG, or PNG up to 5 MB, e.g. a diploma, license, or certificate of employment. Only administrators can see it.</small>
+                                @error('expert_certificate')
+                                <div class="error-message">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="expert_qualifications">Qualifications &amp; Experience <span class="label-optional">(Optional)</span></label>
+                                <textarea id="expert_qualifications" name="expert_qualifications" class="form-input" rows="3" maxlength="2000" placeholder="Other qualifications or experience you'd like to add." aria-describedby="expert_qualifications_hint">{{ old('expert_qualifications') }}</textarea>
+                                <small class="field-hint" id="expert_qualifications_hint">Not needed when your certificate already shows your expertise.</small>
                                 @error('expert_qualifications')
                                 <div class="error-message">{{ $message }}</div>
                                 @enderror
@@ -1153,13 +1223,26 @@
         const expertToggle = document.getElementById('apply_as_expert');
         const expertFields = document.getElementById('expertFields');
         const appliesAsExpert = () => expertToggle.checked;
+        const certificateExtensions = @json(\App\Models\User::EXPERT_CERTIFICATE_MIMES);
+        const certificateMaxBytes = {{ \App\Models\User::EXPERT_CERTIFICATE_MAX_KB }} * 1024;
+        const certificateInput = fieldInput('expert_certificate');
+        const certificateText = document.getElementById('certificateText');
+
+        certificateInput.addEventListener('change', () => {
+            const file = certificateInput.files[0];
+            certificateText.textContent = file ? file.name : 'Choose a file';
+            certificateInput.closest('.certificate-drop').classList.toggle('has-file', !!file);
+            // A picked file is checked right away; the field counts as touched from here on.
+            touched.add('expert_certificate');
+            validateField('expert_certificate');
+        });
 
         expertToggle.addEventListener('change', () => {
             expertFields.hidden = !appliesAsExpert();
             if (appliesAsExpert()) {
                 fieldInput('organization').focus();
             } else {
-                ['organization', 'expert_qualifications'].forEach(name => {
+                ['organization', 'expert_qualifications', 'expert_certificate'].forEach(name => {
                     touched.delete(name);
                     setFieldError(fieldInput(name), null);
                 });
@@ -1252,10 +1335,17 @@
             organization: value => (!appliesAsExpert() || value.trim())
                 ? null
                 : 'Organization or affiliation is required for an expert application.',
-            expert_qualifications: value => {
+            // Optional: the uploaded certificate is the proof of expertise.
+            expert_qualifications: value => (!appliesAsExpert() || value.length <= 2000)
+                ? null
+                : 'Qualifications must be 2000 characters or fewer.',
+            expert_certificate: () => {
                 if (!appliesAsExpert()) return null;
-                if (!value.trim()) return 'Describe your expertise so an administrator can review your application.';
-                return value.trim().length >= 20 ? null : 'Please describe your expertise in at least 20 characters.';
+                const file = fieldInput('expert_certificate').files[0];
+                if (!file) return 'Upload a certificate or proof of expertise for your expert application.';
+                const extension = (file.name.split('.').pop() || '').toLowerCase();
+                if (!certificateExtensions.includes(extension)) return 'The certificate must be a PDF, JPG, or PNG file.';
+                return file.size <= certificateMaxBytes ? null : 'The certificate must be 5 MB or smaller.';
             },
             terms: () => fieldInput('terms').checked
                 ? null

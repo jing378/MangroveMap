@@ -825,9 +825,15 @@
         hideCursorVertex();
       }
       modeHint.hidden = !mode;
+      // Phones and tablets have no Esc key or hover, so they get shorter tap wording.
+      const isTouch = window.matchMedia('(pointer: coarse)').matches;
       modeHint.textContent = mode === 'draw'
-        ? 'Click to add points. Click the starting point or double-click to finish the area. Esc cancels.'
-        : (referenceAreas.length ? 'Click an approved delineation to evaluate it.' : 'No approved delineations are available to select.');
+        ? (isTouch
+          ? 'Tap to add points. Tap the starting point to finish the area.'
+          : 'Click to add points. Click the starting point or double-click to finish the area. Esc cancels.')
+        : (referenceAreas.length
+          ? (isTouch ? 'Tap an approved delineation to evaluate it.' : 'Click an approved delineation to evaluate it.')
+          : 'No approved delineations are available to select.');
       resetHistory();
       renderReferenceAreas();
       renderDraft();

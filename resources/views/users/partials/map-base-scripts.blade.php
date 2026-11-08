@@ -684,7 +684,9 @@
       const locateBtn = L.DomUtil.create('a', 'leaflet-control-locate-button', zoomControlContainer);
       locateBtn.href = '#';
       locateBtn.title = 'Show my location';
-      locateBtn.innerHTML = '<i class="bi bi-geo-alt-fill"></i>';
+      locateBtn.setAttribute('role', 'button');
+      locateBtn.setAttribute('aria-label', 'Show my location');
+      locateBtn.innerHTML = '<i class="bi bi-geo-alt-fill" aria-hidden="true"></i>';
       L.DomEvent.on(locateBtn, 'click', L.DomEvent.stopPropagation)
         .on(locateBtn, 'click', L.DomEvent.preventDefault)
         .on(locateBtn, 'click', showMyLocation);

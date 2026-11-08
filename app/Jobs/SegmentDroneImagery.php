@@ -88,6 +88,16 @@ class SegmentDroneImagery implements ShouldQueue
 
             $inputInfo = $this->readRasterInfo($gdal, $inputPath, $workDirectory);
             $prediction = $segmentation->predictRaster($inputPath, $maskPath);
+            // Position nudge already contained in the raster (the edited raster is shifted).
+            $offset = $layer->final_mosaic_path
+                ? ($layer->applied_edits['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'])
+                : DroneImageryLayer::EMPTY_EDITS['offset'];
+            $genusSuggestion = $this->genusSuggestion($segmentation, $layer, $inputPath, $maskPath, [
+                'bounds' => $this->cornerCoordinates($inputInfo),
+                'latitude' => $this->centerLatitude($layer, $mosaicInfo),
+                'offset' => $offset,
+                'pixel_m' => $pixelSize / $mercatorScale, // ground size of one pixel of the resampled raster
+            ]);
 
             // Re-attach the resampled raster's georeferencing to the mask, then vectorize it.
             $gdal->run([
@@ -140,10 +150,10 @@ class SegmentDroneImagery implements ShouldQueue
                 'device' => $prediction['device'] ?? null,
                 // Position nudge already contained in the coordinates (the edited raster is shifted),
                 // so the review editor can line the areas up with the preview.
-                'offset' => $layer->final_mosaic_path
-                    ? ($layer->applied_edits['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'])
-                    : DroneImageryLayer::EMPTY_EDITS['offset'],
+                'offset' => $offset,
                 'edited' => false,
+                // Kept through the owner's area corrections (updateSegmentation merges the old stats).
+                'genus_suggestion' => $genusSuggestion,
             ];
 
             $localDisk->put($resultRelativePath, json_encode([
@@ -170,6 +180,72 @@ class SegmentDroneImagery implements ShouldQueue
         } finally {
             File::deleteDirectory($workDirectory);
         }
+    }
+
+    /**
+     * Genera the YOLO genus model finds inside the detected mangrove, offered in the review editor.
+     * Optional: no weights means no suggestion, and a failure never fails the extent detection.
+     *
+     * Also keeps the per-pixel genus map (genus_labels.png + .json) so the suggestion can be recounted
+     * for the owner's corrected areas without running the model again (DroneImageryController::updateSegmentation).
+     *
+     * $position is where the raster sits: EPSG:3857 corners [ulx, uly, lrx, lry], centre latitude and
+     * the position offset already contained in it.
+     *
+     * @param  array{bounds: array<int, float>, latitude: float, offset: array{east_m: float, north_m: float}, pixel_m: float}  $position
+     * @return array<string, mixed>|array{error: string}|null
+     */
+    private function genusSuggestion(
+        MangroveSegmentationService $segmentation,
+        DroneImageryLayer $layer,
+        string $inputPath,
+        string $maskPath,
+        array $position,
+    ): ?array {
+        $disk = Storage::disk('local');
+        // A map from an earlier run no longer matches this result.
+        $disk->delete([$layer->genusLabelsPath(), $layer->genusLabelsMetaPath()]);
+
+        $weights = $segmentation->genusWeightsPath();
+        if ($weights === null) {
+            return null;
+        }
+
+        $labelsWorkPath = dirname($maskPath).DIRECTORY_SEPARATOR.'genus_labels.png';
+        // Smallest patch of one genus that counts, in pixels of this raster (edge slivers are ignored).
+        $pixelM = max(0.001, (float) ($position['pixel_m'] ?? 0.15));
+        $minPatchPixels = (int) ceil(max(0.0, (float) config('ml.genus.min_patch_m2', 2.0)) / ($pixelM ** 2));
+        try {
+            $result = $segmentation->predictGenera($inputPath, $maskPath, $weights, $labelsWorkPath, $minPatchPixels);
+        } catch (Throwable $exception) {
+            Log::warning('Drone imagery genus suggestion failed.', [
+                'layer_id' => $layer->id,
+                'exception' => $exception,
+            ]);
+
+            return ['error' => mb_substr($exception->getMessage(), 0, 500)];
+        }
+
+        $suggestion = MangroveSegmentationService::genusSuggestionFromResult($result);
+
+        if (is_file($labelsWorkPath)) {
+            $disk->put($layer->genusLabelsPath(), (string) file_get_contents($labelsWorkPath));
+            $disk->put($layer->genusLabelsMetaPath(), json_encode([
+                'classes' => array_values((array) ($result['classes'] ?? [])),
+                'bounds' => array_map('floatval', $position['bounds']),
+                'latitude' => (float) $position['latitude'],
+                'offset' => [
+                    'east_m' => (float) ($position['offset']['east_m'] ?? 0),
+                    'north_m' => (float) ($position['offset']['north_m'] ?? 0),
+                ],
+                'conf' => (float) config('ml.genus.confidence', 0.1),
+                'prob_conf' => (float) config('ml.genus.probability_confidence', 0.01),
+                'min_patch_px' => $minPatchPixels,
+            ], JSON_UNESCAPED_SLASHES));
+            $suggestion['recountable'] = true;
+        }
+
+        return $suggestion;
     }
 
     private function readRasterInfo(GdalCommandRunner $gdal, string $path, string $workDirectory): array

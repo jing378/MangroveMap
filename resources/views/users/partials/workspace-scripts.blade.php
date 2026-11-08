@@ -1178,11 +1178,14 @@
       if (removeBtn) {
         const isUnsaved = !feature.delineation_id;
         // Unsaved shapes (hand-drawn or AI draft areas) can be dropped one by one before saving.
-        // Experts can also clear out a resident's rejected delineation, once the resident's week to revise it is over.
-        const canExpertRemove = isExpertUser && !feature.is_own && feature.delineation_id && feature.is_rejected
-          && rejectedRemovalOpen(feature);
-        removeBtn.style.display = ((isUnsaved || feature.is_own || canExpertRemove) && !feature.is_approved && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
-        removeBtn.textContent = isUnsaved ? 'Remove this area' : (canExpertRemove ? 'Remove rejected delineation' : 'Remove delineation');
+        // Experts can remove any saved delineation (approved ones included); a resident's rejected one only
+        // once the resident's week to revise it is over.
+        const canExpertRemove = expertCanRemoveDelineation(feature);
+        const canOwnerRemove = feature.is_own && !feature.is_approved;
+        removeBtn.style.display = ((isUnsaved || canOwnerRemove || canExpertRemove) && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
+        removeBtn.textContent = isUnsaved
+          ? 'Remove this area'
+          : (canExpertRemove && !feature.is_own && feature.is_rejected && !feature.is_approved ? 'Remove rejected delineation' : 'Remove delineation');
       }
       updateBoundaryEditActions(feature);
       const lastEditedRow = document.getElementById('delineationLastEditedRow');
@@ -1303,6 +1306,14 @@
     function rejectedRemovalOpen(feature) {
       const date = rejectedRemovalDate(feature);
       return !date || date.getTime() <= Date.now();
+    }
+
+    // Mirrors ExpertController::destroyDelineation: any saved record, except a resident's rejected one
+    // still inside its revision week.
+    function expertCanRemoveDelineation(feature) {
+      if (!isExpertUser || !feature?.delineation_id) return false;
+      const residentRejected = !feature.is_own && feature.is_rejected && !feature.is_approved;
+      return !residentRejected || rejectedRemovalOpen(feature);
     }
 
     function formatRemovalDate(date) {
@@ -1960,23 +1971,32 @@
 
       // If this feature came from a saved delineation record, deleting it must happen server-side.
       // Otherwise it will reappear on refresh (because it is loaded again from the DB).
-      const expertRemovesRejected = isExpertUser && !feature?.is_own && !!feature?.is_rejected && !feature?.is_approved
-        && rejectedRemovalOpen(feature);
-      if (delineationId && ((feature?.is_own && !feature?.is_approved) || expertRemovesRejected)) {
+      const expertRemoves = expertCanRemoveDelineation(feature);
+      if (delineationId && ((feature?.is_own && !feature?.is_approved) || expertRemoves)) {
+        const name = feature.label || 'This delineation';
+        let title = 'Remove this delineation?';
+        let message = `"${name}" is permanently deleted. This cannot be undone.`;
+        if (expertRemoves && !feature.is_own) {
+          if (feature.is_approved) {
+            title = 'Remove this approved delineation?';
+            message = `"${name}" is approved. Removing it permanently deletes it from the map, along with its yearly observations and revision history. The owner is notified. This cannot be undone.`;
+          } else if (feature.is_rejected) {
+            title = 'Remove this rejected delineation?';
+            message = `"${name}" is permanently deleted and the resident can no longer revise it. They are notified. This cannot be undone.`;
+          } else {
+            message = `"${name}" is still pending review. It is permanently deleted and the resident is notified. This cannot be undone.`;
+          }
+        } else if (feature.is_approved) {
+          title = 'Remove this approved delineation?';
+          message = `"${name}" is approved. Removing it permanently deletes it from the map, along with its yearly observations and revision history. This cannot be undone.`;
+        }
         // Confirmation → Processing → Success or Error (partials.action-feedback).
         const outcome = await window.AppActions.run({
-          confirm: {
-            title: expertRemovesRejected ? 'Remove this rejected delineation?' : 'Remove this delineation?',
-            message: expertRemovesRejected
-              ? `"${feature.label || 'This delineation'}" is permanently deleted and the resident can no longer revise it. They are notified. This cannot be undone.`
-              : `"${feature.label || 'This delineation'}" is permanently deleted. This cannot be undone.`,
-            confirmLabel: 'Remove',
-            tone: 'danger',
-          },
+          confirm: { title, message, confirmLabel: 'Remove', tone: 'danger' },
           button: document.getElementById('removeDelineationBtn'),
           busyLabel: 'Removing...',
           task: async () => {
-            const baseUrl = expertRemovesRejected ? expertDeleteDelineationBaseUrl : deleteDelineationBaseUrl;
+            const baseUrl = expertRemoves ? expertDeleteDelineationBaseUrl : deleteDelineationBaseUrl;
             const response = await fetch(`${baseUrl}/${delineationId}`, {
               method: 'DELETE',
               headers: {

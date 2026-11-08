@@ -38,8 +38,8 @@ class ExpertApplicationReviewed extends Notification
         }
 
         return $mail
-            ->line('You can keep using MangroveMap with your resident account.')
-            ->action('Open Dashboard', route('dashboard'));
+            ->line('You can keep using MangroveMap with your resident account, and you can apply again from your profile with a new certificate.')
+            ->action('Reapply from your profile', route('profile.show') . '#expert-application');
     }
 
     public function toArray(object $notifiable): array
@@ -62,6 +62,9 @@ class ExpertApplicationReviewed extends Notification
             'type' => 'expert_application_rejected',
             'icon' => 'bi-x-circle',
             'rejection_notes' => $this->notes,
+            // Relative, so the link keeps working if the site's address changes.
+            'url' => route('profile.show', [], false) . '#expert-application',
+            'actionLabel' => 'Reapply',
         ];
     }
 }

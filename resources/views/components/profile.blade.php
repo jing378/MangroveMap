@@ -35,7 +35,7 @@ if ($currentUser && $currentUser->role === 'admin') {
                 </div>
                 @endif
                 <div class="avatar-ring"></div>
-                <button type="button" class="avatar-camera-btn" onclick="document.getElementById('profile_image_sidebar').click()">
+                <button type="button" class="avatar-camera-btn" onclick="document.getElementById('profile_image_sidebar').click()" aria-label="Change profile photo" title="Change profile photo">
                     <i class="bi bi-camera-fill"></i>
                 </button>
                 <input type="file" id="profile_image_sidebar" name="profile_image_sidebar" class="file-input-hidden" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;">
@@ -207,7 +207,7 @@ if ($currentUser && $currentUser->role === 'admin') {
                             <label for="current_password" class="form-label">Current Password</label>
                             <div class="password-wrapper">
                                 <input type="password" id="current_password" name="current_password" class="form-control password-input" required>
-                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('current_password')" aria-label="Toggle password visibility">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('current_password')" aria-label="Show password" title="Show password">
                                     <i class="bi bi-eye-fill"></i>
                                 </button>
                             </div>
@@ -220,7 +220,7 @@ if ($currentUser && $currentUser->role === 'admin') {
                             <label for="password" class="form-label">New Password</label>
                             <div class="password-wrapper">
                                 <input type="password" id="password" name="password" class="form-control password-input" required>
-                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password')" aria-label="Toggle password visibility">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password')" aria-label="Show password" title="Show password">
                                     <i class="bi bi-eye-fill"></i>
                                 </button>
                             </div>
@@ -231,7 +231,7 @@ if ($currentUser && $currentUser->role === 'admin') {
                             <label for="password_confirmation" class="form-label">Confirm New Password</label>
                             <div class="password-wrapper">
                                 <input type="password" id="password_confirmation" name="password_confirmation" class="form-control password-input" required>
-                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password_confirmation')" aria-label="Toggle password visibility">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password_confirmation')" aria-label="Show password" title="Show password">
                                     <i class="bi bi-eye-fill"></i>
                                 </button>
                             </div>
@@ -246,6 +246,98 @@ if ($currentUser && $currentUser->role === 'admin') {
                     </button>
                 </div>
             </form>
+
+            @if($user->hasPendingExpertApplication())
+            <!-- Expert application waiting for an admin -->
+            <div class="form-section expert-application-section" id="expert-application">
+                <h3 class="form-section-title">
+                    <i class="bi bi-person-badge"></i>
+                    Expert Application
+                </h3>
+                <div class="expert-status is-pending">
+                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                    <div>
+                        <strong>Waiting for review</strong>
+                        <span>
+                            Sent {{ optional($user->expert_applied_at)->format('M d, Y') ?? 'recently' }}.
+                            An administrator will review it, and you'll get a notification with the result.
+                        </span>
+                    </div>
+                </div>
+            </div>
+            @elseif($user->canReapplyAsExpert())
+            <!-- Rejected expert application: the resident can send a new one -->
+            @php $expertErrors = $errors->expertApplication; @endphp
+            <form action="{{ route('profile.expert-application') }}" method="POST" enctype="multipart/form-data"
+                class="expert-application-form" id="expert-application"
+                data-confirm="Send expert application?"
+                data-confirm-message="An administrator will review your new application. Your account stays a resident account until it is approved."
+                data-confirm-label="Send" data-busy-label="Sending application...">
+                @csrf
+
+                <div class="form-section">
+                    <h3 class="form-section-title">
+                        <i class="bi bi-person-badge"></i>
+                        Expert Application
+                    </h3>
+
+                    <div class="expert-status is-rejected">
+                        <i class="bi bi-x-circle" aria-hidden="true"></i>
+                        <div>
+                            <strong>Your last application was not approved</strong>
+                            <span>
+                                @if($user->expert_reviewed_at)Reviewed {{ $user->expert_reviewed_at->format('M d, Y') }}.@endif
+                                @if($user->expert_rejection_notes)
+                                Reason: {{ $user->expert_rejection_notes }}
+                                @endif
+                            </span>
+                            <span>You can apply again with a new certificate or proof of expertise.</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="reapply_organization" class="form-label">Organization / Affiliation</label>
+                            <input type="text" id="reapply_organization" name="organization" class="form-control"
+                                value="{{ $expertErrors->any() ? old('organization') : $user->organization }}"
+                                placeholder="e.g. DENR CENRO Maasin, SLSU" maxlength="255" autocomplete="organization" required>
+                            @if($expertErrors->has('organization'))<div class="form-error">{{ $expertErrors->first('organization') }}</div>@endif
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="reapply_certificate" class="form-label">Certificate / Proof of Expertise</label>
+                            <label class="certificate-drop" for="reapply_certificate">
+                                <input type="file" id="reapply_certificate" name="expert_certificate" class="certificate-input"
+                                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required
+                                    aria-describedby="reapply_certificate_hint">
+                                <i class="bi bi-upload" aria-hidden="true"></i>
+                                <span id="reapplyCertificateText">Choose a file</span>
+                            </label>
+                            <small class="expert-hint" id="reapply_certificate_hint">PDF, JPG, or PNG up to 5 MB, e.g. a diploma, license, or certificate of employment. Only administrators can see it. It replaces the certificate from your last application.</small>
+                            @if($expertErrors->has('expert_certificate'))<div class="form-error">{{ $expertErrors->first('expert_certificate') }}</div>@endif
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="reapply_qualifications" class="form-label">Qualifications &amp; Experience <span class="expert-optional">(Optional)</span></label>
+                            <textarea id="reapply_qualifications" name="expert_qualifications" class="form-control" rows="3" maxlength="2000"
+                                placeholder="Anything that answers the reason above, or other qualifications you'd like to add.">{{ $expertErrors->any() ? old('expert_qualifications') : $user->expert_qualifications }}</textarea>
+                            @if($expertErrors->has('expert_qualifications'))<div class="form-error">{{ $expertErrors->first('expert_qualifications') }}</div>@endif
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i>
+                        Send Application
+                    </button>
+                </div>
+            </form>
+            @endif
         </div>
 
     </div>
@@ -1216,6 +1308,92 @@ if ($currentUser && $currentUser->role === 'admin') {
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
     }
+
+    /* Expert application (residents with a pending or rejected application) */
+    .expert-application-form,
+    .expert-application-section {
+        margin-top: 24px;
+    }
+
+    .expert-status {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 14px;
+        margin-bottom: 18px;
+        border: 1px solid;
+        border-radius: 10px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .expert-status > .bi {
+        font-size: 20px;
+        line-height: 1.2;
+    }
+
+    .expert-status strong,
+    .expert-status span {
+        display: block;
+    }
+
+    .expert-status.is-pending {
+        background: var(--bg-fdf5e8, #fdf5e8);
+        border-color: var(--bd-e8cc98, #e8cc98);
+        color: var(--fg-925a12, #925a12);
+    }
+
+    .expert-status.is-rejected {
+        background: var(--bg-fdf0ee, #fdf0ee);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
+        color: var(--fg-b73318, #b73318);
+    }
+
+    .certificate-drop {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        border: 1px dashed var(--bd-b8cbb8, #b8cbb8);
+        border-radius: 10px;
+        background: var(--bg-f7faf7, #f7faf7);
+        color: var(--fg-3a5a3a, #3a5a3a);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        overflow-wrap: anywhere;
+    }
+
+    .certificate-drop:hover,
+    .certificate-drop:focus-within {
+        border-color: #1e9e62;
+    }
+
+    .certificate-drop .bi {
+        font-size: 18px;
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .certificate-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .expert-hint {
+        display: block;
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    .expert-optional {
+        font-weight: 500;
+        color: #7a9a7a;
+    }
 </style>
 @endsection
 
@@ -1343,6 +1521,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         const input = document.getElementById(fieldId);
         const button = input.nextElementSibling;
         const icon = button.querySelector('i');
+
+        const label = input.type === 'password' ? 'Hide password' : 'Show password';
+        button.setAttribute('aria-label', label);
+        button.title = label;
 
         if (input.type === 'password') {
             input.type = 'text';
@@ -1680,6 +1862,19 @@ if ($currentUser && $currentUser->role === 'admin') {
     @if (session('success'))
     document.addEventListener('DOMContentLoaded', () => window.AppActions?.notify(@json(session('success'))));
     @endif
+    @if (session('error'))
+    document.addEventListener('DOMContentLoaded', () => window.AppActions?.notify(@json(session('error')), 'error'));
+    @endif
+
+    // Expert reapplication: show the chosen certificate's file name.
+    (() => {
+        const input = document.getElementById('reapply_certificate');
+        const label = document.getElementById('reapplyCertificateText');
+        if (!input || !label) return;
+        input.addEventListener('change', () => {
+            label.textContent = input.files && input.files[0] ? input.files[0].name : 'Choose a file';
+        });
+    })();
 
     function applySavedProfile(saved) {
         if (saved.name) {

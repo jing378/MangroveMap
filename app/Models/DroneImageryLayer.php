@@ -144,6 +144,20 @@ class DroneImageryLayer extends Model
         return $this->segmentation_status === 'ready' && (bool) ($this->segmentation_stats['edited'] ?? false);
     }
 
+    /**
+     * Per-pixel genus map from the last AI run (RGB PNG, see ml/predict_genus.py) and its metadata JSON
+     * (position, offset, thresholds). Used to recount the genus when the owner edits the areas.
+     */
+    public function genusLabelsPath(): string
+    {
+        return "drone-imagery/processed/{$this->id}/genus_labels.png";
+    }
+
+    public function genusLabelsMetaPath(): string
+    {
+        return "drone-imagery/processed/{$this->id}/genus_labels.json";
+    }
+
     public function currentEdits(): array
     {
         return $this->edits ?? self::EMPTY_EDITS;

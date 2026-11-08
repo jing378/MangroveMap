@@ -2,6 +2,7 @@
 
      JavaScript (window.AppActions):
        await AppActions.confirm({ title, message, confirmLabel, tone: 'primary' | 'danger' })  → true / false
+       (with extraLabel: a third button that resolves 'extra')
        AppActions.setBusy(button, 'Saving...') / AppActions.clearBusy(button)
        AppActions.notify('Saved.', 'success' | 'error')
        await AppActions.run({ confirm, button, busyLabel, lock, task, successMessage, errorMessage })
@@ -12,11 +13,13 @@
      Regular (page-reload) forms opt in with attributes, no script needed:
        <form data-confirm="Delete this user?" data-confirm-message="…" data-confirm-label="Delete"
              data-confirm-tone="danger" data-confirm-icon="bi-trash" data-busy-label="Deleting...">
+     Add data-busy-overlay="optional message" to also show a progress window (busy label as its title)
+     until the next page loads, e.g. for logging out.
      The server's flash message reports the result after the reload. Forms that submit with fetch()
      call AppActions.run() from their own submit handler instead. --}}
 <style>
     /* A native modal <dialog>: it opens in the top layer, so it also sits above other open <dialog>s
-       (e.g. the admin Map Layers and Model Training dialogs). */
+       (e.g. the admin Map Layers and AI Models dialogs). */
     .app-confirm-dialog {
         /* Explicit centering: CSS resets such as Tailwind's preflight (admin layout) zero the native margin:auto. */
         position: fixed;
@@ -74,6 +77,8 @@
         font-size: 24px;
     }
 
+    /* Red icon: danger dialogs, or a warning icon on an otherwise normal dialog (iconTone: 'danger'). */
+    .app-confirm-icon.is-danger,
     .app-confirm-card.is-danger .app-confirm-icon {
         border-color: var(--bd-f2c2bd, #f2c2bd);
         background: var(--bg-fff1f0, #fff1f0);
@@ -146,6 +151,24 @@
         background: #b42318;
     }
 
+    /* Three choices (extraLabel): one per row, the main action first. */
+    .app-confirm-actions:has(> :nth-child(3)) {
+        grid-template-columns: 1fr;
+    }
+
+    .app-confirm-actions:has(> :nth-child(3)) .is-primary {
+        order: -1;
+    }
+
+    .app-confirm-btn.is-danger-text {
+        color: var(--fg-b42318, #b42318);
+    }
+
+    .app-confirm-btn.is-danger-text:hover {
+        border-color: #d04030;
+        color: var(--fg-b42318, #b42318);
+    }
+
     .app-confirm-btn:focus-visible {
         outline: 3px solid rgba(30, 158, 98, .35);
         outline-offset: 2px;
@@ -171,6 +194,22 @@
 
     [data-loading="true"] {
         cursor: wait !important;
+    }
+
+    /* Progress window (forms with data-busy-overlay, e.g. logging out): stays until the next page loads. */
+    .app-progress-spinner {
+        display: block;
+        width: 36px;
+        height: 36px;
+        margin: 4px auto 16px;
+        border: 3px solid var(--bd-c8e6d4, #c8e6d4);
+        border-top-color: #1e9e62;
+        border-radius: 50%;
+        animation: app-btn-spin .8s linear infinite;
+    }
+
+    .app-confirm-card.is-progress {
+        padding-bottom: 26px;
     }
 
     @keyframes app-btn-spin {
@@ -288,8 +327,12 @@
                 message = '',
                 confirmLabel = 'Confirm',
                 cancelLabel = 'Cancel',
+                // Optional third choice between Cancel and the main button; the promise then resolves 'extra'.
+                extraLabel = null,
                 tone = 'primary',
                 icon = tone === 'danger' ? 'bi-exclamation-triangle' : 'bi-question-lg',
+                // 'danger': red icon only (buttons keep the tone's colours), e.g. a warning with a safe main action.
+                iconTone = tone,
             } = options;
             openDialog?.close(false);
 
@@ -302,11 +345,12 @@
                 if (message) dialog.setAttribute('aria-describedby', 'appConfirmMessage');
                 dialog.innerHTML = `
                     <div class="app-confirm-card${tone === 'danger' ? ' is-danger' : ''}">
-                        <div class="app-confirm-icon" aria-hidden="true"><i class="bi ${escapeHtml(icon)}"></i></div>
+                        <div class="app-confirm-icon${iconTone === 'danger' ? ' is-danger' : ''}" aria-hidden="true"><i class="bi ${escapeHtml(icon)}"></i></div>
                         <h2 class="app-confirm-title" id="appConfirmTitle">${escapeHtml(title)}</h2>
                         ${message ? `<p class="app-confirm-message" id="appConfirmMessage">${escapeHtml(message)}</p>` : ''}
                         <div class="app-confirm-actions">
                             <button type="button" class="app-confirm-btn" data-answer="no">${escapeHtml(cancelLabel)}</button>
+                            ${extraLabel ? `<button type="button" class="app-confirm-btn is-danger-text" data-answer="extra">${escapeHtml(extraLabel)}</button>` : ''}
                             <button type="button" class="app-confirm-btn is-primary" data-answer="yes">${escapeHtml(confirmLabel)}</button>
                         </div>
                     </div>`;
@@ -333,15 +377,45 @@
                         return;
                     }
                     const answer = event.target.closest('[data-answer]')?.dataset.answer;
-                    if (answer) close(answer === 'yes');
+                    if (answer) close(answer === 'extra' ? 'extra' : answer === 'yes');
                 });
                 document.body.appendChild(dialog);
                 openDialog = { dialog, close };
                 dialog.showModal();
                 requestAnimationFrame(() => dialog.classList.add('is-open'));
                 // Destructive actions start on Cancel so Enter does not delete by accident.
-                buttons[tone === 'danger' ? 0 : 1].focus();
+                buttons[tone === 'danger' ? 0 : buttons.length - 1].focus();
             });
+        }
+
+        // ---- Progress window ---------------------------------------------------------------------
+        // A modal with a spinner that cannot be dismissed, for a submit that leaves the page (log out).
+        let progressDialog = null;
+
+        function showProgress({ title = 'Please wait...', message = '' } = {}) {
+            hideProgress();
+            const dialog = document.createElement('dialog');
+            dialog.className = 'app-confirm-dialog';
+            dialog.setAttribute('aria-labelledby', 'appProgressTitle');
+            dialog.setAttribute('aria-busy', 'true');
+            dialog.innerHTML = `
+                <div class="app-confirm-card is-progress" role="status">
+                    <span class="app-progress-spinner" aria-hidden="true"></span>
+                    <h2 class="app-confirm-title" id="appProgressTitle">${escapeHtml(title)}</h2>
+                    ${message ? `<p class="app-confirm-message">${escapeHtml(message)}</p>` : ''}
+                </div>`;
+            dialog.addEventListener('cancel', event => event.preventDefault()); // Escape does not close it
+            document.body.appendChild(dialog);
+            dialog.showModal();
+            requestAnimationFrame(() => dialog.classList.add('is-open'));
+            progressDialog = dialog;
+        }
+
+        function hideProgress() {
+            if (!progressDialog) return;
+            if (progressDialog.open) progressDialog.close();
+            progressDialog.remove();
+            progressDialog = null;
         }
 
         // ---- Busy buttons ----------------------------------------------------------------------
@@ -412,7 +486,7 @@
             toast.setAttribute('role', isError ? 'alert' : 'status');
             toast.innerHTML = `<i class="bi ${isError ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill'}" aria-hidden="true"></i>
                 <div class="app-toast-text">${escapeHtml(message)}</div>
-                <button type="button" class="app-toast-close" aria-label="Dismiss"><i class="bi bi-x-lg"></i></button>`;
+                <button type="button" class="app-toast-close" aria-label="Dismiss" title="Dismiss"><i class="bi bi-x-lg" aria-hidden="true"></i></button>`;
             const dismiss = () => {
                 toast.classList.remove('is-shown');
                 setTimeout(() => {
@@ -494,6 +568,9 @@
             else form.submit();
             if (form.dataset.actionConfirmed === 'true') delete form.dataset.actionConfirmed;
             setBusy(submitter, form.dataset.busyLabel || 'Processing...');
+            if (form.hasAttribute('data-busy-overlay')) {
+                showProgress({ title: form.dataset.busyLabel || 'Please wait...', message: form.dataset.busyOverlay || '' });
+            }
             form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(other => {
                 if (other === submitter || other.disabled) return;
                 other.disabled = true;
@@ -504,6 +581,7 @@
         // Back/forward cache restores the page as it was left: un-stick buttons that were busy.
         window.addEventListener('pageshow', event => {
             if (!event.persisted) return;
+            hideProgress();
             document.querySelectorAll('[data-loading="true"]').forEach(clearBusy);
             document.querySelectorAll('[data-action-locked="true"]').forEach(button => {
                 button.disabled = false;
@@ -511,6 +589,6 @@
             });
         });
 
-        window.AppActions = { confirm: confirmAction, setBusy, clearBusy, notify, run, lockControls, escapeHtml };
+        window.AppActions = { confirm: confirmAction, setBusy, clearBusy, notify, run, lockControls, escapeHtml, showProgress, hideProgress };
     })();
 </script>

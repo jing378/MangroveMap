@@ -197,17 +197,16 @@ class ExpertController extends Controller
             ->with('success', $message);
     }
 
-    /** Experts may delete a resident's delineation only once it has been rejected (never pending or approved ones). */
-    public function destroyRejected(Request $request, Delineation $delineation)
+    /**
+     * Experts may delete any delineation: approved, pending or rejected. A resident's rejected delineation is the one
+     * exception: the resident keeps REJECTED_REMOVAL_GRACE_DAYS to revise and resubmit it before it can be removed.
+     */
+    public function destroyDelineation(Request $request, Delineation $delineation)
     {
-        if (! $delineation->is_rejected || $delineation->is_approved) {
-            return response()->json([
-                'message' => 'Only rejected delineations can be removed.',
-            ], 422);
-        }
+        $expert = Auth::user();
+        $isOwn = (int) $delineation->user_id === (int) $expert->id;
 
-        // The resident keeps a grace period to revise and resubmit before experts can remove it.
-        if (! $delineation->canBeRemovedByExpert()) {
+        if (! $isOwn && $delineation->is_rejected && ! $delineation->is_approved && ! $delineation->canBeRemovedByExpert()) {
             return response()->json([
                 'message' => 'The resident still has time to revise this delineation. It can be removed after '
                     . $delineation->rejectedRemovableAt()->timezone(config('app.timezone'))->format('M j, Y g:i A') . '.',
@@ -217,15 +216,20 @@ class ExpertController extends Controller
         $delineation->load('user');
         $owner = $delineation->user;
         $name = $delineation->name ?: 'Delineation #' . $delineation->id;
+        $status = $delineation->is_approved ? 'approved' : ($delineation->is_rejected ? 'rejected' : 'pending');
+
+        // Logged before deleting so the entry can still name the record; the subject link then shows "deleted".
+        UserActivity::record($expert, 'Removed ' . $status . ' delineation: ' . $name, 'Expert Review', 'rejected', $delineation);
 
         $delineation->delete();
 
-        if ($owner && (int) $owner->id !== (int) Auth::id()) {
-            $this->notifyUserSafely($owner, new DelineationRemoved($name));
+        $notified = $owner && ! $isOwn;
+        if ($notified) {
+            $this->notifyUserSafely($owner, new DelineationRemoved($name, $status));
         }
 
         return response()->json([
-            'message' => 'Rejected delineation removed. The resident has been notified.',
+            'message' => ucfirst($status) . ' delineation removed.' . ($notified ? ' The owner has been notified.' : ''),
         ]);
     }
 

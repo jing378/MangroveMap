@@ -53,7 +53,7 @@
                 <dt>Name</dt>
                 <dd class="detail-strong">{{ $activity->user->name }}</dd>
                 <dt>Email</dt>
-                <dd>{{ $activity->user->email }}</dd>
+                <dd class="detail-wrap">{{ $activity->user->email }}</dd>
                 <dt>Role</dt>
                 <dd>{{ $activity->user->roleLabel() }}</dd>
                 <dt>Last login</dt>
@@ -93,8 +93,8 @@
 
     <div class="section">
         <div class="section-title"><i class="bi bi-clock-history"></i> Other Recent Activity by This User</div>
-        <div class="table-container">
-            <table class="table">
+        <div class="table-container related-table-container">
+            <table class="table related-table">
                 <thead>
                     <tr>
                         <th>Timestamp</th>
@@ -105,11 +105,11 @@
                 </thead>
                 <tbody>
                     @forelse($relatedActivities as $related)
-                    <tr>
-                        <td class="nowrap">{{ $related->created_at?->format('M j, Y g:i A') ?? '—' }}</td>
-                        <td><a href="{{ route('admin.activity-logs.show', $related) }}">{{ $related->activity }}</a></td>
-                        <td>{{ $related->module }}</td>
-                        <td><span class="badge {{ $related->status }}">{{ $related->statusLabel() }}</span></td>
+                    <tr class="related-row">
+                        <td class="nowrap cell-time">{{ $related->created_at?->format('M j, Y g:i A') ?? '—' }}</td>
+                        <td class="cell-activity"><a href="{{ route('admin.activity-logs.show', $related) }}">{{ $related->activity }}</a></td>
+                        <td class="cell-module">{{ $related->module }}</td>
+                        <td class="cell-status"><span class="badge {{ $related->status }}">{{ $related->statusLabel() }}</span></td>
                     </tr>
                     @empty
                     <tr>
@@ -204,6 +204,83 @@
     @media (max-width: 1024px) {
         .detail-grid {
             grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .detail-grid {
+            gap: 0;
+        }
+
+        .detail-grid .section {
+            margin-bottom: 16px;
+        }
+
+        .detail-actions .btn-secondary {
+            flex: 1 1 100%;
+            justify-content: center;
+        }
+
+        /* Other recent activity: one card per entry (activity + status, then time and module). */
+        .related-table-container {
+            overflow-x: visible;
+        }
+
+        .related-table thead {
+            display: none;
+        }
+
+        .related-table,
+        .related-table tbody {
+            display: block;
+        }
+
+        .related-table tr.related-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-areas:
+                "activity status"
+                "meta module";
+            gap: 6px 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        }
+
+        .related-table tr.related-row:last-child {
+            border-bottom: none;
+        }
+
+        .related-table tbody tr:hover {
+            background: transparent;
+        }
+
+        .related-table td {
+            display: block;
+            padding: 0;
+            border: none;
+            min-width: 0;
+        }
+
+        .related-table .cell-activity {
+            grid-area: activity;
+            overflow-wrap: anywhere;
+        }
+
+        .related-table .cell-status {
+            grid-area: status;
+        }
+
+        .related-table .cell-time {
+            grid-area: meta;
+            font-size: 11px;
+            color: #9ab0a0;
+        }
+
+        .related-table .cell-module {
+            grid-area: module;
+            font-size: 11px;
+            color: #9ab0a0;
+            text-align: right;
         }
     }
 

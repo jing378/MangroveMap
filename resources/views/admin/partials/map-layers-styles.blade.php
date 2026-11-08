@@ -187,10 +187,15 @@
 
     .layer-dialog {
         width: min(480px, calc(100vw - 32px));
+        max-height: calc(100dvh - 32px);
+        overflow-y: auto;
         border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 14px;
         padding: 0;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        /* Without these the browser's own dialog colors show (white even in dark mode). */
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-3a5a3a, #3a5a3a);
     }
 
     .layer-dialog::backdrop {
@@ -225,7 +230,19 @@
         font-family: 'Manrope', sans-serif;
         font-size: 13px;
         color: var(--fg-1a2e1a, #1a2e1a);
+        background: var(--bg-ffffff, #fff);
         resize: vertical;
+    }
+
+    .status-note {
+        margin-top: 3px;
+        max-width: 260px;
+        overflow-wrap: anywhere;
+    }
+
+    .status-removable {
+        color: var(--fg-b73318, #b73318);
+        font-weight: 600;
     }
 
     .layer-dialog input:focus,
@@ -254,13 +271,189 @@
             height: 260px;
         }
 
-        .filter-bar {
-            flex-direction: column;
-            align-items: stretch;
+        /* The label names the previewed layer; keep it, on its own line under the title. */
+        .preview-section .section-title {
+            flex-wrap: wrap;
+            row-gap: 4px;
         }
 
         .preview-label {
+            flex-basis: 100%;
+            margin-left: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .tabs {
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .tab {
+            flex: 1 0 auto;
+            justify-content: center;
+            white-space: nowrap;
+            padding: 10px 12px;
+        }
+
+        /* Same as the Users page filter bar: fields stacked full width, same 12px text. */
+        .filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .filter-bar .search-input,
+        .filter-bar .filter-select {
+            flex: none;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        .filter-bar .btn-primary,
+        .filter-bar .btn-secondary {
+            justify-content: center;
+        }
+
+        /* Tables become one card per layer: name on top, labelled details, actions at the bottom. */
+        .layer-table-container {
+            overflow-x: visible;
+        }
+
+        .layer-table thead {
             display: none;
+        }
+
+        .layer-table,
+        .layer-table tbody,
+        .layer-table tr,
+        .layer-table td {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .layer-table tbody tr.layer-row {
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 12px;
+            padding: 12px 14px;
+            background: var(--bg-ffffff, #fff);
+        }
+
+        .layer-table tbody tr + tr {
+            margin-top: 10px;
+        }
+
+        .layer-table tbody tr:hover {
+            background: var(--bg-ffffff, #fff);
+        }
+
+        .layer-table td {
+            padding: 0;
+            border-bottom: none;
+        }
+
+        .layer-table td.cell-title {
+            padding-bottom: 10px;
+            overflow-wrap: anywhere;
+        }
+
+        .layer-table .clamp {
+            max-width: none;
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .layer-table td[data-label] {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 8px 0;
+            border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
+            text-align: right;
+        }
+
+        .layer-table td[data-label]::before {
+            content: attr(data-label);
+            flex: none;
+            padding-top: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #9ab0a0;
+            text-align: left;
+        }
+
+        .layer-table .cell-value {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .layer-table .status-note {
+            max-width: none;
+        }
+
+        .layer-table td.cell-actions {
+            padding-top: 10px;
+            border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        }
+
+        .layer-table .row-actions {
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .layer-table .action-btn {
+            width: 38px;
+            height: 38px;
+        }
+
+        .layer-table td.empty-row {
+            border: 1px dashed var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 12px;
+        }
+
+        .pagination {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .pagination-info {
+            order: -1;
+            flex-basis: 100%;
+            text-align: center;
+        }
+
+        /* Dialogs: bottom sheet with full-width buttons. */
+        .layer-dialog {
+            width: 100%;
+            max-width: 100%;
+            margin: auto 0 0;
+            border-radius: 16px 16px 0 0;
+            border-bottom: none;
+        }
+
+        .layer-dialog form {
+            padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .layer-dialog input,
+        .layer-dialog textarea {
+            font-size: 16px;
+        }
+
+        .dialog-actions {
+            flex-direction: column-reverse;
+        }
+
+        .dialog-actions button {
+            width: 100%;
+            justify-content: center;
+            min-height: 42px;
         }
     }
 </style>

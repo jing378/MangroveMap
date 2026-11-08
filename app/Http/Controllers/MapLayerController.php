@@ -22,19 +22,39 @@ class MapLayerController extends Controller
 {
     private const MODULE = 'Map Layers';
 
+    /** Status filter options per tab: value => label. */
+    public const DELINEATION_STATUSES = [
+        'published' => 'Published',
+        'hidden' => 'Hidden from map',
+        'pending' => 'Pending review',
+        'rejected' => 'Rejected',
+    ];
+
+    public const IMAGERY_STATUSES = [
+        'ready' => 'Ready',
+        'awaiting_review' => 'Awaiting owner review',
+        'finalizing' => 'Finalizing',
+        'processing' => 'Processing',
+        'queued' => 'Queued',
+        'failed' => 'Failed',
+    ];
+
     public function index(Request $request)
     {
         abort_if(Auth::user()->role !== 'admin', 403);
 
         $tab = $request->query('tab') === 'imagery' ? 'imagery' : 'delineations';
+        // Each tab has its own statuses (the same ones its Status dropdown offers).
+        $statuses = $tab === 'imagery' ? self::IMAGERY_STATUSES : self::DELINEATION_STATUSES;
         $filters = Validator::make($request->query(), [
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'in:published,hidden,pending,rejected,queued,processing,ready,failed'],
+            'status' => ['nullable', 'in:' . implode(',', array_keys($statuses))],
         ])->valid();
 
         $data = [
             'tab' => $tab,
             'filters' => $filters,
+            'statusOptions' => $statuses,
             'counts' => [
                 'published' => Delineation::approved()->count(),
                 'hidden' => Delineation::whereNotNull('hidden_at')->count(),
@@ -259,7 +279,7 @@ class MapLayerController extends Controller
                     ->orWhereHas('user', fn(Builder $user) => $user->where('name', 'like', $like)));
             })
             ->when(
-                in_array($filters['status'] ?? null, ['queued', 'processing', 'awaiting_review', 'finalizing', 'ready', 'failed'], true),
+                array_key_exists($filters['status'] ?? '', self::IMAGERY_STATUSES),
                 fn(Builder $query) => $query->where('status', $filters['status'])
             );
     }

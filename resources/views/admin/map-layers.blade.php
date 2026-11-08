@@ -51,15 +51,9 @@
             <input type="search" name="search" class="search-input" placeholder="Search by layer or user name..." value="{{ $filters['search'] ?? '' }}">
             <select name="status" class="filter-select" aria-label="Status">
                 <option value="">All Status</option>
-                @if($tab === 'imagery')
-                @foreach(['ready' => 'Ready', 'awaiting_review' => 'Awaiting owner review', 'finalizing' => 'Finalizing', 'processing' => 'Processing', 'queued' => 'Queued', 'failed' => 'Failed'] as $value => $label)
+                @foreach($statusOptions as $value => $label)
                 <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
                 @endforeach
-                @else
-                @foreach(['published' => 'Published', 'hidden' => 'Hidden from map', 'pending' => 'Pending review', 'rejected' => 'Rejected'] as $value => $label)
-                <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
-                @endforeach
-                @endif
             </select>
             <button type="submit" class="btn-primary"><i class="bi bi-funnel"></i> Filter</button>
             @if(array_filter($filters))

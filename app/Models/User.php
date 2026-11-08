@@ -29,6 +29,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'last_login_at',
         'expert_application_status',
         'expert_qualifications',
+        'expert_certificate_path',
+        'expert_certificate_name',
         'expert_applied_at',
         'expert_reviewed_at',
         'expert_reviewed_by',
@@ -54,9 +56,18 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public const EXPERT_APPLICATION_REJECTED = 'rejected';
 
+    /** Private local disk folder for expert application certificates. */
+    public const EXPERT_CERTIFICATE_DIRECTORY = 'expert-certificates';
+
+    /** Accepted certificate types and the size limit (in KB) shared by the form and the server. */
+    public const EXPERT_CERTIFICATE_MIMES = ['pdf', 'jpg', 'jpeg', 'png'];
+
+    public const EXPERT_CERTIFICATE_MAX_KB = 5120;
+
     protected $hidden = [
         'password',
         'remember_token',
+        'expert_certificate_path',
     ];
 
     protected $casts = [
@@ -74,6 +85,14 @@ class User extends Authenticatable implements MustVerifyEmail
         static::creating(function (User $user) {
             if (! array_key_exists((string) $user->role, self::ROLE_LABELS)) {
                 $user->role = self::ROLE_RESIDENT;
+            }
+        });
+
+        static::deleted(function (User $user) {
+            $user->deleteExpertApplicationNotifications();
+
+            if ($user->expert_certificate_path) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($user->expert_certificate_path);
             }
         });
 
@@ -210,6 +229,65 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hasPendingExpertApplication(): bool
     {
         return $this->expert_application_status === self::EXPERT_APPLICATION_PENDING;
+    }
+
+    /** A resident whose expert application was rejected can send a new one from their profile. */
+    public function canReapplyAsExpert(): bool
+    {
+        return $this->role === self::ROLE_RESIDENT
+            && $this->expert_application_status === self::EXPERT_APPLICATION_REJECTED;
+    }
+
+    /** Tells every admin that this user's expert application (new or resubmitted) is waiting for review. */
+    public function notifyAdminsOfExpertApplication(bool $resubmitted = false): void
+    {
+        try {
+            \Illuminate\Support\Facades\Notification::send(
+                self::where('role', 'admin')->get(),
+                new \App\Notifications\AdminAlert(
+                    $resubmitted ? 'Expert application resubmitted' : 'New expert account application',
+                    $resubmitted
+                        ? 'A previously rejected applicant sent a new expert account application for your review.'
+                        : 'A new expert account application is waiting for your review.',
+                    'expert_application',
+                    // Relative, so the link keeps working if the site's address changes.
+                    route('admin.users', [], false) . '#expert-applications',
+                    'Review',
+                    details: [
+                        // Lets the notification be removed once the application is reviewed.
+                        'applicant_id' => $this->id,
+                        'applicant_name' => $this->name,
+                        'organization' => $this->organization,
+                    ],
+                ),
+            );
+        } catch (\Throwable $exception) {
+            // The application is saved either way; admins still see it on the Users page.
+            logger()->error('Failed to notify admins of expert application', [
+                'user_id' => $this->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Remove the admins' "New expert account application" notifications for this applicant, once the
+     * application is reviewed or the account deleted (nothing is left to review). Older notifications
+     * have no applicant_id, so those are matched by the applicant's name.
+     */
+    public function deleteExpertApplicationNotifications(): void
+    {
+        \Illuminate\Support\Facades\DB::table('notifications')
+            ->where('type', \App\Notifications\AdminAlert::class)
+            ->where('data->type', 'expert_application')
+            ->where(function ($query) {
+                $query->where('data->applicant_id', $this->id)
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('data->applicant_id')
+                            ->where('data->applicant_name', $this->getOriginal('name') ?: $this->name);
+                    });
+            })
+            ->delete();
     }
 
     public function activities(): HasMany

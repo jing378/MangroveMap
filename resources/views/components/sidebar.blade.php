@@ -9,7 +9,7 @@
 
         <a href="{{ route('admin.models') }}" class="sidebar-item {{ request()->routeIs('admin.models') ? 'active' : '' }}">
             <i class="bi bi-robot"></i>
-            <span>Model Training</span>
+            <span>AI Models</span>
         </a>
 
         <a href="{{ route('admin.users') }}" class="sidebar-item {{ request()->routeIs('admin.users') ? 'active' : '' }}">
@@ -70,13 +70,17 @@
             <span>Help &amp; Guide</span>
         </a>
 
+        {{-- Admins read the feedback (Admin > Feedback), so they don't get the "Send Feedback" item. --}}
+        @unless(auth()->user()?->isAdmin())
         <button type="button" class="sidebar-item" data-feedback-open>
             <i class="bi bi-chat-left-text"></i>
             <span>Send Feedback</span>
         </button>
+        @endunless
     </div>
 
     @php($currentUser = auth()->user())
+    @include('partials.install-app')
     <div class="sidebar-version">Version {{ config('app.version') }}</div>
     <div class="sidebar-profile-footer">
         <a href="{{ route('profile.show') }}" class="sidebar-profile-link" aria-label="View profile for {{ $currentUser->name }}">
@@ -93,7 +97,7 @@
                 <span class="sidebar-profile-email">{{ $currentUser->email }}</span>
             </span>
         </a>
-        <form method="POST" action="{{ route('logout') }}" data-confirm="Log out?" data-confirm-message="You will need to log in again to continue." data-confirm-label="Log out" data-confirm-tone="danger" data-confirm-icon="bi-box-arrow-right" data-busy-label="Logging out...">
+        <form method="POST" action="{{ route('logout') }}" data-confirm="Log out?" data-confirm-message="You will need to log in again to continue." data-confirm-label="Log out" data-confirm-tone="danger" data-confirm-icon="bi-box-arrow-right" data-busy-label="Logging out..." data-busy-overlay="Signing you out safely.">
             @csrf
             <button type="submit" class="sidebar-profile-logout" title="Logout" aria-label="Logout">
                 <i class="bi bi-box-arrow-right"></i>

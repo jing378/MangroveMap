@@ -203,4 +203,48 @@ class ProfileNameTest extends TestCase
         $this->assertSame('Pedro', $user->first_name);
         $this->assertSame('San Juan', $user->last_name);
     }
+
+    public function test_admin_edit_modal_saves_name_parts_like_the_profile_page(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create(['name' => 'Ana Reyes']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.users.edit', $user), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertSee('name="first_name"', false)
+            ->assertSee('name="suffix"', false)
+            ->assertDontSee('name="name"', false);
+
+        $this->actingAs($admin)->put(route('admin.users.update', $user), [
+            'first_name' => ' Juan ',
+            'middle_name' => 'Santos',
+            'last_name' => 'Dela Cruz',
+            'suffix' => 'jr',
+            'email' => $user->email,
+            'role' => 'end_user',
+            'phone' => '09123456789',
+        ], ['X-Requested-With' => 'XMLHttpRequest'])->assertOk();
+
+        $user->refresh();
+        $this->assertSame('Juan', $user->first_name);
+        $this->assertSame('Dela Cruz', $user->last_name);
+        $this->assertSame('Juan S. Dela Cruz Jr.', $user->name);
+    }
+
+    public function test_admin_edit_uses_signup_password_and_phone_rules(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create();
+
+        $this->actingAs($admin)->putJson(route('admin.users.update', $user), [
+            'first_name' => 'Ana',
+            'last_name' => 'Reyes',
+            'email' => $user->email,
+            'role' => 'end_user',
+            'phone' => '12345678901',
+            'password' => 'alllowercase1',
+            'password_confirmation' => 'alllowercase1',
+        ])->assertStatus(422)->assertJsonValidationErrors(['phone', 'password']);
+    }
 }

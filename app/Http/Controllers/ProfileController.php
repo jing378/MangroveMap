@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\UserActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
@@ -128,6 +129,77 @@ class ProfileController extends Controller
         }
 
         return back()->with('success', 'Profile updated successfully!');
+    }
+
+    /**
+     * Send a new expert application after a rejected one. Same fields and rules as the sign-up form;
+     * the account stays a resident until an admin approves it.
+     */
+    public function reapplyExpert(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->canReapplyAsExpert()) {
+            return redirect()->route('profile.show')->with('error', $user->hasPendingExpertApplication()
+                ? 'Your expert application is already waiting for review.'
+                : 'Only residents whose expert application was not approved can reapply.');
+        }
+
+        $request->merge([
+            'organization' => trim((string) $request->input('organization')),
+            'expert_qualifications' => trim((string) $request->input('expert_qualifications')),
+        ]);
+
+        $validated = $request->validateWithBag('expertApplication', [
+            'organization' => ['required', 'string', 'max:255'],
+            'expert_qualifications' => ['nullable', 'string', 'max:2000'],
+            'expert_certificate' => [
+                'required',
+                'file',
+                'mimes:' . implode(',', User::EXPERT_CERTIFICATE_MIMES),
+                'max:' . User::EXPERT_CERTIFICATE_MAX_KB,
+            ],
+        ], [
+            'organization.required' => 'Organization or affiliation is required for an expert application.',
+            'organization.max' => 'Organization or affiliation must be 255 characters or fewer.',
+            'expert_qualifications.max' => 'Qualifications must be 2000 characters or fewer.',
+            'expert_certificate.required' => 'Upload a certificate or proof of expertise for your expert application.',
+            'expert_certificate.file' => 'The certificate could not be uploaded. Please try again.',
+            'expert_certificate.uploaded' => 'The certificate could not be uploaded. Please try again.',
+            'expert_certificate.mimes' => 'The certificate must be a PDF, JPG, or PNG file.',
+            'expert_certificate.max' => 'The certificate must be 5 MB or smaller.',
+        ]);
+
+        // Private disk only: admins open it through an authorized route, never the public symlink.
+        $certificate = $request->file('expert_certificate');
+        $newPath = $certificate->store(User::EXPERT_CERTIFICATE_DIRECTORY, 'local');
+        $oldPath = $user->expert_certificate_path;
+
+        $user->forceFill([
+            'organization' => $validated['organization'],
+            'expert_qualifications' => $validated['expert_qualifications'] ?: null,
+            'expert_certificate_path' => $newPath,
+            'expert_certificate_name' => mb_substr($certificate->getClientOriginalName(), 0, 255),
+            'expert_application_status' => User::EXPERT_APPLICATION_PENDING,
+            'expert_applied_at' => now(),
+            'expert_reviewed_at' => null,
+            'expert_reviewed_by' => null,
+            'expert_rejection_notes' => null,
+        ])->save();
+
+        // The rejected application's certificate is replaced by the new one.
+        if ($oldPath && $oldPath !== $newPath) {
+            Storage::disk('local')->delete($oldPath);
+        }
+
+        // The "not approved, reapply" notice has done its job.
+        $user->notifications()->where('data->type', 'expert_application_rejected')->delete();
+
+        UserActivity::record($user, 'Resubmitted expert application', 'User Management', 'pending', $user);
+        $user->notifyAdminsOfExpertApplication(resubmitted: true);
+
+        return redirect()->route('profile.show')
+            ->with('success', 'Your expert application was sent. An administrator will review it.');
     }
 
     /**

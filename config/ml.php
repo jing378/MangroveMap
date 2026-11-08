@@ -28,4 +28,23 @@ return [
         'max_vertices' => (int) env('ML_DRONE_MAX_VERTICES', 300),
         'timeout' => (int) env('ML_DRONE_TIMEOUT', 3600),
     ],
+
+    // Genus suggestion (Ultralytics YOLO segmentation, ml/predict_genus.py), run after the U-Net on drone
+    // imagery. Weights: the newest active "classification" AI model (.pt), else this path. Skipped when
+    // neither exists. The result is only a suggestion: the owner still picks the genus before submitting.
+    'genus' => [
+        'enabled' => (bool) env('ML_GENUS_SUGGEST', true),
+        'script' => env('ML_GENUS_SCRIPT', base_path('ml/predict_genus.py')),
+        'model_path' => env('ML_GENUS_MODEL_PATH', base_path('ml/models/mangrove_classifier.pt')),
+        'input_size' => (int) env('ML_GENUS_INPUT_SIZE', 640),
+        'confidence' => (float) env('ML_GENUS_CONFIDENCE', 0.1),
+        // Lower threshold for the per-genus probabilities the review editor always shows (experimental).
+        'probability_confidence' => (float) env('ML_GENUS_PROBABILITY_CONFIDENCE', 0.01),
+        'timeout' => (int) env('ML_GENUS_TIMEOUT', 1800),
+        // Patches of one genus smaller than this (ground m²) are ignored: the model labels thin slivers
+        // along canopy/mud edges with random genera (e.g. "Nypa" fringes); real stands are larger.
+        'min_patch_m2' => (float) env('ML_GENUS_MIN_PATCH_M2', 2.0),
+        // Recounting the genus inside the owner's edited areas from the saved genus map (no model run).
+        'recount_timeout' => (int) env('ML_GENUS_RECOUNT_TIMEOUT', 60),
+    ],
 ];

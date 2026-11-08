@@ -22,6 +22,9 @@ class FeedbackController extends Controller
     /** "Send Feedback" pop-up in the sidebar (every signed-in user). */
     public function store(Request $request): JsonResponse
     {
+        // Feedback is sent to the admins, so admins themselves don't send it.
+        abort_if($request->user()->isAdmin(), 403, 'Admins review feedback rather than send it.');
+
         $validated = $request->validate([
             'type' => ['required', Rule::in(array_keys(Feedback::TYPES))],
             'message' => ['required', 'string', 'min:5', 'max:5000'],

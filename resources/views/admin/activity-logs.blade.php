@@ -36,7 +36,7 @@
             @if($filteredUser)
             <input type="hidden" name="user" value="{{ $filteredUser->id }}">
             @endif
-            <input type="search" name="search" class="search-input" placeholder="Search activity, user name or email..." value="{{ $filters['search'] ?? '' }}">
+            <input type="search" name="search" class="search-input" placeholder="Search activity, user name or email..." aria-label="Search activity" value="{{ $filters['search'] ?? '' }}">
             <select name="module" class="filter-select" aria-label="Module">
                 <option value="">All Modules</option>
                 @foreach($modules as $module)
@@ -55,12 +55,20 @@
                 <option value="expert" @selected(($filters['role'] ?? '') === 'expert')>Expert</option>
                 <option value="admin" @selected(($filters['role'] ?? '') === 'admin')>Administrator</option>
             </select>
-            <label class="date-filter">From <input type="date" name="from" class="filter-select" value="{{ $filters['from'] ?? '' }}"></label>
-            <label class="date-filter">To <input type="date" name="to" class="filter-select" value="{{ $filters['to'] ?? '' }}"></label>
-            <button type="submit" class="btn-primary"><i class="bi bi-funnel"></i> Filter</button>
-            @if(array_filter($filters))
-            <a href="{{ route('admin.activity-logs.index') }}" class="btn-secondary">Clear</a>
-            @endif
+            <label class="date-filter">
+                <span>From</span>
+                <input type="date" name="from" class="filter-select" value="{{ $filters['from'] ?? '' }}">
+            </label>
+            <label class="date-filter">
+                <span>To</span>
+                <input type="date" name="to" class="filter-select" value="{{ $filters['to'] ?? '' }}">
+            </label>
+            <div class="filter-actions">
+                <button type="submit" class="btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+                @if(array_filter($filters))
+                <a href="{{ route('admin.activity-logs.index') }}" class="btn-secondary"><i class="bi bi-x-lg"></i> Clear</a>
+                @endif
+            </div>
         </form>
 
         @if($filteredUser)
@@ -70,8 +78,8 @@
         </div>
         @endif
 
-        <div class="table-container">
-            <table class="table">
+        <div class="table-container log-table-container">
+            <table class="table log-table">
                 <thead>
                     <tr>
                         <th>Timestamp</th>
@@ -86,18 +94,18 @@
                     @forelse($activities as $activity)
                     @php($detailUrl = route('admin.activity-logs.show', $activity))
                     <tr class="log-row" data-href="{{ $detailUrl }}">
-                        <td class="nowrap">
+                        <td class="nowrap cell-time">
                             <div>{{ $activity->created_at?->format('M j, Y') ?? '—' }}</div>
                             <div class="muted">{{ $activity->created_at?->format('g:i A') }}</div>
                         </td>
-                        <td>
+                        <td class="cell-user">
                             <div class="user-name">{{ $activity->user?->name ?? 'Deleted user' }}</div>
                             <div class="muted">{{ $activity->user?->roleLabel() }}</div>
                         </td>
-                        <td>{{ $activity->activity }}</td>
-                        <td>{{ $activity->module }}</td>
-                        <td><span class="badge {{ $activity->status }}">{{ $activity->statusLabel() }}</span></td>
-                        <td><a href="{{ $detailUrl }}" class="action-btn" title="View log details"><i class="bi bi-chevron-right"></i></a></td>
+                        <td class="cell-activity">{{ $activity->activity }}</td>
+                        <td class="cell-module"><span class="module-tag">{{ $activity->module }}</span></td>
+                        <td class="cell-status"><span class="badge {{ $activity->status }}">{{ $activity->statusLabel() }}</span></td>
+                        <td class="cell-open"><a href="{{ $detailUrl }}" class="action-btn" title="View log details" aria-label="View log details"><i class="bi bi-chevron-right"></i></a></td>
                     </tr>
                     @empty
                     <tr>
@@ -132,54 +140,108 @@
 @section('styles')
 @include('admin.partials.activity-log-styles')
 <style>
+    /* Filters: search on its own row, then an even grid of dropdowns and dates, then the buttons. */
     .filter-bar {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
         gap: 10px;
         margin-bottom: 16px;
-        flex-wrap: wrap;
-        align-items: center;
+        align-items: stretch;
     }
 
     .search-input,
     .filter-select {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
         padding: 10px 14px;
         border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 8px;
         font-family: 'Manrope', sans-serif;
         font-size: 12px;
-        background: var(--bg-ffffff, #fff);
+        background-color: var(--bg-ffffff, #fff);
         color: var(--fg-3a5a3a, #3a5a3a);
     }
 
-    .search-input {
-        flex: 1;
-        min-width: 220px;
+    .filter-bar .search-input {
+        grid-column: 1 / -1;
     }
 
     .filter-select {
-        min-width: 130px;
         cursor: pointer;
     }
 
     .search-input:focus,
-    .filter-select:focus {
+    .filter-select:focus,
+    .date-filter:focus-within {
         outline: none;
         border-color: #1e9e62;
         box-shadow: 0 0 0 3px rgba(30, 158, 98, 0.1);
     }
 
+    /* A date field looks like the dropdowns: one bordered box with a small "From"/"To" label inside. */
     .date-filter {
         display: flex;
         align-items: center;
-        gap: 6px;
-        font-size: 11px;
+        gap: 8px;
+        min-width: 0;
+        padding: 0 0 0 12px;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-radius: 8px;
+        background: var(--bg-ffffff, #fff);
+        cursor: pointer;
+    }
+
+    .date-filter span {
+        flex: none;
+        font-size: 10px;
         font-weight: 700;
+        letter-spacing: 0.5px;
         color: #9ab0a0;
         text-transform: uppercase;
     }
 
     .date-filter .filter-select {
-        min-width: 0;
+        flex: 1;
+        border: none;
+        box-shadow: none;
+        padding-left: 0;
+        background-color: transparent;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        grid-column: -2 / -1;
+    }
+
+    .filter-actions .btn-primary,
+    .filter-actions .btn-secondary {
+        flex: 1;
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    .log-table .cell-activity {
+        color: var(--fg-1a2e1a, #1a2e1a);
+        min-width: 220px;
+    }
+
+    .module-tag {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 6px;
+        background: var(--bg-f5f7f6, #f5f7f6);
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--fg-3a5a3a, #3a5a3a);
+        white-space: nowrap;
+    }
+
+    .log-table .cell-open .action-btn {
+        margin-left: auto;
     }
 
     .filter-chip {
@@ -258,14 +320,136 @@
     }
 
     @media (max-width: 768px) {
+        /* Same idea as the Users page: everything full width, dropdowns two per row. */
         .filter-bar {
-            flex-direction: column;
-            align-items: stretch;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .filter-actions {
+            grid-column: 1 / -1;
+        }
+
+        .filter-chip {
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow-wrap: anywhere;
+        }
+
+        /* Each log becomes a card: what happened + status, who, then when and where. Tap opens it. */
+        .log-table-container {
+            overflow-x: visible;
+        }
+
+        .log-table thead {
+            display: none;
+        }
+
+        .log-table,
+        .log-table tbody {
+            display: block;
+            width: 100%;
+        }
+
+        .log-table tr.log-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            grid-template-areas:
+                "activity activity status"
+                "user user open"
+                "time module open";
+            column-gap: 10px;
+            row-gap: 6px;
+            align-items: center;
+            padding: 12px 14px;
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 12px;
+            background: var(--bg-ffffff, #fff);
+        }
+
+        .log-table tr.log-row + tr {
+            margin-top: 10px;
+        }
+
+        .log-table tr.log-row:active {
+            background: var(--bg-f5f7f6, #f5f7f6);
+        }
+
+        .log-table td {
+            display: block;
+            padding: 0;
+            border: none;
+            min-width: 0;
+        }
+
+        .log-table .cell-activity {
+            grid-area: activity;
+            min-width: 0;
+            font-weight: 600;
+            font-size: 13px;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+
+        .log-table .cell-status {
+            grid-area: status;
+            align-self: start;
+        }
+
+        .log-table .cell-user {
+            grid-area: user;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 0 6px;
+            overflow-wrap: anywhere;
+        }
+
+        .log-table .cell-user .user-name {
+            font-size: 12px;
+        }
+
+        .log-table .cell-time {
+            grid-area: time;
+            display: flex;
+            gap: 6px;
+            font-size: 11px;
+            color: #9ab0a0;
+        }
+
+        .log-table .cell-module {
+            grid-area: module;
+            justify-self: end;
+        }
+
+        .log-table .cell-open {
+            grid-area: open;
+        }
+
+        .log-table .cell-open .action-btn {
+            width: 30px;
+            height: 30px;
+        }
+
+        .log-table td.empty-row {
+            border: 1px dashed var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 12px;
         }
 
         .pagination {
-            flex-direction: column;
-            gap: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .pagination-info {
+            order: -1;
+            flex-basis: 100%;
+            text-align: center;
+        }
+
+        .pagination-btn {
+            flex: 1;
+            text-align: center;
         }
     }
 </style>

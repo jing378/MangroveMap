@@ -15,7 +15,7 @@ class FeedbackTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_sidebar_shows_send_feedback_for_residents_and_admins(): void
+    public function test_sidebar_shows_send_feedback_for_residents_but_not_admins(): void
     {
         $resident = User::factory()->create(['role' => 'end_user']);
         $this->actingAs($resident)->get(route('guide'))
@@ -26,8 +26,25 @@ class FeedbackTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $this->actingAs($admin)->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('Send Feedback')
+            ->assertDontSee('Send Feedback')
+            ->assertDontSee('id="feedbackDialog"', false)
             ->assertSee(route('admin.feedback.index'));
+        $this->actingAs($admin)->get(route('guide'))
+            ->assertOk()
+            ->assertDontSee('Send Feedback');
+    }
+
+    public function test_admins_cannot_send_feedback(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->postJson(route('feedback.store'), ['type' => array_key_first(\App\Models\Feedback::TYPES), 'message' => 'Testing from admin'])
+            ->assertForbidden();
+
+        $this->assertSame(0, \App\Models\Feedback::count());
+        Notification::assertNothingSent();
     }
 
     public function test_user_can_send_feedback_with_screenshot_and_admins_are_notified(): void

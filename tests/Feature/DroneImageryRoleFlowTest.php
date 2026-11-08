@@ -240,7 +240,7 @@ class DroneImageryRoleFlowTest extends TestCase
 
         $this->actingAs($resident)->get(route('drone-imagery.edit', $layer->id))
             ->assertOk()
-            ->assertSee('2. Submitted delineation')
+            ->assertSee('Submitted delineation')
             ->assertSee('Awaiting expert review')
             ->assertSee('Mac, Sogod, Southern Leyte')
             ->assertSeeInOrder(['Mangrove Genus Present', 'Rhizophora', 'Sonneratia'])
@@ -275,7 +275,7 @@ class DroneImageryRoleFlowTest extends TestCase
         $this->actingAs($resident)->get(route('drone-imagery.edit', $layer->id))
             ->assertOk()
             ->assertSee('"read_only":true', false)
-            ->assertSee('view-only');
+            ->assertSee('View only.');
 
         $this->actingAs($resident)->putJson(route('drone-imagery.edits.update', $layer->id), $edits)->assertConflict();
         $this->actingAs($resident)->postJson(route('drone-imagery.confirm', $layer->id), $edits)->assertConflict();

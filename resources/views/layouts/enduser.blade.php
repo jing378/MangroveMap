@@ -9,6 +9,7 @@
     <title>@yield('title', 'Dashboard - MangroveMap')</title>
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    @include('partials.pwa-head')
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -54,6 +55,18 @@
             font-weight: 800;
             font-size: 18px;
             color: var(--fg-1a2e1a, #1a2e1a);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: opacity 0.15s ease;
+        }
+
+        .logo:hover {
+            opacity: 0.8;
+        }
+
+        .logo:focus-visible {
+            outline: 3px solid rgba(30, 158, 98, 0.35);
+            outline-offset: 3px;
         }
 
         .header-left {
@@ -604,10 +617,11 @@
                 <i class="bi bi-list"></i>
                 @include('partials.mobile-menu-badge')
             </button>
-            <div class="logo">
+            {{-- Goes to the user's own dashboard (reloads it when already there). --}}
+            <a href="{{ auth()->user()->homeRoute() }}" class="logo" aria-label="MangroveMap, go to your dashboard" title="Go to your dashboard">
                 <div class="logo-mark"><img src="/icon-192.png" alt=""></div>
                 <span>MangroveMap</span>
-            </div>
+            </a>
         </div>
 
         <div class="header-right">
@@ -677,12 +691,15 @@
                     <i class="bi bi-question-circle"></i>
                     <span>Help &amp; Guide</span>
                 </a>
+                @unless(auth()->user()?->isAdmin())
                 <button type="button" class="sidebar-item" data-feedback-open>
                     <i class="bi bi-chat-left-text"></i>
                     <span>Send Feedback</span>
                 </button>
+                @endunless
             </div>
             @php($currentUser = auth()->user())
+            @include('partials.install-app')
             <div class="sidebar-version">Version {{ config('app.version') }}</div>
             <div class="sidebar-profile-footer">
                 <a href="{{ route('profile.show') }}" class="sidebar-profile-link" aria-label="View profile for {{ $currentUser->name }}">
@@ -699,7 +716,7 @@
                         <span class="sidebar-profile-email">{{ $currentUser->email }}</span>
                     </span>
                 </a>
-                <form method="POST" action="{{ route('logout') }}" data-confirm="Log out?" data-confirm-message="You will need to log in again to continue." data-confirm-label="Log out" data-confirm-tone="danger" data-confirm-icon="bi-box-arrow-right" data-busy-label="Logging out...">
+                <form method="POST" action="{{ route('logout') }}" data-confirm="Log out?" data-confirm-message="You will need to log in again to continue." data-confirm-label="Log out" data-confirm-tone="danger" data-confirm-icon="bi-box-arrow-right" data-busy-label="Logging out..." data-busy-overlay="Signing you out safely.">
                     @csrf
                     <button type="submit" class="sidebar-profile-logout" title="Logout" aria-label="Logout">
                         <i class="bi bi-box-arrow-right"></i>
@@ -715,7 +732,9 @@
         </div>
     </div>
 
+    @unless(auth()->user()?->isAdmin())
     @include('partials.feedback-modal')
+    @endunless
 
     @yield('scripts')
     @stack('scripts')

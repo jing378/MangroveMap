@@ -9,9 +9,10 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DelineationAnnualObservationController;
 use App\Http\Controllers\DroneImageryController;
 use App\Http\Controllers\EndUserController;
-use App\Http\Controllers\MapLayerController;
 use App\Http\Controllers\ExpertController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\MapLayerController;
+use App\Http\Controllers\MapPlaceLabelController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlantingRecommendationController;
 use App\Http\Controllers\ProfileController;
@@ -128,7 +129,7 @@ Route::get('/imagery/{layerId}/tiles/{z}/{x}/{y}', [DroneImageryController::clas
     ->name('public.drone-imagery.tile');
 
 // OpenStreetMap place names drawn on the satellite basemap (every map, including the landing page).
-Route::get('/map/place-labels', \App\Http\Controllers\MapPlaceLabelController::class)
+Route::get('/map/place-labels', MapPlaceLabelController::class)
     ->middleware('throttle:60,1')
     ->name('map.place-labels');
 
@@ -168,6 +169,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('layerId')
         ->middleware('throttle:60,1')
         ->name('drone-imagery.segmentation.update');
+    // Live genus suggestion for unsaved area edits (recount only, nothing is saved).
+    Route::post('/drone-imagery/{layerId}/segmentation/genus-preview', [DroneImageryController::class, 'previewGenusSuggestion'])
+        ->whereNumber('layerId')
+        ->middleware('throttle:120,1')
+        ->name('drone-imagery.segmentation.genus-preview');
     Route::post('/drone-imagery/{layerId}/confirm', [DroneImageryController::class, 'confirm'])
         ->whereNumber('layerId')
         ->middleware('throttle:10,1')
@@ -180,6 +186,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.updatePassword');
+    // Residents whose expert application was rejected can send a new one.
+    Route::post('/profile/expert-application', [ProfileController::class, 'reapplyExpert'])
+        ->middleware('throttle:5,1')
+        ->name('profile.expert-application');
 
     // Help & user guide (sections shown depend on the user's role)
     Route::view('/guide', 'guide')->name('guide');
@@ -207,6 +217,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
+    // Dashboard "Field conditions" card (residents and experts): weather forecast from Open-Meteo, cached.
+    Route::get('/dashboard/field-conditions', [EndUserController::class, 'fieldConditions'])
+        ->middleware('throttle:30,1')
+        ->name('dashboard.field-conditions');
+
     // Resident dashboard - RESTRICTED TO END_USER ROLE ONLY
     Route::middleware('end_user')->get('/dashboard', [EndUserController::class, 'dashboard'])->name('dashboard');
     Route::middleware('end_user')->post('/delineations', [EndUserController::class, 'storeDelineation'])->name('delineations.store');
@@ -221,7 +236,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/delineations', [ExpertController::class, 'storeDelineation'])->name('expert.delineations.store');
         Route::post('/delineations/{delineation}/approve', [ExpertController::class, 'approve'])->name('expert.delineations.approve');
         Route::post('/delineations/{delineation}/reject', [ExpertController::class, 'reject'])->name('expert.delineations.reject');
-        Route::delete('/delineations/{delineation}', [ExpertController::class, 'destroyRejected'])->name('expert.delineations.destroy');
+        Route::delete('/delineations/{delineation}', [ExpertController::class, 'destroyDelineation'])->name('expert.delineations.destroy');
         Route::get('/recommendations', [PlantingRecommendationController::class, 'index'])
             ->name('expert.recommendations.index');
         Route::post('/recommendations', [PlantingRecommendationController::class, 'store'])
@@ -238,6 +253,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/datasets', [AdminController::class, 'datasets'])->name('admin.datasets');
         Route::get('/models', [AdminController::class, 'models'])->name('admin.models');
         Route::post('/models', [AdminController::class, 'uploadModel'])->name('admin.models.upload');
+        Route::post('/models/{model}/activate', [AdminController::class, 'activateModel'])
+            ->whereNumber('model')
+            ->name('admin.models.activate');
+        Route::put('/models/{model}/metrics', [AdminController::class, 'updateModelMetrics'])
+            ->whereNumber('model')
+            ->name('admin.models.metrics');
+        Route::post('/models/{model}/metrics/from-checkpoint', [AdminController::class, 'readModelMetricsFromCheckpoint'])
+            ->whereNumber('model')
+            ->name('admin.models.metrics.checkpoint');
         Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
         Route::get('/users/{user}', [AdminController::class, 'show'])->name('admin.users.show');
         Route::get('/users/{user}/edit', [AdminController::class, 'edit'])->name('admin.users.edit');
@@ -268,6 +292,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('admin.expert-applications.approve');
         Route::post('/users/{user}/expert-application/reject', [AdminController::class, 'rejectExpertApplication'])
             ->name('admin.expert-applications.reject');
+        Route::get('/users/{user}/expert-application/certificate', [AdminController::class, 'expertCertificate'])
+            ->name('admin.expert-applications.certificate');
         Route::get('/feedback', [FeedbackController::class, 'index'])->name('admin.feedback.index');
         Route::put('/feedback/{feedback}', [FeedbackController::class, 'update'])
             ->whereNumber('feedback')

@@ -9,6 +9,7 @@
     <title>@yield('title', 'Admin - MangroveMap')</title>
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    @include('partials.pwa-head')
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
 
@@ -51,6 +52,18 @@
             font-weight: 800;
             font-size: 18px;
             color: var(--fg-1a2e1a, #1a2e1a);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: opacity 0.15s ease;
+        }
+
+        .logo:hover {
+            opacity: 0.8;
+        }
+
+        .logo:focus-visible {
+            outline: 3px solid rgba(30, 158, 98, 0.35);
+            outline-offset: 3px;
         }
 
         .header-left {
@@ -592,6 +605,28 @@
 
     @yield('styles')
     @stack('styles')
+
+    <style>
+        /* Admin dropdowns: one chevron set a little in from the right edge instead of the
+           browser's arrow, which sits flush against the border (far off on wide/full-width selects).
+           The extra :not()s give this rule enough weight over the per-page select styles.
+           AI Models' select (.upload-field) draws its own icon, so it is left alone. */
+        html body select:not([multiple]):not([size]):not(.upload-field select) {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            padding-right: 34px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%236a8a6a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M3.5 6l4.5 4.5L12.5 6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 12px 12px;
+            cursor: pointer;
+        }
+
+        html body select:not([multiple]):not([size]):not(.upload-field select)::-ms-expand {
+            display: none;
+        }
+    </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @include('partials.scrollbar-styles')
     @include('partials.action-feedback')
@@ -604,10 +639,11 @@
                 <i class="bi bi-list"></i>
                 @include('partials.mobile-menu-badge')
             </button>
-            <div class="logo">
+            {{-- Goes to the user's own dashboard (reloads it when already there). --}}
+            <a href="{{ auth()->user()->homeRoute() }}" class="logo" aria-label="MangroveMap, go to your dashboard" title="Go to your dashboard">
                 <div class="logo-mark"><img src="/icon-192.png" alt=""></div>
                 <span>MangroveMap{{ auth()->user()->isAdmin() ? ' Admin' : '' }}</span>
-            </div>
+            </a>
         </div>
 
         <div class="header-right">
@@ -625,7 +661,6 @@
         </div>
     </div>
 
-    @include('partials.feedback-modal')
 
     @yield('scripts')
     @stack('scripts')

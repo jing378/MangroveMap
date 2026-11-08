@@ -54,6 +54,16 @@
                     <dd>{{ $applicant->organization ?: '—' }}</dd>
                     <dt>Qualifications &amp; experience</dt>
                     <dd class="application-qualifications">{{ $applicant->expert_qualifications ?: '—' }}</dd>
+                    <dt>Certificate</dt>
+                    <dd>
+                        @if($applicant->expert_certificate_path)
+                        <a href="{{ route('admin.expert-applications.certificate', $applicant) }}" target="_blank" rel="noopener" class="application-certificate">
+                            <i class="bi bi-file-earmark-text"></i> {{ $applicant->expert_certificate_name ?: 'View certificate' }}
+                        </a>
+                        @else
+                        —
+                        @endif
+                    </dd>
                 </dl>
             </div>
             <div class="application-actions">
@@ -84,10 +94,6 @@
     <div class="section">
         <div class="section-title-with-actions">
             <div><i class="bi bi-people"></i> User Directory</div>
-            <div class="section-actions">
-                <button class="btn-primary"><i class="bi bi-plus-lg"></i> Add User</button>
-                <button class="btn-secondary"><i class="bi bi-arrow-clockwise"></i> Sync Users</button>
-            </div>
         </div>
 
         <div class="filter-bar">
@@ -107,8 +113,8 @@
             </select>
         </div>
 
-        <div class="table-container">
-            <table class="table">
+        <div class="table-container directory-table-container">
+            <table class="table directory-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -136,7 +142,7 @@
                     $statusClass = $user->email_verified_at ? 'success' : 'secondary';
                     @endphp
                     <tr data-role="{{ $user->role }}">
-                        <td>
+                        <td class="cell-user">
                             <div class="user-cell">
                                 <div class="user-avatar">{{ $initials }}</div>
                                 <div>
@@ -145,16 +151,16 @@
                                 </div>
                             </div>
                         </td>
-                        <td>{{ $user->email }}</td>
-                        <td>
+                        <td data-label="Email" class="cell-email">{{ $user->email }}</td>
+                        <td data-label="Role">
                             <span class="role-badge {{ $roleClass }}">{{ $roleLabel }}</span>
                             @if($user->hasPendingExpertApplication())
                             <a href="#expert-applications" class="role-badge manager" title="Expert application pending review">Expert applicant</a>
                             @endif
                         </td>
-                        <td><span class="badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
-                        <td>{{ $user->created_at?->format('M j, Y') ?? 'Unknown' }}</td>
-                        <td>{{ $user->last_login_at ? $user->last_login_at->diffForHumans() : 'Never' }}</td>
+                        <td data-label="Status"><span class="badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
+                        <td data-label="Joined">{{ $user->created_at?->format('M j, Y') ?? 'Unknown' }}</td>
+                        <td data-label="Last login">{{ $user->last_login_at ? $user->last_login_at->diffForHumans() : 'Never' }}</td>
                         <td class="actions-cell">
                             <a class="action-btn view" href="{{ route('admin.users.show', $user) }}" title="View" data-action="show"><i class="bi bi-eye"></i></a>
                             <a class="action-btn edit" href="{{ route('admin.users.edit', $user) }}" title="Edit" data-action="edit"><i class="bi bi-pencil"></i></a>
@@ -324,11 +330,6 @@
         color: var(--fg-1a2e1a, #1a2e1a);
     }
 
-    .section-actions {
-        display: flex;
-        gap: 12px;
-    }
-
     .filter-bar {
         display: flex;
         gap: 12px;
@@ -491,6 +492,20 @@
 
     .application-qualifications {
         white-space: pre-line;
+    }
+
+    .application-certificate {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-weight: 600;
+        color: var(--fg-1e9e62, #1e9e62);
+        text-decoration: none;
+        word-break: break-all;
+    }
+
+    .application-certificate:hover {
+        text-decoration: underline;
     }
 
     .unverified-note {
@@ -881,6 +896,9 @@
     .modal-window {
         width: min(100%, 820px);
         max-height: min(100%, 90vh);
+        max-height: min(100%, 90dvh);
+        display: flex;
+        flex-direction: column;
         overflow: hidden;
         border-radius: 14px;
         background: var(--bg-ffffff, #fff);
@@ -889,10 +907,17 @@
         border: 1px solid var(--bd-e0e8e0, #e0e8e0);
     }
 
+    /* Header and actions stay fixed; only the body scrolls, whatever the screen height. */
     .modal-content {
         display: flex;
         flex-direction: column;
-        min-height: 220px;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    .modal-header,
+    .modal-actions {
+        flex: none;
     }
 
     .modal-header {
@@ -942,7 +967,10 @@
     .modal-body {
         padding: 24px;
         overflow-y: auto;
-        max-height: calc(90vh - 180px);
+        flex: 1 1 auto;
+        min-height: 0;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
     }
 
     .modal-actions {
@@ -1126,6 +1154,223 @@
         min-width: 0;
     }
 
+    /* Edit User modal: grouped like the profile page (Name / Account / Password). */
+    .modal-user-heading {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .modal-user-heading .modal-subtitle {
+        overflow-wrap: anywhere;
+    }
+
+    .user-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .edit-group {
+        margin: 0;
+        padding: 14px 16px 16px;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-radius: 12px;
+        background: var(--bg-fbfcfb, #fbfcfb);
+        min-width: 0;
+    }
+
+    .edit-group legend {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 6px;
+        margin-left: -6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .edit-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 16px;
+    }
+
+    .modal-body .edit-group .form-group input,
+    .modal-body .edit-group .form-group select {
+        width: 100%;
+        min-width: 0;
+        min-height: 40px;
+        box-sizing: border-box;
+    }
+
+    .modal-body .edit-group .password-wrapper {
+        gap: 6px;
+    }
+
+    .modal-body .edit-group .toggle-pw {
+        width: 40px;
+        height: 40px;
+        flex: none;
+        border-radius: 8px;
+    }
+
+    .modal-body .label-optional {
+        font-weight: 500;
+        color: #9ab0a0;
+    }
+
+    .modal-body .field-hint {
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    .modal-body .field-hint--notice {
+        display: flex;
+        gap: 5px;
+        align-items: flex-start;
+        color: var(--fg-c07818, #c07818);
+    }
+
+    .edit-group .password-hint {
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    .edit-group .password-rules {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .edit-group .password-rules li {
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        background: var(--bg-ffffff, #fff);
+        font-size: 10.5px;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    /* User Details modal */
+    .modal-body .detail-group + .detail-group {
+        margin-top: 20px;
+    }
+
+    .modal-body .detail-group h4 {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 0 10px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        margin: 0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--bg-e0e8e0, #e0e8e0);
+    }
+
+    .detail-grid > div {
+        padding: 10px 14px;
+        background: var(--bg-ffffff, #fff);
+        min-width: 0;
+    }
+
+    .detail-grid > .detail-full {
+        grid-column: 1 / -1;
+    }
+
+    .detail-grid dt {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: #9ab0a0;
+        margin-bottom: 4px;
+    }
+
+    .detail-grid dd {
+        margin: 0;
+        font-size: 13px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    .detail-wrap {
+        overflow-wrap: anywhere;
+    }
+
+    .activity-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .activity-list li {
+        padding: 10px 14px;
+        background: var(--bg-ffffff, #fff);
+    }
+
+    .activity-list li + li {
+        border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
+    }
+
+    .activity-main {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .activity-text {
+        font-size: 12.5px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        overflow-wrap: anywhere;
+        min-width: 0;
+    }
+
+    .activity-main .badge {
+        flex: none;
+    }
+
+    .activity-meta {
+        margin-top: 3px;
+        font-size: 11px;
+        color: #9ab0a0;
+    }
+
+    @media (max-width: 560px) {
+        .edit-grid,
+        .detail-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-user-heading .user-avatar {
+            display: none;
+        }
+    }
+
     .modal-body .alert {
         padding: 14px 18px;
         border-radius: 10px;
@@ -1147,6 +1392,18 @@
 
     .modal-body .alert-danger li {
         margin: 4px 0;
+    }
+
+    @keyframes modalSheetIn {
+        from {
+            transform: translateY(40px);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
     }
 
     @keyframes modalFadeIn {
@@ -1179,15 +1436,6 @@
             align-items: flex-start;
             gap: 16px;
         }
-
-        .section-actions {
-            width: 100%;
-        }
-
-        .section-actions .btn-primary,
-        .section-actions .btn-secondary {
-            width: 100%;
-        }
     }
 
     @media (max-width: 768px) {
@@ -1196,36 +1444,59 @@
             margin-bottom: 16px;
         }
 
+        /* Phones: the modal is a bottom sheet with the buttons always in reach. */
         .modal-overlay {
-            padding: 12px;
+            padding: 0;
+            align-items: flex-end;
         }
 
         .modal-window {
             width: 100%;
-            max-height: 85vh;
-            border-radius: 12px;
+            max-height: 92vh;
+            max-height: 92dvh;
+            border-radius: 16px 16px 0 0;
+            border-bottom: none;
+            animation: modalSheetIn 0.22s ease;
         }
 
         .modal-header {
             padding: 16px 16px 12px;
+            align-items: center;
         }
 
         .modal-header h3 {
             font-size: 16px;
         }
 
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            flex: none;
+        }
+
         .modal-body {
             padding: 16px;
-            max-height: calc(85vh - 140px);
         }
 
         .modal-actions {
-            padding: 12px 16px;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
             gap: 8px;
         }
 
         .modal-actions button {
             flex: 1;
+            justify-content: center;
+            min-height: 42px;
+        }
+
+        .edit-group {
+            padding: 12px 12px 14px;
+        }
+
+        /* iOS zooms into fields with text under 16px; keep the form steady while typing. */
+        .modal-body .edit-group .form-group input,
+        .modal-body .edit-group .form-group select {
+            font-size: 16px;
         }
 
         .modal-body .form-row {
@@ -1267,20 +1538,110 @@
             padding: 10px 12px;
         }
 
-        .user-cell {
-            flex-direction: column;
-            gap: 6px;
-            align-items: flex-start;
+        /* User Directory: each row becomes a card (name on top, labelled details, actions at the bottom). */
+        .directory-table-container {
+            overflow-x: visible;
         }
 
-        .actions-cell {
-            gap: 4px;
+        .directory-table thead {
+            display: none;
         }
 
-        .action-btn {
-            width: 28px;
-            height: 28px;
+        .directory-table,
+        .directory-table tbody,
+        .directory-table tr,
+        .directory-table td {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .directory-table tbody tr[data-role] {
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 12px;
+            padding: 12px 14px;
+            background: var(--bg-ffffff, #fff);
+        }
+
+        .directory-table tbody tr + tr {
+            margin-top: 10px;
+        }
+
+        .directory-table tr:hover {
+            background: var(--bg-ffffff, #fff);
+        }
+
+        .directory-table td {
+            padding: 0;
+            border-bottom: none;
+        }
+
+        .directory-table td[data-label] {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 7px 0;
+            border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
             font-size: 12px;
+            text-align: right;
+        }
+
+        .directory-table td[data-label]::before {
+            content: attr(data-label);
+            flex: none;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #9ab0a0;
+            text-align: left;
+        }
+
+        .directory-table td.cell-email {
+            overflow-wrap: anywhere;
+        }
+
+        .directory-table td.cell-user {
+            padding-bottom: 10px;
+        }
+
+        .directory-table .user-cell {
+            min-width: 0;
+        }
+
+        .directory-table .user-cell > div:last-child {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .directory-table td[data-label="Role"] {
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            row-gap: 6px;
+        }
+
+        .directory-table td[data-label="Role"]::before {
+            margin-right: auto;
+        }
+
+        .directory-table .actions-cell {
+            display: flex !important;
+            justify-content: flex-end;
+            gap: 8px;
+            padding-top: 10px !important;
+            border-top: 1px solid var(--bd-f0f4f0, #f0f4f0) !important;
+        }
+
+        .directory-table .action-btn {
+            width: 36px;
+            height: 36px;
+            font-size: 14px;
+        }
+
+        .directory-table td[colspan] {
+            padding: 16px 0;
+            text-align: center;
         }
 
         .pagination {
@@ -1327,11 +1688,14 @@
         userModalContent.innerHTML = '<div class="modal-loading">Loading...</div>';
         userModalOverlay.classList.add('active');
         userModalOverlay.setAttribute('aria-hidden', 'false');
+        // Keep the page behind the modal from scrolling (noticeable on phones).
+        document.documentElement.style.overflow = 'hidden';
     }
 
     function closeModal() {
         userModalOverlay.classList.remove('active');
         userModalOverlay.setAttribute('aria-hidden', 'true');
+        document.documentElement.style.overflow = '';
         userModalContent.innerHTML = '<div class="modal-loading">Loading...</div>';
     }
 
@@ -1399,7 +1763,11 @@
                     button: submitButton,
                     busyLabel: 'Saving...',
                     lock: [...userModalContent.querySelectorAll('[data-modal-close]')],
-                    task: () => axios.post(form.action, new FormData(form)),
+                    task: () => modalRequest(form.action, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' },
+                        body: new FormData(form),
+                    }),
                     errorMessage: false,
                 });
 
@@ -1430,7 +1798,10 @@
 
                 const show = targetInput.type === 'password';
                 targetInput.type = show ? 'text' : 'password';
-                button.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+                button.innerHTML = show ? '<i class="bi bi-eye-slash" aria-hidden="true"></i>' : '<i class="bi bi-eye" aria-hidden="true"></i>';
+                const label = show ? 'Hide password' : 'Show password';
+                button.setAttribute('aria-label', label);
+                button.title = label;
             });
         });
     }
@@ -1459,15 +1830,52 @@
         });
     }
 
+    // Links are generated with the server's idea of the site address. Behind a tunnel or proxy
+    // (e.g. opening the site on a phone over https) that can be http:// or another host, and the
+    // browser then blocks the request. Asking for the same path on the current page's own origin avoids it.
+    function sameOriginUrl(url) {
+        const target = new URL(url, window.location.href);
+        return target.pathname + target.search;
+    }
+
+    // Plain fetch instead of axios: axios comes from the Vite bundle, which a phone cannot load
+    // while the Vite dev server runs on this computer's localhost. Failures are thrown in the
+    // same shape as axios errors ({ response: { status, data } }) so the callers stay simple.
+    async function modalRequest(url, options = {}, as = 'json') {
+        const response = await fetch(sameOriginUrl(url), {
+            credentials: 'same-origin',
+            ...options,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', ...(options.headers || {}) },
+        });
+        const isJson = (response.headers.get('content-type') || '').includes('application/json');
+        const data = isJson ? await response.json() : await response.text();
+        if (!response.ok) {
+            throw { response: { status: response.status, data } };
+        }
+        return as === 'text' && typeof data !== 'string' ? JSON.stringify(data) : data;
+    }
+
     async function loadModalContent(url, action = 'show') {
         openModalLoading();
 
+        let html;
         try {
-            const response = await axios.get(url);
-            userModalContent.innerHTML = response.data;
+            html = await modalRequest(url, { headers: { 'Accept': 'text/html' } }, 'text');
+        } catch (error) {
+            const status = error.response?.status;
+            const message = status === 419 || status === 401
+                ? 'Your session has expired. Please refresh the page and log in again.'
+                : (status ? `Unable to load content (error ${status}). Please refresh.` : 'Unable to load content. Check your connection and try again.');
+            userModalContent.innerHTML = `<div class="modal-loading">${message}</div>`;
+            console.error(error);
+            return;
+        }
+
+        userModalContent.innerHTML = html;
+        try {
             bindModalActions();
         } catch (error) {
-            userModalContent.innerHTML = '<div class="modal-loading">Unable to load content. Please refresh.</div>';
+            // The content is already shown; a binding problem should not replace it with an error.
             console.error(error);
         }
     }

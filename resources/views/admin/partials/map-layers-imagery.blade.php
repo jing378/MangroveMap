@@ -1,5 +1,5 @@
-<div class="table-container">
-    <table class="table">
+<div class="table-container layer-table-container">
+    <table class="table layer-table">
         <thead>
             <tr>
                 <th>Layer</th>
@@ -27,40 +27,47 @@
             $isReady = $layer->status === 'ready' && $layer->bounds;
             @endphp
             <tr class="layer-row" data-layer-id="i{{ $layer->id }}">
-                <td>
+                <td class="cell-title">
                     <div class="user-name">{{ $layer->name }}</div>
                     <div class="muted">{{ $layer->files_count }} {{ \Illuminate\Support\Str::plural('file', $layer->files_count) }} · {{ $layer->source_type === 'batch' ? 'Survey batch' : 'Single GeoTIFF' }}</div>
                 </td>
-                <td>
-                    <div>{{ $layer->user?->name ?? 'Deleted user' }}</div>
-                    <div class="muted">{{ $layer->user?->roleLabel() }}</div>
+                <td data-label="Uploaded by">
+                    <div class="cell-value">
+                        <div>{{ $layer->user?->name ?? 'Deleted user' }}</div>
+                        <div class="muted">{{ $layer->user?->roleLabel() }}</div>
+                    </div>
                 </td>
-                <td>
-                    <span class="badge {{ $statusClass }}">{{ $layer->status === 'awaiting_review' ? 'Awaiting owner review' : ucfirst($layer->status) }}</span>
-                    @if($layer->status === 'failed' && $layer->error_message)
-                    <div class="muted clamp" title="{{ $layer->error_message }}">{{ $layer->error_message }}</div>
-                    @endif
+                <td data-label="Processing">
+                    <div class="cell-value">
+                        <span class="badge {{ $statusClass }}">{{ \App\Http\Controllers\MapLayerController::IMAGERY_STATUSES[$layer->status] ?? ucfirst((string) $layer->status) }}</span>
+                        @if($layer->status === 'failed' && $layer->error_message)
+                        <div class="muted clamp status-note" title="{{ $layer->error_message }}">{{ $layer->error_message }}</div>
+                        @endif
+                    </div>
                 </td>
-                <td>
-                    <span class="badge {{ $segmentationClass }}">{{ $layer->segmentation_status ? ucfirst($layer->segmentation_status) : 'Not run' }}</span>
-                    @if($layer->segmentation_status === 'failed' && $layer->segmentation_error)
-                    <div class="muted clamp" title="{{ $layer->segmentation_error }}">{{ $layer->segmentation_error }}</div>
-                    @endif
+                <td data-label="AI segmentation">
+                    <div class="cell-value">
+                        <span class="badge {{ $segmentationClass }}">{{ $layer->segmentation_status ? ucfirst($layer->segmentation_status) : 'Not run' }}</span>
+                        @if($layer->segmentation_status === 'failed' && $layer->segmentation_error)
+                        <div class="muted clamp status-note" title="{{ $layer->segmentation_error }}">{{ $layer->segmentation_error }}</div>
+                        @endif
+                    </div>
                 </td>
-                <td class="nowrap">{{ $layer->created_at?->format('M j, Y') ?? '—' }}</td>
-                <td>
+                <td data-label="Uploaded" class="nowrap">{{ $layer->created_at?->format('M j, Y') ?? '—' }}</td>
+                <td class="cell-actions">
                     <div class="row-actions">
+                        {{-- Relative URLs: absolute ones can come out as http:// behind the https tunnel and get blocked. --}}
                         <button type="button" class="action-btn" title="Preview on map" data-preview
                             data-kind="imagery"
                             data-name="{{ $layer->name }}"
                             @if($isReady)
-                            data-tile-url="{{ url("/drone-imagery/{$layer->id}/tiles") }}/{z}/{x}/{y}"
+                            data-tile-url="{{ parse_url(url("/drone-imagery/{$layer->id}/tiles"), PHP_URL_PATH) }}/{z}/{x}/{y}"
                             data-bounds='@json($layer->bounds)'
                             data-zoom-min="{{ $layer->zoom_min }}"
                             data-zoom-max="{{ $layer->zoom_max }}"
                             @endif
                             @if($layer->segmentation_status === 'ready')
-                            data-segmentation-url="{{ route('drone-imagery.segmentation.show', $layer->id) }}"
+                            data-segmentation-url="{{ route('drone-imagery.segmentation.show', $layer->id, false) }}"
                             @endif
                             @disabled(! $isReady)><i class="bi bi-eye"></i></button>
                         <button type="button" class="action-btn" title="Rename" data-rename-imagery

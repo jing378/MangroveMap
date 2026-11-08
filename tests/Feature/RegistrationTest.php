@@ -121,7 +121,7 @@ class RegistrationTest extends TestCase
         $html = $this->get('/register')->assertOk()->getContent();
 
         $this->assertStringContainsString('register\/check-email', $html);
-        $this->assertStringContainsString('action="/register" novalidate', $html);
+        $this->assertStringContainsString('action="/register" enctype="multipart/form-data" novalidate', $html);
     }
 
     public function test_registration_rejects_weak_passwords(): void

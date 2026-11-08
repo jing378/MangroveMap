@@ -93,6 +93,232 @@ class MangroveSegmentationService
     }
 
     /**
+     * Genus weights in use: the newest active "classification" model (.pt), else the configured file.
+     * Null when genus suggestion is off or no weights exist, so callers can skip it.
+     */
+    public function genusWeightsPath(): ?string
+    {
+        if (! config('ml.genus.enabled', true)) {
+            return null;
+        }
+
+        $registered = AIModel::query()
+            ->where('model_type', 'classification')
+            ->where('is_active', true)
+            ->whereNotNull('model_path')
+            ->orderByDesc('id')
+            ->pluck('model_path')
+            ->first(fn($path) => is_string($path)
+                && strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'pt'
+                && is_file($path));
+
+        if ($registered !== null) {
+            return $registered;
+        }
+
+        $configured = (string) config('ml.genus.model_path');
+
+        return $configured !== '' && is_file($configured) ? $configured : null;
+    }
+
+    /**
+     * Share of each genus inside the U-Net mangrove mask of a raster (same pixel grid).
+     *
+     * @return array<string, mixed>
+     */
+    public function predictGenera(
+        string $rasterAbsolutePath,
+        string $maskAbsolutePath,
+        string $weightsPath,
+        ?string $labelsOutPath = null,
+        int $minPatchPixels = 0,
+    ): array {
+        $python = config('ml.python');
+        $script = config('ml.genus.script');
+
+        if (! is_file((string) $python) && $python !== 'python' && $python !== 'python3') {
+            throw new RuntimeException('Python interpreter not found. Create ml/.venv and install ml/requirements.txt.');
+        }
+
+        if (! is_file((string) $script)) {
+            throw new RuntimeException('Genus prediction script is missing: ' . $script);
+        }
+
+        foreach ([$weightsPath, $rasterAbsolutePath, $maskAbsolutePath] as $path) {
+            if (! is_file($path)) {
+                throw new RuntimeException('File not found: ' . $path);
+            }
+        }
+
+        return $this->runScript([
+            (string) $python,
+            (string) $script,
+            '--raster',
+            $rasterAbsolutePath,
+            '--mask',
+            $maskAbsolutePath,
+            '--weights',
+            $weightsPath,
+            '--size',
+            (string) config('ml.genus.input_size', 640),
+            '--conf',
+            (string) config('ml.genus.confidence', 0.1),
+            '--prob-conf',
+            (string) config('ml.genus.probability_confidence', 0.01),
+            // The per-pixel genus map, kept so the owner's edited areas can be recounted (recountGenera).
+            ...($labelsOutPath !== null ? ['--labels-out', $labelsOutPath] : []),
+            '--min-patch-px',
+            (string) max(0, $minPatchPixels),
+        ], (int) config('ml.genus.timeout', 1800));
+    }
+
+    /**
+     * Genus result for the owner's edited areas, counted from the genus map saved by predictGenera
+     * (no model run, well under a second).
+     *
+     * @param  array<int, array<int, array{0: float, 1: float}>>  $lngLatRings
+     * @param  array{east_m: float, north_m: float}  $offset  imagery offset the rings were drawn at
+     * @return array<string, mixed>
+     */
+    public function recountGenera(string $labelsPath, string $metaPath, array $lngLatRings, array $offset): array
+    {
+        $python = config('ml.python');
+        $script = config('ml.genus.script');
+
+        if (! is_file((string) $python) && $python !== 'python' && $python !== 'python3') {
+            throw new RuntimeException('Python interpreter not found. Create ml/.venv and install ml/requirements.txt.');
+        }
+
+        foreach ([(string) $script, $labelsPath, $metaPath] as $path) {
+            if (! is_file($path)) {
+                throw new RuntimeException('File not found: '.$path);
+            }
+        }
+
+        $areasPath = tempnam(sys_get_temp_dir(), 'genus-areas-');
+        if ($areasPath === false) {
+            throw new RuntimeException('Could not create a temporary file for the genus recount.');
+        }
+
+        try {
+            file_put_contents($areasPath, json_encode([
+                'rings' => $lngLatRings,
+                'offset' => ['east_m' => (float) $offset['east_m'], 'north_m' => (float) $offset['north_m']],
+            ]));
+
+            return $this->runScript([
+                (string) $python,
+                (string) $script,
+                '--recount',
+                $areasPath,
+                '--labels',
+                $labelsPath,
+                '--meta',
+                $metaPath,
+                '--min-patch-m2',
+                (string) (float) config('ml.genus.min_patch_m2', 2.0),
+            ], (int) config('ml.genus.recount_timeout', 60));
+        } finally {
+            @unlink($areasPath);
+        }
+    }
+
+    /**
+     * The genus suggestion as stored in segmentation_stats.genus_suggestion, from a predict_genus.py result.
+     *
+     * @return array{genera: array<int, array<string, mixed>>, labeled_percent: float, probabilities: array<int, array<string, mixed>>, probability_basis: string}
+     */
+    public static function genusSuggestionFromResult(array $result): array
+    {
+        $genera = [];
+        foreach ((array) ($result['genera'] ?? []) as $item) {
+            $genus = trim((string) ($item['genus'] ?? ''));
+            if ($genus === '') {
+                continue;
+            }
+            $genera[] = [
+                'genus' => ucfirst($genus),
+                'share_percent' => round((float) ($item['share_percent'] ?? 0), 1),
+                'mean_confidence' => round((float) ($item['mean_confidence'] ?? 0), 3),
+                'detections' => (int) ($item['detections'] ?? 0),
+            ];
+        }
+
+        // Experimental: a probability for every genus the model knows, shown even when it is unsure.
+        $probabilities = [];
+        foreach ((array) ($result['probabilities'] ?? []) as $item) {
+            $genus = trim((string) ($item['genus'] ?? ''));
+            if ($genus === '') {
+                continue;
+            }
+            $probabilities[] = [
+                'genus' => ucfirst($genus),
+                'probability' => round((float) ($item['probability'] ?? 0), 4),
+                'mean_confidence' => round((float) ($item['mean_confidence'] ?? 0), 3),
+                'detections' => (int) ($item['detections'] ?? 0),
+            ];
+        }
+
+        return [
+            'genera' => $genera,
+            // Share of the detected mangrove the model recognised at all.
+            'labeled_percent' => round((float) ($result['labeled_percent'] ?? 0), 1),
+            'probabilities' => $probabilities,
+            // "pixels" = from the model's detections; "none" = it detected nothing, so the shares are equal.
+            'probability_basis' => (string) ($result['probability_basis'] ?? 'none'),
+        ];
+    }
+
+    /**
+     * Check an uploaded genus checkpoint loads as a YOLO segmentation model.
+     *
+     * @return array<int, string> the class (genus) names
+     */
+    public function validateGenusWeights(string $weightsPath): array
+    {
+        return $this->inspectGenusWeights($weightsPath)['classes'];
+    }
+
+    /**
+     * Validates a YOLO genus checkpoint and returns its classes plus the validation results that
+     * Ultralytics stored in it at the end of training (null when the file has none):
+     * mask mAP50 / mAP50-95 / precision / recall (0–1), dataset (e.g. the Roboflow export
+     * "mangrove-canopy-2"), base model, epochs, image size and training date.
+     *
+     * @return array{classes: array<int, string>, training: array<string, mixed>|null}
+     */
+    public function inspectGenusWeights(string $weightsPath): array
+    {
+        $python = config('ml.python');
+        $script = config('ml.genus.script');
+
+        if (! is_file((string) $python) && $python !== 'python' && $python !== 'python3') {
+            throw new RuntimeException('Python interpreter not found. Create ml/.venv and install ml/requirements.txt.');
+        }
+
+        if (! is_file((string) $script)) {
+            throw new RuntimeException('Genus prediction script is missing: ' . $script);
+        }
+
+        if (! is_file($weightsPath)) {
+            throw new RuntimeException('Uploaded checkpoint could not be read.');
+        }
+
+        $result = $this->runScript([
+            (string) $python,
+            (string) $script,
+            '--weights',
+            $weightsPath,
+            '--validate-weights',
+        ], (int) config('ml.timeout', 180));
+
+        return [
+            'classes' => array_values(array_map('strval', (array) ($result['classes'] ?? []))),
+            'training' => is_array($result['training'] ?? null) ? $result['training'] : null,
+        ];
+    }
+
+    /**
      * @param  array<int, string>  $command
      * @return array<string, mixed>
      */

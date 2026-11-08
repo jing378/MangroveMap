@@ -4,9 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Notifications\AdminAlert;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -80,7 +78,15 @@ class RegisteredUserController extends Controller
             // Optional expert application; the account stays a resident until an admin approves it.
             'apply_as_expert' => ['nullable', 'boolean'],
             'organization' => ['exclude_unless:apply_as_expert,1,true', 'required', 'string', 'max:255'],
-            'expert_qualifications' => ['exclude_unless:apply_as_expert,1,true', 'required', 'string', 'min:20', 'max:2000'],
+            // Optional when a certificate is uploaded: the certificate already shows the expertise.
+            'expert_qualifications' => ['exclude_unless:apply_as_expert,1,true', 'nullable', 'required_without:expert_certificate', 'string', 'max:2000'],
+            'expert_certificate' => [
+                'exclude_unless:apply_as_expert,1,true',
+                'required',
+                'file',
+                'mimes:' . implode(',', User::EXPERT_CERTIFICATE_MIMES),
+                'max:' . User::EXPERT_CERTIFICATE_MAX_KB,
+            ],
             'password' => self::passwordRules(),
             'terms' => ['accepted'],
         ], self::passwordMessages() + [
@@ -94,8 +100,13 @@ class RegisteredUserController extends Controller
             'suffix.regex' => 'Suffix can only contain letters and periods (e.g. Jr., Sr., III).',
             'phone.digits' => 'Enter the 9 digits after 09 (e.g. 09123456789).',
             'organization.required' => 'Organization or affiliation is required for an expert application.',
-            'expert_qualifications.required' => 'Describe your expertise so an administrator can review your application.',
-            'expert_qualifications.min' => 'Please describe your expertise in at least 20 characters.',
+            'expert_qualifications.required_without' => 'Describe your expertise or upload a certificate so an administrator can review your application.',
+            'expert_qualifications.max' => 'Qualifications must be 2000 characters or fewer.',
+            'expert_certificate.required' => 'Upload a certificate or proof of expertise for your expert application.',
+            'expert_certificate.file' => 'The certificate could not be uploaded. Please try again.',
+            'expert_certificate.uploaded' => 'The certificate could not be uploaded. Please try again.',
+            'expert_certificate.mimes' => 'The certificate must be a PDF, JPG, or PNG file.',
+            'expert_certificate.max' => 'The certificate must be 5 MB or smaller.',
             'terms.accepted' => 'You must agree to the Terms and Conditions to create an account.',
         ]);
 
@@ -112,6 +123,15 @@ class RegisteredUserController extends Controller
         $validated = $validator->validated();
         $appliesAsExpert = ! empty($validated['apply_as_expert']);
 
+        $certificatePath = null;
+        $certificateName = null;
+        if ($appliesAsExpert) {
+            $certificate = $request->file('expert_certificate');
+            // Private disk only: admins open it through an authorized route, never the public symlink.
+            $certificatePath = $certificate->store(User::EXPERT_CERTIFICATE_DIRECTORY, 'local');
+            $certificateName = mb_substr($certificate->getClientOriginalName(), 0, 255);
+        }
+
         $user = User::create([
             // The User model builds the display name ("Juan D. Dela Cruz Jr.") from these parts.
             'first_name' => $validated['first_name'],
@@ -124,12 +144,14 @@ class RegisteredUserController extends Controller
             'phone' => isset($validated['phone']) ? '09' . $validated['phone'] : null,
             'organization' => $appliesAsExpert ? trim($validated['organization']) : null,
             'expert_application_status' => $appliesAsExpert ? User::EXPERT_APPLICATION_PENDING : null,
-            'expert_qualifications' => $appliesAsExpert ? trim($validated['expert_qualifications']) : null,
+            'expert_qualifications' => $appliesAsExpert ? (trim((string) ($validated['expert_qualifications'] ?? '')) ?: null) : null,
+            'expert_certificate_path' => $certificatePath,
+            'expert_certificate_name' => $certificateName,
             'expert_applied_at' => $appliesAsExpert ? now() : null,
         ]);
 
         if ($appliesAsExpert) {
-            $this->notifyAdminsOfExpertApplication($user);
+            $user->notifyAdminsOfExpertApplication();
         }
 
         Auth::login($user);
@@ -163,31 +185,5 @@ class RegisteredUserController extends Controller
         }
 
         return redirect('/email/verify')->with('status', 'verification-link-sent');
-    }
-
-    private function notifyAdminsOfExpertApplication(User $applicant): void
-    {
-        try {
-            Notification::send(
-                User::where('role', 'admin')->get(),
-                new AdminAlert(
-                    'New expert account application',
-                    'A new expert account application is waiting for your review.',
-                    'expert_application',
-                    route('admin.users') . '#expert-applications',
-                    'Review',
-                    details: [
-                        'applicant_name' => $applicant->name,
-                        'organization' => $applicant->organization,
-                    ],
-                ),
-            );
-        } catch (\Throwable $exception) {
-            // The application is saved either way; admins still see it on the Users page.
-            logger()->error('Failed to notify admins of expert application', [
-                'user_id' => $applicant->id,
-                'error' => $exception->getMessage(),
-            ]);
-        }
     }
 }

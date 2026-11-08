@@ -109,6 +109,10 @@
       loaded: false,
       pollTimer: null,
     };
+    // Live genus suggestion for unsaved area edits (see scheduleGenusPreview).
+    const GENUS_PREVIEW_DELAY_MS = 800;
+    const GENUS_MIN_CONFIDENT_PERCENT = 1; // "Confident" tag only when confident detections cover >= 1% of the area
+    const genusPreview = { snapshot: null, suggestion: null, loading: false, failed: false, timer: null, sequence: 0 };
     const aiIsRunning = () => ['queued', 'processing'].includes(ai.status);
 
     // ---- Map, base layers and preview ------------------------------------------------------
@@ -414,6 +418,7 @@
     }
 
     function renderList() {
+      if (!aiList) return; // the panel no longer lists the areas; they are edited on the map
       aiList.replaceChildren();
       areas().forEach(layer => {
         const item = document.createElement('li');
@@ -605,6 +610,7 @@
     }
 
     function refresh() {
+      scheduleGenusPreview(); // before rendering, so the list shows "Updating…" right after an edit
       renderList();
       renderAi();
       renderToggles();
@@ -678,6 +684,206 @@
       otherGeneraInput.value = '';
       renderCustomGenera();
       renderActionButtons();
+    }
+
+    // AI genus suggestion (genus model run with the extent detection). Only a hint: nothing is selected
+    // until the owner clicks a chip. DOM lookups only, since renderActionButtons() can run before this
+    // section's constants are initialised.
+    function chosenGeneraFromDom() {
+      const pills = [...document.querySelectorAll('#droneEditorGenera .drone-editor-genus[aria-pressed="true"]')]
+        .map(button => button.dataset.genus);
+      const tags = [...document.querySelectorAll('#droneEditorSelectedGenera .drone-editor-selected-genus > span')]
+        .map(span => span.textContent);
+      return new Set([...pills, ...tags].filter(Boolean).map(genus => genus.toLowerCase()));
+    }
+
+    function chooseSuggestedGenus(genus) {
+      const button = generaBox
+        ? [...generaBox.querySelectorAll('.drone-editor-genus')].find(item => item.dataset.genus?.toLowerCase() === genus.toLowerCase())
+        : null;
+      if (button) {
+        setGenusPressed(button, true);
+      } else if (!customGenera.some(item => item.toLowerCase() === genus.toLowerCase())) {
+        customGenera.push(genus);
+        renderCustomGenera();
+      }
+      renderActionButtons();
+    }
+
+    // ---- Live genus suggestion -------------------------------------------------------------------
+    // Shortly after the areas change, the unsaved areas are recounted on the server from the AI run's
+    // genus map (genus_preview_url: nothing is saved) and the list follows them straight away.
+    // (State: genusPreview, declared next to `ai` because refresh() can run before this point.)
+    function genusSuggestionFollowsEdits() {
+      return editor.needs_delineation && !editor.read_only && Boolean(editor.genus_preview_url)
+        && ai.status === 'ready' && ai.stats?.genus_suggestion?.recountable === true;
+    }
+
+    function scheduleGenusPreview() {
+      if (!genusSuggestionFollowsEdits() || !areasChanged()) {
+        clearTimeout(genusPreview.timer);
+        genusPreview.snapshot = null; // back to the saved areas: the stored suggestion applies again
+        genusPreview.suggestion = null;
+        genusPreview.loading = false;
+        genusPreview.failed = false;
+        return;
+      }
+      const snapshot = areasSnapshot();
+      if (snapshot === genusPreview.snapshot) return; // already counted (or being counted) for these areas
+      genusPreview.snapshot = snapshot;
+      genusPreview.loading = true;
+      genusPreview.failed = false;
+      clearTimeout(genusPreview.timer);
+      genusPreview.timer = setTimeout(() => requestGenusPreview(snapshot), GENUS_PREVIEW_DELAY_MS);
+    }
+
+    async function requestGenusPreview(snapshot) {
+      const sequence = ++genusPreview.sequence;
+      try {
+        const body = await send(editor.genus_preview_url, 'POST', {
+          areas: areas().map(toLngLat),
+          offset: state.offset,
+        });
+        // A newer edit (or a save) happened meanwhile: that one's result is what counts.
+        if (sequence !== genusPreview.sequence || snapshot !== genusPreview.snapshot) return;
+        genusPreview.suggestion = body.genus_suggestion || null;
+        genusPreview.failed = Boolean(body.genus_suggestion?.recount_failed);
+      } catch (error) {
+        if (sequence !== genusPreview.sequence || snapshot !== genusPreview.snapshot) return;
+        genusPreview.failed = true;
+      }
+      genusPreview.loading = false;
+      renderGenusSuggestion();
+    }
+
+    /** The suggestion to show: the live one for unsaved area edits once it is in, else the saved one. */
+    function currentGenusSuggestion() {
+      const stored = ai.stats?.genus_suggestion;
+      if (genusPreview.suggestion && genusPreview.snapshot === areasSnapshot() && areasChanged()) {
+        return genusPreview.suggestion;
+      }
+      return stored;
+    }
+
+    function genusSuggestionFreshness(suggestion) {
+      const edited = Boolean(ai.stats?.edited);
+      if (suggestion.recountable === false || (suggestion.recountable === undefined && edited)) {
+        return edited
+          ? 'Counted on the AI’s original areas: this imagery was processed before the suggestion could follow your edits. Re-run AI to enable it (this replaces your area edits).'
+          : null;
+      }
+      if (areasChanged()) {
+        if (genusPreview.loading) return 'Updating for your area changes…';
+        if (genusPreview.failed) return 'Could not update the suggestion for your latest area changes. It shows the previous result.';
+        return 'Updated for your area changes.';
+      }
+      if (suggestion.recount_failed) return 'Could not update the suggestion for your latest area edits. It shows the previous result.';
+      if (suggestion.recounted_at) return 'Updated for your edited mangrove areas.';
+      return null;
+    }
+
+    function renderGenusSuggestion() {
+      const box = document.getElementById('droneEditorGenusSuggestion');
+      if (!box) return;
+      const suggestion = editor.needs_delineation && !editor.read_only ? currentGenusSuggestion() : null;
+      if (!suggestion || ai.status !== 'ready') {
+        box.hidden = true;
+        box.replaceChildren();
+        return;
+      }
+
+      box.replaceChildren();
+      box.hidden = false;
+      if (suggestion.error) {
+        const message = document.createElement('p');
+        message.textContent = 'The AI genus suggestion is not available for this imagery. Choose the genus yourself.';
+        box.append(message);
+        return;
+      }
+
+      // One list: every genus with its probability (detections down to 0.01), tagged "Confident" when the
+      // stricter check (ml.genus.confidence) also found it. Older results only have the confident list.
+      const genera = Array.isArray(suggestion.genera) ? suggestion.genera : [];
+      const confident = new Map(genera.map(item => [String(item.genus || '').toLowerCase(), item]));
+      let rows = Array.isArray(suggestion.probabilities) ? suggestion.probabilities : [];
+      if (!rows.length) {
+        rows = genera.map(item => ({ genus: item.genus, probability: Number(item.share_percent || 0) / 100 }));
+      }
+      if (!rows.length) {
+        const message = document.createElement('p');
+        message.textContent = 'The AI did not recognise a genus in these mangrove areas. Choose the genus yourself.';
+        box.append(message);
+        return;
+      }
+
+      const chosen = chosenGeneraFromDom();
+      const section = document.createElement('div');
+      section.className = 'drone-editor-genus-probabilities';
+
+      const heading = document.createElement('p');
+      heading.innerHTML = '<strong>AI genus suggestion</strong> <span class="drone-editor-genus-badge">Experimental</span>'
+        + '<br><small>Click a genus to add it.</small>';
+      section.append(heading);
+
+      // The suggestion is recounted for the corrected areas when they are saved (from the AI run's genus map).
+      const freshness = genusSuggestionFreshness(suggestion);
+      if (freshness) {
+        const status = document.createElement('p');
+        status.className = 'drone-editor-genus-freshness';
+        status.textContent = freshness;
+        section.append(status);
+      }
+
+      // Every genus found gets a row (clickable), small ones included. Genera that would show as 0.0%
+      // were not found in these areas, so they are left out (they can still be picked from the list below).
+      rows.forEach(item => {
+        const genus = String(item.genus || '').trim();
+        if (!genus) return;
+        const percent = Math.max(0, Math.min(100, Number(item.probability || 0) * 100));
+        if (percent < 0.05) return;
+        const isChosen = chosen.has(genus.toLowerCase());
+        // "Confident" needs confident detections covering a real part of the area, not a few pixels.
+        const confidentItem = confident.get(genus.toLowerCase());
+        const sure = confidentItem && Number(confidentItem.share_percent || 0) >= GENUS_MIN_CONFIDENT_PERCENT ? confidentItem : null;
+
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'drone-editor-genus-probability';
+        row.disabled = isChosen;
+        row.title = isChosen ? `${genus} is selected` : `Select ${genus}`;
+
+        // + / check icon so the rows read as buttons.
+        const icon = document.createElement('i');
+        icon.className = isChosen ? 'bi bi-check2' : 'bi bi-plus-lg';
+        icon.setAttribute('aria-hidden', 'true');
+        const name = document.createElement('span');
+        name.className = 'drone-editor-genus-probability-name';
+        name.textContent = genus;
+        const track = document.createElement('span');
+        track.className = 'drone-editor-genus-probability-track';
+        const fill = document.createElement('span');
+        fill.className = 'drone-editor-genus-probability-fill';
+        fill.style.width = `${percent.toFixed(1)}%`;
+        track.append(fill);
+        const value = document.createElement('span');
+        value.className = 'drone-editor-genus-probability-value';
+        value.textContent = `${percent.toFixed(percent < 10 ? 1 : 0)}%`;
+        const tag = document.createElement('span');
+        tag.className = `drone-editor-genus-probability-tag${sure ? ' is-confident' : ''}`;
+        tag.textContent = sure ? `Confident · ${Math.round(Number(sure.mean_confidence || 0) * 100)}%` : 'Low confidence';
+
+        row.setAttribute('aria-label', `${genus}: ${value.textContent}, ${tag.textContent}${isChosen ? ' (selected)' : ''}`);
+        row.append(icon, name, track, value, tag);
+        row.addEventListener('click', () => chooseSuggestedGenus(genus));
+        section.append(row);
+      });
+
+      const note = document.createElement('p');
+      note.textContent = suggestion.probability_basis === 'none'
+        ? 'The genus model found nothing in these areas, so every genus is shown as equally likely.'
+        : 'Check the imagery before choosing: the genus model is still being trained and is not accurate yet.';
+      section.append(note);
+      box.append(section);
     }
 
     const delineationNameInput = document.getElementById('droneEditorDelineationName');
@@ -773,6 +979,7 @@
     }
 
     function renderActionButtons() {
+      renderGenusSuggestion(); // its chips show which suggested genera are already chosen
       const unsaved = hasUnsavedChanges();
       const blocker = confirmBlocker(unsaved);
       setActionButton(saveButton, {
@@ -861,6 +1068,11 @@
         confirmLabel: 'Save',
       });
       if (!confirmed || state.busy || !hasUnsavedChanges()) return;
+      await performSaveDraft();
+    });
+
+    /** Saves the draft (areas, opacity, delineation details). true when everything was saved. */
+    async function performSaveDraft() {
       state.busy = 'save';
       refresh();
       showMessage('Saving…');
@@ -884,13 +1096,15 @@
         showMessage(editor.status === 'ready' && body.has_pending_edits
           ? 'Saved. The mangrove areas are updated; confirm to apply the other changes.'
           : 'Saved.');
+        return true;
       } catch (error) {
         showMessage(error.message, true);
+        return false;
       } finally {
         state.busy = null;
         refresh();
       }
-    });
+    }
 
     confirmButton.addEventListener('click', async () => {
       if (confirmButton.disabled) return;
@@ -923,6 +1137,63 @@
         refresh();
       }
     });
+
+    // ---- Leaving with unsaved changes ---------------------------------------------------------
+    // Links and Logout inside the app ask first, offering to save the draft. Closing the tab, reloading or
+    // typing another address can only get the browser's own "Leave site?" prompt (beforeunload below).
+    function unsavedChangesSummary() {
+      const parts = [];
+      if (areasChanged()) parts.push('the mangrove areas');
+      if (detailsChanged()) parts.push('the delineation details');
+      if (opacityChanged()) parts.push('the imagery opacity');
+      return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+    }
+
+    async function confirmLeave(leave) {
+      const answer = await window.AppActions.confirm({
+        title: 'Leave without saving?',
+        message: `You changed ${unsavedChangesSummary()} and have not saved them. Save them as a draft before leaving? `
+          + 'Unsaved changes are lost.',
+        confirmLabel: 'Save draft & leave',
+        extraLabel: 'Leave without saving',
+        cancelLabel: 'Stay on this page',
+        icon: 'bi-exclamation-triangle',
+        iconTone: 'danger', // red warning icon; the buttons stay as they are
+      });
+      if (answer === 'extra') {
+        state.leaving = true;
+        leave();
+      } else if (answer === true) {
+        if (state.busy) return;
+        if (await performSaveDraft()) {
+          state.leaving = true;
+          leave();
+        } // on failure the error shows in the panel and the page stays open
+      }
+    }
+
+    document.addEventListener('click', event => {
+      if (state.leaving || event.defaultPrevented || event.button !== 0
+        || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest('a[href]');
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+      const url = new URL(link.href, window.location.href);
+      // Same-page anchors and map controls (href="#") do not leave the page.
+      if (url.origin !== window.location.origin || (url.pathname === window.location.pathname && url.search === window.location.search)) return;
+      if (!hasUnsavedChanges()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      confirmLeave(() => { window.location.href = url.href; });
+    }, true);
+
+    document.addEventListener('submit', event => {
+      const form = event.target;
+      if (state.leaving || !(form instanceof HTMLFormElement) || !/\/logout$/.test(new URL(form.action, window.location.href).pathname)) return;
+      if (!hasUnsavedChanges()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      confirmLeave(() => form.submit());
+    }, true);
 
     window.addEventListener('beforeunload', event => {
       if (state.leaving || !hasUnsavedChanges()) return;

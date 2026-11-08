@@ -232,12 +232,70 @@
 
     .nav-mobile-toggle {
       display: none;
+      position: relative;
+      width: 40px;
+      height: 40px;
       background: none;
       border: none;
-      font-size: 24px;
+      border-radius: 10px;
       color: var(--primary-forest);
       cursor: pointer;
-      padding: 4px;
+      padding: 0;
+      transition: background-color 0.2s ease;
+    }
+
+    .nav-mobile-toggle:hover,
+    .nav-mobile-toggle[aria-expanded="true"] {
+      background-color: rgba(30, 158, 98, 0.1);
+    }
+
+    .nav-mobile-toggle:focus-visible {
+      outline: 3px solid rgba(30, 158, 98, 0.35);
+      outline-offset: 2px;
+    }
+
+    .nav-mobile-toggle:active .hamburger-bars {
+      transform: scale(0.9);
+    }
+
+    /* Hamburger bars: the middle one fades out, the outer two meet in the middle and rotate into an X. */
+    .hamburger-bars {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 22px;
+      height: 16px;
+      margin: -8px 0 0 -11px;
+      transition: transform 0.15s ease;
+    }
+
+    .hamburger-bars span {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 2.5px;
+      border-radius: 2px;
+      background: currentColor;
+      transition: transform 0.35s cubic-bezier(0.68, -0.4, 0.27, 1.4), opacity 0.2s ease, top 0.25s ease;
+    }
+
+    .hamburger-bars span:nth-child(1) { top: 0; }
+    .hamburger-bars span:nth-child(2) { top: 6.75px; }
+    .hamburger-bars span:nth-child(3) { top: 13.5px; }
+
+    .nav-mobile-toggle[aria-expanded="true"] .hamburger-bars span:nth-child(1) {
+      top: 6.75px;
+      transform: rotate(45deg);
+    }
+
+    .nav-mobile-toggle[aria-expanded="true"] .hamburger-bars span:nth-child(2) {
+      opacity: 0;
+      transform: scaleX(0.2);
+    }
+
+    .nav-mobile-toggle[aria-expanded="true"] .hamburger-bars span:nth-child(3) {
+      top: 6.75px;
+      transform: rotate(-45deg);
     }
 
     /* Polished Hero Section */
@@ -1447,7 +1505,12 @@
 
     /* Mobile Menu Drawer */
     .mobile-menu-drawer {
-      display: none;
+      display: flex;
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(-12px);
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.3s;
       position: fixed;
       top: 68px;
       left: 0;
@@ -1462,7 +1525,11 @@
     }
 
     .mobile-menu-drawer.open {
-      display: flex;
+      visibility: visible;
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
     }
 
     .mobile-menu-drawer a {
@@ -1472,6 +1539,26 @@
       font-weight: 600;
       padding: 8px 0;
       border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 0.2s ease, transform 0.25s ease;
+    }
+
+    /* Links follow one after another as the menu opens. */
+    .mobile-menu-drawer.open a {
+      opacity: 1;
+      transform: translateY(0);
+      transition-delay: calc(var(--i, 0) * 45ms + 60ms);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mobile-menu-drawer,
+      .mobile-menu-drawer a,
+      .hamburger-bars,
+      .hamburger-bars span {
+        transition-duration: 0.01ms !important;
+        transition-delay: 0s !important;
+      }
     }
 
     /* Responsive Media Queries */
@@ -1601,8 +1688,12 @@
       @include('partials.theme-toggle')
 
       <!-- Mobile Hamburger Toggle -->
-      <button class="nav-mobile-toggle" id="mobileMenuBtn" aria-label="Toggle navigation menu">
-        <i class="bi bi-list"></i>
+      <button type="button" class="nav-mobile-toggle" id="mobileMenuBtn" aria-label="Open navigation menu" title="Menu"
+        aria-controls="mobileMenuDrawer" aria-expanded="false">
+        {{-- Three bars that turn into an X while the menu is open. --}}
+        <span class="hamburger-bars" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
       </button>
     </div>
   </header>
@@ -1994,15 +2085,41 @@
     // Mobile Menu Controls
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const mobileMenuDrawer = document.getElementById('mobileMenuDrawer');
-    if (mobileMenuBtn && mobileMenuDrawer) {
-      mobileMenuBtn.addEventListener('click', () => {
-        mobileMenuDrawer.classList.toggle('open');
-      });
+    // The button's bars turn into an X (CSS on aria-expanded) while the drawer is open.
+    function setMobileMenu(open) {
+      if (!mobileMenuBtn || !mobileMenuDrawer) return;
+      mobileMenuDrawer.classList.toggle('open', open);
+      mobileMenuDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+      mobileMenuDrawer.toggleAttribute('inert', !open);
+      mobileMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      mobileMenuBtn.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
     }
     function closeMobileMenu() {
-      if (mobileMenuDrawer) {
-        mobileMenuDrawer.classList.remove('open');
-      }
+      setMobileMenu(false);
+    }
+    if (mobileMenuBtn && mobileMenuDrawer) {
+      // Stagger order for the links' slide-in.
+      mobileMenuDrawer.querySelectorAll('a').forEach((link, index) => link.style.setProperty('--i', index));
+      setMobileMenu(false);
+
+      mobileMenuBtn.addEventListener('click', () => {
+        setMobileMenu(!mobileMenuDrawer.classList.contains('open'));
+      });
+      // Close with Escape, a tap outside the menu, or when the screen gets wide enough for the full nav.
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && mobileMenuDrawer.classList.contains('open')) {
+          closeMobileMenu();
+          mobileMenuBtn.focus();
+        }
+      });
+      document.addEventListener('click', event => {
+        if (!mobileMenuDrawer.classList.contains('open')) return;
+        if (mobileMenuDrawer.contains(event.target) || mobileMenuBtn.contains(event.target)) return;
+        closeMobileMenu();
+      });
+      window.addEventListener('resize', () => {
+        if (getComputedStyle(mobileMenuBtn).display === 'none') closeMobileMenu();
+      });
     }
 
     // GIS Basemap Tile Layers

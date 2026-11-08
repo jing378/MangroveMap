@@ -354,6 +354,10 @@ if ($currentUser && $currentUser->role === 'admin') {
         ];
         $delineationId = $notification->data['delineation_id'] ?? null;
         $viewUrl = $notification->data['url'] ?? $notification->data['actionUrl'] ?? null;
+        // Links are stored with the site address of the moment (e.g. an old tunnel URL); open them on this site.
+        if (is_string($viewUrl) && preg_match('#^https?://[^/]+(/.*)?$#i', $viewUrl, $urlMatch)) {
+        $viewUrl = $urlMatch[1] ?? '/';
+        }
         if ($delineationId) {
         $viewUrl = Auth::user()->isExpert()
         ? route('expert.map', ['delineation' => $delineationId])
@@ -390,6 +394,8 @@ if ($currentUser && $currentUser->role === 'admin') {
                     <i class="bi bi-map"></i> View
                     @elseif($type === 'expert_application')
                     <i class="bi bi-person-check"></i> Review
+                    @elseif($type === 'expert_application_rejected')
+                    <i class="bi bi-arrow-repeat"></i> Reapply
                     @else
                     <i class="bi bi-box-arrow-up-right"></i> View
                     @endif

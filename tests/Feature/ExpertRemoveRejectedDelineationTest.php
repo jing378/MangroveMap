@@ -86,22 +86,48 @@ class ExpertRemoveRejectedDelineationTest extends TestCase
         });
     }
 
-    public function test_expert_cannot_remove_pending_or_approved_delineations(): void
+    public function test_expert_can_remove_approved_and_pending_delineations_and_the_owner_is_notified(): void
     {
+        Notification::fake();
         $resident = User::factory()->create(['role' => 'end_user']);
         $expert = User::factory()->create(['role' => 'expert']);
-        $pending = $this->makeDelineation($resident);
-        $approved = $this->makeDelineation($resident, ['is_approved' => true]);
+        $pending = $this->makeDelineation($resident, ['name' => 'Pending patch']);
+        $approved = $this->makeDelineation($resident, ['name' => 'Approved patch', 'is_approved' => true]);
 
         $this->actingAs($expert)
             ->deleteJson(route('expert.delineations.destroy', $pending))
-            ->assertStatus(422);
+            ->assertOk();
         $this->actingAs($expert)
             ->deleteJson(route('expert.delineations.destroy', $approved))
-            ->assertStatus(422);
+            ->assertOk()
+            ->assertJsonPath('message', 'Approved delineation removed. The owner has been notified.');
 
-        $this->assertDatabaseHas('delineations', ['id' => $pending->id]);
-        $this->assertDatabaseHas('delineations', ['id' => $approved->id]);
+        $this->assertDatabaseMissing('delineations', ['id' => $pending->id]);
+        $this->assertDatabaseMissing('delineations', ['id' => $approved->id]);
+        Notification::assertSentTo(
+            $resident,
+            DelineationRemoved::class,
+            fn(DelineationRemoved $n) => $n->delineationName === 'Approved patch' && $n->status === 'approved',
+        );
+        Notification::assertSentTo(
+            $resident,
+            DelineationRemoved::class,
+            fn(DelineationRemoved $n) => $n->delineationName === 'Pending patch' && $n->status === 'pending',
+        );
+    }
+
+    public function test_expert_can_remove_their_own_approved_delineation_without_a_notification(): void
+    {
+        Notification::fake();
+        $expert = User::factory()->create(['role' => 'expert']);
+        $own = $this->makeDelineation($expert, ['is_approved' => true]);
+
+        $this->actingAs($expert)
+            ->deleteJson(route('expert.delineations.destroy', $own))
+            ->assertOk();
+
+        $this->assertDatabaseMissing('delineations', ['id' => $own->id]);
+        Notification::assertNothingSent();
     }
 
     public function test_residents_cannot_use_the_expert_remove_route(): void

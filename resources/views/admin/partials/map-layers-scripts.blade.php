@@ -5,17 +5,21 @@
         const DEFAULT_VIEW = [10.25, 125.1];
 
         const previewMap = L.map('layerPreviewMap', { maxZoom: MAP_MAX_ZOOM }).setView(DEFAULT_VIEW, 9);
-        const previewImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        // Satellite basemap. Not called previewImagery: that name is the drone-layer preview function
+        // below, and declaring both is a syntax error that stops this whole script (no map at all).
+        const basemapImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: MAP_MAX_ZOOM,
             maxNativeZoom: 18,
             attribution: 'Imagery &copy; Esri',
         }).addTo(previewMap);
         @include('partials.map-place-labels')
-        attachPlaceLabels(previewMap, [previewImagery]);
+        attachPlaceLabels(previewMap, [basemapImagery]);
 
         const previewGroup = L.layerGroup().addTo(previewMap);
         const previewLabel = document.getElementById('previewLabel');
         const delineationStyle = { color: '#22c55e', weight: 2, fillOpacity: 0.25 };
+        // Rejected delineations in red, so they are not mistaken for published mangrove areas.
+        const rejectedDelineationStyle = { color: '#ef4444', weight: 2, fillOpacity: 0.25 };
         const aiExtentStyle = { color: '#facc15', weight: 2, fillOpacity: 0.12, dashArray: '4 4' };
 
         // Delineation features use {type: point|line|area, coords: [lat, lng] | [[lat, lng], ...]}.
@@ -43,7 +47,8 @@
 
         function previewDelineation(button) {
             const features = JSON.parse(button.dataset.features || '[]');
-            fitTo(drawFeatures(features, delineationStyle).getBounds());
+            const style = 'rejected' in button.dataset ? rejectedDelineationStyle : delineationStyle;
+            fitTo(drawFeatures(features, style).getBounds());
         }
 
         function previewImagery(button) {
@@ -73,8 +78,19 @@
             }
         }
 
-        document.querySelectorAll('[data-preview]').forEach(button => {
-            button.addEventListener('click', () => {
+        const previewMapEl = document.getElementById('layerPreviewMap');
+
+        // Bring the map into view after a row's preview button, but only when it is off screen
+        // (on phones the list is below the map), and never for the automatic first preview.
+        function revealPreviewMap() {
+            const rect = previewMapEl.getBoundingClientRect();
+            const visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+            if (!visible) {
+                previewMapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function showPreview(button, { reveal = true } = {}) {
                 previewGroup.clearLayers();
                 document.querySelectorAll('.layer-row.previewing').forEach(row => row.classList.remove('previewing'));
                 document.querySelectorAll('[data-preview].is-previewing').forEach(b => b.classList.remove('is-previewing'));
@@ -86,16 +102,23 @@
                     previewLabel.textContent = button.dataset.name + (button.dataset.segmentationUrl ? ' · AI-detected extent in yellow' : '');
                     previewImagery(button);
                 } else {
-                    previewLabel.textContent = button.dataset.name;
+                    previewLabel.textContent = button.dataset.name + ('rejected' in button.dataset ? ' · Rejected, shown in red' : '');
                     previewDelineation(button);
                 }
 
-                document.getElementById('layerPreviewMap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            });
+                if (reveal) revealPreviewMap();
+        }
+
+        document.querySelectorAll('[data-preview]').forEach(button => {
+            button.addEventListener('click', () => showPreview(button));
         });
 
-        // Preview the first previewable row so the map is never empty on load.
-        document.querySelector('[data-preview]:not(:disabled)')?.click();
+        // Preview the first previewable row so the map is never empty on load (without scrolling the page).
+        const firstPreview = document.querySelector('[data-preview]:not(:disabled)');
+        if (firstPreview) showPreview(firstPreview, { reveal: false });
+
+        // The map sits in a card that can change width (sidebar, rotation); keep its tiles filling it.
+        window.addEventListener('resize', () => previewMap.invalidateSize());
 
         // ---- Dialogs ----
         function openDialog(id, action, fill) {
@@ -128,6 +151,13 @@
 
         document.querySelectorAll('[data-close-dialog]').forEach(button => {
             button.addEventListener('click', () => button.closest('dialog').close());
+        });
+
+        // Tapping the dimmed area outside a dialog closes it, like the other admin modals.
+        document.querySelectorAll('dialog.layer-dialog').forEach(dialog => {
+            dialog.addEventListener('click', event => {
+                if (event.target === dialog) dialog.close();
+            });
         });
         // Forms with data-confirm / data-busy-label are handled by partials.action-feedback.
     })();
