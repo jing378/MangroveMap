@@ -2,6 +2,9 @@
 
 return [
     'qgis_env' => env('GDAL_QGIS_ENV', 'C:\\Program Files\\QGIS 3.44.12\\bin\\o4w_env.bat'),
+    // Linux only: the Python that has GDAL's osgeo_utils (apt package python3-gdal).
+    // This is NOT ml/.venv, which has no GDAL. Windows uses QGIS's Python via qgis_env instead.
+    'python' => env('GDAL_PYTHON', 'python3'),
     'timeout' => (int) env('GDAL_PROCESS_TIMEOUT', 7000),
     // "min-max" or "min-auto"; auto picks the zoom that matches the raster's native resolution
     // (e.g. ~22 for 5 cm drone mosaics), capped at max_tile_zoom (the map's MAP_MAX_ZOOM).
