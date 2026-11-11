@@ -534,5 +534,6 @@
 @endsection
 
 @section('scripts')
+    @include('partials.chunked-upload')
     @include('users.partials.drone-upload-scripts')
 @endsection

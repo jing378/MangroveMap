@@ -289,6 +289,12 @@ class DroneImageryController extends Controller
             throw $exception;
         }
 
+        return self::queueProcessing($layer, count($files));
+    }
+
+    /** Queues the uploaded layer for GDAL processing and returns the upload's JSON reply (also used by chunked uploads). */
+    public static function queueProcessing(DroneImageryLayer $layer, int $fileCount): JsonResponse
+    {
         try {
             ProcessDroneImagery::dispatch($layer->id);
         } catch (Throwable $exception) {
@@ -313,7 +319,7 @@ class DroneImageryController extends Controller
             'name' => $layer->name,
             'status' => $layer->status,
             'source_type' => $layer->source_type,
-            'file_count' => count($files),
+            'file_count' => $fileCount,
         ], 202);
     }
 
@@ -354,6 +360,8 @@ class DroneImageryController extends Controller
             'page' => [
                 'index_url' => route('drone-imagery.index'),
                 'upload_url' => route('drone-imagery.store'),
+                'uploads_url' => url('/drone-imagery/uploads'),
+                'upload_parallel' => max(1, min(8, (int) config('gdal.upload_parallel', 4))),
                 'layer_url' => url('/drone-imagery'),
                 // Residents' imagery reaches the map only once an expert approves its delineation.
                 'needs_expert_review' => ! $viewer->isExpert(),

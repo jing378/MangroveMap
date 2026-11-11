@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DelineationAnnualObservationController;
 use App\Http\Controllers\DroneImageryController;
+use App\Http\Controllers\DroneImageryUploadController;
 use App\Http\Controllers\EndUserController;
 use App\Http\Controllers\ExpertController;
 use App\Http\Controllers\FeedbackController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlantingRecommendationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicController;
+use App\Http\Controllers\TileExplorerController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -141,6 +143,46 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/drone-imagery', [DroneImageryController::class, 'store'])
         ->middleware('throttle:10,1')
         ->name('drone-imagery.store');
+    // Chunked, resumable upload (what the Drone Upload page uses): start, send slices in parallel, complete.
+    Route::post('/drone-imagery/uploads', [DroneImageryUploadController::class, 'start'])
+        ->middleware('throttle:20,1')
+        ->name('drone-imagery.uploads.start');
+    Route::get('/drone-imagery/uploads/{uploadId}', [DroneImageryUploadController::class, 'status'])
+        ->whereUuid('uploadId')
+        ->name('drone-imagery.uploads.status');
+    Route::put('/drone-imagery/uploads/{uploadId}/files/{fileIndex}/chunks/{chunkIndex}', [DroneImageryUploadController::class, 'chunk'])
+        ->whereUuid('uploadId')
+        ->whereNumber(['fileIndex', 'chunkIndex'])
+        ->middleware('throttle:3000,1')
+        ->name('drone-imagery.uploads.chunk');
+    Route::post('/drone-imagery/uploads/{uploadId}/complete', [DroneImageryUploadController::class, 'complete'])
+        ->whereUuid('uploadId')
+        ->middleware('throttle:20,1')
+        ->name('drone-imagery.uploads.complete');
+    Route::delete('/drone-imagery/uploads/{uploadId}', [DroneImageryUploadController::class, 'cancel'])
+        ->whereUuid('uploadId')
+        ->name('drone-imagery.uploads.cancel');
+
+    // Tile Explorer: upload a GeoTIFF (chunked uploads above, purpose "tiles"), cut it into tiles, download a selection
+    Route::get('/tile-explorer', [TileExplorerController::class, 'page'])->name('tile-explorer.page');
+    Route::post('/tile-explorer/sources/{sourceId}/sets', [TileExplorerController::class, 'storeSet'])
+        ->whereNumber('sourceId')
+        ->middleware('throttle:20,1')
+        ->name('tile-explorer.sets.store');
+    Route::delete('/tile-explorer/sources/{sourceId}', [TileExplorerController::class, 'destroySource'])
+        ->whereNumber('sourceId')
+        ->name('tile-explorer.sources.destroy');
+    Route::get('/tile-explorer/sets/{tileSetId}', [TileExplorerController::class, 'show'])
+        ->whereNumber('tileSetId')
+        ->name('tile-explorer.sets.show');
+    Route::get('/tile-explorer/sets/{tileSetId}/tiles/{tileId}/{variant}', [TileExplorerController::class, 'image'])
+        ->whereNumber('tileSetId')
+        ->where('variant', 'thumb|full')
+        ->name('tile-explorer.tiles.image');
+    Route::post('/tile-explorer/sets/{tileSetId}/download', [TileExplorerController::class, 'download'])
+        ->whereNumber('tileSetId')
+        ->middleware('throttle:20,1')
+        ->name('tile-explorer.sets.download');
     Route::delete('/drone-imagery/{layerId}', [DroneImageryController::class, 'destroy'])
         ->whereNumber('layerId')
         ->name('drone-imagery.destroy');

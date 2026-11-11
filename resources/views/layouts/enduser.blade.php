@@ -661,6 +661,11 @@
                     <i class="bi bi-cloud-arrow-up"></i>
                     <span>Drone Upload</span>
                 </a>
+                <a href="{{ route('tile-explorer.page') }}"
+                    class="sidebar-item {{ request()->routeIs('tile-explorer.*') ? 'active' : '' }}">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                    <span>Tile Explorer</span>
+                </a>
             </div>
 
             <div class="sidebar-section">

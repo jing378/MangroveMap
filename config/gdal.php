@@ -15,4 +15,12 @@ return [
     'preview_max_dimension' => (int) env('GDAL_PREVIEW_MAX_DIMENSION', 2048),
     // Files per drone imagery batch. PHP's max_file_uploads (php.ini) must be at least this high.
     'max_upload_files' => (int) env('DRONE_MAX_UPLOAD_FILES', 100),
+    // Drone Upload sends files in slices of this many MB, several at once (upload_parallel), resuming after
+    // dropped connections. Each slice is one request, so the web server's body limit must allow it.
+    'upload_chunk_mb' => (int) env('DRONE_UPLOAD_CHUNK_MB', 8),
+    'upload_parallel' => (int) env('DRONE_UPLOAD_PARALLEL', 4),
+    // Tile Explorer: tiles with at least this much mangrove (% of the tile's imagery) are labelled "Mangrove".
+    'tile_explorer' => [
+        'mangrove_min_percent' => (float) env('TILE_EXPLORER_MANGROVE_MIN_PERCENT', 5),
+    ],
 ];

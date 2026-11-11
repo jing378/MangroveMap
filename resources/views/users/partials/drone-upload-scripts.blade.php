@@ -89,48 +89,32 @@
     });
 
     // ---- Upload ---------------------------------------------------------------------------
-    function setProgress(percentage) {
+    // Chunked, parallel and resumable: see partials/chunked-upload.
+    function setProgress(percentage, detail = '') {
       const value = Math.max(0, Math.min(100, Math.round(percentage)));
       progress.hidden = false;
       progressBar.setAttribute('aria-valuenow', String(value));
       progressFill.style.width = `${value}%`;
-      progressPercent.textContent = value === 0 ? 'Waiting for the server…'
-        : (value < 100 ? `${value}%` : 'Saving files on the server…');
+      progressPercent.textContent = value === 0 && !detail ? 'Starting…'
+        : (value < 100 ? `${value}%${detail ? ` · ${detail}` : ''}` : 'Finishing…');
     }
 
-    function upload(formData) {
-      return new Promise((resolve, reject) => {
-        const request = new XMLHttpRequest();
-        request.open('POST', page.upload_url);
-        request.withCredentials = true;
-        request.setRequestHeader('Accept', 'application/json');
-        request.setRequestHeader('X-CSRF-TOKEN', csrfToken);
-        request.upload.addEventListener('progress', event => {
-          if (event.lengthComputable) setProgress((event.loaded / event.total) * 100);
-        });
-        request.addEventListener('load', () => {
-          let payload;
-          try {
-            payload = JSON.parse(request.responseText);
-          } catch {
-            // Usually a PHP warning or HTML error page (upload limits, timeout, expired session).
-            const status = request.status ? ` (HTTP ${request.status})` : '';
-            const hint = request.status === 413 ? ' The files are larger than the server allows.'
-              : (request.status === 419 ? ' Your session expired; reload the page and try again.' : ' Check the server upload limits in php.ini.');
-            reject(new Error(`The server returned an invalid response while uploading${status}.${hint}`));
-            return;
-          }
-          if (request.status < 200 || request.status >= 300) {
-            const validationError = payload.errors ? Object.values(payload.errors).flat()[0] : null;
-            reject(new Error(validationError || payload.message || 'Unable to upload the GeoTIFF files.'));
-            return;
-          }
-          resolve(payload);
-        });
-        request.addEventListener('error', () => reject(new Error('Network error while uploading.')));
-        request.addEventListener('abort', () => reject(new Error('The upload was cancelled.')));
-        request.send(formData);
+    async function upload(files, name) {
+      const result = await window.ChunkedUpload.upload({
+        url: page.uploads_url,
+        files,
+        fields: { name },
+        parallel: page.upload_parallel,
+        resumeKey: 'droneUpload.resume',
+        onProgress: ({ loaded, total, speed }) => {
+          const detail = [`${formatBytes(loaded)} of ${formatBytes(total)}`, speed > 0 ? `${formatBytes(speed)}/s` : '']
+            .filter(Boolean).join(' · ');
+          setProgress(total ? (loaded / total) * 100 : 100, detail);
+        },
+        onResumed: bytes => showMessage(`Resuming the earlier upload: ${formatBytes(bytes)} was already on the server.`),
       });
+      setProgress(100);
+      return result;
     }
 
     window.addEventListener('beforeunload', event => {
@@ -166,7 +150,7 @@
       setProgress(0);
       showMessage('Uploading… keep this page open until the upload finishes.');
       try {
-        const payload = await upload(new FormData(form));
+        const payload = await upload([...fileInput.files], nameInput.value.trim());
         form.reset();
         selected.textContent = '';
         highlightId = payload.id;
