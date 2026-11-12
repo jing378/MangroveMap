@@ -158,6 +158,15 @@ class DroneImageryLayer extends Model
         return "drone-imagery/processed/{$this->id}/genus_labels.json";
     }
 
+    /**
+     * Every canopy the AI pinpointed in the last run (genus, confidence, area, centre and outline), see
+     * ml/predict_genus.py --canopies-out. Shown as pins on the map and in the review editor.
+     */
+    public function canopiesPath(): string
+    {
+        return "drone-imagery/processed/{$this->id}/canopies.json";
+    }
+
     public function currentEdits(): array
     {
         return $this->edits ?? self::EMPTY_EDITS;

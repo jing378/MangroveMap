@@ -94,8 +94,8 @@ class RejectedDelineationRevisionTest extends TestCase
             'page' => 'delineate',
         ])->render();
 
-        $this->assertStringContainsString(
-            'id="saveBtn" type="button" class="btn btn-g delineation-save-btn"',
+        $this->assertMatchesRegularExpression(
+            '/id="saveBtn" type="button" class="btn btn-g delineation-save-btn[^"]*"/',
             $html,
         );
     }

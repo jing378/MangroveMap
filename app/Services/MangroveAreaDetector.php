@@ -5,8 +5,9 @@ namespace App\Services;
 use RuntimeException;
 
 /**
- * Runs the mangrove U-Net (MangroveSegmentationService::predictRaster) over any georeferenced RGB raster
- * and returns the detected mangrove areas as GeoJSON polygons in EPSG:4326.
+ * Runs the mangrove extent model (MangroveSegmentationService::predictExtent: the canopy model or the
+ * U-Net) over any georeferenced RGB raster and returns the detected mangrove areas as GeoJSON polygons
+ * in EPSG:4326.
  *
  * Same steps as SegmentDroneImagery, for rasters in any coordinate system: a working copy is warped to
  * EPSG:3857 at the model's ground resolution (ml.drone.resolution, capped by ml.drone.max_dimension),
@@ -65,7 +66,9 @@ class MangroveAreaDetector
             throw new RuntimeException('GDAL could not prepare the image for mangrove detection.');
         }
 
-        $prediction = $this->segmentation->predictRaster($inputPath, $maskPath);
+        $prediction = $this->segmentation->predictExtent($inputPath, $maskPath, [
+            'close_iterations' => (int) config('ml.drone.close_iterations', 2),
+        ]);
 
         $this->gdal->run([
             'gdal_translate', '-q',

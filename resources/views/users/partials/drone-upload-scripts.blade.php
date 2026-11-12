@@ -215,8 +215,10 @@
     function aiSummary(layer) {
       if (layer.segmentation_status === 'ready' && layer.segmentation_stats) {
         const stats = layer.segmentation_stats;
+        const canopyCount = Number(stats.canopy_count ?? 0);
         return `${stats.edited ? 'Mangrove areas (corrected by you)' : 'AI'}: ${Number(stats.mangrove_area_ha || 0).toFixed(2)} ha of mangrove`
-          + `${stats.mangrove_coverage_percent ? ` (${Number(stats.mangrove_coverage_percent).toFixed(1)}% of the imagery)` : ''}.`;
+          + `${stats.mangrove_coverage_percent ? ` (${Number(stats.mangrove_coverage_percent).toFixed(1)}% of the imagery)` : ''}.`
+          + (canopyCount > 0 ? ` ${canopyCount.toLocaleString()} canop${canopyCount === 1 ? 'y' : 'ies'} pinpointed.` : '');
       }
       if (layer.segmentation_status === 'failed') return `AI detection failed: ${layer.segmentation_error || 'unknown error'}`;
       return '';

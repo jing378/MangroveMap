@@ -128,6 +128,11 @@
     // AI mangrove extent (SegmentDroneImagery output) per drone layer.
     const droneSegmentationOverlays = new Map(); // layer id -> { key, group }
     const droneSegmentationCache = new Map(); // `${id}:${segmented_at}` -> payload
+    // Canopies the canopy model pinpointed (layer.canopies_url): pins coloured by genus, crown outlines when zoomed in.
+    const droneCanopyOverlays = new Map(); // layer id -> { key, pins, outlines }
+    const droneCanopyCache = new Map(); // `${id}:${segmented_at}` -> payload
+    const DRONE_CANOPY_OUTLINE_MIN_ZOOM = 19;
+    const DRONE_GENUS_COLORS = { rhizophora: '#e4572e', avicennia: '#2e86de', sonneratia: '#f5b700', nypa: '#8e44ad', bruguiera: '#16a085', ceriops: '#d35400' };
     let droneSegmentationPollTimer = null;
 
     // layer.auto_show: published imagery (an expert's, or a resident's whose delineation an expert approved;
@@ -281,6 +286,91 @@
       const overlay = droneSegmentationOverlays.get(layerId);
       if (overlay && mainMap.hasLayer(overlay.group)) mainMap.removeLayer(overlay.group);
       droneSegmentationOverlays.delete(layerId);
+      removeDroneCanopyOverlay(layerId);
+    }
+
+    function droneGenusColor(genus) {
+      return DRONE_GENUS_COLORS[String(genus || '').trim().toLowerCase()] || '#1e9e62';
+    }
+
+    const droneEscape = text => String(text ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+    async function fetchDroneCanopies(layer) {
+      const key = `${layer.id}:${layer.segmented_at}`;
+      if (droneCanopyCache.has(key)) return droneCanopyCache.get(key);
+      const response = await fetch(layer.canopies_url, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Unable to load the pinpointed canopies.');
+      droneCanopyCache.set(key, payload);
+      return payload;
+    }
+
+    function removeDroneCanopyOverlay(layerId) {
+      const overlay = droneCanopyOverlays.get(layerId);
+      if (overlay) {
+        if (mainMap.hasLayer(overlay.pins)) mainMap.removeLayer(overlay.pins);
+        if (mainMap.hasLayer(overlay.outlines)) mainMap.removeLayer(overlay.outlines);
+      }
+      droneCanopyOverlays.delete(layerId);
+    }
+
+    // Crown outlines only when zoomed in enough to tell crowns apart; the pins always.
+    function syncDroneCanopyOutlines() {
+      const zoomedIn = mainMap.getZoom() >= DRONE_CANOPY_OUTLINE_MIN_ZOOM;
+      droneCanopyOverlays.forEach(overlay => {
+        const shown = mainMap.hasLayer(overlay.pins) && zoomedIn;
+        if (shown && !mainMap.hasLayer(overlay.outlines)) overlay.outlines.addTo(mainMap);
+        if (!shown && mainMap.hasLayer(overlay.outlines)) mainMap.removeLayer(overlay.outlines);
+      });
+    }
+    mainMap.on('zoomend', syncDroneCanopyOutlines);
+
+    async function showDroneCanopyOverlay(layer) {
+      const key = `${layer.id}:${layer.segmented_at}`;
+      let overlay = droneCanopyOverlays.get(layer.id);
+      if (!overlay || overlay.key !== key) {
+        removeDroneCanopyOverlay(layer.id);
+        const payload = await fetchDroneCanopies(layer);
+        const pins = L.layerGroup();
+        const outlines = L.layerGroup();
+        (payload.canopies || []).forEach(canopy => {
+          if (!Array.isArray(canopy.center) || canopy.center.length < 2) return;
+          const color = droneGenusColor(canopy.genus);
+          const percent = Math.round((Number(canopy.confidence) || 0) * 100);
+          const genus = droneEscape(canopy.genus || 'Mangrove');
+          const pin = L.circleMarker(canopy.center, { radius: 5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95 });
+          pin.bindTooltip(`${genus} · ${percent}%`, { direction: 'top', offset: [0, -6] });
+          pin.bindPopup(`<strong>${genus}</strong><br>Confidence ${percent}%`
+            + (canopy.area_m2 != null ? `<br>Canopy about ${Number(canopy.area_m2).toFixed(1)} m²` : '')
+            + `<br><small>${droneEscape(layer.name || '')}</small>`);
+          pins.addLayer(pin);
+          // One ring per separate patch of the canopy (older results only have "coords", a single ring).
+          const rings = (Array.isArray(canopy.rings) ? canopy.rings : [canopy.coords])
+            .filter(ring => Array.isArray(ring) && ring.length >= 3);
+          if (rings.length) {
+            // Nested as a multipolygon: each ring is its own shape, not a hole in the first.
+            outlines.addLayer(L.polygon(rings.map(ring => [ring]), { color, weight: 1.5, fillColor: color, fillOpacity: 0.12, interactive: false }));
+          }
+        });
+        overlay = { key, pins, outlines };
+        droneCanopyOverlays.set(layer.id, overlay);
+      }
+      overlay.pins.addTo(mainMap);
+      syncDroneCanopyOutlines();
+      return overlay.pins;
+    }
+
+    function droneCanopySummary(layer) {
+      const count = Number(layer.segmentation_stats?.canopy_count ?? 0);
+      if (!count) return '';
+      const byGenus = Object.entries(layer.segmentation_stats?.canopies_by_genus || {})
+        .filter(([, n]) => Number(n) > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([genus, n]) => `${genus} ${Number(n).toLocaleString()}`);
+      return `${count.toLocaleString()} canop${count === 1 ? 'y' : 'ies'} pinpointed${byGenus.length ? ` (${byGenus.join(', ')})` : ''}`;
     }
 
     async function showDroneSegmentationOverlay(layer) {
@@ -354,6 +444,40 @@
         });
         toggleLabel.append(toggle, document.createTextNode(' Show AI extent'));
         actions.appendChild(toggleLabel);
+
+        if (layer.canopies_url) {
+          const canopyLabel = document.createElement('label');
+          canopyLabel.className = 'drone-imagery-ai-toggle';
+          canopyLabel.title = droneCanopySummary(layer) || 'Every canopy the AI pinpointed, coloured by genus';
+          const canopyToggle = document.createElement('input');
+          canopyToggle.type = 'checkbox';
+          const canopyOverlay = droneCanopyOverlays.get(layer.id);
+          canopyToggle.checked = Boolean(canopyOverlay && canopyOverlay.key === `${layer.id}:${layer.segmented_at}` && mainMap.hasLayer(canopyOverlay.pins));
+          canopyToggle.addEventListener('change', async () => {
+            if (!canopyToggle.checked) {
+              const current = droneCanopyOverlays.get(layer.id);
+              if (current) {
+                if (mainMap.hasLayer(current.pins)) mainMap.removeLayer(current.pins);
+                if (mainMap.hasLayer(current.outlines)) mainMap.removeLayer(current.outlines);
+              }
+              return;
+            }
+            try {
+              const pins = await showDroneCanopyOverlay(layer);
+              if (pins.getLayers().length) {
+                mainMap.flyToBounds(L.featureGroup(pins.getLayers()).getBounds(), { padding: [40, 40], duration: 0.8 });
+              } else {
+                showDroneImageryMessage('The AI did not pinpoint any canopies on this imagery.');
+              }
+            } catch (error) {
+              canopyToggle.checked = false;
+              showDroneImageryMessage(error.message, true);
+            }
+          });
+          const canopyCount = Number(layer.segmentation_stats?.canopy_count ?? 0);
+          canopyLabel.append(canopyToggle, document.createTextNode(` Show mangrove classification${canopyCount ? ` (${canopyCount.toLocaleString()})` : ''}`));
+          actions.appendChild(canopyLabel);
+        }
         if (typeof window.useAiExtentAsDelineation === 'function') {
           const useButton = document.createElement('button');
           useButton.type = 'button';

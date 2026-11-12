@@ -551,7 +551,7 @@
             <button type="button" class="tx-zoom" data-preview tabindex="-1" aria-label="Preview tile ${escapeHtml(tile.id)}"><i class="bi bi-arrows-angle-expand"></i></button>
             ${badge(tile)}
           </div>
-          <div class="tx-name">${escapeHtml(tile.name)}</div>
+          <div class="tx-name"><span class="tx-name-full">${escapeHtml(tile.name)}</span><span class="tx-name-id">${escapeHtml(tile.id)}</span></div>
         </div>`;
     }
 

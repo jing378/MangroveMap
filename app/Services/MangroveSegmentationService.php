@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AIModel;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
@@ -22,15 +23,15 @@ class MangroveSegmentationService
         }
 
         if (! is_file((string) $script)) {
-            throw new RuntimeException('Prediction script is missing: ' . $script);
+            throw new RuntimeException('Prediction script is missing: '.$script);
         }
 
         if (! is_file((string) $weights)) {
-            throw new RuntimeException('Model weights are missing: ' . $weights);
+            throw new RuntimeException('Model weights are missing: '.$weights);
         }
 
         if (! is_file($imageAbsolutePath)) {
-            throw new RuntimeException('Image not found: ' . $imageAbsolutePath);
+            throw new RuntimeException('Image not found: '.$imageAbsolutePath);
         }
 
         return $this->runScript([
@@ -63,15 +64,15 @@ class MangroveSegmentationService
         }
 
         if (! is_file((string) $script)) {
-            throw new RuntimeException('Prediction script is missing: ' . $script);
+            throw new RuntimeException('Prediction script is missing: '.$script);
         }
 
         if (! is_file((string) $weights)) {
-            throw new RuntimeException('Model weights are missing: ' . $weights);
+            throw new RuntimeException('Model weights are missing: '.$weights);
         }
 
         if (! is_file($rasterAbsolutePath)) {
-            throw new RuntimeException('Raster not found: ' . $rasterAbsolutePath);
+            throw new RuntimeException('Raster not found: '.$rasterAbsolutePath);
         }
 
         return $this->runScript([
@@ -108,7 +109,7 @@ class MangroveSegmentationService
             ->whereNotNull('model_path')
             ->orderByDesc('id')
             ->pluck('model_path')
-            ->first(fn($path) => is_string($path)
+            ->first(fn ($path) => is_string($path)
                 && strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'pt'
                 && is_file($path));
 
@@ -122,16 +123,64 @@ class MangroveSegmentationService
     }
 
     /**
-     * Share of each genus inside the U-Net mangrove mask of a raster (same pixel grid).
+     * Which model delineates the mangrove extent of drone imagery: "yolo" (the canopy model, when its
+     * weights exist) or "unet". See config ml.drone.extent_model.
+     */
+    public function extentModel(): string
+    {
+        $configured = strtolower(trim((string) config('ml.drone.extent_model', 'yolo')));
+
+        return $configured === 'yolo' && $this->genusWeightsPath() !== null ? 'yolo' : 'unet';
+    }
+
+    /**
+     * Mangrove extent of a raster as a 0/1 mask PNG (same pixel grid), with the configured extent model.
      *
+     * With the canopy model, $yoloOptions are passed on to predictGenera (labels_out, canopies_out, bounds…)
+     * so one run gives the extent, the genus suggestion and the canopies; the result then carries the
+     * genus summary too. If that run fails, the U-Net takes over (logged). The result has 'extent_model'.
+     *
+     * @param  array<string, mixed>  $yoloOptions
+     * @return array<string, mixed>
+     */
+    public function predictExtent(string $rasterAbsolutePath, string $maskAbsolutePath, array $yoloOptions = []): array
+    {
+        if ($this->extentModel() === 'yolo') {
+            $weights = $this->genusWeightsPath();
+            try {
+                $result = $this->predictGenera($rasterAbsolutePath, null, (string) $weights, $yoloOptions['labels_out'] ?? null,
+                    (int) ($yoloOptions['min_patch_px'] ?? 0), ['extent_out' => $maskAbsolutePath] + $yoloOptions);
+
+                return ['extent_model' => 'yolo', 'extent_weights' => $weights] + $result;
+            } catch (RuntimeException $exception) {
+                Log::warning('Canopy model extent detection failed; falling back to the U-Net.', [
+                    'raster' => $rasterAbsolutePath,
+                    'exception' => $exception,
+                ]);
+            }
+        }
+
+        return ['extent_model' => 'unet'] + $this->predictRaster($rasterAbsolutePath, $maskAbsolutePath);
+    }
+
+    /**
+     * Runs the canopy model over a raster: the share of each genus inside $maskAbsolutePath (a U-Net mask on
+     * the same pixel grid) or, without a mask, inside the model's own extent (options extent_out).
+     *
+     * Options: extent_out (write the model's mangrove extent mask PNG there), canopies_out (write every
+     * canopy as JSON there; needs bounds = EPSG:3857 corners [ulx, uly, lrx, lry]), pixel_m (ground metres
+     * per pixel, for canopy areas), canopy_min_px, close_iterations.
+     *
+     * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
     public function predictGenera(
         string $rasterAbsolutePath,
-        string $maskAbsolutePath,
+        ?string $maskAbsolutePath,
         string $weightsPath,
         ?string $labelsOutPath = null,
         int $minPatchPixels = 0,
+        array $options = [],
     ): array {
         $python = config('ml.python');
         $script = config('ml.genus.script');
@@ -141,13 +190,23 @@ class MangroveSegmentationService
         }
 
         if (! is_file((string) $script)) {
-            throw new RuntimeException('Genus prediction script is missing: ' . $script);
+            throw new RuntimeException('Genus prediction script is missing: '.$script);
         }
 
-        foreach ([$weightsPath, $rasterAbsolutePath, $maskAbsolutePath] as $path) {
+        if ($maskAbsolutePath === null && empty($options['extent_out'])) {
+            throw new RuntimeException('The canopy model needs a mangrove mask or an extent output path.');
+        }
+
+        foreach (array_filter([$weightsPath, $rasterAbsolutePath, $maskAbsolutePath]) as $path) {
             if (! is_file($path)) {
-                throw new RuntimeException('File not found: ' . $path);
+                throw new RuntimeException('File not found: '.$path);
             }
+        }
+
+        $canopiesOut = $options['canopies_out'] ?? null;
+        $bounds = $options['bounds'] ?? null;
+        if ($canopiesOut !== null && (! is_array($bounds) || count($bounds) !== 4)) {
+            throw new RuntimeException('Pinpointing canopies needs the raster bounds (EPSG:3857 corners).');
         }
 
         return $this->runScript([
@@ -155,8 +214,7 @@ class MangroveSegmentationService
             (string) $script,
             '--raster',
             $rasterAbsolutePath,
-            '--mask',
-            $maskAbsolutePath,
+            ...($maskAbsolutePath !== null ? ['--mask', $maskAbsolutePath] : []),
             '--weights',
             $weightsPath,
             '--size',
@@ -169,6 +227,22 @@ class MangroveSegmentationService
             ...($labelsOutPath !== null ? ['--labels-out', $labelsOutPath] : []),
             '--min-patch-px',
             (string) max(0, $minPatchPixels),
+            // The model's own mangrove extent (drone.extent_model = yolo).
+            ...(! empty($options['extent_out']) ? [
+                '--extent-out', (string) $options['extent_out'],
+                '--extent-conf', (string) config('ml.genus.extent_confidence', 0.25),
+                '--close', (string) (int) ($options['close_iterations'] ?? config('ml.drone.close_iterations', 2)),
+            ] : []),
+            // Every canopy pinpointed, for the map.
+            ...($canopiesOut !== null ? [
+                '--canopies-out', (string) $canopiesOut,
+                '--bounds', ...array_map(fn ($value) => (string) (float) $value, array_values($bounds)),
+                ...(isset($options['pixel_m']) ? ['--pixel-m', (string) (float) $options['pixel_m']] : []),
+                '--canopy-min-px', (string) max(0, (int) ($options['canopy_min_px'] ?? 0)),
+                '--canopy-max', (string) max(0, (int) config('ml.genus.canopy_max', 3000)),
+                '--canopy-conf', (string) (float) config('ml.genus.canopy_confidence', 0.4),
+                '--canopy-overlap', (string) (float) config('ml.genus.canopy_overlap', 0.5),
+            ] : []),
         ], (int) config('ml.genus.timeout', 1800));
     }
 
@@ -297,7 +371,7 @@ class MangroveSegmentationService
         }
 
         if (! is_file((string) $script)) {
-            throw new RuntimeException('Genus prediction script is missing: ' . $script);
+            throw new RuntimeException('Genus prediction script is missing: '.$script);
         }
 
         if (! is_file($weightsPath)) {
@@ -371,7 +445,7 @@ class MangroveSegmentationService
         }
 
         if (! is_file((string) $script)) {
-            throw new RuntimeException('Prediction script is missing: ' . $script);
+            throw new RuntimeException('Prediction script is missing: '.$script);
         }
 
         if (! is_file($weightsPath)) {
@@ -403,7 +477,7 @@ class MangroveSegmentationService
             ->whereNotNull('model_path')
             ->orderByDesc('id')
             ->pluck('model_path')
-            ->first(fn($path) => is_string($path)
+            ->first(fn ($path) => is_string($path)
                 && strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'pth'
                 && is_file($path));
     }
@@ -424,10 +498,10 @@ class MangroveSegmentationService
         }
 
         $systemRoot = $env['SystemRoot'] ?? $env['SYSTEMROOT'] ?? 'C:\\Windows';
-        $system32 = $systemRoot . '\\System32';
+        $system32 = $systemRoot.'\\System32';
         $path = $env['PATH'] ?? $env['Path'] ?? '';
         if (stripos($path, $system32) === false) {
-            $path = $system32 . ';' . $systemRoot . ';' . $system32 . '\\Wbem;' . $path;
+            $path = $system32.';'.$systemRoot.';'.$system32.'\\Wbem;'.$path;
         }
 
         $env['SYSTEMROOT'] = $systemRoot;
@@ -437,7 +511,7 @@ class MangroveSegmentationService
         $env['PATH'] = $path;
         $env['Path'] = $path;
         $env['PATHEXT'] = $env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD;.VBS';
-        $env['COMSPEC'] = $env['COMSPEC'] ?? $system32 . '\\cmd.exe';
+        $env['COMSPEC'] = $env['COMSPEC'] ?? $system32.'\\cmd.exe';
         $env['TEMP'] = $env['TEMP'] ?? sys_get_temp_dir();
         $env['TMP'] = $env['TMP'] ?? sys_get_temp_dir();
         $env['PYTHONUNBUFFERED'] = '1';
@@ -462,7 +536,7 @@ class MangroveSegmentationService
             if (empty($env[$key])) {
                 continue;
             }
-            putenv($key . '=' . $env[$key]);
+            putenv($key.'='.$env[$key]);
             $_ENV[$key] = $env[$key];
             $_SERVER[$key] = $env[$key];
         }

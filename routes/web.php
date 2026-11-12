@@ -189,6 +189,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/drone-imagery/{layerId}/tiles/{z}/{x}/{y}', [DroneImageryController::class, 'tile'])
         ->whereNumber(['layerId', 'z', 'x', 'y'])
         ->name('drone-imagery.tile');
+    Route::get('/drone-imagery/{layerId}/canopies', [DroneImageryController::class, 'canopies'])
+        ->whereNumber('layerId')
+        ->name('drone-imagery.canopies.show');
+    // Review editor: Save draft / Confirm sends the canopies the owner removed.
+    Route::put('/drone-imagery/{layerId}/canopies', [DroneImageryController::class, 'updateCanopies'])
+        ->whereNumber('layerId')
+        ->middleware('throttle:60,1')
+        ->name('drone-imagery.canopies.update');
     Route::get('/drone-imagery/{layerId}/segmentation', [DroneImageryController::class, 'segmentation'])
         ->whereNumber('layerId')
         ->name('drone-imagery.segmentation.show');
@@ -244,6 +252,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Map viewer & Delineate studio (accessible to authenticated users)
     Route::get('/map', [EndUserController::class, 'map'])->name('map');
     Route::get('/delineate', [EndUserController::class, 'delineate'])->name('delineate');
+    // The map's delineations as JSON: the map redraws from it right after a save, edit, review or removal.
+    Route::get('/map/delineations', [EndUserController::class, 'mapDelineations'])
+        ->middleware('throttle:120,1')
+        ->name('map.delineations');
     Route::get('/delineations/{delineation}/annual-observations', [DelineationAnnualObservationController::class, 'index'])
         ->name('delineations.annual-observations.index');
     Route::post('/delineations/location-preview', [EndUserController::class, 'previewDelineationLocation'])

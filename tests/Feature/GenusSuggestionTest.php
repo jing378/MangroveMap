@@ -100,6 +100,108 @@ class GenusSuggestionTest extends TestCase
         });
     }
 
+    public function test_the_canopy_model_delineates_the_extent_when_configured_and_its_weights_exist(): void
+    {
+        $service = app(MangroveSegmentationService::class);
+
+        config(['ml.drone.extent_model' => 'yolo']);
+        $this->assertSame('unet', $service->extentModel(), 'Without canopy weights the U-Net delineates.');
+
+        config(['ml.genus.model_path' => $this->file('best.pt')]);
+        $this->assertSame('yolo', $service->extentModel());
+
+        config(['ml.drone.extent_model' => 'unet']);
+        $this->assertSame('unet', $service->extentModel());
+    }
+
+    public function test_predict_extent_runs_the_canopy_model_once_for_extent_genus_and_canopies(): void
+    {
+        $weights = $this->file('best.pt');
+        config(['ml.drone.extent_model' => 'yolo', 'ml.genus.model_path' => $weights, 'ml.genus.extent_confidence' => 0.3]);
+        Process::fake(['*' => Process::result(json_encode([
+            'ok' => true,
+            'classes' => ['Avicennia', 'Rhizophora'],
+            'genera' => [['genus' => 'Rhizophora', 'pixels' => 80, 'share_percent' => 80.0, 'mean_confidence' => 0.4]],
+            'labeled_percent' => 25.0,
+            'pixels_mangrove' => 500, 'pixels_valid' => 1000, 'mangrove_coverage_percent' => 50.0, 'mean_confidence' => 0.61,
+            'canopy_count' => 12, 'canopies_kept' => 12, 'canopies_by_genus' => ['Avicennia' => 4, 'Rhizophora' => 8],
+        ]))]);
+
+        $raster = $this->file('seg_input.tif');
+        $mask = $this->workDirectory.DIRECTORY_SEPARATOR.'mask.png';
+        $result = app(MangroveSegmentationService::class)->predictExtent($raster, $mask, [
+            'labels_out' => $this->workDirectory.'/genus_labels.png',
+            'canopies_out' => $this->workDirectory.'/canopies.json',
+            'bounds' => [13800000.0, 1120000.0, 13800150.0, 1119880.0],
+            'pixel_m' => 0.15,
+            'min_patch_px' => 88,
+            'canopy_min_px' => 44,
+            'close_iterations' => 2,
+        ]);
+
+        $this->assertSame('yolo', $result['extent_model']);
+        $this->assertSame(500, $result['pixels_mangrove']);
+        $this->assertSame(12, $result['canopy_count']);
+        $this->assertSame('Rhizophora', $result['genera'][0]['genus']);
+        Process::assertRanTimes(fn (PendingProcess $process) => str_ends_with($process->command[1], 'predict_genus.py'), 1);
+        Process::assertRan(function (PendingProcess $process) use ($raster, $mask, $weights) {
+            $command = $process->command;
+            $after = fn (string $flag) => $command[array_search($flag, $command, true) + 1] ?? null;
+
+            return str_ends_with($command[1], 'predict_genus.py')
+                && in_array($raster, $command, true)
+                && ! in_array('--mask', $command, true) // the model's own extent is the target
+                && $after('--weights') === $weights
+                && $after('--extent-out') === $mask
+                && $after('--extent-conf') === '0.3'
+                && $after('--close') === '2'
+                && str_ends_with($after('--canopies-out'), 'canopies.json')
+                && $after('--bounds') === '13800000'
+                && $after('--pixel-m') === '0.15'
+                && $after('--canopy-min-px') === '44'
+                && $after('--min-patch-px') === '88'
+                && $after('--canopy-max') === (string) config('ml.genus.canopy_max')
+                // Weak guesses and duplicate detections of the same trees are not pinned.
+                && $after('--canopy-conf') === '0.4'
+                && $after('--canopy-overlap') === '0.5';
+        });
+    }
+
+    public function test_predict_extent_falls_back_to_the_unet_when_the_canopy_model_fails(): void
+    {
+        config(['ml.drone.extent_model' => 'yolo', 'ml.genus.model_path' => $this->file('best.pt'), 'ml.model_path' => $this->file('unet.pth')]);
+        Process::fake([
+            '*predict_genus.py*' => Process::result(json_encode(['ok' => false, 'error' => 'CUDA out of memory']), exitCode: 1),
+            '*predict.py*' => Process::result(json_encode(['ok' => true, 'pixels_mangrove' => 7, 'pixels_valid' => 10, 'mangrove_coverage_percent' => 70.0])),
+        ]);
+
+        $result = app(MangroveSegmentationService::class)->predictExtent($this->file('seg_input.tif'), $this->workDirectory.'/mask.png');
+
+        $this->assertSame('unet', $result['extent_model']);
+        $this->assertSame(7, $result['pixels_mangrove']);
+        Process::assertRan(fn (PendingProcess $process) => str_ends_with($process->command[1], 'predict.py') && in_array('--raster', $process->command, true));
+    }
+
+    public function test_predict_extent_uses_the_unet_when_the_unet_is_configured(): void
+    {
+        config(['ml.drone.extent_model' => 'unet', 'ml.genus.model_path' => $this->file('best.pt'), 'ml.model_path' => $this->file('unet.pth')]);
+        Process::fake(['*' => Process::result(json_encode(['ok' => true, 'pixels_mangrove' => 1, 'pixels_valid' => 2]))]);
+
+        $result = app(MangroveSegmentationService::class)->predictExtent($this->file('seg_input.tif'), $this->workDirectory.'/mask.png');
+
+        $this->assertSame('unet', $result['extent_model']);
+        Process::assertNotRan(fn (PendingProcess $process) => str_ends_with($process->command[1], 'predict_genus.py'));
+    }
+
+    public function test_the_canopy_model_needs_a_mask_or_an_extent_output(): void
+    {
+        Process::fake();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('mangrove mask or an extent output');
+
+        app(MangroveSegmentationService::class)->predictGenera($this->file('seg_input.tif'), null, $this->file('best.pt'));
+    }
+
     private function editableLayer(User $owner, array $genusSuggestion, bool $withGenusMap): DroneImageryLayer
     {
         $bounds = ['west' => 124.0, 'south' => 9.99, 'east' => 124.01, 'north' => 10.0];
@@ -497,7 +599,7 @@ class GenusSuggestionTest extends TestCase
 
         $this->assertStringContainsString('Accuracy must be between 0 and 100', $html);
         // The page reopens this model's dialog with what was typed.
-        $this->assertStringContainsString('[data-edit-metrics][data-model-id="' . $unet->id . '"]', $html);
+        $this->assertStringContainsString('[data-edit-metrics][data-model-id="'.$unet->id.'"]', $html);
         $this->assertStringContainsString('"accuracy":"120"', $html);
 
         $this->assertNull($unet->fresh()->accuracy);

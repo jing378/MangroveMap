@@ -9,15 +9,19 @@ use App\Models\DroneImageryLayer;
 use App\Models\PlantingRecommendation;
 use App\Models\User;
 use App\Models\UserActivity;
+use App\Notifications\DelineationSubmittedForReview;
 use App\Services\ApprovedCoverageStats;
 use App\Services\BoundaryResolver;
 use App\Services\DelineationObservationRecorder;
-use App\Notifications\DelineationSubmittedForReview;
+use App\Services\FieldWeatherService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\LazyCollection;
 use Illuminate\Validation\ValidationException;
 
 class EndUserController extends Controller
@@ -42,7 +46,7 @@ class EndUserController extends Controller
         foreach ($features as $feature) {
             $genera = array_filter(
                 (array) ($feature['genera'] ?? []),
-                fn($genus) => is_string($genus) && trim($genus) !== ''
+                fn ($genus) => is_string($genus) && trim($genus) !== ''
             );
 
             if ($genera === []) {
@@ -57,7 +61,7 @@ class EndUserController extends Controller
      * Dashboard "Field conditions" card, loaded after the page (the forecast may take a moment).
      * lat/lng come from the browser when the user shares their location; without them it is the default place.
      */
-    public function fieldConditions(Request $request, \App\Services\FieldWeatherService $weather)
+    public function fieldConditions(Request $request, FieldWeatherService $weather)
     {
         $validated = $request->validate([
             'lat' => ['nullable', 'numeric', 'between:-90,90', 'required_with:lng'],
@@ -80,6 +84,7 @@ class EndUserController extends Controller
         $data = $this->buildDashboardData();
         $data['page'] = 'dashboard';
         $data += $this->buildContributorData(Auth::user());
+
         return view('users.dashboard', $data);
     }
 
@@ -128,8 +133,9 @@ class EndUserController extends Controller
             ->limit(self::PLANTING_RECOMMENDATIONS_MAP_LIMIT)
             ->get()
             // Site notes are the expert's working notes; the map popup does not show them.
-            ->map(fn(PlantingRecommendation $recommendation) => Arr::except($recommendation->toMapPayload(), ['site_notes']))
+            ->map(fn (PlantingRecommendation $recommendation) => Arr::except($recommendation->toMapPayload(), ['site_notes']))
             ->values();
+
         return view('users.map', $data);
     }
 
@@ -137,6 +143,7 @@ class EndUserController extends Controller
     {
         $data = $this->buildDashboardData();
         $data['page'] = 'delineate';
+
         return view('users.delineate', $data);
     }
 
@@ -168,7 +175,7 @@ class EndUserController extends Controller
                 continue;
             }
 
-            $key = $type . ':' . json_encode($coords);
+            $key = $type.':'.json_encode($coords);
             if (isset($seen[$key])) {
                 continue;
             }
@@ -196,7 +203,7 @@ class EndUserController extends Controller
         $viewer = request()->user();
         $plantingRecommendations = ($viewer?->isExpert() || $delineation->is_approved)
             ? $delineation->loadMissing(self::PLANTING_RECOMMENDATIONS_RELATION)->plantingRecommendations
-                ->map(fn(PlantingRecommendation $recommendation) => $recommendation->toDelineationPanelPayload())
+                ->map(fn (PlantingRecommendation $recommendation) => $recommendation->toDelineationPanelPayload())
                 ->values()
                 ->all()
             : [];
@@ -232,14 +239,14 @@ class EndUserController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>|array<int, array<string, mixed>>  $records
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @param  Collection<int, array<string, mixed>>|array<int, array<string, mixed>>  $records
+     * @return Collection<int, array<string, mixed>>
      */
-    private function prependUniqueDelineationPayload($records, array $payload): \Illuminate\Support\Collection
+    private function prependUniqueDelineationPayload($records, array $payload): Collection
     {
         $collection = collect($records);
 
-        if ($collection->contains(fn(array $row) => (int) ($row['id'] ?? 0) === (int) $payload['id'])) {
+        if ($collection->contains(fn (array $row) => (int) ($row['id'] ?? 0) === (int) $payload['id'])) {
             return $collection->values();
         }
 
@@ -247,7 +254,7 @@ class EndUserController extends Controller
     }
 
     /**
-     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection|\Illuminate\Support\LazyCollection, 3: ?array, 4: ?int}
+     * @return array{0: Collection, 1: Collection, 2: Collection|LazyCollection, 3: ?array, 4: ?int}
      */
     private function applyFocusDelineationForMap(
         User $user,
@@ -284,6 +291,70 @@ class EndUserController extends Controller
         }
 
         return [$delineations, $approvedDelineationsForMap, $residentDelineationsForMap, $payload, $focusId];
+    }
+
+    /**
+     * The delineations the map draws for this user: their own, the approved ones of others, and (experts)
+     * residents' delineations. Shared by the page render and mapDelineations (refresh after a change).
+     *
+     * @return array{delineations: Collection, approvedDelineations: Collection, approvedDelineationsForMap: Collection, residentDelineationsForMap: Collection}
+     */
+    private function mapDelineationData(User $user): array
+    {
+        $delineationModels = Delineation::fetchForMap(
+            $user->delineations()->with(['user:id,name,role', 'approvedBy:id,name']),
+            Delineation::MAP_QUERY_LIMIT_OWN,
+            ['latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION]
+        );
+        $delineations = $delineationModels
+            ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d))
+            ->values();
+
+        $approvedForMapModels = Delineation::fetchForMap(
+            Delineation::approved()->where('user_id', '!=', $user->id)->with(['user:id,name,role', 'approvedBy:id,name']),
+            Delineation::MAP_QUERY_LIMIT,
+            [self::PLANTING_RECOMMENDATIONS_RELATION]
+        );
+
+        $approvedDelineations = $approvedForMapModels;
+
+        $approvedDelineationsForMap = $approvedForMapModels
+            ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d, [
+                'is_system' => true,
+                'approved' => true,
+                'is_approved' => true,
+            ]))
+            ->values();
+
+        $residentDelineationsForMap = collect();
+        if ($user->isExpert()) {
+            $residentDelineationsForMap = Delineation::fetchResidentDelineationsForExpertMap()
+                ->load(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION])
+                ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d))
+                ->values();
+        }
+
+        return [
+            'delineations' => $delineations,
+            'approvedDelineations' => $approvedDelineations,
+            'approvedDelineationsForMap' => $approvedDelineationsForMap,
+            'residentDelineationsForMap' => $residentDelineationsForMap,
+        ];
+    }
+
+    /**
+     * The map's delineation data as JSON, so the map can redraw right after a save, edit, review or
+     * removal without reloading the page (refreshMapData in workspace-scripts).
+     */
+    public function mapDelineations(): JsonResponse
+    {
+        $data = $this->mapDelineationData(Auth::user());
+
+        return response()->json([
+            'delineations' => $data['delineations'],
+            'approvedDelineationsForMap' => $data['approvedDelineationsForMap'],
+            'residentDelineationsForMap' => $data['residentDelineationsForMap'],
+        ])->header('Cache-Control', 'no-store');
     }
 
     public function buildDashboardData(): array
@@ -325,38 +396,12 @@ class EndUserController extends Controller
             $coverageChangePct = round(($trendValues[count($trendValues) - 1] - $previous) / $previous * 100, 1);
         }
 
-        $delineationModels = Delineation::fetchForMap(
-            $user->delineations()->with(['user:id,name,role', 'approvedBy:id,name']),
-            Delineation::MAP_QUERY_LIMIT_OWN,
-            ['latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION]
-        );
-        $delineations = $delineationModels
-            ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d))
-            ->values();
-
-        $approvedForMapModels = Delineation::fetchForMap(
-            Delineation::approved()->where('user_id', '!=', $user->id)->with(['user:id,name,role', 'approvedBy:id,name']),
-            Delineation::MAP_QUERY_LIMIT,
-            [self::PLANTING_RECOMMENDATIONS_RELATION]
-        );
-
-        $approvedDelineations = $approvedForMapModels;
-
-        $approvedDelineationsForMap = $approvedForMapModels
-            ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d, [
-                'is_system' => true,
-                'approved' => true,
-                'is_approved' => true,
-            ]))
-            ->values();
-
-        $residentDelineationsForMap = collect();
-        if ($user->isExpert()) {
-            $residentDelineationsForMap = Delineation::fetchResidentDelineationsForExpertMap()
-                ->load(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION])
-                ->map(fn(Delineation $d) => $this->delineationPayloadForMap($d))
-                ->values();
-        }
+        [
+            'delineations' => $delineations,
+            'approvedDelineations' => $approvedDelineations,
+            'approvedDelineationsForMap' => $approvedDelineationsForMap,
+            'residentDelineationsForMap' => $residentDelineationsForMap,
+        ] = $this->mapDelineationData($user);
 
         [
             $delineations,
@@ -434,7 +479,7 @@ class EndUserController extends Controller
 
         User::where('role', 'expert')
             ->get()
-            ->each(fn($expert) => $expert->notify(new DelineationSubmittedForReview($delineation)));
+            ->each(fn ($expert) => $expert->notify(new DelineationSubmittedForReview($delineation)));
 
         return response()->json([
             'message' => 'Delineation saved and submitted for expert review.',
@@ -460,7 +505,7 @@ class EndUserController extends Controller
             'notes' => ['required', 'string'],
         ]);
 
-        $features = collect($data['features'])->map(fn(array $feature) => [
+        $features = collect($data['features'])->map(fn (array $feature) => [
             'type' => $feature['type'],
             'coords' => $feature['coords'],
             'genera' => $feature['genera'] ?? [],
@@ -511,7 +556,7 @@ class EndUserController extends Controller
 
         User::where('role', 'expert')
             ->get()
-            ->each(fn($expert) => $expert->notify(new DelineationSubmittedForReview($delineation, true)));
+            ->each(fn ($expert) => $expert->notify(new DelineationSubmittedForReview($delineation, true)));
 
         return response()->json([
             'message' => 'Revised delineation submitted for expert review.',
@@ -570,8 +615,8 @@ class EndUserController extends Controller
             // Experts say whether the edit fixes the drawing or records a real change in the mangroves.
             'record_as' => ['nullable', 'string', 'in:correction,observation'],
             // The app clock is UTC; "today" is judged in local (Philippine) time like the date picker.
-            'observation_date' => ['exclude_unless:record_as,observation', 'required', 'date', 'after_or_equal:2000-01-01', 'before_or_equal:' . now(DelineationAnnualObservation::LOCAL_TIMEZONE)->toDateString()],
-            'observation_source' => ['exclude_unless:record_as,observation', 'required', 'string', 'in:' . implode(',', array_keys(DelineationAnnualObservation::SOURCES))],
+            'observation_date' => ['exclude_unless:record_as,observation', 'required', 'date', 'after_or_equal:2000-01-01', 'before_or_equal:'.now(DelineationAnnualObservation::LOCAL_TIMEZONE)->toDateString()],
+            'observation_source' => ['exclude_unless:record_as,observation', 'required', 'string', 'in:'.implode(',', array_keys(DelineationAnnualObservation::SOURCES))],
         ], [
             'observation_date.required' => 'Enter the date the change was observed.',
             'observation_date.before_or_equal' => 'The observation date cannot be in the future.',
@@ -597,10 +642,10 @@ class EndUserController extends Controller
                 $valid = self::isLatLngPair($coords);
                 $coords = $valid ? [(float) $coords[0], (float) $coords[1]] : $coords;
             } else {
-                $valid = collect($coords)->every(fn($pair) => self::isLatLngPair($pair));
+                $valid = collect($coords)->every(fn ($pair) => self::isLatLngPair($pair));
                 if ($valid) {
-                    $coords = collect($coords)->map(fn($pair) => [(float) $pair[0], (float) $pair[1]])->values()->all();
-                    $distinct = collect($coords)->map(fn($pair) => $pair[0] . ',' . $pair[1])->unique()->count();
+                    $coords = collect($coords)->map(fn ($pair) => [(float) $pair[0], (float) $pair[1]])->values()->all();
+                    $distinct = collect($coords)->map(fn ($pair) => $pair[0].','.$pair[1])->unique()->count();
                     $valid = $distinct >= ($feature['type'] === 'area' ? 3 : 2);
                 }
             }
@@ -671,7 +716,7 @@ class EndUserController extends Controller
         return response()->json([
             'message' => $observation
                 ? "Boundary updated and recorded as the {$observation->year} observation ("
-                    . number_format($observation->coverage_area_ha, 2) . ' ha).'
+                    .number_format($observation->coverage_area_ha, 2).' ha).'
                 : 'Delineation boundary updated.',
             'delineation' => $this->delineationPayloadForMap($delineation),
             'observation_year' => $observation?->year,

@@ -138,19 +138,17 @@ class DroneImageryController extends Controller
             'segmentation_url' => $layer->segmentation_status === 'ready'
                 ? route('drone-imagery.segmentation.show', $layer->id)
                 : null,
+            // Every canopy the AI pinpointed (null when the canopy model did not run).
+            'canopies_url' => $layer->segmentation_status === 'ready' && ($layer->segmentation_stats['canopy_count'] ?? null) !== null
+                ? route('drone-imagery.canopies.show', $layer->id)
+                : null,
         ];
     }
 
     /** AI-detected mangrove extent as delineation-ready area features. */
     public function segmentation(Request $request, int $layerId): JsonResponse
     {
-        $viewer = $request->user();
-        // awaiting_review layers only match for their owner (shared layers must be ready), for the review editor.
-        $layer = $this->visibleLayersQuery($viewer)
-            ->whereIn('status', ['ready', 'awaiting_review'])
-            ->where('segmentation_status', 'ready')
-            ->whereDoesntHave('hiddenByUsers', fn (Builder $query) => $query->whereKey($viewer->id))
-            ->findOrFail($layerId);
+        $layer = $this->segmentedLayer($request, $layerId);
 
         $disk = Storage::disk('local');
         if ($layer->segmentation_path !== "drone-imagery/processed/{$layer->id}/ai_extent.json"
@@ -167,6 +165,203 @@ class DroneImageryController extends Controller
             'stats' => $result['stats'] ?? $layer->segmentation_stats,
             'segmented_at' => $layer->segmented_at?->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Every canopy the AI pinpointed on this imagery (genus, confidence, ground area, centre and outline in
+     * [lat, lng]), from the last AI run. Same visibility as the extent. The owner's area corrections do not
+     * change them: they are what the model saw.
+     */
+    public function canopies(Request $request, int $layerId): JsonResponse
+    {
+        $layer = $this->segmentedLayer($request, $layerId);
+
+        $disk = Storage::disk('local');
+        if (! $disk->exists($layer->canopiesPath())) {
+            abort(404);
+        }
+
+        $result = json_decode((string) $disk->get($layer->canopiesPath()), true);
+        if (! is_array($result)) {
+            abort(404);
+        }
+
+        return response()->json([
+            'id' => $layer->id,
+            'name' => $layer->name,
+            'count' => (int) ($result['count'] ?? 0),
+            'kept' => (int) ($result['kept'] ?? 0),
+            'by_genus' => (array) ($result['by_genus'] ?? []),
+            'canopies' => array_values((array) ($result['canopies'] ?? [])),
+            // Position nudge the canopies were placed at (same as the extent's), for the review editor.
+            'offset' => $layer->segmentation_stats['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'],
+            'segmented_at' => $layer->segmented_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * The owner's canopy corrections (review editor): Save draft / Confirm sends the centres of the pins the
+     * owner removed, like the mangrove area corrections. A centre that matches no canopy (already removed)
+     * is ignored. The counts in canopies.json, segmentation_stats and ai_extent.json follow. The genus
+     * suggestion is unchanged: it is counted from the genus map, not from the pins.
+     */
+    public function updateCanopies(Request $request, int $layerId): JsonResponse
+    {
+        $layer = $this->reviewableLayer($request, $layerId);
+        if ($layer instanceof JsonResponse) {
+            return $layer;
+        }
+
+        if ($layer->isSegmenting() || $layer->segmentation_status !== 'ready') {
+            return response()->json([
+                'message' => 'Wait until AI detection finishes before removing canopies.',
+            ], 409);
+        }
+
+        $max = max(1, (int) config('ml.genus.canopy_max', 3000));
+        $validated = $request->validate([
+            // Whole canopies, by centre (pins without an outline, or every patch at once).
+            'removed' => ['present', 'array', 'max:'.$max],
+            'removed.*' => ['array', 'size:2'],
+            'removed.*.0' => ['required', 'numeric', 'between:-90,90'],
+            'removed.*.1' => ['required', 'numeric', 'between:-180,180'],
+            // Single patches of a canopy, by the first point of their outline.
+            'removed_rings' => ['sometimes', 'array', 'max:'.($max * 20)],
+            'removed_rings.*' => ['array', 'size:2'],
+            'removed_rings.*.0' => ['required', 'numeric', 'between:-90,90'],
+            'removed_rings.*.1' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $disk = Storage::disk('local');
+        $result = $disk->exists($layer->canopiesPath())
+            ? json_decode((string) $disk->get($layer->canopiesPath()), true)
+            : null;
+        if (! is_array($result)) {
+            abort(404);
+        }
+
+        // Points are matched as stored (7 decimals, like the editor's keys), so an exact key is enough.
+        $key = fn ($point): string => sprintf('%.7f,%.7f', (float) $point[0], (float) $point[1]);
+        $removed = array_flip(array_map($key, $validated['removed']));
+        $removedRings = array_flip(array_map($key, $validated['removed_rings'] ?? []));
+
+        $canopies = [];
+        $byGenus = array_map('intval', (array) ($result['by_genus'] ?? []));
+        $removedCount = 0;
+        foreach ((array) ($result['canopies'] ?? []) as $canopy) {
+            $center = is_array($canopy) ? ($canopy['center'] ?? null) : null;
+            $gone = is_array($center) && count($center) >= 2 && isset($removed[$key($center)]);
+            if (! $gone && $removedRings !== []) {
+                [$canopy, $gone] = $this->withoutRemovedRings($canopy, $removedRings, $key);
+            }
+            if ($gone) {
+                $removedCount++;
+                $genus = (string) ($canopy['genus'] ?? '');
+                if ($genus !== '' && ($byGenus[$genus] ?? 0) > 0) {
+                    $byGenus[$genus]--;
+                }
+
+                continue;
+            }
+            $canopies[] = $canopy;
+        }
+
+        $result['canopies'] = $canopies;
+        $result['count'] = max(count($canopies), (int) ($result['count'] ?? 0) - $removedCount);
+        $result['kept'] = count($canopies);
+        $result['by_genus'] = $byGenus;
+        $disk->put($layer->canopiesPath(), json_encode($result, JSON_UNESCAPED_SLASHES));
+
+        $stats = [
+            ...($layer->segmentation_stats ?? []),
+            'canopy_count' => $result['count'],
+            'canopies_by_genus' => $byGenus,
+        ];
+        $layer->update(['segmentation_stats' => $stats]);
+
+        // The editor reads the AI stats from ai_extent.json: keep its canopy counts in step.
+        $extentPath = "drone-imagery/processed/{$layer->id}/ai_extent.json";
+        if ($layer->segmentation_path === $extentPath && $disk->exists($extentPath)) {
+            $extent = json_decode((string) $disk->get($extentPath), true);
+            if (is_array($extent) && is_array($extent['stats'] ?? null)) {
+                $extent['stats']['canopy_count'] = $result['count'];
+                $extent['stats']['canopies_by_genus'] = $byGenus;
+                $disk->put($extentPath, json_encode($extent, JSON_UNESCAPED_SLASHES));
+            }
+        }
+
+        return response()->json([
+            'id' => $layer->id,
+            'count' => $result['count'],
+            'kept' => $result['kept'],
+            'by_genus' => $byGenus,
+            'canopies' => $canopies,
+            'offset' => $stats['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'],
+            'segmented_at' => $layer->segmented_at?->toIso8601String(),
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * A canopy without the patches the owner removed. Its area shrinks by the removed share and its centre
+     * moves to the largest patch left. Returns [canopy, true] when no patch is left (the canopy is gone).
+     *
+     * @param  array<string, int>  $removedRings  keys of the first point of each removed ring
+     * @return array{0: mixed, 1: bool}
+     */
+    private function withoutRemovedRings(mixed $canopy, array $removedRings, \Closure $key): array
+    {
+        if (! is_array($canopy)) {
+            return [$canopy, false];
+        }
+        $rings = is_array($canopy['rings'] ?? null) ? $canopy['rings'] : (is_array($canopy['coords'] ?? null) ? [$canopy['coords']] : []);
+        $rings = array_values(array_filter($rings, fn ($ring) => is_array($ring) && count($ring) >= 3));
+        if ($rings === []) {
+            return [$canopy, false];
+        }
+
+        $kept = array_values(array_filter($rings, fn (array $ring) => ! isset($removedRings[$key($ring[0])])));
+        if (count($kept) === count($rings)) {
+            return [$canopy, false];
+        }
+        if ($kept === []) {
+            return [$canopy, true];
+        }
+
+        // Shoelace in degrees: only the ratio between patches is used, so the units cancel out.
+        $area = fn (array $ring): float => abs(array_sum(array_map(
+            fn (array $point, int $index) => (float) $point[1] * (float) $ring[($index + 1) % count($ring)][0]
+                - (float) $ring[($index + 1) % count($ring)][1] * (float) $point[0],
+            $ring,
+            array_keys($ring),
+        ))) / 2;
+        $total = array_sum(array_map($area, $rings));
+        $left = array_map($area, $kept);
+        if (isset($canopy['area_m2']) && $total > 0) {
+            $canopy['area_m2'] = round((float) $canopy['area_m2'] * array_sum($left) / $total, 2);
+        }
+        $largest = $kept[array_search(max($left), $left, true)];
+        $canopy['center'] = [
+            round(array_sum(array_map(fn ($point) => (float) $point[0], $largest)) / count($largest), 7),
+            round(array_sum(array_map(fn ($point) => (float) $point[1], $largest)) / count($largest), 7),
+        ];
+        $canopy['rings'] = $kept;
+        $canopy['coords'] = $largest;
+
+        return [$canopy, false];
+    }
+
+    /** A layer whose AI result the viewer may see: visible to them, not hidden, and segmented. */
+    private function segmentedLayer(Request $request, int $layerId): DroneImageryLayer
+    {
+        $viewer = $request->user();
+
+        // awaiting_review layers only match for their owner (shared layers must be ready), for the review editor.
+        return $this->visibleLayersQuery($viewer)
+            ->whereIn('status', ['ready', 'awaiting_review'])
+            ->where('segmentation_status', 'ready')
+            ->whereDoesntHave('hiddenByUsers', fn (Builder $query) => $query->whereKey($viewer->id))
+            ->findOrFail($layerId);
     }
 
     /** Queue (or re-run) AI segmentation for a ready or under-review layer the viewer owns. */

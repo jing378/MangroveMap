@@ -18,8 +18,10 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Runs the mangrove U-Net over a processed drone mosaic and stores the detected
- * extent as delineation-ready area features (drone-imagery/processed/{id}/ai_extent.json).
+ * Detects the mangroves on a processed drone mosaic and stores the extent as delineation-ready
+ * area features (drone-imagery/processed/{id}/ai_extent.json), the genus suggestion and every
+ * canopy the canopy model pinpointed (canopies.json). See MangroveSegmentationService::predictExtent
+ * for which model draws the extent.
  */
 class SegmentDroneImagery implements ShouldQueue
 {
@@ -87,17 +89,19 @@ class SegmentDroneImagery implements ShouldQueue
             ], $workDirectory, $gdalTimeout);
 
             $inputInfo = $this->readRasterInfo($gdal, $inputPath, $workDirectory);
-            $prediction = $segmentation->predictRaster($inputPath, $maskPath);
             // Position nudge already contained in the raster (the edited raster is shifted).
             $offset = $layer->final_mosaic_path
                 ? ($layer->applied_edits['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'])
                 : DroneImageryLayer::EMPTY_EDITS['offset'];
-            $genusSuggestion = $this->genusSuggestion($segmentation, $layer, $inputPath, $maskPath, [
-                'bounds' => $this->cornerCoordinates($inputInfo),
-                'latitude' => $this->centerLatitude($layer, $mosaicInfo),
-                'offset' => $offset,
-                'pixel_m' => $pixelSize / $mercatorScale, // ground size of one pixel of the resampled raster
-            ]);
+            // The U-Net delineates the extent; the canopy model (YOLO, best.pt) then suggests the genus and
+            // pinpoints every canopy inside it. With ml.drone.extent_model = yolo the canopy model does all three.
+            ['prediction' => $prediction, 'genus_suggestion' => $genusSuggestion, 'canopies' => $canopies]
+                = $this->detect($segmentation, $layer, $inputPath, $maskPath, [
+                    'bounds' => $this->cornerCoordinates($inputInfo),
+                    'latitude' => $this->centerLatitude($layer, $mosaicInfo),
+                    'offset' => $offset,
+                    'pixel_m' => $pixelSize / $mercatorScale, // ground size of one pixel of the resampled raster
+                ]);
 
             // Re-attach the resampled raster's georeferencing to the mask, then vectorize it.
             $gdal->run([
@@ -148,12 +152,17 @@ class SegmentDroneImagery implements ShouldQueue
                 'resolution_m' => round($pixelSize / $mercatorScale, 3),
                 'tiles' => (int) ($prediction['tiles'] ?? 0),
                 'device' => $prediction['device'] ?? null,
+                // Which model drew the extent: "yolo" (the canopy model) or "unet".
+                'extent_model' => (string) ($prediction['extent_model'] ?? 'unet'),
                 // Position nudge already contained in the coordinates (the edited raster is shifted),
                 // so the review editor can line the areas up with the preview.
                 'offset' => $offset,
                 'edited' => false,
                 // Kept through the owner's area corrections (updateSegmentation merges the old stats).
                 'genus_suggestion' => $genusSuggestion,
+                // Canopies pinpointed by the canopy model (canopies.json); null when it did not run.
+                'canopy_count' => $canopies['count'] ?? null,
+                'canopies_by_genus' => $canopies['by_genus'] ?? null,
             ];
 
             $localDisk->put($resultRelativePath, json_encode([
@@ -183,52 +192,109 @@ class SegmentDroneImagery implements ShouldQueue
     }
 
     /**
-     * Genera the YOLO genus model finds inside the detected mangrove, offered in the review editor.
-     * Optional: no weights means no suggestion, and a failure never fails the extent detection.
+     * Mangrove extent mask of the resampled raster ($maskPath), plus what the canopy model (YOLO) gives:
+     * the genus suggestion offered in the review editor and every canopy it pinpointed.
+     *
+     * By default the U-Net draws the extent and the canopy model runs inside that mask (genus shares and
+     * canopies counted there only). With ml.drone.extent_model = yolo one canopy-model run gives all three.
+     * The canopy model is optional: no weights means no suggestion and no canopies, and its failure never
+     * fails the extent detection.
      *
      * Also keeps the per-pixel genus map (genus_labels.png + .json) so the suggestion can be recounted
      * for the owner's corrected areas without running the model again (DroneImageryController::updateSegmentation).
      *
-     * $position is where the raster sits: EPSG:3857 corners [ulx, uly, lrx, lry], centre latitude and
-     * the position offset already contained in it.
+     * $position is where the raster sits: EPSG:3857 corners [ulx, uly, lrx, lry], centre latitude, the
+     * position offset already contained in it and the ground size of one pixel.
      *
      * @param  array{bounds: array<int, float>, latitude: float, offset: array{east_m: float, north_m: float}, pixel_m: float}  $position
-     * @return array<string, mixed>|array{error: string}|null
+     * @return array{prediction: array<string, mixed>, genus_suggestion: array<string, mixed>|null, canopies: array<string, mixed>|null}
      */
-    private function genusSuggestion(
+    private function detect(
         MangroveSegmentationService $segmentation,
         DroneImageryLayer $layer,
         string $inputPath,
         string $maskPath,
         array $position,
-    ): ?array {
-        $disk = Storage::disk('local');
-        // A map from an earlier run no longer matches this result.
-        $disk->delete([$layer->genusLabelsPath(), $layer->genusLabelsMetaPath()]);
+    ): array {
+        // Results of an earlier run no longer match this one.
+        Storage::disk('local')->delete([$layer->genusLabelsPath(), $layer->genusLabelsMetaPath(), $layer->canopiesPath()]);
 
         $weights = $segmentation->genusWeightsPath();
-        if ($weights === null) {
-            return null;
+        $options = $weights === null ? [] : $this->canopyModelOptions($maskPath, $position);
+
+        $prediction = $segmentation->predictExtent($inputPath, $maskPath, $options);
+        if (($prediction['extent_model'] ?? null) === 'yolo') {
+            return [
+                'prediction' => $prediction,
+                'genus_suggestion' => $this->storeGenusRun($layer, $prediction, $options, $position),
+                'canopies' => $this->storeCanopies($layer, $options),
+            ];
         }
 
-        $labelsWorkPath = dirname($maskPath).DIRECTORY_SEPARATOR.'genus_labels.png';
-        // Smallest patch of one genus that counts, in pixels of this raster (edge slivers are ignored).
-        $pixelM = max(0.001, (float) ($position['pixel_m'] ?? 0.15));
-        $minPatchPixels = (int) ceil(max(0.0, (float) config('ml.genus.min_patch_m2', 2.0)) / ($pixelM ** 2));
+        if ($weights === null) {
+            return ['prediction' => $prediction, 'genus_suggestion' => null, 'canopies' => null];
+        }
+
         try {
-            $result = $segmentation->predictGenera($inputPath, $maskPath, $weights, $labelsWorkPath, $minPatchPixels);
+            $result = $segmentation->predictGenera(
+                $inputPath, $maskPath, $weights, $options['labels_out'], $options['min_patch_px'], $options
+            );
         } catch (Throwable $exception) {
             Log::warning('Drone imagery genus suggestion failed.', [
                 'layer_id' => $layer->id,
                 'exception' => $exception,
             ]);
 
-            return ['error' => mb_substr($exception->getMessage(), 0, 500)];
+            return [
+                'prediction' => $prediction,
+                'genus_suggestion' => ['error' => mb_substr($exception->getMessage(), 0, 500)],
+                'canopies' => null,
+            ];
         }
 
+        return [
+            'prediction' => $prediction,
+            'genus_suggestion' => $this->storeGenusRun($layer, $result, $options, $position),
+            'canopies' => $this->storeCanopies($layer, $options),
+        ];
+    }
+
+    /**
+     * Where the canopy model writes its outputs (next to the mask) and its size thresholds for this raster.
+     *
+     * @return array<string, mixed>
+     */
+    private function canopyModelOptions(string $maskPath, array $position): array
+    {
+        $workDirectory = dirname($maskPath);
+        $pixelM = max(0.001, (float) ($position['pixel_m'] ?? 0.15));
+        $pixelsFor = fn (float $groundM2) => (int) ceil(max(0.0, $groundM2) / ($pixelM ** 2));
+
+        return [
+            'labels_out' => $workDirectory.DIRECTORY_SEPARATOR.'genus_labels.png',
+            'canopies_out' => $workDirectory.DIRECTORY_SEPARATOR.'canopies.json',
+            'bounds' => array_map('floatval', $position['bounds']),
+            'pixel_m' => $pixelM,
+            // Smallest patch of one genus that counts, in pixels of this raster (edge slivers are ignored).
+            'min_patch_px' => $pixelsFor((float) config('ml.genus.min_patch_m2', 2.0)),
+            // Smallest canopy worth pinpointing.
+            'canopy_min_px' => $pixelsFor((float) config('ml.genus.canopy_min_area_m2', 1.0)),
+            'close_iterations' => (int) config('ml.drone.close_iterations', 2),
+        ];
+    }
+
+    /**
+     * The genus suggestion from a canopy-model result, keeping its genus map for later recounts.
+     *
+     * @return array<string, mixed>
+     */
+    private function storeGenusRun(DroneImageryLayer $layer, array $result, array $options, array $position): array
+    {
+        $disk = Storage::disk('local');
         $suggestion = MangroveSegmentationService::genusSuggestionFromResult($result);
 
-        if (is_file($labelsWorkPath)) {
+        $labelsWorkPath = (string) ($options['labels_out'] ?? '');
+        if ($labelsWorkPath !== '' && is_file($labelsWorkPath)) {
             $disk->put($layer->genusLabelsPath(), (string) file_get_contents($labelsWorkPath));
             $disk->put($layer->genusLabelsMetaPath(), json_encode([
                 'classes' => array_values((array) ($result['classes'] ?? [])),
@@ -240,12 +306,39 @@ class SegmentDroneImagery implements ShouldQueue
                 ],
                 'conf' => (float) config('ml.genus.confidence', 0.1),
                 'prob_conf' => (float) config('ml.genus.probability_confidence', 0.01),
-                'min_patch_px' => $minPatchPixels,
+                'min_patch_px' => (int) ($options['min_patch_px'] ?? 0),
             ], JSON_UNESCAPED_SLASHES));
             $suggestion['recountable'] = true;
         }
 
         return $suggestion;
+    }
+
+    /**
+     * Keeps the pinpointed canopies (canopies.json) with the layer and returns their summary.
+     *
+     * @return array{count: int, kept: int, by_genus: array<string, int>}|null
+     */
+    private function storeCanopies(DroneImageryLayer $layer, array $options): ?array
+    {
+        $workPath = (string) ($options['canopies_out'] ?? '');
+        if ($workPath === '' || ! is_file($workPath)) {
+            return null;
+        }
+
+        $contents = (string) file_get_contents($workPath);
+        $decoded = json_decode($contents, true);
+        if (! is_array($decoded) || ! is_array($decoded['canopies'] ?? null)) {
+            return null;
+        }
+
+        Storage::disk('local')->put($layer->canopiesPath(), $contents);
+
+        return [
+            'count' => (int) ($decoded['count'] ?? count($decoded['canopies'])),
+            'kept' => (int) ($decoded['kept'] ?? count($decoded['canopies'])),
+            'by_genus' => array_map('intval', (array) ($decoded['by_genus'] ?? [])),
+        ];
     }
 
     private function readRasterInfo(GdalCommandRunner $gdal, string $path, string $workDirectory): array

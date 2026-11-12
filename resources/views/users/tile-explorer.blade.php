@@ -67,6 +67,34 @@
             box-shadow: 0 0 0 3px rgba(30, 158, 98, .15);
         }
 
+        /* Dropdowns: one chevron in every browser and theme (the native arrow differs per browser and
+           sat tight against the edge). Its colour is a custom property, so dark mode sets it below. */
+        .tx-page,
+        .tx-dialog {
+            --tx-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%234c6b5d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m3.5 6 4.5 4.5L12.5 6'/%3E%3C/svg%3E");
+        }
+
+        html[data-theme="dark"] .tx-page,
+        html[data-theme="dark"] .tx-dialog {
+            --tx-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23a9c2b4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m3.5 6 4.5 4.5L12.5 6'/%3E%3C/svg%3E");
+        }
+
+        select.tx-select {
+            -webkit-appearance: none;
+            appearance: none;
+            padding-right: 34px;
+            background-image: var(--tx-chevron);
+            background-repeat: no-repeat;
+            background-position: right 11px center;
+            background-size: 14px 14px;
+            cursor: pointer;
+            text-overflow: ellipsis;
+        }
+
+        select.tx-select::-ms-expand {
+            display: none;
+        }
+
 
 
 
@@ -149,6 +177,13 @@
         .tx-browser[hidden],
         .tx-empty[hidden] {
             display: none;
+        }
+
+        /* [hidden] must beat each component's own display (e.g. .tx-btn is inline-flex): otherwise a hidden
+           button, like the notice's empty action button, still shows. */
+        .tx-page [hidden],
+        .tx-dialog [hidden] {
+            display: none !important;
         }
 
         .tx-status.is-error {
@@ -860,6 +895,10 @@
             border: 1.5px solid #e8c56a;
         }
 
+        .tx-name-id {
+            display: none;
+        }
+
         .tx-name {
             margin-top: 7px;
             font-size: 12.5px;
@@ -907,6 +946,8 @@
         .tx-dialog {
             width: min(1100px, calc(100vw - 32px));
             max-height: calc(100vh - 32px);
+            max-height: calc(100dvh - 32px);
+            margin: auto; /* centred: the CSS reset sets margin: 0 on every element */
             padding: 0;
             border: 0;
             border-radius: 16px;
@@ -1083,6 +1124,11 @@
             }
         }
 
+        .tx-short,
+        .tx-selbar-break {
+            display: none;
+        }
+
         @media (max-width: 600px) {
 
             .tx-card,
@@ -1090,6 +1136,129 @@
             .tx-selbar {
                 padding-left: 14px;
                 padding-right: 14px;
+            }
+
+            /* Filters: the three chips share the full width on one line. */
+            .tx-chips {
+                display: flex;
+                width: 100%;
+            }
+
+            .tx-chip {
+                flex: 1 1 0;
+                min-width: 0;
+                justify-content: center;
+                gap: 5px;
+                padding: 7px 6px;
+                font-size: 12.5px;
+                white-space: nowrap;
+            }
+
+            .tx-chip .bi {
+                display: none;
+            }
+
+            .tx-toolbar-end {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            /* Selection bar (sticky): two short rows instead of five, so it covers less of the tiles.
+               Row 1: Select all · Mangrove · Clear. Row 2: format + Download. The count shows only once
+               something is selected (the "Shift-click" hint is for mice). */
+            .tx-selbar {
+                gap: 8px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+            }
+
+            .tx-selbar-end {
+                display: contents;
+            }
+
+            .tx-checkall {
+                flex: 1 1 auto;
+                min-width: 0;
+                font-size: 13px;
+            }
+
+            .tx-selbar:not(.has-selection) .tx-selcount {
+                display: none;
+            }
+
+            .tx-selcount {
+                order: 4;
+                width: 100%;
+                font-size: 12.5px;
+            }
+
+            /* Starts row 2 (format + Download) when the count, itself a full row, is not shown. */
+            .tx-selbar-break {
+                display: block;
+                order: 5;
+                flex-basis: 100%;
+                height: 0;
+                margin-top: -8px;
+            }
+
+            .tx-selbar.has-selection .tx-selbar-break {
+                display: none;
+            }
+
+            #txSelectMangrove,
+            #txClear {
+                order: 2;
+                padding: 7px 8px;
+            }
+
+            .tx-long {
+                display: none;
+            }
+
+            .tx-short {
+                display: inline;
+            }
+
+            .tx-format {
+                order: 6;
+                flex: 0 1 auto;
+                max-width: 48%;
+            }
+
+            #txDownload {
+                order: 7;
+                flex: 1 1 0;
+                min-width: 0;
+                justify-content: center;
+                white-space: nowrap;
+            }
+
+            /* Tiles: the preview button is always visible (there is no hover on a phone); names show the tile id. */
+            .tx-zoom {
+                opacity: 1;
+            }
+
+            .tx-name-full {
+                display: none;
+            }
+
+            .tx-name-id {
+                display: inline;
+            }
+
+            /* Preview: nearly full screen, and no keyboard shortcuts. */
+            .tx-dialog {
+                width: calc(100vw - 16px);
+                max-height: calc(100dvh - 16px);
+                border-radius: 14px;
+            }
+
+            .tx-dialog-body {
+                max-height: calc(100dvh - 16px);
+            }
+
+            .tx-hint {
+                display: none;
             }
 
             .tx-grid {
@@ -1221,8 +1390,9 @@
                 </label>
                 <span class="tx-selcount" id="txSelCount"></span>
                 <div class="tx-selbar-end">
-                    <button type="button" class="tx-btn ghost" id="txSelectMangrove"><i class="bi bi-tree"></i> Select mangrove tiles</button>
+                    <button type="button" class="tx-btn ghost" id="txSelectMangrove"><i class="bi bi-tree"></i> <span class="tx-long">Select mangrove tiles</span><span class="tx-short">Mangrove</span></button>
                     <button type="button" class="tx-btn ghost" id="txClear"><i class="bi bi-x-lg"></i> Clear</button>
+                    <span class="tx-selbar-break" aria-hidden="true"></span>
                     <select id="txFormat" class="tx-select tx-format" aria-label="Download format">
                         <option value="both">GeoTIFF + JPEG</option>
                         <option value="tif">GeoTIFF only</option>

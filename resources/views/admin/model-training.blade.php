@@ -115,7 +115,7 @@
                     @endforeach
                 </datalist>
                 <p class="upload-help" id="segmentationUploadHelp">Requires U-Net with a ResNet34 encoder, 3 input channels, and 2 output classes.</p>
-                <p class="upload-help" id="classificationUploadNotice" hidden>Requires an Ultralytics YOLO segmentation model (.pt) whose classes are mangrove genera. It suggests the genus for drone imagery; owners still confirm it.</p>
+                <p class="upload-help" id="classificationUploadNotice" hidden>Requires an Ultralytics YOLO segmentation model (.pt) whose classes are mangrove genera (e.g. best.pt from Roboflow/Colab training). On drone imagery it works inside the U-Net's mangrove extent: it suggests the genus and pinpoints each canopy on the map; owners still confirm the genus.</p>
                 <div class="dialog-actions">
                     <button class="btn-secondary" type="button" data-close-upload>Cancel</button>
                     <button class="btn-primary" id="uploadModelSubmit" type="submit"><i class="bi bi-upload"></i> Upload &amp; Activate</button>
