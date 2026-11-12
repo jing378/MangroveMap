@@ -305,12 +305,36 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      background: #0b2416;
+      padding: 80px 24px 110px 24px;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* Hero photo: slow Ken Burns zoom, nudged by the mouse (--px/--py set in JS). */
+    .hero-bg {
+      position: absolute;
+      inset: -40px;
       background-image: url("{{ asset('images/mangrove-login.jpg') }}");
       background-size: cover;
       background-position: center center;
-      background-repeat: no-repeat;
-      padding: 80px 24px 70px 24px;
-      overflow: hidden;
+      transform: translate3d(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -14px), 0);
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 0;
+    }
+
+    .hero-bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: inherit;
+      background-size: cover;
+      animation: kenBurns 28s ease-in-out infinite alternate;
+    }
+
+    @keyframes kenBurns {
+      from { transform: scale(1.02); }
+      to { transform: scale(1.14) translate(-1.5%, -1%); }
     }
 
     .hero-overlay {
@@ -351,7 +375,6 @@
       font-weight: 600;
       letter-spacing: 0.02em;
       margin-bottom: 22px;
-      animation: fadeInDown 0.8s ease;
     }
 
     .hero-eyebrow .pulse-dot {
@@ -1648,6 +1671,665 @@
         align-items: flex-start;
       }
     }
+
+    /* ===================== Motion & interactivity ===================== */
+
+    /* Reading progress bar along the top of the nav. */
+    .scroll-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      width: 100%;
+      transform-origin: 0 50%;
+      transform: scaleX(var(--progress, 0));
+      background: linear-gradient(90deg, #144a2b, #1e9e62, #4ade80);
+      z-index: 10001;
+      pointer-events: none;
+    }
+
+    /* Nav tightens and gains a shadow once the page scrolls. */
+    .site-nav.scrolled {
+      height: 58px;
+      box-shadow: 0 6px 24px rgba(14, 56, 32, 0.1);
+    }
+
+    .nav-links a {
+      position: relative;
+    }
+
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -8px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--primary-green);
+      transform: scaleX(0);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .nav-links a:hover::after,
+    .nav-links a.active::after {
+      transform: scaleX(1);
+    }
+
+    .nav-links a.active {
+      color: var(--primary-green);
+    }
+
+    /* Hero layers: particles canvas, cursor glow, wave. */
+    .hero-overlay {
+      background:
+        radial-gradient(ellipse at 50% 120%, rgba(30, 158, 98, 0.35), transparent 60%),
+        linear-gradient(180deg, rgba(10, 32, 20, 0.72) 0%, rgba(12, 38, 24, 0.82) 50%, rgba(9, 28, 17, 0.94) 100%);
+    }
+
+    .hero-particles {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .hero-glow {
+      position: absolute;
+      width: 520px;
+      height: 520px;
+      left: 0;
+      top: 0;
+      margin: -260px 0 0 -260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(74, 222, 128, 0.16) 0%, transparent 65%);
+      transform: translate3d(var(--gx, 50vw), var(--gy, 40vh), 0);
+      transition: transform 0.25s ease-out, opacity 0.4s ease;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .hero-section:hover .hero-glow {
+      opacity: 1;
+    }
+
+    .hero-waves {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 90px;
+      z-index: 2;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .hero-waves svg {
+      position: absolute;
+      bottom: 0;
+      width: 200%;
+      height: 100%;
+    }
+
+    .hero-waves .wave-back {
+      fill: rgba(30, 158, 98, 0.22);
+      animation: waveDrift 16s linear infinite;
+    }
+
+    .hero-waves .wave-front {
+      fill: var(--bg-f7faf7, #f7faf7);
+      animation: waveDrift 10s linear infinite reverse;
+    }
+
+    @keyframes waveDrift {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    /* Staggered entrance for the hero copy. */
+    .hero-enter {
+      opacity: 0;
+      transform: translateY(26px);
+      filter: blur(6px);
+      animation: heroEnter 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: calc(var(--d, 0) * 120ms + 150ms);
+    }
+
+    @keyframes heroEnter {
+      to { opacity: 1; transform: none; filter: blur(0); }
+    }
+
+    /* Rotating word in the headline. */
+    .hero-rotator {
+      display: inline-grid;
+      vertical-align: bottom;
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: center;
+      overflow: hidden;
+      padding-bottom: 0.14em;
+      margin-bottom: -0.14em;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .hero-rotator > span {
+      grid-area: 1 / 1;
+      justify-self: center;
+      opacity: 0;
+      transform: translateY(105%);
+      transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+    }
+
+    .hero-rotator > span.on {
+      opacity: 1;
+      transform: none;
+    }
+
+    .hero-rotator > span.out {
+      opacity: 0;
+      transform: translateY(-105%);
+    }
+
+    .hero-title-highlight {
+      background-size: 200% auto;
+      animation: shimmerText 6s linear infinite;
+    }
+
+    @keyframes shimmerText {
+      to { background-position: 200% center; }
+    }
+
+    .btn-hero-primary {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-hero-primary::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -60%;
+      width: 40%;
+      height: 100%;
+      background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      transform: skewX(-20deg);
+      animation: btnShine 4.5s ease-in-out infinite 2s;
+    }
+
+    @keyframes btnShine {
+      0%, 70% { left: -60%; }
+      100% { left: 130%; }
+    }
+
+    .hero-stat-card {
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .hero-stat-card:hover {
+      transform: translateY(-4px);
+    }
+
+    .hero-stat-card:hover .stat-val {
+      color: #bbf7d0;
+    }
+
+    .stat-val {
+      font-variant-numeric: tabular-nums;
+      transition: color 0.2s ease;
+    }
+
+    /* Scroll cue under the hero. */
+    .scroll-cue {
+      position: relative;
+      margin-top: 36px;
+      width: 26px;
+      height: 42px;
+      --cue-ink: rgba(255, 255, 255, 0.55);
+      border: 2px solid var(--cue-ink);
+      border-radius: 14px;
+      display: block;
+      opacity: 0;
+      animation: heroEnter 0.8s ease forwards 1.4s;
+    }
+
+    .scroll-cue::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 7px;
+      width: 4px;
+      height: 8px;
+      margin-left: -2px;
+      border-radius: 2px;
+      --cue-dot: #ffffff;
+      background: var(--cue-dot);
+      animation: scrollDot 1.8s ease-in-out infinite;
+    }
+
+    @keyframes scrollDot {
+      0% { transform: translateY(0); opacity: 1; }
+      70% { transform: translateY(14px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 0; }
+    }
+
+    /* Reveal on scroll (only once JS has marked the page, so nothing hides without it). */
+    .js-motion .reveal {
+      opacity: 0;
+      transform: translateY(34px) scale(0.98);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      transition-delay: calc(var(--i, 0) * 110ms);
+    }
+
+    .js-motion .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* Feature cards: 3D tilt (--rx/--ry) and a spotlight that follows the cursor (--mx/--my). */
+    .features-grid {
+      perspective: 1200px;
+    }
+
+    .feature-card.tilting {
+      transition: transform 0.08s linear, box-shadow 0.28s ease, border-color 0.28s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    }
+
+    .feature-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), rgba(30, 158, 98, 0.1), transparent 45%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .feature-card:hover::after {
+      opacity: 1;
+    }
+
+    .feature-card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .feature-points li {
+      transition: transform 0.25s ease;
+    }
+
+    .feature-card:hover .feature-points li {
+      transform: translateX(4px);
+    }
+
+    .feature-card:hover .feature-points li:nth-child(2) { transition-delay: 40ms; }
+    .feature-card:hover .feature-points li:nth-child(3) { transition-delay: 80ms; }
+
+    /* How it works: interactive step-through. */
+    .how-section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 10px 24px 90px 24px;
+    }
+
+    .how-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+      gap: 36px;
+      align-items: stretch;
+    }
+
+    .how-steps {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .how-step {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 14px;
+      align-items: center;
+      text-align: left;
+      font-family: inherit;
+      padding: 16px 18px;
+      background: var(--bg-ffffff, #ffffff);
+      border: 1px solid var(--earth-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    }
+
+    .how-step:hover {
+      transform: translateX(4px);
+      border-color: rgba(30, 158, 98, 0.35);
+    }
+
+    .how-step:focus-visible {
+      outline: 3px solid rgba(30, 158, 98, 0.35);
+      outline-offset: 2px;
+    }
+
+    .how-step.active {
+      border-color: var(--primary-green);
+      box-shadow: var(--shadow-md);
+    }
+
+    .how-step-num {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: var(--primary-green);
+      background: var(--primary-mint);
+      transition: background 0.3s ease, color 0.3s ease, transform 0.3s ease;
+    }
+
+    .how-step.active .how-step-num {
+      background: linear-gradient(135deg, #1e9e62, #144a2b);
+      color: #ffffff;
+      transform: rotate(-6deg) scale(1.05);
+    }
+
+    .how-step-title {
+      font-size: 15.5px;
+      font-weight: 700;
+      color: var(--primary-forest);
+    }
+
+    .how-step-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Auto-advance timer bar inside the active step. */
+    .how-step-bar {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      height: 3px;
+      width: 100%;
+      background: var(--primary-green);
+      transform-origin: 0 50%;
+      transform: scaleX(0);
+    }
+
+    .how-step.active .how-step-bar {
+      animation: stepTimer var(--how-ms, 6000ms) linear forwards;
+    }
+
+    .how-steps.paused .how-step-bar {
+      animation-play-state: paused;
+    }
+
+    @keyframes stepTimer {
+      to { transform: scaleX(1); }
+    }
+
+    .how-stage {
+      position: relative;
+      min-height: 380px;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      background: linear-gradient(160deg, #0e3820 0%, #144a2b 55%, #1b6b41 100%);
+      box-shadow: var(--shadow-lg);
+      color: #ffffff;
+    }
+
+    .how-stage::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 32px 32px;
+      animation: gridPan 20s linear infinite;
+    }
+
+    @keyframes gridPan {
+      to { background-position: 32px 32px; }
+    }
+
+    .how-panel {
+      position: absolute;
+      inset: 0;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(16px);
+      transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.5s;
+    }
+
+    .how-panel.active {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+      transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
+    }
+
+    .how-art {
+      position: absolute;
+      top: 24px;
+      left: 30px;
+      right: 30px;
+      height: 200px;
+    }
+
+    .how-art svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .how-panel h3 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .how-panel p {
+      font-size: 14.5px;
+      line-height: 1.65;
+      color: #d1e7d9;
+      max-width: 520px;
+    }
+
+    /* Step artwork animations (they replay whenever a panel becomes active). */
+    .how-panel.active .draw-path {
+      stroke-dasharray: 900;
+      stroke-dashoffset: 900;
+      animation: drawLine 2.2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+    }
+
+    .how-panel.active .fill-in {
+      opacity: 0;
+      animation: fadeFill 0.8s ease forwards 1.9s;
+    }
+
+    @keyframes drawLine {
+      to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes fadeFill {
+      to { opacity: 1; }
+    }
+
+    .how-panel.active .pop {
+      transform-box: fill-box;
+      transform-origin: center;
+      transform: scale(0);
+      animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      animation-delay: calc(var(--d, 0) * 1ms);
+    }
+
+    @keyframes popIn {
+      to { transform: scale(1); }
+    }
+
+    .how-panel.active .scan-line {
+      animation: scan 2.4s ease-in-out infinite;
+    }
+
+    @keyframes scan {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(180px); }
+    }
+
+    .how-panel.active .drone {
+      animation: droneFly 4s ease-in-out infinite;
+    }
+
+    @keyframes droneFly {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(260px, 10px); }
+    }
+
+    .how-panel.active .grow-bar {
+      transform-box: fill-box;
+      transform-origin: bottom;
+      transform: scaleY(0);
+      animation: growBar 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: calc(var(--d, 0) * 1ms);
+    }
+
+    @keyframes growBar {
+      to { transform: scaleY(1); }
+    }
+
+    /* Impact cards: big animated figures and a slow aurora behind them. */
+    .impact-section {
+      overflow: hidden;
+    }
+
+    .impact-section::before {
+      content: '';
+      position: absolute;
+      width: 900px;
+      height: 900px;
+      top: -450px;
+      left: -200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(74, 222, 128, 0.14), transparent 60%);
+      animation: aurora 18s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes aurora {
+      to { transform: translate(60vw, 300px); }
+    }
+
+    .impact-grid {
+      position: relative;
+    }
+
+    .impact-figure {
+      font-size: 40px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      margin-bottom: 6px;
+      --figure-from: #bbf7d0;
+      background: linear-gradient(120deg, var(--figure-from), #4ade80);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .impact-icon {
+      display: inline-flex;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .impact-card:hover .impact-icon {
+      transform: translateY(-4px) rotate(-8deg) scale(1.12);
+    }
+
+    /* Map frame lifts a little as it enters. */
+    .map-browser-frame {
+      transition: box-shadow 0.4s ease;
+    }
+
+    .map-browser-frame:hover {
+      box-shadow: 0 26px 60px rgba(14, 56, 32, 0.18);
+    }
+
+    @media (max-width: 900px) {
+      .how-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .how-stage {
+        min-height: 360px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .hero-section {
+        padding-bottom: 100px;
+      }
+
+      .scroll-cue {
+        display: none;
+      }
+
+      .hero-waves {
+        height: 60px;
+      }
+
+      .how-section {
+        padding: 0 18px 60px 18px;
+      }
+
+      .how-panel {
+        padding: 22px;
+      }
+
+      .how-art {
+        left: 22px;
+        right: 22px;
+        height: 170px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0s !important;
+      }
+
+      .hero-enter, .scroll-cue {
+        opacity: 1;
+        transform: none;
+        filter: none;
+      }
+
+      .hero-particles, .hero-glow {
+        display: none;
+      }
+    }
   </style>
   @include('partials.scrollbar-styles')
 </head>
@@ -1702,6 +2384,7 @@
   <div class="mobile-menu-drawer" id="mobileMenuDrawer">
     <a href="#overview" onclick="closeMobileMenu()"><i class="bi bi-info-circle"></i> Overview</a>
     <a href="#features" onclick="closeMobileMenu()"><i class="bi bi-grid-1x2"></i> System Capabilities</a>
+    <a href="#how-it-works" onclick="closeMobileMenu()"><i class="bi bi-diagram-3"></i> How It Works</a>
     <a href="#map-section" onclick="scrollToMap(event); closeMobileMenu()"><i class="bi bi-compass"></i> GIS Explorer</a>
     <a href="#impact" onclick="closeMobileMenu()"><i class="bi bi-shield-check"></i> Conservation Impact</a>
     @auth
@@ -1714,61 +2397,76 @@
 
   <!-- Polished, Visually Dominant Hero Section -->
   <section class="hero-section" id="overview">
+    <div class="hero-bg" aria-hidden="true"></div>
     <div class="hero-overlay"></div>
+    <canvas class="hero-particles" id="heroParticles" aria-hidden="true"></canvas>
+    <div class="hero-glow" aria-hidden="true"></div>
     <div class="hero-content">
-      <div class="hero-eyebrow">
+      <div class="hero-eyebrow hero-enter" style="--d:0">
         <span class="pulse-dot"></span>
         <span>Geospatial Environmental Intelligence &amp; Coastal Conservation</span>
       </div>
 
-      <h1 class="hero-title">
-        Mangrove Mapping &amp; <br />
+      <h1 class="hero-title hero-enter" style="--d:1">
+        Mangrove <span style="white-space: nowrap"><span class="hero-rotator" id="heroRotator" aria-live="off"><span class="on">Mapping</span><span>Monitoring</span><span>Restoration</span></span> &amp;</span><br />
         <span class="hero-title-highlight">Classification System</span>
       </h1>
 
-      <p class="hero-description">
+      <p class="hero-description hero-enter" style="--d:2">
         A Web GIS platform for mapping the mangrove forests of Southern Leyte. Residents draw mangrove boundaries on the map, experts review them, and drone imagery is classified by an AI model to help outline mangrove cover for conservation and restoration planning.
       </p>
 
-      <div class="hero-actions">
+      <div class="hero-actions hero-enter" style="--d:3">
         <a href="#map-section" onclick="scrollToMap(event)" class="btn-hero-primary" id="exploreMapHeroBtn">
           <i class="bi bi-compass-fill"></i> Explore Map
         </a>
-        <a href="#features" class="btn-hero-secondary">
-          <i class="bi bi-layers-fill"></i> System Capabilities
+        <a href="#how-it-works" class="btn-hero-secondary">
+          <i class="bi bi-play-circle-fill"></i> See How It Works
         </a>
       </div>
 
       <!-- Live GIS KPI / Statistics Strip -->
-      <div class="hero-stats-strip">
-        {{-- All figures are from expert-approved delineations. --}}
+      <div class="hero-stats-strip hero-enter" style="--d:4">
+        {{-- All figures are from expert-approved delineations. data-count drives the count-up animation. --}}
         <div class="hero-stat-card">
-          <div class="stat-val">{{ number_format($mappedAreaHa ?? 0, 2) }}<span>ha</span></div>
+          <div class="stat-val"><b data-count="{{ round($mappedAreaHa ?? 0, 2) }}" data-decimals="2">{{ number_format($mappedAreaHa ?? 0, 2) }}</b><span>ha</span></div>
           <div class="stat-label">Mapped Mangrove Area</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val">{{ number_format($barangayCount ?? 0) }}<span>barangays</span></div>
+          <div class="stat-val"><b data-count="{{ $barangayCount ?? 0 }}">{{ number_format($barangayCount ?? 0) }}</b><span>barangays</span></div>
           <div class="stat-label">Areas Mapped</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val">{{ number_format($generaCount ?? 0) }}<span>genera</span></div>
+          <div class="stat-val"><b data-count="{{ $generaCount ?? 0 }}">{{ number_format($generaCount ?? 0) }}</b><span>genera</span></div>
           <div class="stat-label">Mangrove Genera Recorded</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val">{{ number_format(count($delineations ?? [])) }}<span>records</span></div>
+          <div class="stat-val"><b data-count="{{ count($delineations ?? []) }}">{{ number_format(count($delineations ?? [])) }}</b><span>records</span></div>
           <div class="stat-label">Approved Delineations</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val">{{ number_format($contributorCount ?? 0) }}<span>people</span></div>
+          <div class="stat-val"><b data-count="{{ $contributorCount ?? 0 }}">{{ number_format($contributorCount ?? 0) }}</b><span>people</span></div>
           <div class="stat-label">Contributors</div>
         </div>
       </div>
+
+      <a href="#features" class="scroll-cue" aria-label="Scroll to capabilities"></a>
+    </div>
+
+    {{-- Two looping waves; each path repeats once so translateX(-50%) loops seamlessly. --}}
+    <div class="hero-waves" aria-hidden="true">
+      <svg class="wave-back" viewBox="0 0 2880 90" preserveAspectRatio="none">
+        <path d="M0 45 C240 10 480 80 720 45 C960 10 1200 80 1440 45 C1680 10 1920 80 2160 45 C2400 10 2640 80 2880 45 V90 H0 Z" />
+      </svg>
+      <svg class="wave-front" viewBox="0 0 2880 90" preserveAspectRatio="none">
+        <path d="M0 60 C360 30 720 85 1080 60 C1260 48 1350 50 1440 60 C1800 30 2160 85 2520 60 C2700 48 2790 50 2880 60 V90 H0 Z" />
+      </svg>
     </div>
   </section>
 
   <!-- Polished Feature Section -->
   <section class="section-wrap" id="features">
-    <div class="section-header">
+    <div class="section-header reveal">
       <div class="section-kicker">
         <i class="bi bi-stars"></i> Core Architecture
       </div>
@@ -1780,7 +2478,7 @@
 
     <div class="features-grid">
       <!-- Feature 1: Mangrove Mapping -->
-      <div class="feature-card">
+      <div class="feature-card reveal" style="--i:0">
         <div class="feature-icon-box">
           <i class="bi bi-map-fill"></i>
         </div>
@@ -1796,7 +2494,7 @@
       </div>
 
       <!-- Feature 2: GIS Visualization -->
-      <div class="feature-card">
+      <div class="feature-card reveal" style="--i:1">
         <div class="feature-icon-box">
           <i class="bi bi-layers-half"></i>
         </div>
@@ -1812,7 +2510,7 @@
       </div>
 
       <!-- Feature: Drone Imagery & AI Segmentation -->
-      <div class="feature-card">
+      <div class="feature-card reveal" style="--i:0">
         <div class="feature-icon-box">
           <i class="bi bi-airplane-fill"></i>
         </div>
@@ -1828,7 +2526,7 @@
       </div>
 
       <!-- Feature 3: Mangrove Monitoring -->
-      <div class="feature-card">
+      <div class="feature-card reveal" style="--i:1">
         <div class="feature-icon-box">
           <i class="bi bi-activity"></i>
         </div>
@@ -1845,10 +2543,139 @@
     </div>
   </section>
 
+  <!-- How It Works: interactive step-through (auto-advances; click or use arrow keys) -->
+  <section class="how-section" id="how-it-works">
+    <div class="section-header reveal">
+      <div class="section-kicker">
+        <i class="bi bi-diagram-3"></i> How It Works
+      </div>
+      <h2 class="section-title">From Shoreline to Map in Four Steps</h2>
+      <p class="section-subtitle">
+        Select a step to see how a mangrove area goes from a first sketch to a monitored, expert-approved record.
+      </p>
+    </div>
+
+    <div class="how-layout reveal">
+      <ul class="how-steps" id="howSteps" role="tablist" aria-label="How MangroveMap works">
+        <li><button type="button" class="how-step active" role="tab" aria-selected="true" aria-controls="howPanel0" data-step="0">
+          <span class="how-step-num"><i class="bi bi-pencil-fill"></i></span>
+          <span><span class="how-step-title">1. Draw the area</span><br><span class="how-step-sub">Residents outline mangroves on the map</span></span>
+          <span class="how-step-bar"></span>
+        </button></li>
+        <li><button type="button" class="how-step" role="tab" aria-selected="false" aria-controls="howPanel1" data-step="1" tabindex="-1">
+          <span class="how-step-num"><i class="bi bi-airplane-fill"></i></span>
+          <span><span class="how-step-title">2. Detect with drone AI</span><br><span class="how-step-sub">Orthomosaics segmented by U-Net &amp; YOLO</span></span>
+          <span class="how-step-bar"></span>
+        </button></li>
+        <li><button type="button" class="how-step" role="tab" aria-selected="false" aria-controls="howPanel2" data-step="2" tabindex="-1">
+          <span class="how-step-num"><i class="bi bi-patch-check-fill"></i></span>
+          <span><span class="how-step-title">3. Expert review</span><br><span class="how-step-sub">Approve, correct, or send back with feedback</span></span>
+          <span class="how-step-bar"></span>
+        </button></li>
+        <li><button type="button" class="how-step" role="tab" aria-selected="false" aria-controls="howPanel3" data-step="3" tabindex="-1">
+          <span class="how-step-num"><i class="bi bi-graph-up-arrow"></i></span>
+          <span><span class="how-step-title">4. Monitor &amp; restore</span><br><span class="how-step-sub">Yearly observations and planting plans</span></span>
+          <span class="how-step-bar"></span>
+        </button></li>
+      </ul>
+
+      <div class="how-stage" id="howStage">
+        {{-- Step 1: a polygon being drawn vertex by vertex. --}}
+        <div class="how-panel active" id="howPanel0" role="tabpanel">
+          <div class="how-art" aria-hidden="true">
+            <svg viewBox="0 0 400 200">
+              <path d="M10 170 C80 150 120 175 190 160 C260 145 320 170 390 150" fill="none" stroke="rgba(125,211,252,.45)" stroke-width="3" />
+              <path class="fill-in" d="M70 120 L130 50 L220 40 L300 80 L280 140 L160 150 Z" fill="rgba(74,222,128,.28)" />
+              <path class="draw-path" d="M70 120 L130 50 L220 40 L300 80 L280 140 L160 150 Z" fill="none" stroke="#4ade80" stroke-width="3" stroke-linejoin="round" />
+              <circle class="pop" style="--d:0" cx="70" cy="120" r="6" fill="#fff" />
+              <circle class="pop" style="--d:350" cx="130" cy="50" r="6" fill="#fff" />
+              <circle class="pop" style="--d:700" cx="220" cy="40" r="6" fill="#fff" />
+              <circle class="pop" style="--d:1050" cx="300" cy="80" r="6" fill="#fff" />
+              <circle class="pop" style="--d:1400" cx="280" cy="140" r="6" fill="#fff" />
+              <circle class="pop" style="--d:1700" cx="160" cy="150" r="6" fill="#fff" />
+              <g class="fill-in"><rect x="150" y="82" width="86" height="26" rx="13" fill="rgba(0,0,0,.35)" /><text x="193" y="100" fill="#fff" font-size="13" font-weight="700" text-anchor="middle" font-family="Inter, sans-serif">2.84 ha</text></g>
+            </svg>
+          </div>
+          <h3>Draw the mangrove boundary</h3>
+          <p>Residents trace mangrove stands on satellite imagery. The area is measured in hectares and matched to its barangay and municipality automatically.</p>
+        </div>
+
+        {{-- Step 2: a drone sweeps over the canopy while a scan line passes. --}}
+        <div class="how-panel" id="howPanel1" role="tabpanel">
+          <div class="how-art" aria-hidden="true">
+            <svg viewBox="0 0 400 200">
+              <g>
+                <circle class="pop" style="--d:100" cx="70" cy="120" r="26" fill="rgba(34,197,94,.55)" />
+                <circle class="pop" style="--d:250" cx="120" cy="140" r="20" fill="rgba(74,222,128,.5)" />
+                <circle class="pop" style="--d:400" cx="180" cy="115" r="30" fill="rgba(22,163,74,.6)" />
+                <circle class="pop" style="--d:550" cx="245" cy="140" r="22" fill="rgba(74,222,128,.5)" />
+                <circle class="pop" style="--d:700" cx="300" cy="118" r="28" fill="rgba(34,197,94,.55)" />
+                <circle class="pop" style="--d:850" cx="350" cy="145" r="18" fill="rgba(134,239,172,.5)" />
+              </g>
+              <g class="fill-in" fill="none" stroke="#facc15" stroke-width="2" stroke-dasharray="5 4">
+                <rect x="150" y="85" width="60" height="60" rx="6" />
+                <rect x="272" y="90" width="56" height="56" rx="6" />
+              </g>
+              <g class="fill-in" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#fde68a">
+                <text x="150" y="80">Rhizophora 92%</text>
+                <text x="272" y="85">Avicennia 87%</text>
+              </g>
+              <rect class="scan-line" x="0" y="0" width="400" height="3" fill="rgba(125,211,252,.8)" />
+              <g class="drone">
+                <rect x="40" y="10" width="34" height="10" rx="5" fill="#fff" />
+                <line x1="30" y1="8" x2="84" y2="8" stroke="#fff" stroke-width="2" />
+                <circle cx="57" cy="24" r="4" fill="#7dd3fc" />
+              </g>
+            </svg>
+          </div>
+          <h3>Detect mangroves from drone imagery</h3>
+          <p>Upload a GeoTIFF orthomosaic and it is tiled for the map, segmented by a U-Net, and checked canopy by canopy by a YOLO model that suggests the genus.</p>
+        </div>
+
+        {{-- Step 3: a submission card gets the expert's check mark. --}}
+        <div class="how-panel" id="howPanel2" role="tabpanel">
+          <div class="how-art" aria-hidden="true">
+            <svg viewBox="0 0 400 200">
+              <rect class="pop" style="--d:0" x="90" y="20" width="220" height="150" rx="16" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.25)" />
+              <rect class="pop" style="--d:200" x="112" y="44" width="120" height="12" rx="6" fill="rgba(255,255,255,.55)" />
+              <rect class="pop" style="--d:300" x="112" y="68" width="170" height="8" rx="4" fill="rgba(255,255,255,.25)" />
+              <rect class="pop" style="--d:400" x="112" y="84" width="150" height="8" rx="4" fill="rgba(255,255,255,.25)" />
+              <rect class="pop" style="--d:500" x="112" y="100" width="160" height="8" rx="4" fill="rgba(255,255,255,.25)" />
+              <circle class="pop" style="--d:1000" cx="300" cy="150" r="30" fill="#22c55e" />
+              <path class="draw-path" style="animation-delay:1.3s; animation-duration:1.4s" d="M286 150 L296 160 L316 138" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <h3>Experts review every submission</h3>
+          <p>Experts approve an area, correct its boundary, or reject it with feedback. Rejected areas can be revised and resubmitted, and only approved records reach the public map.</p>
+        </div>
+
+        {{-- Step 4: yearly coverage bars grow. --}}
+        <div class="how-panel" id="howPanel3" role="tabpanel">
+          <div class="how-art" aria-hidden="true">
+            <svg viewBox="0 0 400 200">
+              <line x1="30" y1="170" x2="380" y2="170" stroke="rgba(255,255,255,.3)" />
+              <rect class="grow-bar" style="--d:0" x="50" y="110" width="40" height="60" rx="6" fill="rgba(74,222,128,.45)" />
+              <rect class="grow-bar" style="--d:150" x="115" y="95" width="40" height="75" rx="6" fill="rgba(74,222,128,.55)" />
+              <rect class="grow-bar" style="--d:300" x="180" y="80" width="40" height="90" rx="6" fill="rgba(74,222,128,.65)" />
+              <rect class="grow-bar" style="--d:450" x="245" y="55" width="40" height="115" rx="6" fill="rgba(74,222,128,.8)" />
+              <rect class="grow-bar" style="--d:600" x="310" y="30" width="40" height="140" rx="6" fill="#4ade80" />
+              <path class="draw-path" d="M70 100 L135 85 L200 70 L265 45 L330 20" fill="none" stroke="#fde68a" stroke-width="3" stroke-linecap="round" />
+              <g font-family="Inter, sans-serif" font-size="11" fill="rgba(255,255,255,.7)" text-anchor="middle">
+                <text x="70" y="188">Y1</text><text x="135" y="188">Y2</text><text x="200" y="188">Y3</text><text x="265" y="188">Y4</text><text x="330" y="188">Y5</text>
+              </g>
+            </svg>
+          </div>
+          <h3>Monitor change and plan restoration</h3>
+          <p>Yearly observations build a coverage timeline for each area, and experts add planting recommendations rated by site suitability to guide replanting.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Interactive GIS Map Section -->
   <section class="map-section" id="map-section">
     <div class="map-showcase-container">
-      <div class="section-header" style="margin-bottom: 30px;">
+      <div class="section-header reveal" style="margin-bottom: 30px;">
         <div class="section-kicker">
           <i class="bi bi-globe2"></i> Interactive Geospatial Platform
         </div>
@@ -1859,11 +2686,13 @@
       </div>
 
       <!-- GIS Map Browser Frame -->
-      <div class="map-browser-frame">
+      <div class="map-browser-frame reveal">
         <!-- Frame Toolbar Header -->
         <div class="map-frame-toolbar">
           <div class="toolbar-left">
-
+            <span class="live-status-pill"><span class="indicator-dot"></span> Live</span>
+            <span class="map-frame-heading">{{ count($delineations ?? []) }} approved mangrove areas</span>
+          </div>
 
           <div class="toolbar-right">
             <button class="map-action-btn" onclick="toggleLayerMenu()" title="Switch Satellite / Street Base Layers">
@@ -2003,24 +2832,27 @@
   <!-- Ecological Importance / Conservation Impact Section -->
   <section class="impact-section" id="impact">
     <div class="impact-grid">
-      <div class="impact-card">
+      <div class="impact-card reveal" style="--i:0">
         <div class="impact-icon"><i class="bi bi-cloud-arrow-down-fill"></i></div>
+        <div class="impact-figure">up to <span data-count="4">4</span>&times;</div>
         <h3 class="impact-title">Blue Carbon Sequestration</h3>
         <p class="impact-text">
           Mangrove forests capture carbon up to 4 times faster than tropical terrestrial rainforests, burying carbon safely in coastal sediments for millennia.
         </p>
       </div>
 
-      <div class="impact-card">
+      <div class="impact-card reveal" style="--i:1">
         <div class="impact-icon"><i class="bi bi-shield-shaded"></i></div>
+        <div class="impact-figure"><span data-count="66">66</span>%</div>
         <h3 class="impact-title">Coastal Storm Protection</h3>
         <p class="impact-text">
           Dense root networks absorb wave energy, attenuating storm surges by up to 66% and preventing critical shoreline erosion in vulnerable coastal regions.
         </p>
       </div>
 
-      <div class="impact-card">
+      <div class="impact-card reveal" style="--i:2">
         <div class="impact-icon"><i class="bi bi-water"></i></div>
+        <div class="impact-figure"><span data-count="100">100</span>s</div>
         <h3 class="impact-title">Biodiversity &amp; Livelihoods</h3>
         <p class="impact-text">
           Serving as vital nursery grounds for hundreds of marine species, mangroves sustain local artisanal fisheries and provide economic resilience for coastal communities.
@@ -2705,6 +3537,277 @@
       if (mobileInstallBtn) mobileInstallBtn.style.display = 'none';
       deferredPrompt = null;
     });
+  </script>
+
+  {{-- Landing page motion: scroll progress, scrollspy, reveals, counters, hero effects, how-it-works. --}}
+  <div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+  <script>
+    (() => {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      document.documentElement.classList.add('js-motion');
+
+      // Scroll progress bar, condensed nav and active nav link.
+      const progress = document.getElementById('scrollProgress');
+      const nav = document.querySelector('.site-nav');
+      const navLinks = [...document.querySelectorAll('.nav-links a[href^="#"]')];
+      const spySections = navLinks
+        .map(link => document.querySelector(link.getAttribute('href')))
+        .filter(Boolean);
+      let ticking = false;
+
+      function onScroll() {
+        ticking = false;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        progress.style.setProperty('--progress', max > 0 ? Math.min(1, window.scrollY / max) : 0);
+        nav.classList.toggle('scrolled', window.scrollY > 24);
+
+        const probe = window.scrollY + window.innerHeight * 0.35;
+        let current = spySections[0];
+        spySections.forEach(section => {
+          if (section.offsetTop <= probe) current = section;
+        });
+        navLinks.forEach(link => link.classList.toggle('active', current && link.getAttribute('href') === '#' + current.id));
+      }
+
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(onScroll);
+        }
+      }, { passive: true });
+      onScroll();
+
+      // Count-up numbers (hero stats and impact figures) when they come into view.
+      function countUp(el) {
+        const target = parseFloat(el.dataset.count) || 0;
+        const decimals = parseInt(el.dataset.decimals || '0', 10);
+        const format = value => value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        if (reduceMotion || target === 0) {
+          el.textContent = format(target);
+          return;
+        }
+        const duration = 1600;
+        const start = performance.now();
+        const step = now => {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - t, 4);
+          el.textContent = format(target * eased);
+          if (t < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+
+      // Reveal-on-scroll; counters start when their block appears.
+      const revealObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+      document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+      const countObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          countUp(entry.target);
+          countObserver.unobserve(entry.target);
+        });
+      }, { threshold: 0.6 });
+      document.querySelectorAll('[data-count]').forEach(el => {
+        if (!reduceMotion) el.textContent = '0';
+        countObserver.observe(el);
+      });
+
+      // Rotating word in the hero headline.
+      const rotator = document.getElementById('heroRotator');
+      if (rotator && !reduceMotion) {
+        const words = [...rotator.children];
+        let index = 0;
+        // The box takes the current word's width so there is no gap around shorter words.
+        const fit = () => { rotator.style.width = words[index].getBoundingClientRect().width + 'px'; };
+        fit();
+        document.fonts && document.fonts.ready.then(fit);
+        window.addEventListener('resize', () => { rotator.style.transition = 'none'; fit(); requestAnimationFrame(() => rotator.style.transition = ''); });
+        setInterval(() => {
+          if (document.hidden) return;
+          const prev = words[index];
+          index = (index + 1) % words.length;
+          prev.classList.remove('on');
+          prev.classList.add('out');
+          words[index].classList.remove('out');
+          words[index].classList.add('on');
+          fit();
+          setTimeout(() => prev.classList.remove('out'), 600);
+        }, 2800);
+      }
+
+      // Hero parallax and cursor glow.
+      const hero = document.querySelector('.hero-section');
+      const heroBg = hero && hero.querySelector('.hero-bg');
+      const heroGlow = hero && hero.querySelector('.hero-glow');
+      if (hero && finePointer && !reduceMotion) {
+        hero.addEventListener('pointermove', event => {
+          const rect = hero.getBoundingClientRect();
+          const x = (event.clientX - rect.left) / rect.width - 0.5;
+          const y = (event.clientY - rect.top) / rect.height - 0.5;
+          heroBg.style.setProperty('--px', x.toFixed(3));
+          heroBg.style.setProperty('--py', y.toFixed(3));
+          heroGlow.style.setProperty('--gx', (event.clientX - rect.left) + 'px');
+          heroGlow.style.setProperty('--gy', (event.clientY - rect.top) + 'px');
+        });
+        hero.addEventListener('pointerleave', () => {
+          heroBg.style.setProperty('--px', 0);
+          heroBg.style.setProperty('--py', 0);
+        });
+      }
+
+      // Hero particles: drifting glowing motes, like fireflies over the mangroves.
+      const canvas = document.getElementById('heroParticles');
+      if (canvas && hero && !reduceMotion) {
+        const ctx = canvas.getContext('2d');
+        let width = 0, height = 0, motes = [], running = true;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        function resize() {
+          width = hero.clientWidth;
+          height = hero.clientHeight;
+          canvas.width = width * dpr;
+          canvas.height = height * dpr;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          const count = Math.round(Math.min(70, width / 18));
+          motes = Array.from({ length: count }, () => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            r: Math.random() * 2.2 + 0.6,
+            vx: (Math.random() - 0.5) * 0.25,
+            vy: -(Math.random() * 0.35 + 0.08),
+            phase: Math.random() * Math.PI * 2,
+            hue: Math.random() < 0.75 ? '134, 239, 172' : '253, 230, 138',
+          }));
+        }
+
+        function frame(time) {
+          if (!running) return;
+          ctx.clearRect(0, 0, width, height);
+          motes.forEach(m => {
+            m.x += m.vx + Math.sin(time / 1800 + m.phase) * 0.15;
+            m.y += m.vy;
+            if (m.y < -10) { m.y = height + 10; m.x = Math.random() * width; }
+            if (m.x < -10) m.x = width + 10;
+            if (m.x > width + 10) m.x = -10;
+            const alpha = 0.35 + Math.sin(time / 600 + m.phase) * 0.3;
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(${m.hue}, ${Math.max(0.05, alpha)})`;
+            ctx.shadowColor = `rgba(${m.hue}, 0.9)`;
+            ctx.shadowBlur = 8;
+            ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          requestAnimationFrame(frame);
+        }
+
+        resize();
+        window.addEventListener('resize', resize);
+        // Only animate while the hero is on screen.
+        new IntersectionObserver(([entry]) => {
+          const wasRunning = running;
+          running = entry.isIntersecting;
+          if (running && !wasRunning) requestAnimationFrame(frame);
+        }).observe(hero);
+        requestAnimationFrame(frame);
+      }
+
+      // Feature cards: 3D tilt and spotlight.
+      if (finePointer && !reduceMotion) {
+        document.querySelectorAll('.feature-card').forEach(card => {
+          card.addEventListener('pointermove', event => {
+            const rect = card.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+            card.classList.add('tilting');
+            card.style.setProperty('--ry', ((x - 0.5) * 8).toFixed(2) + 'deg');
+            card.style.setProperty('--rx', ((0.5 - y) * 8).toFixed(2) + 'deg');
+            card.style.setProperty('--mx', (x * 100).toFixed(1) + '%');
+            card.style.setProperty('--my', (y * 100).toFixed(1) + '%');
+          });
+          card.addEventListener('pointerleave', () => {
+            card.classList.remove('tilting');
+            card.style.setProperty('--rx', '0deg');
+            card.style.setProperty('--ry', '0deg');
+          });
+        });
+      }
+
+      // How it works: tabs that auto-advance, pause on hover/focus, and follow arrow keys.
+      const stepList = document.getElementById('howSteps');
+      if (stepList) {
+        const stepMs = 6000;
+        const steps = [...stepList.querySelectorAll('.how-step')];
+        const panels = steps.map(step => document.getElementById(step.getAttribute('aria-controls')));
+        let active = 0, timer = null, paused = false, inView = false;
+        stepList.style.setProperty('--how-ms', stepMs + 'ms');
+
+        function show(index, focus) {
+          active = (index + steps.length) % steps.length;
+          steps.forEach((step, i) => {
+            const on = i === active;
+            step.classList.toggle('active', on);
+            step.setAttribute('aria-selected', on ? 'true' : 'false');
+            step.tabIndex = on ? 0 : -1;
+            panels[i].classList.toggle('active', on);
+          });
+          if (focus) steps[active].focus();
+          restartBar();
+          schedule();
+        }
+
+        // Restarting the timer bar keeps it in step with a restarted timeout.
+        function restartBar() {
+          const bar = steps[active].querySelector('.how-step-bar');
+          bar.style.animation = 'none';
+          void bar.offsetWidth;
+          bar.style.animation = '';
+        }
+
+        function schedule() {
+          clearTimeout(timer);
+          if (reduceMotion || paused || !inView) return;
+          timer = setTimeout(() => show(active + 1), stepMs);
+        }
+
+        function setPaused(value) {
+          paused = value;
+          stepList.classList.toggle('paused', paused);
+          if (!paused) restartBar();
+          schedule();
+        }
+
+        steps.forEach((step, i) => {
+          step.addEventListener('click', () => show(i));
+          step.addEventListener('keydown', event => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowRight') { event.preventDefault(); show(active + 1, true); }
+            if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') { event.preventDefault(); show(active - 1, true); }
+          });
+        });
+
+        const layout = stepList.closest('.how-layout');
+        layout.addEventListener('pointerenter', () => setPaused(true));
+        layout.addEventListener('pointerleave', () => setPaused(false));
+        layout.addEventListener('focusin', () => setPaused(true));
+        layout.addEventListener('focusout', event => {
+          if (!layout.contains(event.relatedTarget)) setPaused(false);
+        });
+
+        new IntersectionObserver(([entry]) => {
+          const wasInView = inView;
+          inView = entry.isIntersecting;
+          if (inView && !wasInView) show(active);
+          else if (!inView) clearTimeout(timer);
+        }, { threshold: 0.35 }).observe(layout);
+      }
+    })();
   </script>
 </body>
 
