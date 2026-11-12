@@ -881,9 +881,21 @@
       display: contents;
     }
 
-    #mapRightPanel #cancelRejectedRevisionBtn,
-    #mapRightPanel #cancelBoundaryEditBtn {
-      margin-bottom: 12px !important;
+    /* Cancel / Save rows float at the bottom of the panel like Save; the buttons inside stay in the row. */
+    #mapRightPanel .panel-actions {
+      position: sticky;
+      bottom: -10px;
+      z-index: 2;
+      margin: 8px 0 12px;
+      padding: 8px 0 10px;
+      background: var(--bg-ffffff, #fff);
+      box-shadow: 0 -6px 12px rgba(var(--bd-f7faf7-rgb, 247, 250, 247), 0.95);
+    }
+
+    #mapRightPanel .panel-actions .delineation-save-btn {
+      position: static;
+      margin-top: 0;
+      box-shadow: none;
     }
 
     #v-classify {
@@ -1330,6 +1342,117 @@
   .d-key {
     color: #9ab0a0;
     flex-shrink: 0;
+  }
+
+  /* Selected delineation panel: each fact in its own labelled box (icon + label above the value), and the
+     editable genus / notes as boxed fields, like the drone review editor. Scoped to #delineationInfoCard and the recommendation panel (#recommendationForm). */
+  :is(#delineationInfoCard, #recommendationForm) .d-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-title i {
+    color: var(--fg-1e9e62, #1e9e62);
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-fields .d-row {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--bd-dfe9e1, #dfe9e1);
+    border-radius: 10px;
+    background: var(--bg-ffffff, #fff);
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-fields .d-row-wide {
+    grid-column: 1 / -1;
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-key,
+  :is(#delineationInfoCard, #recommendationForm) .d-field-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--fg-2f5a46, #2f5a46);
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-key i,
+  :is(#delineationInfoCard, #recommendationForm) .d-field-label i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: var(--bg-e3f4ea, #e3f4ea);
+    color: var(--fg-1e9e62, #1e9e62);
+    font-size: 11px;
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-fields .d-val {
+    font-size: 13px;
+    text-align: left;
+    color: var(--fg-182918, #182918);
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-title-details {
+    margin-top: 2px;
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-field {
+    margin-bottom: 10px;
+    padding: 10px 12px 12px;
+    border: 1px solid var(--bd-dfe9e1, #dfe9e1);
+    border-radius: 12px;
+    background: var(--bg-ffffff, #fff);
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-field-label {
+    margin-bottom: 8px;
+  }
+
+  /* "required" / "optional" after the label. */
+  :is(#delineationInfoCard, #recommendationForm) .d-field-label em {
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-eef3ee, #eef3ee);
+    color: var(--fg-6b8a78, #6b8a78);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: none;
+  }
+
+  :is(#delineationInfoCard, #recommendationForm) .d-field-label em.is-required {
+    background: var(--bg-fdecea, #fdecea);
+    color: var(--fg-b42318, #b42318);
+  }
+
+  /* The recommendation fields keep their own spacing rules; only the label row comes from .d-field-label. */
+  #recommendationForm .rec-field.d-field > .d-field-label {
+    color: var(--fg-2f5a46, #2f5a46);
+    margin-bottom: 8px;
   }
 
   .d-val {
@@ -2962,6 +3085,88 @@
 
   /* Saved-delineation boundary editing */
   .boundary-edit-actions { margin-bottom: 12px; }
+
+  /* Editing a boundary: only the edit controls in the panel, only Undo / Redo on the map toolbar. */
+  body.is-boundary-editing #mapRightPanel .scroll > :not(#boundaryEditActions),
+  body.is-boundary-editing #delineationToolbar .draw-select-wrapper,
+  body.is-boundary-editing #delineationToolbar .delineation-separator,
+  body.is-boundary-editing #delineationToolbar .toolbar-save-btn {
+    display: none !important;
+  }
+
+  /* Right-panel edit buttons, shared by the delineation and Planting Recommendation panels: an "Editing" note,
+     Cancel / Save side by side, and the delete button set apart at the bottom (shown only while viewing). */
+  .panel-editing-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--bd-f3d48a, #f3d48a);
+    background: var(--bg-fff8e6, #fff8e6);
+    color: var(--fg-7a5a00, #7a5a00);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .panel-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .panel-actions .btn {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    margin: 0;
+  }
+  /* Cancel: red outline on white, so it stands out from Save. (Delete is filled light red and is never shown
+     at the same time: it is hidden while editing.) */
+  .panel-cancel-btn {
+    background: var(--bg-ffffff, #fff);
+    color: var(--fg-d04030, #d04030);
+    border-color: var(--bd-e07a6c, #e07a6c);
+  }
+  .panel-cancel-btn:hover:not(:disabled) {
+    background: var(--bg-fdf0ee, #fdf0ee);
+    color: var(--fg-b42318, #b42318);
+    border-color: var(--bd-d04030, #d04030);
+  }
+  .panel-delete-zone {
+    margin: 6px 0 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--bd-e3ece3, #e3ece3);
+  }
+  .panel-delete-btn {
+    width: 100%;
+    justify-content: center;
+    background: var(--bg-fdf0ee, #fdf0ee);
+    color: var(--fg-d04030, #d04030);
+    border-color: var(--bd-e8b8b0, #e8b8b0);
+  }
+
+  /* One size for every right-panel action button (Edit, Cancel, Save, Delete, Approve / Reject, Delete
+     selected point), on the delineation and Planting Recommendation panels alike. */
+  #mapRightPanel .panel-btn {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 20px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #mapRightPanel .panel-btn:not(.panel-actions .panel-btn):not([id^="expert"]) {
+    margin: 0 0 8px;
+  }
+  #mapRightPanel .panel-btn i {
+    margin-right: 2px;
+  }
   .boundary-edit-hint { font-size: 11px; color: var(--fg-3c5a3c, #3c5a3c); background: var(--bg-eef6ee, #eef6ee); border: 1px solid var(--bd-cfe3cf, #cfe3cf); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
   .boundary-edit-hint ul { margin: 4px 0 0; padding-left: 16px; }
   .boundary-edit-hint kbd { font-size: 10px; padding: 0 4px; border: 1px solid var(--bd-b8c8b8, #b8c8b8); border-radius: 3px; background: var(--bg-ffffff, #fff); }

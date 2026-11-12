@@ -156,6 +156,15 @@
             border: 2px dashed var(--bd-e8f5e8, #e8f5e8);
             outline: 1px solid #7fa88a;
         }
+
+        /* Editing a saved recommendation's area (setAreaEditFocus): only the edit controls in the panel,
+           only Undo / Redo on the map toolbar. */
+        body.is-area-editing #recommendationForm > :not(#recEditingNote):not(.boundary-edit-actions):not(.panel-actions),
+        body.is-area-editing #delineationToolbar .draw-select-wrapper,
+        body.is-area-editing #delineationToolbar .delineation-separator,
+        body.is-area-editing #recModeHint {
+            display: none !important;
+        }
     </style>
 @endsection
 
@@ -185,7 +194,13 @@
             </div>
           </div>
           <div class="rec-draw-hint" id="recModeHint" hidden></div>
-          <x-map-layer-control />
+          <x-map-layer-control>
+            <button id="mapGuideBtn" type="button" onclick="toggleMapGuide()" title="Quick guide" aria-label="Quick guide"
+              aria-controls="mapGuideCard" aria-expanded="false">
+              <i class="bi bi-question-lg"></i>
+            </button>
+          </x-map-layer-control>
+          @include('users.partials.map-quick-guide', ['page' => 'recommendations'])
           <div class="rec-legend" aria-label="Map legend">
             @foreach ($suitabilityLevels as $key => $label)
               <div><span data-suitability-swatch="{{ $key }}"></span>{{ $label }}</div>
@@ -209,25 +224,29 @@
         </div>
         <div class="scroll">
           <form id="recommendationForm" class="d-card" novalidate>
-            <div class="d-title" id="recFormTitle">New recommendation</div>
-            <div class="d-row"><span class="d-key">Area (ha)</span><span class="d-val" id="recArea">-</span></div>
-            <div class="d-row"><span class="d-key">Location</span><span class="d-val" id="recLocation">-</span></div>
-            <div class="d-row"><span class="d-key">Mapped area</span><span class="d-val" id="recSource">-</span></div>
-            <div class="d-row" id="recExpertRow" style="display:none;"><span class="d-key">Recommended by</span><span class="d-val" id="recExpert">-</span></div>
-            <div class="d-row" id="recUpdatedRow" style="display:none;"><span class="d-key">Last updated</span><span class="d-val" id="recUpdated">-</span></div>
+            {{-- Same layout as the map's delineation panel: each fact in its own labelled box, then the fields. --}}
+            <div class="d-title"><i class="bi bi-flower1" aria-hidden="true"></i> <span id="recFormTitle">New recommendation</span></div>
+            <div class="d-fields">
+              <div class="d-row"><span class="d-key"><i class="bi bi-rulers" aria-hidden="true"></i> Area (ha)</span><span class="d-val" id="recArea">-</span></div>
+              <div class="d-row" id="recExpertRow" style="display:none;"><span class="d-key"><i class="bi bi-person-fill" aria-hidden="true"></i> Recommended by</span><span class="d-val" id="recExpert">-</span></div>
+              <div class="d-row d-row-wide"><span class="d-key"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> Location</span><span class="d-val" id="recLocation">-</span></div>
+              <div class="d-row d-row-wide"><span class="d-key"><i class="bi bi-layers-fill" aria-hidden="true"></i> Source</span><span class="d-val" id="recSource">-</span></div>
+              <div class="d-row d-row-wide" id="recUpdatedRow" style="display:none;"><span class="d-key"><i class="bi bi-clock-fill" aria-hidden="true"></i> Last updated</span><span class="d-val" id="recUpdated">-</span></div>
+            </div>
             <div class="div"></div>
+            <div class="d-title d-title-details"><i class="bi bi-pencil-square" aria-hidden="true"></i> Details</div>
 
             <div id="recReadonlyNote" class="rec-readonly-note" style="display:none;">
               Recommended by another expert. Only its author can edit it.
             </div>
 
-            <div class="rec-field">
-              <label for="recName">Name</label>
+            <div class="rec-field d-field">
+              <label for="recName" class="d-field-label"><i class="bi bi-tag-fill" aria-hidden="true"></i> Name <em class="is-required">required</em></label>
               <input id="recName" class="rec-input" type="text" maxlength="191" placeholder="e.g. Brgy. San Isidro mudflat">
             </div>
 
-            <div class="rec-field">
-              <label for="recSuitability">Planting suitability</label>
+            <div class="rec-field d-field">
+              <label for="recSuitability" class="d-field-label"><i class="bi bi-clipboard2-check-fill" aria-hidden="true"></i> Planting suitability <em class="is-required">required</em></label>
               <select id="recSuitability" class="rec-input">
                 <option value="" disabled selected>Select suitability</option>
                 @foreach ($suitabilityLevels as $key => $label)
@@ -236,8 +255,8 @@
               </select>
             </div>
 
-            <div class="rec-field" id="recGenusField">
-              <label>Recommended mangrove genus</label>
+            <div class="rec-field d-field" id="recGenusField">
+              <span class="d-field-label"><i class="bi bi-tree-fill" aria-hidden="true"></i> Recommended mangrove genus <em class="is-required">required</em></span>
               <div class="rec-genus-group" id="recGenusGroup">
                 @foreach ($recommendedGenera as $genus)
                   <button type="button" class="genus-pill-btn" data-genus="{{ $genus }}" aria-pressed="false"></button>
@@ -254,20 +273,27 @@
               <div id="recSelectedGenera" aria-live="polite"></div>
             </div>
 
-            <div class="rec-field">
-              <label for="recRecommendation">Recommendations <span style="color:#9ab0a0;">(optional)</span></label>
+            <div class="rec-field d-field">
+              <label for="recRecommendation" class="d-field-label"><i class="bi bi-list-check" aria-hidden="true"></i> Recommendations <em>optional</em></label>
               <textarea id="recRecommendation" class="rec-input" rows="5" maxlength="5000"
                 placeholder="Planting method, spacing, season, propagule source, protection and monitoring"></textarea>
             </div>
 
-            <div class="rec-field">
-              <label for="recSiteNotes">Site assessment notes <span style="color:#9ab0a0;">(optional)</span></label>
+            <div class="rec-field d-field">
+              <label for="recSiteNotes" class="d-field-label"><i class="bi bi-chat-left-text-fill" aria-hidden="true"></i> Site assessment notes <em>optional</em></label>
               <textarea id="recSiteNotes" class="rec-input" rows="3" maxlength="5000"
                 placeholder="Substrate, tidal inundation, salinity, existing vegetation, threats"></textarea>
             </div>
 
+            {{-- Buttons by state (updatePanelActions): viewing = Edit area + Delete; editing (area or fields changed,
+                 or a new recommendation) = an "Editing" note + Save / Cancel side by side, Delete hidden. --}}
+            <div id="recEditingNote" class="panel-editing-note" style="display:none;" role="status">
+              <i class="bi bi-pencil-fill" aria-hidden="true"></i>
+              <span id="recEditingNoteText">Editing. Save your changes, or Cancel to undo them.</span>
+            </div>
+
             <div class="boundary-edit-actions">
-              <button type="button" id="recEditAreaBtn" class="btn" style="width:100%;margin-bottom:8px;display:none;">
+              <button type="button" id="recEditAreaBtn" class="btn panel-btn" style="width:100%;margin-bottom:8px;display:none;">
                 <i class="bi bi-bounding-box-circles"></i> Edit area
               </button>
               <div id="recEditHint" class="boundary-edit-hint" style="display:none;">
@@ -278,22 +304,25 @@
                   <li>Double-click or right-click a point to delete it, or select it and press <kbd>Delete</kbd>.</li>
                 </ul>
               </div>
-              <button type="button" id="recDeleteVertexBtn" class="btn" style="width:100%;margin-bottom:8px;display:none;" disabled>
+              <button type="button" id="recDeleteVertexBtn" class="btn panel-btn" style="width:100%;margin-bottom:8px;display:none;" disabled>
                 <i class="bi bi-dash-circle"></i> Delete selected point
               </button>
             </div>
 
-            <button type="submit" id="recSaveBtn" class="btn btn-g delineation-save-btn" style="width:100%;margin-bottom:8px;">
-              <i class="bi bi-save"></i> <span>Save recommendation</span>
-            </button>
-            <button type="button" id="recDeleteBtn" class="btn"
-              style="width:100%;display:none;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);">
-              <i class="bi bi-trash"></i> Delete recommendation
-            </button>
+            <div class="panel-actions">
+              <button type="button" id="recCancelBtn" class="btn panel-btn panel-cancel-btn" style="display:none;"><i class="bi bi-x-lg"></i> Cancel</button>
+              <button type="submit" id="recSaveBtn" class="btn btn-g delineation-save-btn panel-btn">
+                <i class="bi bi-save"></i> <span>Save recommendation</span>
+              </button>
+            </div>
+
+            {{-- Only while viewing a saved recommendation, apart from the Save / Cancel row. --}}
+            <div id="recDeleteZone" class="panel-delete-zone" style="display:none;">
+              <button type="button" id="recDeleteBtn" class="btn panel-btn panel-delete-btn">
+                <i class="bi bi-trash"></i> Delete recommendation
+              </button>
+            </div>
           </form>
-          {{-- Below the card, like "Remove delineation" on the Delineate panel. --}}
-          <button type="button" id="recCancelBtn" class="btn"
-            style="width:100%;margin-top:8px;margin-bottom:14px;display:none;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);"><i class="bi bi-x-circle"></i> Discard changes</button>
         </div>
       </div>
     </div>

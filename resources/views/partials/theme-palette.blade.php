@@ -26,12 +26,14 @@
         --bd-cedecf: #334c35;
         --bd-cfe0d5: #324d3b;
         --bd-cfe3cf: #2e4f2e;
+        --bd-cfe5d8: #2b503b;
         --bd-d0d8d0: #3b473b;
         --bd-d4dfd4: #354735;
         --bd-d4e0d4: #344834;
         --bd-d5e5d8: #2e4b33;
         --bd-d6e6dc: #2d4a38;
         --bd-d8e5dc: #304837;
+        --bd-dfe9e1: #2e4333;
         --bd-e0e8e0: #2a3a31;
         --bd-e0ebe2: #2c4430;
         --bd-e0ece4: #2a4533;
@@ -56,6 +58,7 @@
         --bd-f0d9a0: #5c5032;
         --bd-f0f4f0: #2a3a2a;
         --bd-f2c2bd: #52302c;
+        --bd-f3d48a: #625535;
         --bd-f5c2bc: #51302c;
         --bd-f7d6d6: #482727;
         --bd-f7faf7-rgb: 36, 57, 36;
@@ -81,6 +84,8 @@
         --bg-e3efe7: #18291d;
         --bg-e3effa: #101e2a;
         --bg-e3f2e8: #142b1c;
+        --bg-e3f4ea: #112c1c;
+        --bg-e3f5ea: #112c1b;
         --bg-e3f6ec: #112c1e;
         --bg-e4f5eb: #112c1c;
         --bg-e5eee7: #19271c;
@@ -122,6 +127,7 @@
         --bg-f5f7f5: #161b16;
         --bg-f5f7f6: #1b2620;
         --bg-f5faf7: #101f16;
+        --bg-f6f9f6: #131c13;
         --bg-f7faf7: #121c12;
         --bg-f7faf8: #121c15;
         --bg-f7fbf8: #0f1e13;
@@ -130,10 +136,13 @@
         --bg-f8fcfa: #16231c;
         --bg-faf5ff: #160c20;
         --bg-fafbfa: #131813;
+        --bg-fafcfa: #101b10;
         --bg-fbfcfb: #121812;
         --bg-fbfdfb: #0e1c0e;
+        --bg-fde8e8: #270f0f;
         --bg-fdecea: #26110e;
         --bg-fdf0ee: #24110e;
+        --bg-fdf3e1: #2a2010;
         --bg-fdf5e8: #271d0f;
         --bg-fdf7ee: #241b0e;
         --bg-fef2f2: #220d0d;
@@ -160,6 +169,7 @@
         --fg-16824f: #98e5c1;
         --fg-16a34a: #81e0a4;
         --fg-176d46: #a5e9ca;
+        --fg-17703f: #a3e8c2;
         --fg-178a54: #92e4bd;
         --fg-182918: #dcebdc;
         --fg-1a2e1a: #e3ece6;
@@ -224,10 +234,12 @@
         --fg-8a5a00: #e8cfa1;
         --fg-925a12: #e3bf8f;
         --fg-9a5b00: #e5c596;
+        --fg-9a5b0b: #e3be8f;
         --fg-a12f22: #de857a;
         --fg-a52f21: #dd8378;
         --fg-a63b30: #d67b72;
         --fg-b42318: #dc7c74;
+        --fg-b42323: #da6d6d;
         --fg-b73318: #dc8472;
         --fg-b83828: #d97367;
         --fg-c0392b: #d76a5f;

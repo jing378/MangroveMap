@@ -740,23 +740,47 @@
       updatePanelActions();
     }));
 
+    // Editing a saved recommendation's area: the panel shows only the edit controls and the toolbar only
+    // Undo / Redo (CSS in recommendations.blade.php), like editing a delineation's boundary on the map.
+    // A new recommendation keeps its fields, since they still have to be filled in.
+    function setAreaEditFocus(on) {
+      if (document.body.classList.contains('is-area-editing') === on) return;
+      document.body.classList.toggle('is-area-editing', on);
+      document.querySelector('#mapRightPanel .scroll')?.scrollTo?.({ top: 0 });
+    }
+
     function updatePanelActions() {
-      if (!draft) return;
+      if (!draft) {
+        setAreaEditFocus(false);
+        return;
+      }
       const saved = draft.id !== null;
+      setAreaEditFocus(saved && draft.can_edit && draft.editingArea);
       const dirty = isDraftDirty();
       document.getElementById('recEditAreaBtn').style.display = saved && draft.can_edit && !draft.editingArea ? 'block' : 'none';
       document.getElementById('recEditHint').style.display = draft.editingArea ? 'block' : 'none';
       const deleteVertexBtn = document.getElementById('recDeleteVertexBtn');
       deleteVertexBtn.style.display = draft.editingArea ? 'block' : 'none';
       deleteVertexBtn.disabled = !selectedVertex;
+      // Editing: a new recommendation, the area being edited, or changed fields. Then only Save / Cancel are
+      // offered; Delete is for a saved recommendation that is just being viewed.
+      const editing = draft.can_edit && (!saved || dirty || draft.editingArea);
       const saveBtn = document.getElementById('recSaveBtn');
-      saveBtn.style.display = draft.can_edit ? 'block' : 'none';
-      saveBtn.disabled = saved && !dirty;
+      saveBtn.style.display = editing ? '' : 'none';
+      saveBtn.disabled = saved && !dirty; // editing the area, nothing moved yet
+      saveBtn.title = saved && !dirty ? 'No changes yet. Move a point of the area or change a detail first.' : '';
       saveBtn.querySelector('span').textContent = saved ? 'Save changes' : 'Save recommendation';
       const cancelBtn = document.getElementById('recCancelBtn');
-      cancelBtn.style.display = draft.can_edit && (!saved || dirty || draft.editingArea) ? 'block' : 'none';
-      cancelBtn.lastChild.textContent = saved ? ' Discard changes' : ' Discard';
-      document.getElementById('recDeleteBtn').style.display = saved && draft.can_edit ? 'block' : 'none';
+      cancelBtn.style.display = editing ? '' : 'none';
+      cancelBtn.title = saved ? 'Undo your changes and go back to the saved recommendation' : 'Discard this new recommendation';
+      const editingNote = document.getElementById('recEditingNote');
+      if (editingNote) {
+        editingNote.style.display = editing && saved ? 'flex' : 'none';
+        document.getElementById('recEditingNoteText').textContent = draft.editingArea
+          ? 'Editing the area. Save your changes, or Cancel to undo them.'
+          : 'Unsaved changes. Save them, or Cancel to undo them.';
+      }
+      document.getElementById('recDeleteZone').style.display = saved && draft.can_edit && !editing ? 'block' : 'none';
       updateHistoryButtons();
     }
 
@@ -819,6 +843,7 @@
       if (!force && !confirmDiscardDraft(() => { closeDraft(true); then?.(); })) return false;
       draft = null;
       selectedVertex = null;
+      setAreaEditFocus(false);
       hidePanel();
       resetHistory();
       renderRecommendations();

@@ -23,6 +23,8 @@ class UserGuideTest extends TestCase
             ->assertOk()
             ->assertSee('id="delineate"', false)
             ->assertSee('id="drone"', false)
+            ->assertSee('id="tiles"', false)
+            ->assertSee('Confirm &amp; submit for review', false)
             ->assertDontSee('id="review"', false)
             ->assertDontSee('id="admin"', false);
     }

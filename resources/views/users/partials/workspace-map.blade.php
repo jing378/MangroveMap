@@ -83,7 +83,12 @@
                 <i class="bi bi-flower1"></i>
               </button>
             @endif
+            <button id="mapGuideBtn" type="button" onclick="toggleMapGuide()" title="Quick guide" aria-label="Quick guide"
+              aria-controls="mapGuideCard" aria-expanded="false">
+              <i class="bi bi-question-lg"></i>
+            </button>
           </x-map-layer-control>
+          @include('users.partials.map-quick-guide', ['page' => request()->routeIs('delineate', 'expert.delineate') ? 'delineate' : 'map'])
 
         </div>
       </div>
@@ -103,35 +108,27 @@
         </div>
         <div class="scroll">
           <div id="delineationInfoCard" class="d-card" style="display:none;">
-            <div class="d-title">Delineated Area Info</div>
-            <div class="d-row"><span class="d-key">Type</span><span class="d-val" id="delineationFeatureType">-</span>
+            {{-- Each fact is its own labelled box (icon + label above the value), like the drone review editor. --}}
+            <div class="d-title"><i class="bi bi-info-circle-fill" aria-hidden="true"></i> Area info</div>
+            <div class="d-fields">
+              <div class="d-row"><span class="d-key"><i class="bi bi-layers-fill" aria-hidden="true"></i> Source</span><span class="d-val" id="delineationFeatureType">-</span></div>
+              <div class="d-row"><span class="d-key"><i class="bi bi-rulers" aria-hidden="true"></i> Area (ha)</span><span class="d-val" id="delineationFeatureArea">-</span></div>
+              <div class="d-row d-row-wide"><span class="d-key"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> Location</span><span class="d-val" id="delineationFeatureLocation">-</span></div>
+              <div class="d-row d-row-wide d-row-genera" style="display:none;"><span class="d-key"><i class="bi bi-tree-fill" aria-hidden="true"></i> Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span></div>
+              <div class="d-row"><span class="d-key"><i class="bi bi-person-fill" aria-hidden="true"></i> Delineated by</span><span class="d-val" id="delineationCreatedBy">-</span></div>
+              <div class="d-row"><span class="d-key"><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Review status</span><span class="d-val" id="delineationReviewStatus">-</span></div>
+              <div class="d-row d-row-wide d-row-recommendation"><span class="d-key"><i class="bi bi-flower1" aria-hidden="true"></i> Planting recommendation</span><span class="d-val" id="delineationPlantingRecommendation" style="white-space:pre-line;overflow-wrap:anywhere;">No recommendation provided</span></div>
+              <div class="d-row d-row-wide" id="delineationLastEditedRow" style="display:none;"><span class="d-key"><i class="bi bi-pencil-fill" aria-hidden="true"></i> Boundary last edited by</span><span class="d-val" id="delineationLastEditedBy">-</span></div>
             </div>
-            <div class="d-row"><span class="d-key">Area (ha)</span><span class="d-val"
-              id="delineationFeatureArea">-</span></div>
-            <div class="d-row"><span class="d-key">Location</span><span class="d-val" id="delineationFeatureLocation">-</span>
-            </div>
-            <div class="d-row d-row-genera" style="display:none;"><span class="d-key">Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span>
-            </div>
-            <div class="d-row"><span class="d-key">Delineated by</span><span class="d-val"
-                id="delineationCreatedBy">-</span></div>
-            <div class="d-row"><span class="d-key">Review status</span><span class="d-val"
-                id="delineationReviewStatus">-</span></div>
-            <div class="d-row d-row-recommendation"><span class="d-key">Planting recommendation</span><span class="d-val"
-                id="delineationPlantingRecommendation" style="white-space:pre-line;overflow-wrap:anywhere;">No recommendation provided</span></div>
-            <div class="d-row" id="delineationLastEditedRow" style="display:none;"><span class="d-key">Boundary last edited by</span><span class="d-val"
-                id="delineationLastEditedBy">-</span></div>
             <div id="delineationRejectionBox" class="delineation-rejection-box" style="display:none;">
               <strong>Expert feedback</strong>
               <p id="delineationRejectionNotes" style="margin:0;"></p>
               <p id="delineationRejectionHint" style="display:none;margin:8px 0 0;font-size:12px;"></p>
             </div>
-            @if(Auth::user()->isExpert())
-              <div class="d-row" id="delineationSubmitterRow" style="display:none;"><span class="d-key">Submitted
-                  by</span><span class="d-val" id="delineationSubmitter">-</span></div>
-            @endif
             <div class="div"></div>
-            <div id="delineationGenusEditor" style="margin-bottom:12px;">
-              <label style="display:block;font-size:12px;color:var(--fg-556b56, #556b56);margin-bottom:6px;">Mangrove Genus Present</label>
+            <div class="d-title d-title-details" id="delineationDetailsTitle"><i class="bi bi-pencil-square" aria-hidden="true"></i> Details</div>
+            <div id="delineationGenusEditor" class="d-field">
+              <span class="d-field-label"><i class="bi bi-tree-fill" aria-hidden="true"></i> Mangrove Genus Present <em class="is-required">required</em></span>
               <div id="genusQuickSelector" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
                 <button type="button" class="genus-pill-btn" data-genus="Rhizophora" onclick="toggleGenusSelection('Rhizophora')"><i class="bi bi-plus"></i> Rhizophora <span class="genus-local-name">(Bakawan)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Avicennia" onclick="toggleGenusSelection('Avicennia')"><i class="bi bi-plus"></i> Avicennia <span class="genus-local-name">(Bungalon)</span></button>
@@ -151,9 +148,8 @@
               </div>
               <div id="delineationSelectedGeneraContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
             </div>
-            <div id="delineationNotesEditor" style="margin-bottom:12px;">
-              <label for="delineationNotes"
-                style="display:block;font-size:12px;color:var(--fg-556b56, #556b56);margin-bottom:6px;">Notes</label>
+            <div id="delineationNotesEditor" class="d-field">
+              <label for="delineationNotes" class="d-field-label"><i class="bi bi-chat-left-text-fill" aria-hidden="true"></i> Notes <em class="is-required">required</em></label>
               <textarea id="delineationNotes" rows="4"
                 style="width:100%;padding:10px;border:1px solid var(--bd-d4dfd4, #d4dfd4);border-radius:10px;background:var(--bg-f8faf7, #f8faf7);color:var(--fg-182918, #182918);resize:none;overflow-y:auto;"
                 placeholder="Fill in information about this delineated feature"></textarea>
@@ -167,40 +163,52 @@
                     placeholder="Explain what the resident should revise (min 10 characters)"></textarea>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:8px;">
-                  <button type="button" id="expertApproveBtn" class="btn btn-g"
-                    style="flex:1;min-width:0;padding:8px 4px;font-size:12px;">
+                  <button type="button" id="expertApproveBtn" class="btn btn-g panel-btn"
+                    style="flex:1;min-width:0;margin:0;">
                     <i class="bi bi-check-circle"></i> Approve
                   </button>
-                  <button type="button" id="expertRejectBtn" class="btn"
-                    style="flex:1;min-width:0;padding:8px 4px;font-size:12px;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);">
+                  <button type="button" id="expertRejectBtn" class="btn panel-btn"
+                    style="flex:1;min-width:0;margin:0;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);">
                     <i class="bi bi-x-circle"></i> Reject
                   </button>
                 </div>
               </div>
             @endif
             @if (request()->routeIs('delineate') || request()->routeIs('expert.delineate'))
-              <button id="saveBtn" type="button" class="btn btn-g delineation-save-btn" style="width:100%;">
+              <button id="saveBtn" type="button" class="btn btn-g delineation-save-btn panel-btn" style="width:100%;">
                 <i class="bi bi-save"></i> Save delineation
               </button>
             @endif
           </div>
           @if(request()->routeIs('delineate'))
+            {{-- Same button layout as the Planting Recommendation panel: viewing = one Edit button (and Remove at
+                 the bottom); editing = an "Editing" note, then Cancel / Save side by side, Remove hidden. --}}
             <div id="rejectedRevisionActions" style="display:none;margin-bottom:12px;">
-              <button type="button" id="startRejectedRevisionBtn" class="btn" style="width:100%;margin-bottom:8px;">
+              <button type="button" id="startRejectedRevisionBtn" class="btn panel-btn" style="width:100%;margin-bottom:8px;">
                 <i class="bi bi-pencil-square"></i> Revise rejected delineation
               </button>
-              <button type="button" id="saveRejectedRevisionBtn" class="btn btn-g delineation-save-btn" style="display:none;width:100%;margin-bottom:8px;">
-                <i class="bi bi-send"></i> Resubmit for review
-              </button>
-              <button type="button" id="cancelRejectedRevisionBtn" class="btn" style="display:none;width:100%;">
-                Cancel revision
-              </button>
+              <div id="revisionEditingNote" class="panel-editing-note" style="display:none;" role="status">
+                <i class="bi bi-pencil-fill" aria-hidden="true"></i>
+                <span>Revising. Resubmit it for review, or Cancel to undo your changes.</span>
+              </div>
+              <div id="revisionActionRow" class="panel-actions" style="display:none;">
+                <button type="button" id="cancelRejectedRevisionBtn" class="btn panel-btn panel-cancel-btn">
+                  <i class="bi bi-x-lg"></i> Cancel
+                </button>
+                <button type="button" id="saveRejectedRevisionBtn" class="btn btn-g delineation-save-btn panel-btn">
+                  <i class="bi bi-send"></i> Resubmit for review
+                </button>
+              </div>
             </div>
           @endif
           <div id="boundaryEditActions" class="boundary-edit-actions" style="display:none;">
-            <button type="button" id="startBoundaryEditBtn" class="btn" style="width:100%;margin-bottom:8px;">
+            <button type="button" id="startBoundaryEditBtn" class="btn panel-btn" style="width:100%;margin-bottom:8px;">
               <i class="bi bi-bounding-box-circles"></i> Edit Delineation
             </button>
+            <div id="boundaryEditingNote" class="panel-editing-note" style="display:none;" role="status">
+              <i class="bi bi-pencil-fill" aria-hidden="true"></i>
+              <span>Editing the boundary. Save your changes, or Cancel to undo them.</span>
+            </div>
             <div id="boundaryEditHint" class="boundary-edit-hint" style="display:none;">
               <strong>Editing boundary</strong>
               <ul>
@@ -235,19 +243,23 @@
                 </div>
               </fieldset>
             @endif
-            <button type="button" id="deleteBoundaryVertexBtn" class="btn" style="display:none;width:100%;margin-bottom:8px;" disabled>
+            <button type="button" id="deleteBoundaryVertexBtn" class="btn panel-btn" style="display:none;width:100%;margin-bottom:8px;" disabled>
               <i class="bi bi-dash-circle"></i> Delete selected point
             </button>
-            <button type="button" id="saveBoundaryEditBtn" class="btn btn-g delineation-save-btn" style="display:none;width:100%;margin-bottom:8px;">
-              <i class="bi bi-check2-circle"></i> Save Changes
-            </button>
-            <button type="button" id="cancelBoundaryEditBtn" class="btn" style="display:none;width:100%;margin-bottom:8px;">
-              <i class="bi bi-x-circle"></i> Cancel
-            </button>
+            <div id="boundaryEditActionRow" class="panel-actions" style="display:none;">
+              <button type="button" id="cancelBoundaryEditBtn" class="btn panel-btn panel-cancel-btn">
+                <i class="bi bi-x-lg"></i> Cancel
+              </button>
+              <button type="button" id="saveBoundaryEditBtn" class="btn btn-g delineation-save-btn panel-btn">
+                <i class="bi bi-save"></i> Save changes
+              </button>
+            </div>
           </div>
-          <button id="removeDelineationBtn" class="btn"
-            style="width:100%;margin-top:8px;margin-bottom:14px;background:var(--bg-fdf0ee, #fdf0ee);color:var(--fg-d04030, #d04030);border-color:var(--bd-e8b8b0, #e8b8b0);"
-            onclick="window.removeCurrentDelineation()">Remove delineation</button>
+          {{-- Only while viewing (hidden during an edit or revision), apart from the Cancel / Save row. --}}
+          <div id="removeDelineationZone" class="panel-delete-zone" style="display:none;">
+            <button type="button" id="removeDelineationBtn" class="btn panel-btn panel-delete-btn"
+              onclick="window.removeCurrentDelineation()"><i class="bi bi-trash"></i> <span>Remove delineation</span></button>
+          </div>
           <div id="zoneDetailsContent">
             <div class="d-card">
               <div class="d-title" id="dName"></div>

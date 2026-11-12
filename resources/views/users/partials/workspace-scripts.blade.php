@@ -2,6 +2,8 @@
     const APP_PAGE = @json($page ?? 'map');
 
     // DATA & MAP INITIALIZATION (same as before)
+    // The map's delineations as JSON: refreshMapData redraws from it after every save, edit, review or removal.
+    const mapDelineationsUrl = "{{ route('map.delineations') }}";
     const saveDelineationUrl = "{{ Auth::user()->isExpert() ? route('expert.delineations.store') : route('delineations.store') }}";
     const delineatePageUrl = @json(Auth::user()->isExpert() ? route('expert.delineate') : route('delineate'));
     const reviseDelineationUrlTemplate = @json(route('delineations.revise', ['delineation' => '__DELINEATION_ID__']));
@@ -11,9 +13,10 @@
     const expertDeleteDelineationBaseUrl = @json(url('/expert/delineations'));
     const annualObservationBaseUrl = @json(url('/delineations'));
     const isExpertUser = {{ Auth::check() && Auth::user()->isExpert() ? 'true' : 'false' }};
-    const savedDelineations = @json($delineations);
-    const approvedDelineations = @json($approvedDelineationsForMap);
-    const residentDelineations = @json($residentDelineationsForMap ?? []);
+    // Replaced by refreshMapData after every change, so the map shows the saved state without a page reload.
+    let savedDelineations = @json($delineations);
+    let approvedDelineations = @json($approvedDelineationsForMap);
+    let residentDelineations = @json($residentDelineationsForMap ?? []);
     const focusDelineationId = @json($focusDelineationId ?? null);
     const focusDelineationRecord = @json($focusDelineationRecord ?? null);
     const authUserId = @json(Auth::id());
@@ -38,20 +41,29 @@
       modal.classList.remove('active');
     }
 
+    // Resolves the promise of the success modal that is open (see showSuccessModal).
+    let successModalClosed = null;
+
+    /** Shows the success modal; the returned promise resolves when the user clicks "Got it". */
     function showSuccessModal(message, title = 'Success!') {
       const modal = document.getElementById('successModal');
-      if (!modal) return;
+      if (!modal) return Promise.resolve();
       const titleEl = document.getElementById('successModalTitle');
       const msgEl = document.getElementById('successModalMessage');
       if (titleEl) titleEl.textContent = title;
       if (msgEl) msgEl.textContent = message || 'Delineation saved and submitted for expert review.';
+      successModalClosed?.(); // a modal replaced by another counts as closed
       modal.classList.add('active');
+      modal.querySelector('.success-modal-btn')?.focus();
+      return new Promise(resolve => { successModalClosed = resolve; });
     }
 
     function hideSuccessModal() {
       const modal = document.getElementById('successModal');
-      if (!modal) return;
-      modal.classList.remove('active');
+      if (modal) modal.classList.remove('active');
+      const resolve = successModalClosed;
+      successModalClosed = null;
+      resolve?.();
     }
     function mergeDelineationsById(...lists) {
       const byId = new Map();
@@ -65,9 +77,10 @@
 
     // Experts also get every approved delineation (e.g. another expert's drone/AI delineation, approved on
     // submit), so it is on the map next to its GeoTIFF, which the drone panel shows for everyone once approved.
-    const allDelineations = isExpertUser
+    const mergeMapDelineations = () => (isExpertUser
       ? mergeDelineationsById(savedDelineations, residentDelineations, approvedDelineations)
-      : mergeDelineationsById(savedDelineations, approvedDelineations);
+      : mergeDelineationsById(savedDelineations, approvedDelineations));
+    let allDelineations = mergeMapDelineations();
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
 
@@ -381,11 +394,12 @@
 
 
     // Residents: sidebar lists approved community zones. Experts: all resident submissions (incl. pending).
-    const zoneRecords = Array.isArray(allDelineations)
-      ? allDelineations.filter(r => isExpertUser ? !r?.is_rejected : (!!r?.is_approved && !r?.is_rejected))
-      : [];
+    const zoneRecordsFrom = records => (Array.isArray(records)
+      ? records.filter(r => isExpertUser ? !r?.is_rejected : (!!r?.is_approved && !r?.is_rejected))
+      : []);
+    let zoneRecords = zoneRecordsFrom(allDelineations);
 
-    const zones = zoneRecords.map(record => {
+    function zoneFromRecord(record) {
       const features = Array.isArray(record.features) ? record.features : [];
       const feature = features[0] || null;
       // The record's single pin sits on its largest area (AI delineations can start with a tiny patch).
@@ -409,18 +423,24 @@
         color: review.color,
         chip: review.chip
       };
-    });
+    }
+    let zones = zoneRecords.map(zoneFromRecord);
 
     const plantSites = [];
 
     const zoneContainer = document.getElementById('zoneListContainer');
-    zones.forEach((z, i) => {
-      const div = document.createElement('div');
-      div.className = `zone-row`;
-      div.setAttribute('onclick', `flyTo(${i})`);
-      div.innerHTML = `<div class="z-pip" style="background:${z.color}"></div><div class="z-name">${z.name}</div><div class="z-ha">${z.area.replace(/[^0-9k]/g, '')}</div><span class="z-chip ${z.chip || 'ca'}">${z.status}</span>`;
-      zoneContainer.appendChild(div);
-    });
+    function renderZoneList() {
+      if (!zoneContainer) return;
+      zoneContainer.replaceChildren();
+      zones.forEach((z, i) => {
+        const div = document.createElement('div');
+        div.className = `zone-row`;
+        div.setAttribute('onclick', `flyTo(${i})`);
+        div.innerHTML = `<div class="z-pip" style="background:${z.color}"></div><div class="z-name">${escapeHtml(z.name)}</div><div class="z-ha">${z.area.replace(/[^0-9k]/g, '')}</div><span class="z-chip ${z.chip || 'ca'}">${z.status}</span>`;
+        zoneContainer.appendChild(div);
+      });
+    }
+    renderZoneList();
 
     const quickJumpInput = document.getElementById('quickJumpInput');
     const quickJumpResults = document.getElementById('quickJumpResults');
@@ -471,11 +491,16 @@
       quickJumpInput?.setAttribute('aria-expanded', 'true');
     }
 
-    if (quickJumpInput && quickJumpResults) {
+    function updateQuickJumpState() {
+      if (!quickJumpInput) return;
       quickJumpInput.placeholder = zones.length
         ? 'Search Mangrove areas'
         : 'No saved areas available';
       quickJumpInput.disabled = zones.length === 0;
+    }
+
+    if (quickJumpInput && quickJumpResults) {
+      updateQuickJumpState();
       quickJumpInput.addEventListener('focus', () => renderQuickJumpResults(quickJumpInput.value));
       quickJumpInput.addEventListener('input', () => renderQuickJumpResults(quickJumpInput.value));
       quickJumpInput.addEventListener('keydown', event => {
@@ -628,6 +653,9 @@
     }
 
     let polys = [];
+    function renderZoneMarkers() {
+    zoneMarkerLayer.clearLayers();
+    polys = [];
     zones.forEach((z, i) => {
       // Same pin as the landing page (.map-pin), colored by review status.
       const locationIcon = L.divIcon({
@@ -648,6 +676,8 @@
       });
       polys.push(p);
     });
+    }
+    renderZoneMarkers();
 
     let plantMap = null;
     let pMarkers = [];
@@ -782,6 +812,7 @@
               planting_recommendations: Array.isArray(record.planting_recommendations) ? record.planting_recommendations : [],
               approved_by_name: record.approved_by_name || null,
               delineation_id: record.id,
+              drone_imagery_layer_id: record.drone_imagery_layer_id || null,
               is_approved: !!record.is_approved,
               is_rejected: !!record.is_rejected,
               is_own: true,
@@ -819,6 +850,7 @@
           planting_recommendations: Array.isArray(record.planting_recommendations) ? record.planting_recommendations : [],
           approved_by_name: record.approved_by_name || null,
           delineation_id: record.id,
+          drone_imagery_layer_id: record.drone_imagery_layer_id || null,
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
           rejection_notes: record.rejection_notes || null,
@@ -860,6 +892,67 @@
     }
 
     loadDelineationsOnMap();
+
+    /**
+     * Reloads every delineation from the server and redraws the map, the zone list, the search and the pins,
+     * like a page refresh but without leaving the page. Called right after a save, revision, boundary edit,
+     * review or removal. Unsaved shapes are kept. selectDelineationId reopens that delineation in the panel;
+     * null closes the panel (e.g. it was removed). Returns false when the reload failed.
+     */
+    async function refreshMapData({ selectDelineationId = null, fly = false } = {}) {
+      let body;
+      try {
+        const response = await fetch(mapDelineationsUrl, {
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+        body = await response.json();
+        if (!response.ok) throw new Error(body?.message || `HTTP ${response.status}`);
+      } catch (error) {
+        console.error('Unable to refresh the map delineations.', error);
+        return false;
+      }
+
+      savedDelineations = Array.isArray(body.delineations) ? body.delineations : [];
+      approvedDelineations = Array.isArray(body.approvedDelineationsForMap) ? body.approvedDelineationsForMap : [];
+      residentDelineations = Array.isArray(body.residentDelineationsForMap) ? body.residentDelineationsForMap : [];
+
+      // Zone list, search and pins.
+      allDelineations = mergeMapDelineations();
+      zoneRecords = zoneRecordsFrom(allDelineations);
+      zones = zoneRecords.map(zoneFromRecord);
+      renderZoneList();
+      updateQuickJumpState();
+      if (quickJumpResults && !quickJumpResults.hidden) renderQuickJumpResults(quickJumpInput?.value || '');
+      renderZoneMarkers();
+
+      // Shapes: the saved ones from the server, plus any unsaved drawing still in progress.
+      const unsaved = drawnFeatures.filter(feature => !feature.delineation_id);
+      loadDelineationsOnMap();
+      if (unsaved.length) {
+        drawnFeatures.push(...unsaved);
+        redrawFeatures();
+      }
+      // Undo/redo snapshots held the old records: start again from what is on the server now.
+      featureHistory = [];
+      historyIndex = -1;
+      saveDrawingStateToHistory();
+
+      const index = selectDelineationId == null ? -1
+        : drawnFeatures.findIndex(feature => Number(feature.delineation_id) === Number(selectDelineationId));
+      if (index >= 0) {
+        selectDrawnFeature(index, { fly });
+        redrawFeatures();
+      } else {
+        selectedDrawnIndex = -1;
+        const infoCard = document.getElementById('delineationInfoCard');
+        if (infoCard) infoCard.style.display = 'none';
+        window.closeRightPanel?.();
+      }
+      updateSaveButtonState?.();
+      return true;
+    }
 
     function openRightPanel() {
       const panel = document.getElementById('mapRightPanel');
@@ -1075,7 +1168,7 @@
 
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
-        removeBtn.style.display = 'none';
+        setRemoveDelineationVisible(false);
       }
 
       openRightPanel();
@@ -1084,7 +1177,6 @@
       document.getElementById('zoneDetailsContent').style.display = 'block';
       document.getElementById('expertReviewActions')?.style.setProperty('display', 'none');
       resetExpertRejectionPrompt();
-      document.getElementById('delineationSubmitterRow')?.style.setProperty('display', 'none');
       const feature = z.feature;
       if (feature?.type === 'point' && Array.isArray(feature.coords)) {
         mainMap.flyTo([z.lat, z.lng], Math.max(mainMap.getZoom(), 16), { duration: 0.8 });
@@ -1173,17 +1265,22 @@
       if (genusEditor) genusEditor.style.display = showResidentEditors ? '' : 'none';
       if (generaRow) generaRow.style.display = feature.delineation_id ? '' : 'none';
       if (notesEditor) notesEditor.style.display = showResidentEditors ? '' : 'none';
+      // The "Details" heading belongs to the genus and notes fields.
+      const detailsTitle = document.getElementById('delineationDetailsTitle');
+      if (detailsTitle) detailsTitle.style.display = showResidentEditors ? '' : 'none';
 
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
         const isUnsaved = !feature.delineation_id;
         // Unsaved shapes (hand-drawn or AI draft areas) can be dropped one by one before saving.
         // Experts can remove any saved delineation (approved ones included); a resident's rejected one only
-        // once the resident's week to revise it is over.
+        // once the resident's week to revise it is over. Hidden while editing, like Delete on the
+        // Planting Recommendation panel.
         const canExpertRemove = expertCanRemoveDelineation(feature);
         const canOwnerRemove = feature.is_own && !feature.is_approved;
-        removeBtn.style.display = ((isUnsaved || canOwnerRemove || canExpertRemove) && !feature.is_editing_revision && !feature.is_editing_boundary) ? 'block' : 'none';
-        removeBtn.textContent = isUnsaved
+        setRemoveDelineationVisible((isUnsaved || canOwnerRemove || canExpertRemove) && !feature.is_editing_revision && !feature.is_editing_boundary);
+        const removeLabel = removeBtn.querySelector('span'); // absent while the button shows its busy spinner
+        if (removeLabel) removeLabel.textContent = isUnsaved
           ? 'Remove this area'
           : (canExpertRemove && !feature.is_own && feature.is_rejected && !feature.is_approved ? 'Remove rejected delineation' : 'Remove delineation');
       }
@@ -1203,11 +1300,14 @@
         // '' (not 'block') when shown: on mobile the CSS makes the wrapper display:contents so Resubmit floats.
         revisionActions.style.display = canRevise ? '' : 'none';
         document.getElementById('startRejectedRevisionBtn').style.display = canRevise && !feature.is_editing_revision ? 'block' : 'none';
-        document.getElementById('saveRejectedRevisionBtn').style.display = feature.is_editing_revision ? 'block' : 'none';
-        document.getElementById('cancelRejectedRevisionBtn').style.display = feature.is_editing_revision ? 'block' : 'none';
+        document.getElementById('revisionEditingNote').style.display = feature.is_editing_revision ? 'flex' : 'none';
+        document.getElementById('revisionActionRow').style.display = feature.is_editing_revision ? '' : 'none';
       }
 
-      document.getElementById('delineationFeatureType').textContent = feature.type || '-';
+      // "Source": where the boundary came from. Delineations are only drawn as areas, so the shape says nothing.
+      document.getElementById('delineationFeatureType').textContent = feature.drone_imagery_layer_id
+        ? 'Drone imagery (AI-assisted)'
+        : (feature.source === 'ai' ? 'Drone imagery AI (draft)' : 'Drawn on the map');
       document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
       const locationEl = document.getElementById('delineationFeatureLocation');
       if (locationEl) {
@@ -1253,19 +1353,6 @@
         rejectionNotes.textContent = '';
       }
       renderRejectionHint(feature);
-
-      const submitterRow = document.getElementById('delineationSubmitterRow');
-      const submitterEl = document.getElementById('delineationSubmitter');
-      if (submitterRow && submitterEl) {
-        const submitter = feature.created_by || feature.submitted_by;
-        if (isExpertUser && submitter && !feature.is_own) {
-          submitterRow.style.display = '';
-          submitterEl.textContent = submitter;
-        } else {
-          submitterRow.style.display = 'none';
-          submitterEl.textContent = '-';
-        }
-      }
 
       const expertReview = document.getElementById('expertReviewActions');
       if (expertReview) {
@@ -1495,7 +1582,9 @@
         finishRejectedDelineationRevision();
         redrawFeatures();
         selectDrawnFeature(activeIndex >= 0 ? activeIndex : selectedIndex);
-        showSuccessModal(payload.message || 'Revised delineation submitted for expert review.');
+        // After "Got it", reload from the server so the list, pins and panel show the resubmitted record.
+        await showSuccessModal(payload.message || 'Revised delineation submitted for expert review.');
+        await refreshMapData({ selectDelineationId: feature.delineation_id });
       } catch (error) {
         setButtonLoading(submitRevisionBtn, false);
         if (cancelRevisionBtn) cancelRevisionBtn.disabled = false;
@@ -1514,6 +1603,12 @@
       return !!feature.is_own && !feature.is_approved && !feature.is_rejected;
     }
 
+    // The Remove button sits in its own zone at the bottom of the panel (dashed line above it).
+    function setRemoveDelineationVisible(visible) {
+      const zone = document.getElementById('removeDelineationZone');
+      if (zone) zone.style.display = visible ? 'block' : 'none';
+    }
+
     function updateBoundaryEditActions(feature) {
       const actions = document.getElementById('boundaryEditActions');
       if (!actions) return;
@@ -1522,9 +1617,9 @@
       // '' (not 'block') when shown: on mobile the CSS makes the wrapper display:contents so Save floats.
       actions.style.display = canEdit ? '' : 'none';
       document.getElementById('startBoundaryEditBtn').style.display = canEdit && !editing ? 'block' : 'none';
+      document.getElementById('boundaryEditingNote').style.display = editing ? 'flex' : 'none';
       document.getElementById('boundaryEditHint').style.display = editing ? 'block' : 'none';
-      document.getElementById('saveBoundaryEditBtn').style.display = editing ? 'block' : 'none';
-      document.getElementById('cancelBoundaryEditBtn').style.display = editing ? 'block' : 'none';
+      document.getElementById('boundaryEditActionRow').style.display = editing ? '' : 'none';
       const recordAs = document.getElementById('boundaryRecordAs');
       if (recordAs) recordAs.style.display = editing ? 'block' : 'none';
       const deleteVertexBtn = document.getElementById('deleteBoundaryVertexBtn');
@@ -1584,6 +1679,7 @@
       const previousDrawingMode = boundaryEdit?.previousDrawingMode || null;
       boundaryEdit = null;
       selectedEditVertex = null;
+      setBoundaryEditFocus(false);
       resetBoundaryObservationChoice();
       setRejectedRevisionControlsLocked(false);
       // Restore the drawing mode that was active before editing (e.g. line mode on the Delineate page).
@@ -1631,10 +1727,19 @@
       if (drawTypeSelect) drawTypeSelect.value = '';
       document.querySelectorAll('.draw-btn[data-mode]').forEach(button => button.classList.remove('active'));
       setRejectedRevisionControlsLocked(true, false);
+      setBoundaryEditFocus(true);
 
       redrawFeatures();
       updateHistoryButtons();
       selectDrawnFeature(selectedDrawnIndex);
+    }
+
+    // While a boundary is edited, the panel shows only the edit controls and the map toolbar only Undo / Redo
+    // (CSS in workspace-styles), so the other info and buttons don't get in the way.
+    function setBoundaryEditFocus(on) {
+      document.body.classList.toggle('is-boundary-editing', on);
+      document.getElementById('mapRightPanel')?.scrollTo?.({ top: 0 });
+      document.querySelector('#mapRightPanel .scroll')?.scrollTo?.({ top: 0 });
     }
 
     function cancelBoundaryEdit(restoreSelection = true) {
@@ -1727,9 +1832,11 @@
         finishBoundaryEdit();
         redrawFeatures();
         if (activeIndex >= 0) selectDrawnFeature(activeIndex);
+        // After "Got it", reload from the server so the new area, location and "last edited by" show everywhere.
+        await showSuccessModal(payload.message || 'Delineation boundary updated.', 'Changes saved');
+        await refreshMapData({ selectDelineationId: delineationId });
         // Show the new year in "Changes over time" and the coverage trend.
         if (payload.observation_year) loadAnnualObservationCharts(delineationId);
-        showSuccessModal(payload.message || 'Delineation boundary updated.', 'Changes saved');
       } catch (error) {
         window.AppActions.notify(error.message || 'Unable to save the boundary changes. Please try again.', 'error');
       } finally {
@@ -2011,10 +2118,12 @@
             }
             return payload;
           },
-          successMessage: payload => payload.message || 'Delineation deleted.',
         });
-        // Reload so the record disappears everywhere it is listed (after the message has been seen).
-        if (outcome.status === 'done') setTimeout(() => window.location.reload(), 1200);
+        // After "Got it", reload the map data so the record disappears everywhere it is listed, and close its panel.
+        if (outcome.status === 'done') {
+          await showSuccessModal(outcome.result?.message || 'Delineation deleted.', 'Removed');
+          if (!(await refreshMapData({ selectDelineationId: null }))) window.location.reload(); // refresh failed
+        }
         return;
       }
 
@@ -2338,7 +2447,9 @@
         }
 
         setSaveButtonSaving(false);
-        showSuccessModal(payload.message || 'Delineation saved and submitted for expert review.');
+        // After "Got it", reload from the server so the new delineation shows with its saved status, location and genus.
+        await showSuccessModal(payload.message || 'Delineation saved and submitted for expert review.');
+        if (payload.delineation?.id) await refreshMapData({ selectDelineationId: payload.delineation.id });
       } catch (error) {
         setSaveButtonSaving(false);
         console.error('Delineation save failed:', error);
@@ -2490,20 +2601,28 @@
 
         // Restore first so re-selecting the feature can reset the review controls.
         restoreReviewButtons();
-        showSuccessModal(payload.message || 'Review saved.');
+        const reviewModalClosed = showSuccessModal(payload.message || 'Review saved.');
         if (selectedDrawnIndex >= 0) {
           selectDrawnFeature(selectedDrawnIndex);
         }
-        // Reload once the message has been seen so the reviewed delineation is shown everywhere with its new
-        // status (approved ones join the community layers and zone list), reopened on the same delineation.
+        // After "Got it", reload the map data so the reviewed delineation shows everywhere with its new status
+        // (approved ones join the community layers and zone list), reopened on the same delineation.
         if (approveBtn) approveBtn.disabled = true;
         if (rejectBtn) rejectBtn.disabled = true;
-        setTimeout(() => {
-          const reloadUrl = new URL(window.location.href);
-          reloadUrl.searchParams.set('delineation', String(delineationId));
-          reloadUrl.searchParams.delete('ai_layer');
-          window.location.replace(reloadUrl.toString());
-        }, 1200);
+        await reviewModalClosed;
+        if (await refreshMapData({ selectDelineationId: delineationId })) {
+          if (approveBtn) approveBtn.disabled = false;
+          if (rejectBtn) rejectBtn.disabled = false;
+        } else {
+          if (approveBtn) approveBtn.disabled = true;
+          if (rejectBtn) rejectBtn.disabled = true;
+          setTimeout(() => { // the refresh failed: fall back to a page reload
+            const reloadUrl = new URL(window.location.href);
+            reloadUrl.searchParams.set('delineation', String(delineationId));
+            reloadUrl.searchParams.delete('ai_layer');
+            window.location.replace(reloadUrl.toString());
+          }, 1200);
+        }
       } catch (error) {
         restoreReviewButtons();
         window.AppActions.notify(error.message || 'Unable to complete review.', 'error');
@@ -3621,8 +3740,7 @@
       document.getElementById('dGenus').textContent = 'Rhizophora & Avicennia';
       document.getElementById('dScan').textContent = `${epoch.year} Satellite Epoch`;
 
-      const removeBtn = document.getElementById('removeDelineationBtn');
-      if (removeBtn) removeBtn.style.display = 'none';
+      setRemoveDelineationVisible(false);
 
       updateTemporalEpochList();
 

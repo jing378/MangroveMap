@@ -99,7 +99,11 @@
     // The slider moves in 5% steps, so a saved 0.78 shows as 80%: within half a step counts as unchanged.
     const opacityChanged = () => Math.abs(state.opacity - saved.opacity) >= 0.025;
     // detailsChanged (section 3: name, genus, notes) is a hoisted function declaration further down.
-    const hasUnsavedChanges = () => areasChanged() || opacityChanged() || detailsChanged();
+    // Canopy pins removed since the last save (keys from canopyKey), sent with Save draft / Confirm.
+    const removedCanopies = new Set();
+    const canopyKey = center => `${Number(center[0]).toFixed(7)},${Number(center[1]).toFixed(7)}`;
+    const canopiesChanged = () => removedCanopies.size > 0;
+    const hasUnsavedChanges = () => areasChanged() || canopiesChanged() || opacityChanged() || detailsChanged();
 
     const ai = {
       status: editor.segmentation_status,
@@ -109,6 +113,9 @@
       loaded: false,
       pollTimer: null,
     };
+    // Every canopy the canopy model pinpointed (canopies_url): clickable shapes coloured by genus, plus pins when
+    // zoomed out. Loaded the first time they are shown; a new AI run replaces them.
+    const canopies = { url: editor.canopies_url || null, payload: null, shown: false, loading: false };
     // Live genus suggestion for unsaved area edits (see scheduleGenusPreview).
     const GENUS_PREVIEW_DELAY_MS = 800;
     const GENUS_MIN_CONFIDENT_PERCENT = 1; // "Confident" tag only when confident detections cover >= 1% of the area
@@ -131,6 +138,9 @@
     map.createPane('dronePreview');
     map.getPane('dronePreview').style.zIndex = 350;
     map.getPane('dronePreview').style.pointerEvents = 'none';
+    // Canopy pins sit above the areas so they stay clickable while the areas are edited.
+    map.createPane('droneCanopies');
+    map.getPane('droneCanopies').style.zIndex = 450;
 
     const source = editor.preview_bounds;
     const centerLatitude = (source.south + source.north) / 2;
@@ -152,7 +162,7 @@
       opacity: state.opacity,
       interactive: false,
     }).addTo(map);
-    preview.on('error', () => showMessage('The imagery preview could not be loaded. Reload the page to try again.', true));
+    preview.on('error', () => showMessage('The preview failed to load. Reload the page.', true));
     // On mobile the peeking sheet covers the bottom of the map (min(355px, 45vh), see the view's CSS):
     // keep fitted content above it.
     function fitOptions(pad) {
@@ -203,6 +213,9 @@
     // Draw: keeps drawing new mangrove areas until toggled off. Edit: every area shows its corners;
     // drag a corner to move it, double-click it to delete it (like the manual delineation).
     const toggles = { draw: false, edit: false };
+    // Mangrove areas hidden on the map (Hide areas, see setAreasHidden).
+    let areasHidden = false;
+    const areasToggle = document.getElementById('droneEditorAreasToggle');
 
     // Toggle buttons in the top toolbar (next to Undo / Redo).
     const drawToggle = document.getElementById('droneEditorDrawToggle');
@@ -214,7 +227,7 @@
       removeLayerBelowMinVertexCount: false,
       removeVertexValidation: ({ layer: edited }) => {
         if (outerRing(edited).length > 3) return true;
-        showMessage('An area needs at least 3 corners. Move this corner instead, or remove the whole area.', true);
+        showMessage('An area needs at least 3 corners.', true);
         return false;
       },
     };
@@ -228,8 +241,12 @@
         button.classList.toggle('is-active', on);
         button.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
-      drawToggle.disabled = aiIsRunning();
-      editToggle.disabled = aiIsRunning() || (!areas().length && !toggles.edit);
+      // Hidden areas cannot be drawn on or edited (see setAreasHidden).
+      drawToggle.disabled = aiIsRunning() || areasHidden;
+      editToggle.disabled = aiIsRunning() || areasHidden || (!areas().length && !toggles.edit);
+      drawToggle.title = areasHidden ? 'Show the AI delineation to draw' : 'Draw areas (click again to stop)';
+      editToggle.title = areasHidden ? 'Show the AI delineation to edit' :'Edit corners: drag to move, double-click to delete';
+      renderAreasToggle();
     }
 
     function setEditing(on) {
@@ -240,7 +257,7 @@
       if (on) {
         map.doubleClickZoom.disable(); // so double-clicking a corner deletes it instead of zooming
         areas().forEach(enableCornerEditing);
-        showMessage('Edit is on: drag a corner to move it, double-click a corner to delete it. Click Edit again when you are done.');
+        showMessage('Edit on: drag a corner to move it, double-click to delete it.');
       } else {
         areas().forEach(layer => layer.pm.disable());
         map.doubleClickZoom.enable();
@@ -260,7 +277,7 @@
         setEditing(false);
         toggles.draw = true; // before enableDraw, which fires pm:drawstart right away
         map.pm.enableDraw('Polygon', { pathOptions: AREA_STYLE, allowSelfIntersection: false, continueDrawing: true });
-        showMessage('Draw is on: click on the map to place the corners, click the first corner to finish an area. Keep drawing, or click Draw again to stop.');
+        showMessage('Draw on: click to add corners, click the first corner to finish.');
       } else {
         toggles.draw = false;
         map.pm.disableDraw();
@@ -297,18 +314,66 @@
         L.DomEvent.stopPropagation(event);
         openAreaPopup(layer, event.latlng);
       });
-      layer.on('mouseover', () => layer.setStyle({ weight: 4 }));
-      layer.on('mouseout', () => layer.setStyle({ weight: AREA_STYLE.weight }));
+      layer.on('mouseover', () => { if (!areasHidden) layer.setStyle({ weight: 4 }); });
+      layer.on('mouseout', () => { if (!areasHidden) layer.setStyle({ weight: AREA_STYLE.weight }); });
       if (toggles.edit) enableCornerEditing(layer);
+      applyAreaVisibility(layer); // areas rebuilt by undo/redo or a new AI result stay hidden while hidden
       return layer;
     }
+
+    // ---- Hide / show the mangrove areas (AI delineation) ------------------------------------
+    // Hidden areas stay on the map (so nothing counts as removed or unsaved), just invisible and not
+    // clickable. Draw and Edit are off while they are hidden, so nothing changes unseen.
+    // (State: areasHidden / areasToggle, declared next to `toggles`.)
+
+    function applyAreaVisibility(layer) {
+      layer.setStyle(areasHidden
+        ? { opacity: 0, fillOpacity: 0 }
+        : { opacity: 1, fillOpacity: AREA_STYLE.fillOpacity, weight: AREA_STYLE.weight });
+      const element = layer.getElement?.();
+      if (element) element.style.pointerEvents = areasHidden ? 'none' : '';
+    }
+
+    function renderAreasToggle() {
+      if (!areasToggle) return;
+      areasToggle.hidden = !areas().length && !areasHidden;
+      // Its card (step 1) shows whether the delineation is on the map; pressed = shown.
+      const card = document.getElementById('droneEditorAreasCard');
+      if (card) {
+        card.hidden = areasToggle.hidden;
+        card.classList.toggle('is-on', !areasHidden);
+      }
+      areasToggle.setAttribute('aria-pressed', areasHidden ? 'false' : 'true');
+      areasToggle.innerHTML = areasHidden
+        ? '<i class="bi bi-eye"></i> Show'
+        : '<i class="bi bi-eye-slash"></i> Hide';
+      areasToggle.setAttribute('aria-label', areasHidden ? 'Show AI delineation' : 'Hide AI delineation');
+      areasToggle.title = areasHidden
+        ? 'Show the AI delineation'
+        : 'Hide the AI delineation (it is kept)';
+    }
+
+    function setAreasHidden(hidden) {
+      if (hidden) {
+        setDrawing(false);
+        setEditing(false);
+        map.closePopup();
+      }
+      areasHidden = hidden;
+      areas().forEach(applyAreaVisibility);
+      showMessage(hidden ? 'AI delineation hidden. It is kept; click Show on its card (step 1) to see and edit it again.' : '');
+      refresh();
+    }
+
+    areasToggle?.addEventListener('click', () => setAreasHidden(!areasHidden));
 
     function addArea(latLngs, label = null) {
       return watchArea(L.polygon(latLngs, AREA_STYLE).addTo(map), label);
     }
 
     // ---- Undo / redo (like the manual delineation): snapshots of all mangrove areas ----------
-    // Every change (draw, remove, move or delete a corner) records a snapshot; undo/redo rebuilds the areas.
+    // Every change (draw, remove, move or delete a corner, remove a canopy) records a snapshot of the
+    // areas and the removed canopies; undo/redo rebuilds them.
     const HISTORY_LIMIT = 100;
     const history = { states: [], index: -1 };
 
@@ -319,8 +384,12 @@
       }));
     }
 
+    function snapshotEditor() {
+      return { areas: snapshotAreas(), canopies: [...removedCanopies].sort() };
+    }
+
     function recordHistory() {
-      const snapshot = snapshotAreas();
+      const snapshot = snapshotEditor();
       const current = history.states[history.index];
       // Geoman can report one change twice (e.g. vertex removed + edit); keep a single step.
       if (current && JSON.stringify(current) === JSON.stringify(snapshot)) return;
@@ -331,8 +400,16 @@
     }
 
     function resetHistory() {
-      history.states = [snapshotAreas()];
+      history.states = [snapshotEditor()];
       history.index = 0;
+    }
+
+    // Saved canopy removals cannot be undone (the server no longer has those canopies): drop them from
+    // every step so undo/redo only brings back unsaved ones.
+    function forgetSavedCanopies(keys) {
+      history.states.forEach(snapshot => {
+        snapshot.canopies = snapshot.canopies.filter(key => !keys.has(key));
+      });
     }
 
     function restoreHistory(index) {
@@ -342,7 +419,10 @@
         layer.pm.disable();
         map.removeLayer(layer);
       });
-      history.states[index].forEach(area => addArea(area.latLngs.map(([lat, lng]) => L.latLng(lat, lng)), area.label));
+      history.states[index].areas.forEach(area => addArea(area.latLngs.map(([lat, lng]) => L.latLng(lat, lng)), area.label));
+      removedCanopies.clear();
+      history.states[index].canopies.forEach(key => removedCanopies.add(key));
+      buildCanopyLayers();
       history.index = index;
       if (toggles.edit && !areas().length) setEditing(false);
       refresh();
@@ -397,7 +477,7 @@
       }
       const hint = document.createElement('span');
       hint.style.color = '#4c6b5d';
-      hint.textContent = 'Not mangrove? Remove it so it is left out of the delineation.';
+      hint.textContent = 'Not mangrove? Remove it.';
       box.append(title, hint);
       if (!toggles.edit) {
         const edit = document.createElement('button');
@@ -439,8 +519,8 @@
         remove.title = 'Remove this area';
         remove.innerHTML = '<i class="bi bi-x-lg"></i>';
         remove.addEventListener('click', () => removeArea(layer));
-        item.addEventListener('mouseenter', () => layer.setStyle({ weight: 4 }));
-        item.addEventListener('mouseleave', () => layer.setStyle({ weight: AREA_STYLE.weight }));
+        item.addEventListener('mouseenter', () => { if (!areasHidden) layer.setStyle({ weight: 4 }); });
+        item.addEventListener('mouseleave', () => { if (!areasHidden) layer.setStyle({ weight: AREA_STYLE.weight }); });
         item.append(label);
         if (!editor.read_only) item.append(remove);
         aiList.appendChild(item);
@@ -469,7 +549,7 @@
       try {
         const response = await fetch(ai.url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.message || 'Unable to load the AI mangrove areas.');
+        if (!response.ok) throw new Error(body.message || 'Could not load the mangrove areas.');
         if (body.stats) ai.stats = body.stats;
         setEditing(false);
         setDrawing(false);
@@ -488,8 +568,271 @@
       refresh();
     }
 
+    // ---- Pinpointed canopies ----------------------------------------------------------------
+    const CANOPY_PIN_MAX_ZOOM = 18; // centre pins below this zoom; from here on the canopy shapes are big enough
+    const GENUS_COLORS = { rhizophora: '#e4572e', avicennia: '#2e86de', sonneratia: '#f5b700', nypa: '#8e44ad', bruguiera: '#16a085', ceriops: '#d35400' };
+    const FALLBACK_GENUS_COLORS = ['#ff6f91', '#00b8a9', '#f8a100', '#7b61ff', '#4caf50', '#ff3d3d'];
+    const canopyToggle = document.getElementById('droneEditorCanopyToggle');
+    const canopyLegend = document.getElementById('droneEditorCanopyLegend');
+    const canopyPins = L.layerGroup();
+    const canopyOutlines = L.layerGroup();
+    const genusColorCache = new Map();
+
+    function canopyColor(genus) {
+      const key = String(genus || '').trim().toLowerCase();
+      if (GENUS_COLORS[key]) return GENUS_COLORS[key];
+      if (!genusColorCache.has(key)) genusColorCache.set(key, FALLBACK_GENUS_COLORS[genusColorCache.size % FALLBACK_GENUS_COLORS.length]);
+      return genusColorCache.get(key);
+    }
+
+    const escapeText = text => String(text ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+    // The canopies were placed at the AI run's offset (payload.offset): shift them like the areas (aiLatLngs).
+    function canopyLatLng(point, stored) {
+      const shift = metresToDegrees(state.offset.east_m - (Number(stored?.east_m) || 0), state.offset.north_m - (Number(stored?.north_m) || 0));
+      return L.latLng(point[0] + shift.lat, point[1] + shift.lng);
+    }
+
+    // A canopy can be several separate patches (rings; older results only have "coords", a single ring).
+    // Each patch is its own shape and can be removed on its own ("r:" + its first point); a canopy without
+    // an outline is removed as a whole ("c:" + its centre). A canopy with every patch removed is gone.
+    const canopyRings = canopy => (Array.isArray(canopy.rings) ? canopy.rings : [canopy.coords])
+      .filter(ring => Array.isArray(ring) && ring.length >= 3);
+    const ringRemovalKey = ring => `r:${canopyKey(ring[0])}`;
+    const canopyRemovalKey = canopy => `c:${canopyKey(canopy.center)}`;
+    const remainingRings = canopy => canopyRings(canopy).filter(ring => !removedCanopies.has(ringRemovalKey(ring)));
+    function canopyRemoved(canopy) {
+      if (!Array.isArray(canopy.center) || canopy.center.length < 2) return true;
+      if (removedCanopies.has(canopyRemovalKey(canopy))) return true;
+      return canopyRings(canopy).length > 0 && remainingRings(canopy).length === 0;
+    }
+
+    function buildCanopyLayers() {
+      canopyPins.clearLayers();
+      canopyOutlines.clearLayers();
+      const payload = canopies.payload;
+      if (!payload) return;
+      (payload.canopies || []).forEach(canopy => {
+        if (canopyRemoved(canopy)) return;
+        const color = canopyColor(canopy.genus);
+        const percent = Math.round((Number(canopy.confidence) || 0) * 100);
+        const label = `${escapeText(canopy.genus || 'Mangrove')} · ${percent}%`;
+        const rings = remainingRings(canopy);
+        const pin = L.circleMarker(canopyLatLng(canopy.center, payload.offset), {
+          pane: 'droneCanopies', radius: 5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95,
+        });
+        pin.bindTooltip(label, { direction: 'top', offset: [0, -6], className: 'drone-canopy-tooltip' });
+        pin.bindPopup(() => canopyPopup(canopy, percent, null));
+        if (!rings.length) { // no outline: the pin is the canopy at every zoom
+          canopyOutlines.addLayer(pin);
+          return;
+        }
+        canopyPins.addLayer(pin);
+        // Every patch is its own clickable shape, like a mangrove area (details and "Remove this canopy").
+        rings.forEach(ring => {
+          const shape = L.polygon(ring.map(point => canopyLatLng(point, payload.offset)), {
+            pane: 'droneCanopies', color, weight: 2, fillColor: color, fillOpacity: 0.25, bubblingMouseEvents: false,
+          });
+          shape.bindTooltip(label, { sticky: true, className: 'drone-canopy-tooltip' });
+          shape.bindPopup(() => canopyPopup(canopy, percent, ring));
+          shape.on('mouseover', () => shape.setStyle({ weight: 4, fillOpacity: 0.4 }));
+          shape.on('mouseout', () => shape.setStyle({ weight: 2, fillOpacity: 0.25 }));
+          canopyOutlines.addLayer(shape);
+        });
+      });
+    }
+
+    // Details, plus "Remove this canopy" while the imagery can still be edited (like the areas' popup).
+    // ring: the clicked patch (removes only that shape); null for the pin (removes the whole canopy).
+    function canopyPopup(canopy, percent, ring) {
+      const box = document.createElement('div');
+      box.style.cssText = 'display:grid;gap:6px;font:13px Manrope,sans-serif;min-width:180px;max-width:240px';
+      const details = document.createElement('div');
+      const patches = remainingRings(canopy).length;
+      const areaM2 = ring ? ringAreaHa(ring.map(([lat, lng]) => L.latLng(lat, lng))) * 10000 : canopy.area_m2;
+      details.innerHTML = `<strong>${escapeText(canopy.genus || 'Mangrove')}</strong><br>Confidence ${percent}%`
+        + (areaM2 != null ? `<br>Canopy about ${Number(areaM2).toFixed(1)} m²` : '');
+      box.append(details);
+      if (!editor.read_only && !aiIsRunning()) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'drone-editor-btn';
+        remove.style.color = '#b42318';
+        remove.innerHTML = !ring && patches > 1
+          ? `<i class="bi bi-x-circle"></i> Remove all ${patches} shapes`
+          : '<i class="bi bi-x-circle"></i> Remove this canopy';
+        remove.addEventListener('click', () => removeCanopy(canopy, ring));
+        box.append(remove);
+      }
+      return box;
+    }
+
+    function removeCanopy(canopy, ring) {
+      map.closePopup();
+      if (ring) {
+        removedCanopies.add(ringRemovalKey(ring));
+      } else {
+        const rings = remainingRings(canopy);
+        if (rings.length) rings.forEach(each => removedCanopies.add(ringRemovalKey(each)));
+        else removedCanopies.add(canopyRemovalKey(canopy));
+      }
+      buildCanopyLayers();
+      markChanged();
+      showMessage(`${canopy.genus || 'Mangrove'} canopy removed. Use Undo at the top of the map to bring it back.`);
+    }
+
+    // Canopy counts as the owner sees them: the AI's minus the canopies with nothing left.
+    function visibleCanopyCounts() {
+      const payload = canopies.payload;
+      const byGenus = { ...(payload?.by_genus || ai.stats?.canopies_by_genus || {}) };
+      let removed = 0;
+      (payload?.canopies || []).forEach(canopy => {
+        if (!Array.isArray(canopy.center) || !canopyRemoved(canopy)) return;
+        removed++;
+        if (canopy.genus && Number(byGenus[canopy.genus]) > 0) byGenus[canopy.genus] = Number(byGenus[canopy.genus]) - 1;
+      });
+      const total = Number(ai.stats?.canopy_count ?? payload?.count ?? 0) - removed;
+      const kept = Number(payload?.kept || (payload?.canopies || []).length) - removed;
+      return { total: Math.max(0, total), kept: Math.max(0, kept), byGenus };
+    }
+
+    // Save draft / Confirm: the removed canopies are saved like the area corrections.
+    async function saveCanopies() {
+      if (!canopiesChanged() || !canopies.url) return;
+      const sent = new Set(removedCanopies);
+      const points = prefix => [...sent].filter(key => key.startsWith(prefix)).map(key => key.slice(2).split(',').map(Number));
+      const body = await send(canopies.url, 'PUT', { removed: points('c:'), removed_rings: points('r:') });
+      canopies.payload = canopies.payload ? { ...canopies.payload, ...body } : null;
+      ai.stats = { ...(ai.stats || {}), canopy_count: body.count, canopies_by_genus: body.by_genus };
+      sent.forEach(key => removedCanopies.delete(key));
+      forgetSavedCanopies(sent);
+      buildCanopyLayers();
+    }
+
+    function renderCanopyLegend() {
+      if (!canopyLegend) return;
+      const payload = canopies.payload;
+      if (!canopies.shown || !payload) {
+        canopyLegend.hidden = true;
+        canopyLegend.replaceChildren();
+        return;
+      }
+      canopyLegend.replaceChildren();
+      const counts = visibleCanopyCounts();
+      const byGenus = Object.entries(counts.byGenus).filter(([, count]) => Number(count) > 0).sort((a, b) => b[1] - a[1]);
+      byGenus.forEach(([genus, count]) => {
+        const chip = document.createElement('span');
+        const dot = document.createElement('i');
+        dot.style.background = canopyColor(genus);
+        dot.setAttribute('aria-hidden', 'true');
+        chip.append(dot, document.createTextNode(`${genus} ${Number(count).toLocaleString()}`));
+        canopyLegend.append(chip);
+      });
+      const note = document.createElement('small');
+      const { total, kept } = counts;
+      // How to use them is on the card; the note only says when not every canopy is drawn.
+      if (kept < total) {
+        note.textContent = `Showing the ${kept.toLocaleString()} largest of ${total.toLocaleString()}.`;
+        canopyLegend.append(note);
+      }
+      canopyLegend.hidden = false;
+    }
+
+    function syncCanopyLayers() {
+      // The shapes are always shown; the centre pins only when zoomed out, where the shapes get too small to spot.
+      const showOutlines = canopies.shown && Boolean(canopies.payload);
+      const showPins = showOutlines && map.getZoom() < CANOPY_PIN_MAX_ZOOM;
+      if (showPins && !map.hasLayer(canopyPins)) canopyPins.addTo(map);
+      if (!showPins && map.hasLayer(canopyPins)) map.removeLayer(canopyPins);
+      if (showOutlines && !map.hasLayer(canopyOutlines)) canopyOutlines.addTo(map);
+      if (!showOutlines && map.hasLayer(canopyOutlines)) map.removeLayer(canopyOutlines);
+    }
+    map.on('zoomend', syncCanopyLayers);
+
+    function renderCanopies() {
+      if (!canopyToggle) return;
+      const available = ai.status === 'ready' && Boolean(canopies.url);
+      canopyToggle.hidden = !available;
+      canopyToggle.setAttribute('aria-pressed', canopies.shown ? 'true' : 'false');
+      canopyToggle.disabled = canopies.loading;
+      const count = visibleCanopyCounts().total;
+      // Its card (step 1) shows whether the classification is on the map, and how many canopies it has.
+      const card = document.getElementById('droneEditorCanopyCard');
+      if (card) {
+        card.hidden = !available;
+        card.classList.toggle('is-on', canopies.shown && !canopies.loading);
+      }
+      const countElement = document.getElementById('droneEditorCanopyCount');
+      if (countElement) countElement.textContent = count ? `· ${count.toLocaleString()} canop${count === 1 ? 'y' : 'ies'}` : '';
+      canopyToggle.innerHTML = canopies.loading ? '<i class="bi bi-hourglass-split"></i> Loading…'
+        : (canopies.shown ? '<i class="bi bi-eye-slash"></i> Hide' : '<i class="bi bi-eye"></i> Show');
+      canopyToggle.setAttribute('aria-label', canopies.shown ? 'Hide mangrove classification' : 'Show mangrove classification');
+      canopyToggle.title = canopies.shown ? 'Hide on the map' : 'Show on the map';
+      syncCanopyLayers();
+      renderCanopyLegend();
+    }
+
+    async function loadCanopies() {
+      if (!canopies.url || canopies.loading) return;
+      canopies.loading = true;
+      renderCanopies();
+      try {
+        const response = await fetch(canopies.url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.message || 'Could not load the canopies.');
+        canopies.payload = body;
+        buildCanopyLayers();
+      } catch (error) {
+        canopies.shown = false;
+        showMessage(error.message, true);
+      }
+      canopies.loading = false;
+      renderCanopies();
+    }
+
+    // A new AI run (or a reloaded result) replaces the canopies.
+    function resetCanopies(url) {
+      canopies.url = url || null;
+      canopies.payload = null;
+      canopies.shown = false;
+      removedCanopies.clear();
+      history.states.forEach(snapshot => { snapshot.canopies = []; });
+      canopyPins.clearLayers();
+      canopyOutlines.clearLayers();
+      renderCanopies();
+    }
+
+    // Opening view (and after an AI run): the mangrove classification first; the AI delineation stays
+    // hidden until "Show AI delineation". Without a classification the delineation shows as before.
+    async function showClassificationFirst() {
+      if (!canopies.url || canopies.shown) return;
+      if (areas().length) {
+        setDrawing(false);
+        setEditing(false);
+        areasHidden = true;
+        areas().forEach(applyAreaVisibility);
+      }
+      canopies.shown = true;
+      await loadCanopies();
+      if (!canopies.shown && areasHidden) { // the classification failed to load: show the delineation instead
+        areasHidden = false;
+        areas().forEach(applyAreaVisibility);
+      }
+      refresh();
+    }
+
+    canopyToggle?.addEventListener('click', async () => {
+      canopies.shown = !canopies.shown;
+      if (canopies.shown && !canopies.payload) {
+        await loadCanopies();
+        return;
+      }
+      renderCanopies();
+    });
+
     function renderAi() {
       aiStatusElement.classList.toggle('is-failed', ai.status === 'failed');
+      renderCanopies();
       aiRunButton.hidden = editor.read_only || aiIsRunning();
       if (aiRunButton.dataset.loading !== 'true') { // keep the busy label while the request runs
         aiRunButton.innerHTML = `<i class="bi bi-cpu"></i> ${ai.status === 'ready' ? 'Re-run AI' : (ai.status === 'failed' ? 'Retry AI detection' : 'Run AI detection')}`;
@@ -501,18 +844,20 @@
       const edited = unsavedAreas || ai.stats?.edited;
       if (ai.status === 'queued' || ai.status === 'processing') {
         aiStatusElement.textContent = ai.status === 'queued'
-          ? 'Waiting for the AI to start detecting mangroves…'
-          : 'The AI is detecting mangroves… This can take a few minutes. The areas appear here when it is done.';
+          ? 'Waiting for the AI to start…'
+          : 'AI is detecting mangroves… (a few minutes)';
       } else if (ai.status === 'failed' && !all.length) {
         aiStatusElement.textContent = `AI detection failed: ${ai.error || 'unknown error'}. You can retry it, or draw the mangrove areas yourself.`;
       } else if (all.length) {
+        const canopyCount = Number(ai.stats?.canopy_count ?? 0);
         aiStatusElement.textContent = `${all.length} mangrove area${all.length === 1 ? '' : 's'}, ${totalHa.toFixed(2)} ha`
           + (edited ? ' · corrected by you' : ' · as detected by the AI')
-          + (unsavedAreas ? ' (not saved yet)' : '');
+          + (unsavedAreas ? ' (not saved yet)' : '')
+          + (canopyCount > 0 ? ` · ${canopyCount.toLocaleString()} canop${canopyCount === 1 ? 'y' : 'ies'} pinpointed` : '');
       } else if (ai.status === 'ready' && ai.loaded) {
-        aiStatusElement.textContent = 'No mangrove areas. Draw them yourself if the AI missed some.';
+        aiStatusElement.textContent = 'No mangrove areas found. Draw any the AI missed.';
       } else if (ai.status === 'ready') {
-        aiStatusElement.textContent = 'Loading the AI mangrove areas…';
+        aiStatusElement.textContent = 'Loading mangrove areas…';
       } else {
         aiStatusElement.textContent = 'AI detection has not run on this imagery yet. Run it, or draw the mangrove areas yourself.';
       }
@@ -530,7 +875,11 @@
             ai.stats = body.segmentation_stats;
             ai.error = body.segmentation_error;
             ai.url = body.segmentation_url;
-            if (ai.status === 'ready') await loadAiAreas();
+            if (ai.status === 'ready') {
+              resetCanopies(body.canopies_url);
+              await loadAiAreas();
+              await showClassificationFirst();
+            }
           }
         } catch (error) {
           console.error('Unable to refresh the AI detection status.', error);
@@ -545,10 +894,10 @@
       // Confirmation → Processing → Success or Error (partials.action-feedback); errors use the panel's message line.
       const outcome = await window.AppActions.run({
         confirm: replacing
-          ? { title: 'Run the AI again?', message: 'Your corrections to the mangrove areas are replaced by the new AI result.', confirmLabel: 'Run AI', tone: 'danger' }
+          ? { title: 'Run the AI again?', message: 'Your area corrections will be replaced.', confirmLabel: 'Run AI', tone: 'danger' }
           : (ai.status === 'ready'
-            ? { title: 'Run AI detection again?', message: 'The current mangrove areas are replaced when it finishes.', confirmLabel: 'Run AI' }
-            : { title: 'Run AI detection?', message: 'The AI detects the mangrove areas on this imagery. This can take a few minutes.', confirmLabel: 'Run AI' }),
+            ? { title: 'Run AI detection again?', message: 'The current areas will be replaced.', confirmLabel: 'Run AI' }
+            : { title: 'Run AI detection?', message: 'Takes a few minutes.', confirmLabel: 'Run AI' }),
         button: aiRunButton,
         busyLabel: 'Starting AI...',
         lock: [saveButton, confirmButton, drawToggle, editToggle],
@@ -560,12 +909,13 @@
             credentials: 'same-origin',
           });
           const body = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(body.message || 'Unable to start AI detection.');
+          if (!response.ok) throw new Error(body.message || 'Could not start AI detection.');
         },
       });
       if (outcome.status === 'done') {
         ai.status = 'queued';
         ai.loaded = false;
+        resetCanopies(null);
         setEditing(false);
         setDrawing(false);
         areas().forEach(layer => map.removeLayer(layer));
@@ -595,17 +945,17 @@
       if (editor.status === 'failed') {
         statusElement.textContent = `Adding this imagery to the map failed: ${editor.error_message || 'unknown error'}. Confirm again to retry.`;
       } else if (editor.read_only) {
-        statusElement.textContent = 'Approved by an expert: this imagery and its delineation are on the map. View only.';
+        statusElement.textContent = 'Approved and on the map. View only.';
       } else if (editor.status === 'ready' && editor.needs_delineation) {
-        statusElement.textContent = 'This imagery is processed, but its mangrove areas were never submitted. Choose the genus present and confirm.';
+        statusElement.textContent = 'Not submitted yet. Choose the genus and confirm.';
       } else if (editor.status === 'ready') {
         statusElement.textContent = editor.has_pending_edits
-          ? 'This imagery is processed, but saved changes to it are not applied yet. Confirm to rebuild it.'
-          : 'This imagery is processed. Its delineation is edited on the map, like any other delineation.';
+          ? 'Saved changes not applied yet. Confirm to apply.'
+          : 'Processed. Edit its delineation on the map.';
       } else {
         statusElement.textContent = editor.needs_expert_review
-          ? 'Not on the map yet. Correct the mangrove areas, choose the genus present, then submit them for expert review.'
-          : 'Not on the map yet. Correct the mangrove areas, choose the genus present, then publish.';
+          ? 'Not on the map yet. Fix the areas, choose the genus, then submit.'
+          : 'Not on the map yet. Fix the areas, choose the genus, then publish.';
       }
     }
 
@@ -619,7 +969,7 @@
       renderLocation();
     }
 
-    // ---- 3. Delineation details (first confirm only): submitted with the imagery ------------------
+    // ---- 2. Details (first confirm only): submitted with the imagery ------------------
     const generaBox = document.getElementById('droneEditorGenera');
     const otherGeneraInput = document.getElementById('droneEditorOtherGenera');
     const addGenusButton = document.getElementById('droneEditorAddGenus');
@@ -769,16 +1119,16 @@
       const edited = Boolean(ai.stats?.edited);
       if (suggestion.recountable === false || (suggestion.recountable === undefined && edited)) {
         return edited
-          ? 'Counted on the AI’s original areas: this imagery was processed before the suggestion could follow your edits. Re-run AI to enable it (this replaces your area edits).'
+          ? 'Based on the AI’s original areas. Re-run AI to follow your edits (replaces them).'
           : null;
       }
       if (areasChanged()) {
-        if (genusPreview.loading) return 'Updating for your area changes…';
-        if (genusPreview.failed) return 'Could not update the suggestion for your latest area changes. It shows the previous result.';
-        return 'Updated for your area changes.';
+        if (genusPreview.loading) return 'Updating…';
+        if (genusPreview.failed) return 'Could not update. Showing the previous result.';
+        return 'Updated for your changes.';
       }
-      if (suggestion.recount_failed) return 'Could not update the suggestion for your latest area edits. It shows the previous result.';
-      if (suggestion.recounted_at) return 'Updated for your edited mangrove areas.';
+      if (suggestion.recount_failed) return 'Could not update. Showing the previous result.';
+      if (suggestion.recounted_at) return 'Updated for your edits.';
       return null;
     }
 
@@ -796,7 +1146,7 @@
       box.hidden = false;
       if (suggestion.error) {
         const message = document.createElement('p');
-        message.textContent = 'The AI genus suggestion is not available for this imagery. Choose the genus yourself.';
+        message.textContent = 'No AI suggestion for this imagery. Choose the genus yourself.';
         box.append(message);
         return;
       }
@@ -811,7 +1161,7 @@
       }
       if (!rows.length) {
         const message = document.createElement('p');
-        message.textContent = 'The AI did not recognise a genus in these mangrove areas. Choose the genus yourself.';
+        message.textContent = 'The AI found no genus here. Choose it yourself.';
         box.append(message);
         return;
       }
@@ -822,7 +1172,7 @@
 
       const heading = document.createElement('p');
       heading.innerHTML = '<strong>AI genus suggestion</strong> <span class="drone-editor-genus-badge">Experimental</span>'
-        + '<br><small>Click a genus to add it.</small>';
+        + '<br><small>Click to add.</small>';
       section.append(heading);
 
       // The suggestion is recounted for the corrected areas when they are saved (from the AI run's genus map).
@@ -880,8 +1230,8 @@
 
       const note = document.createElement('p');
       note.textContent = suggestion.probability_basis === 'none'
-        ? 'The genus model found nothing in these areas, so every genus is shown as equally likely.'
-        : 'Check the imagery before choosing: the genus model is still being trained and is not accurate yet.';
+        ? 'Nothing found, so all genera are equally likely.'
+        : 'Still in training: check the imagery before choosing.';
       section.append(note);
       box.append(section);
     }
@@ -947,20 +1297,20 @@
     // Why Confirm cannot be used yet (null = it can).
     function confirmBlocker(unsaved) {
       // The AI job reads the mosaic that confirming rebuilds from, so wait for it to finish.
-      if (aiIsRunning()) return 'Available when AI detection has finished.';
-      if (ai.status === 'ready' && !ai.loaded) return 'Available when the mangrove areas have loaded.';
+      if (aiIsRunning()) return 'Wait for AI detection to finish.';
+      if (ai.status === 'ready' && !ai.loaded) return 'Wait for the areas to load.';
       if (editor.needs_delineation) {
         const count = areas().length;
-        if (!count) return 'Draw at least one mangrove area first (or run AI detection).';
+        if (!count) return 'Draw at least one area first.';
         if (count > editor.max_delineation_areas) {
           return `A delineation can hold up to ${editor.max_delineation_areas} areas; there are ${count}. Remove the smallest ones.`;
         }
-        if (!selectedGenera().length) return 'Choose at least one Mangrove Genus Present.';
+        if (!selectedGenera().length) return 'Choose a genus first.';
         return null;
       }
       // Already on the map: only a rebuild with something new is worth confirming.
       if (editor.status === 'ready' && !unsaved && !editor.has_pending_edits) {
-        return 'No changes to apply. Edit the mangrove areas first.';
+        return 'No changes to apply.';
       }
       return null;
     }
@@ -988,8 +1338,8 @@
         idleHtml: SAVE_IDLE_HTML,
         busyLabel: 'Saving draft...',
         title: unsaved ? '' : (editor.needs_delineation
-          ? 'No unsaved changes. Edit the mangrove areas or delineation details first.'
-          : 'No unsaved changes. Edit the mangrove areas first.'),
+          ? 'No unsaved changes.'
+          : 'No unsaved changes.'),
       });
       setActionButton(confirmButton, {
         disabled: Boolean(state.busy) || blocker !== null,
@@ -1031,6 +1381,7 @@
       ai.status = body.segmentation_status;
       ai.stats = body.segmentation_stats;
       ai.url = body.segmentation_url;
+      canopies.url = body.canopies_url || canopies.url; // the canopies are the model's: area edits keep them
       saved.areas = sent;
       if (body.location) editor.location = body.location;
       renderLocation();
@@ -1045,9 +1396,9 @@
       let text = location.text;
       if (!text) {
         text = {
-          none: 'Identified once there are mangrove areas.',
-          pending: 'Location pending boundary import.',
-        }[location.status] || 'Outside the loaded barangay boundaries.';
+          none: 'Shown once there are areas.',
+          pending: 'Pending boundary import.',
+        }[location.status] || 'Outside the loaded barangays.';
       }
       const stale = location.status !== 'none' && areasChanged();
       locationElement.textContent = stale ? `${text} (updates when you save)` : text;
@@ -1058,8 +1409,8 @@
     saveButton.addEventListener('click', async () => {
       if (saveButton.disabled) return;
       const what = editor.needs_delineation
-        ? 'Your mangrove area corrections and delineation details (name, genus, notes) are saved.'
-        : 'Your mangrove area corrections are saved.';
+        ? 'Areas and details saved.'
+        : 'Areas saved.';
       const confirmed = await window.AppActions.confirm({
         title: 'Save draft?',
         message: editor.needs_delineation || editor.status !== 'ready'
@@ -1078,6 +1429,7 @@
       showMessage('Saving…');
       try {
         await saveAiAreas();
+        await saveCanopies();
         const sentOpacity = state.opacity;
         const sentDetails = editor.needs_delineation ? delineationDetails() : null;
         const body = await send(editor.save_url, 'PUT', {
@@ -1094,7 +1446,7 @@
         editor.has_pending_edits = body.has_pending_edits;
         renderStatus();
         showMessage(editor.status === 'ready' && body.has_pending_edits
-          ? 'Saved. The mangrove areas are updated; confirm to apply the other changes.'
+          ? 'Saved. Confirm to apply the other changes.'
           : 'Saved.');
         return true;
       } catch (error) {
@@ -1110,11 +1462,11 @@
       if (confirmButton.disabled) return;
       let dialog;
       if (!editor.needs_delineation) {
-        dialog = { title: 'Confirm?', message: 'This imagery is rebuilt with your changes. It is hidden while it is processed.', confirmLabel: 'Confirm' };
+        dialog = { title: 'Confirm?', message: 'The imagery is rebuilt with your changes (hidden meanwhile).', confirmLabel: 'Confirm' };
       } else if (editor.needs_expert_review) {
-        dialog = { title: 'Submit for expert review?', message: 'The imagery is processed and its mangrove areas are submitted as a delineation. Once an expert approves it, both appear on the map.', confirmLabel: 'Submit' };
+        dialog = { title: 'Submit for expert review?', message: 'An expert reviews your areas. Once approved, they appear on the map.', confirmLabel: 'Submit' };
       } else {
-        dialog = { title: 'Publish?', message: 'The imagery is processed in the background, then it and its mangrove areas are published on the map.', confirmLabel: 'Publish' };
+        dialog = { title: 'Publish?', message: 'It is processed, then published on the map.', confirmLabel: 'Publish' };
       }
       const confirmed = await window.AppActions.confirm(dialog);
       if (!confirmed || state.busy || confirmButton.disabled) return;
@@ -1124,12 +1476,13 @@
       showMessage('Sending your edits…');
       try {
         await saveAiAreas();
+        await saveCanopies();
         const body = await send(editor.confirm_url, 'POST', {
           ...editsPayload(),
           ...(editor.needs_delineation ? { delineation: delineationDetails() } : {}),
         });
         state.leaving = true;
-        showMessage('Confirmed. Opening Drone Upload, where you can follow the progress…');
+        showMessage('Confirmed. Opening Drone Upload…');
         window.location.href = body.redirect_url || editor.back_url;
       } catch (error) {
         showMessage(error.message, true);
@@ -1144,7 +1497,8 @@
     function unsavedChangesSummary() {
       const parts = [];
       if (areasChanged()) parts.push('the mangrove areas');
-      if (detailsChanged()) parts.push('the delineation details');
+      if (canopiesChanged()) parts.push('the canopies');
+      if (detailsChanged()) parts.push('the details');
       if (opacityChanged()) parts.push('the imagery opacity');
       return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
     }
@@ -1152,8 +1506,7 @@
     async function confirmLeave(leave) {
       const answer = await window.AppActions.confirm({
         title: 'Leave without saving?',
-        message: `You changed ${unsavedChangesSummary()} and have not saved them. Save them as a draft before leaving? `
-          + 'Unsaved changes are lost.',
+        message: `You changed ${unsavedChangesSummary()}. Save a draft before leaving?`,
         confirmLabel: 'Save draft & leave',
         extraLabel: 'Leave without saving',
         cancelLabel: 'Stay on this page',
@@ -1204,7 +1557,7 @@
     renderStatus();
     resetHistory(); // starts empty; replaced when the AI areas load
     refresh();
-    loadAiAreas();
+    loadAiAreas().then(showClassificationFirst);
     scheduleAiPoll();
     setTimeout(() => map.invalidateSize(), 100);
   })();

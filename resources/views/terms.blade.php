@@ -1,7 +1,7 @@
 @php
     // Shown as the contact address in section 15. Set MAIL_FROM_ADDRESS to the project's real inbox.
     $contactEmail = config('mail.from.address');
-    $lastUpdated = 'November 5, 2026';
+    $lastUpdated = 'November 12, 2026';
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -342,9 +342,14 @@
                         protected areas.</li>
                     <li>Do not upload imagery that shows people, homes, or private property in a way that invades
                         privacy, or imagery unrelated to mangrove mapping.</li>
-                    <li>Uploaded files are stored privately. Processed tiles and segmentation results are available
-                        only to you and to administrators, unless you confirm them as a delineation, which then goes
-                        through the normal review process.</li>
+                    <li>Uploaded files are stored privately. Until the imagery is approved, the processed imagery and
+                        the AI results (mangrove areas, genus suggestion and tree canopies) are available only to you,
+                        to experts, and to administrators. When you confirm it, the mangrove areas are submitted as a
+                        delineation and go through the normal review process. Once that delineation is approved, the
+                        imagery and its AI results appear on the System's maps, including the public map. Imagery
+                        uploaded by an expert is published as soon as it is processed.</li>
+                    <li>Files uploaded to the Tile Explorer are used only to make tiles for you to download. They are
+                        never added to the map or sent for review, and only you can see them.</li>
                     <li>Processing large files can take a long time and may fail. The System may limit file size and
                         the number of uploads, and does not guarantee that every file can be processed.</li>
                 </ul>
@@ -447,7 +452,7 @@
                     You keep ownership of the content and imagery you submit. By submitting it, you give the System
                     and its operators a non-exclusive, royalty-free license to store, process, display, and share it
                     within the System and for mangrove research, education, and conservation purposes, including
-                    showing approved delineations on the public map.
+                    showing approved delineations and drone imagery on the public map.
                 </p>
                 <p>
                     The System's software, design, and compiled map data belong to its developers and operators.

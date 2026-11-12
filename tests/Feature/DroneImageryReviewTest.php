@@ -69,6 +69,8 @@ class DroneImageryReviewTest extends TestCase
         $this->actingAs($owner)->get(route('drone-imagery.edit', $layer->id))
             ->assertOk()
             ->assertSee('Confirm &amp; submit for review', false)
+            ->assertSee('Quick guide')
+            ->assertSee('An expert reviews it before it goes on the map.')
             ->assertSee(str_replace('/', '\/', route('drone-imagery.preview', $layer->id)), false);
 
         $this->actingAs($owner)->get(route('drone-imagery.preview', $layer->id))
