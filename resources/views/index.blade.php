@@ -1809,6 +1809,8 @@
       grid-template-columns: minmax(0, 1fr);
       justify-items: center;
       overflow: hidden;
+      overflow-x: visible;
+      overflow-y: clip;
       padding-bottom: 0.14em;
       margin-bottom: -0.14em;
       transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2011,9 +2013,11 @@
       transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
     }
 
-    .how-step:hover {
-      transform: translateX(4px);
-      border-color: rgba(30, 158, 98, 0.35);
+    @media (hover: hover) {
+      .how-step:hover {
+        transform: translateX(4px);
+        border-color: rgba(30, 158, 98, 0.35);
+      }
     }
 
     .how-step:focus-visible {
@@ -2298,6 +2302,62 @@
 
       .how-section {
         padding: 0 18px 60px 18px;
+      }
+
+      .how-layout {
+        gap: 14px;
+      }
+
+      .how-steps {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .how-step {
+        grid-template-columns: 1fr;
+        justify-items: start;
+        gap: 8px;
+        padding: 12px;
+        height: 100%;
+      }
+
+      .how-step-num {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+        border-radius: 10px;
+      }
+
+      .how-step-title {
+        font-size: 13.5px;
+        line-height: 1.3;
+      }
+
+      .how-step-sub,
+      .how-step br {
+        display: none;
+      }
+
+      .how-stage {
+        min-height: 340px;
+      }
+
+      .how-panel h3 {
+        font-size: 19px;
+      }
+
+      .how-panel p {
+        font-size: 13.5px;
+      }
+
+      .footer-nav {
+        flex-wrap: wrap;
+        gap: 12px 20px;
+      }
+
+      .footer-nav a {
+        white-space: nowrap;
       }
 
       .how-panel {

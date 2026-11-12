@@ -432,6 +432,93 @@
         margin: 8px 0 12px;
     }
 
+    /* ---------- Card animations ---------- */
+    /* Cards rise in one after another when the page opens. */
+    .guide-task {
+        position: relative;
+        overflow: hidden;
+        animation: guideCardIn .5s cubic-bezier(.16, 1, .3, 1) backwards;
+        animation-delay: calc(var(--i, 0) * 45ms);
+    }
+
+    @keyframes guideCardIn {
+        from { opacity: 0; transform: translateY(12px) scale(.97); }
+    }
+
+    .guide-task-icon {
+        transition: transform .3s cubic-bezier(.34, 1.56, .64, 1), background .2s ease, color .2s ease;
+    }
+
+    .guide-task:hover .guide-task-icon {
+        transform: scale(1.1) rotate(-6deg);
+    }
+
+    /* Press: the card sinks, the icon fills green. */
+    .guide-task:active,
+    .guide-task.is-pressed {
+        transform: scale(.96) !important;
+        transition-duration: .08s;
+    }
+
+    .guide-task.is-pressed .guide-task-icon {
+        background: #1e9e62;
+        color: #fff;
+        transform: scale(1.15) rotate(-8deg);
+    }
+
+    /* Ripple from where the card was clicked (--rx/--ry set in JS). */
+    .guide-ripple {
+        position: absolute;
+        left: var(--rx);
+        top: var(--ry);
+        width: 12px;
+        height: 12px;
+        margin: -6px 0 0 -6px;
+        border-radius: 50%;
+        background: rgba(30, 158, 98, .28);
+        pointer-events: none;
+        animation: guideRipple .6s ease-out forwards;
+    }
+
+    @keyframes guideRipple {
+        to { transform: scale(40); opacity: 0; }
+    }
+
+    /* The section you jumped to glows and its icon bounces. */
+    .guide-section.is-arriving {
+        animation: guideArrive 1.6s ease-out;
+    }
+
+    .guide-section.is-arriving .guide-section-head .guide-task-icon {
+        animation: guideIconBounce .7s cubic-bezier(.34, 1.56, .64, 1) .25s;
+    }
+
+    @keyframes guideArrive {
+        0% { box-shadow: 0 0 0 0 rgba(30, 158, 98, 0); border-color: var(--bd-e0e8e0, #e0e8e0); }
+        20% { box-shadow: 0 0 0 6px rgba(30, 158, 98, .22); border-color: #1e9e62; }
+        100% { box-shadow: 0 0 0 14px rgba(30, 158, 98, 0); border-color: var(--bd-e0e8e0, #e0e8e0); }
+    }
+
+    @keyframes guideIconBounce {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.3) rotate(-10deg); background: #1e9e62; color: #fff; }
+        100% { transform: scale(1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .guide-task,
+        .guide-task-icon,
+        .guide-section.is-arriving,
+        .guide-section.is-arriving .guide-section-head .guide-task-icon {
+            animation: none !important;
+            transition: none !important;
+        }
+
+        .guide-ripple {
+            display: none;
+        }
+    }
+
     @media (max-width: 640px) {
         .guide-hero {
             padding: 18px;
@@ -593,7 +680,7 @@
     <h2 class="guide-tasks-title">What do you want to do?</h2>
     <nav class="guide-tasks" aria-label="Guide sections">
         @foreach ($sections as $id => [$title, $icon, $blurb, $badge])
-            <a class="guide-task" href="#{{ $id }}">
+            <a class="guide-task" href="#{{ $id }}" style="--i: {{ $loop->index }}">
                 <span class="guide-task-icon" aria-hidden="true"><i class="bi {{ $icon }}"></i></span>
                 <span>
                     <strong>{{ $title }}</strong>
@@ -979,4 +1066,71 @@
         @unless ($isAdmin)Still stuck? Use <strong>Send Feedback</strong> in the sidebar to reach the administrators. &middot;@endunless
         <a href="{{ route('terms') }}">Terms and Conditions</a></p>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    // Guide cards: ripple + press on click, smooth scroll to the section, then the section glows.
+    (() => {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        function arrive(section) {
+            section.classList.remove('is-arriving');
+            void section.offsetWidth; // restart the animation when the same card is clicked again
+            section.classList.add('is-arriving');
+            clearTimeout(section._arriveTimer);
+            section._arriveTimer = setTimeout(() => section.classList.remove('is-arriving'), 1700);
+        }
+
+        function goTo(hash) {
+            const target = document.getElementById(hash.slice(1));
+            if (!target) return false;
+            history.replaceState(null, '', hash);
+            target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+            if (target.classList.contains('guide-section')) {
+                // Glow once the scroll has (roughly) settled, so the user sees it.
+                setTimeout(() => arrive(target), reduceMotion ? 0 : 450);
+            }
+            return true;
+        }
+
+        document.querySelectorAll('.guide-task').forEach(card => {
+            card.addEventListener('click', event => {
+                if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+                event.preventDefault();
+
+                if (!reduceMotion) {
+                    const rect = card.getBoundingClientRect();
+                    const ripple = document.createElement('span');
+                    ripple.className = 'guide-ripple';
+                    // Keyboard clicks have no pointer position: ripple from the centre.
+                    const x = event.clientX ? event.clientX - rect.left : rect.width / 2;
+                    const y = event.clientY ? event.clientY - rect.top : rect.height / 2;
+                    ripple.style.setProperty('--rx', x + 'px');
+                    ripple.style.setProperty('--ry', y + 'px');
+                    card.appendChild(ripple);
+                    ripple.addEventListener('animationend', () => ripple.remove());
+
+                    card.classList.add('is-pressed');
+                    setTimeout(() => card.classList.remove('is-pressed'), 220);
+                }
+
+                // Let the press show briefly before the page moves.
+                setTimeout(() => goTo(card.getAttribute('href')), reduceMotion ? 0 : 160);
+            });
+        });
+
+        document.querySelectorAll('.guide-top').forEach(link => {
+            link.addEventListener('click', event => {
+                if (goTo(link.getAttribute('href'))) event.preventDefault();
+            });
+        });
+
+        // Opening the guide with a #section link also highlights that section.
+        if (location.hash) {
+            const section = document.getElementById(location.hash.slice(1));
+            if (section && section.classList.contains('guide-section')) setTimeout(() => arrive(section), 300);
+        }
+    })();
+</script>
 @endsection

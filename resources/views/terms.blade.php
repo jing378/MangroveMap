@@ -30,6 +30,7 @@
                 var(--bg-f5f7f6, #f5f7f6);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            overflow-x: clip;
         }
 
         .terms-header {
@@ -176,6 +177,143 @@
             color: var(--fg-7a8a7f, #7a8a7f);
         }
 
+        /* ---------- Sliding animations ---------- */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        .terms-header {
+            overflow: hidden;
+        }
+
+        /* Header text slides down, the card slides up, the contents list slides in item by item. */
+        .terms-header-inner > * {
+            animation: termsSlideDown .7s cubic-bezier(.16, 1, .3, 1) backwards;
+        }
+
+        .terms-header-inner > :nth-child(2) { animation-delay: .08s; }
+        .terms-header-inner > :nth-child(3) { animation-delay: .16s; }
+
+        .terms-card {
+            animation: termsSlideUp .8s cubic-bezier(.16, 1, .3, 1) .15s backwards;
+        }
+
+        .toc li {
+            animation: termsSlideRight .55s cubic-bezier(.16, 1, .3, 1) backwards;
+            animation-delay: calc(.35s + var(--i, 0) * 40ms);
+        }
+
+        .toc a {
+            display: inline-block;
+            transition: transform .2s ease;
+        }
+
+        .toc a:hover {
+            transform: translateX(4px);
+        }
+
+        @keyframes termsSlideDown {
+            from { opacity: 0; transform: translateY(-18px); }
+        }
+
+        @keyframes termsSlideUp {
+            from { opacity: 0; transform: translateY(40px); }
+        }
+
+        @keyframes termsSlideRight {
+            from { opacity: 0; transform: translateX(-16px); }
+        }
+
+        /* Sections slide in as they scroll into view, alternating sides (classes added in JS). */
+        .js-slide section {
+            opacity: 0;
+            transform: translateX(-36px);
+            transition: opacity .7s ease, transform .7s cubic-bezier(.16, 1, .3, 1);
+        }
+
+        .js-slide section:nth-of-type(even) {
+            transform: translateX(36px);
+        }
+
+        .js-slide section.is-in {
+            opacity: 1;
+            transform: none;
+        }
+
+        /* The heading you jumped to from the contents gets a sweeping underline. */
+        h2 {
+            position: relative;
+            display: inline-block;
+        }
+
+        h2::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -3px;
+            height: 3px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #1e9e62, #4ade80);
+            transform: scaleX(0);
+            transform-origin: 0 50%;
+        }
+
+        section.is-target h2::after {
+            animation: termsUnderline 1.8s cubic-bezier(.16, 1, .3, 1);
+        }
+
+        @keyframes termsUnderline {
+            0% { transform: scaleX(0); transform-origin: 0 50%; }
+            35% { transform: scaleX(1); transform-origin: 0 50%; }
+            65% { transform: scaleX(1); transform-origin: 100% 50%; }
+            100% { transform: scaleX(0); transform-origin: 100% 50%; }
+        }
+
+        /* Reading progress bar. */
+        .terms-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            transform-origin: 0 50%;
+            transform: scaleX(var(--progress, 0));
+            background: linear-gradient(90deg, #1e9e62, #4ade80);
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+                animation: none !important;
+                transition: none !important;
+            }
+
+            .js-slide section {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        @media (max-width: 640px) {
+            /* Narrow screens: slide up instead of sideways so nothing pokes past the edge. */
+            .js-slide section,
+            .js-slide section:nth-of-type(even) {
+                transform: translateY(24px);
+            }
+
+            .js-slide section.is-in {
+                transform: none;
+            }
+        }
+
         @media (max-width: 640px) {
             .terms-header h1 {
                 font-size: 24px;
@@ -206,8 +344,15 @@
             }
 
             .back-link,
-            .toc {
+            .toc,
+            .terms-progress {
                 display: none;
+            }
+
+            /* Print everything, unanimated. */
+            .js-slide section {
+                opacity: 1 !important;
+                transform: none !important;
             }
 
             .terms-card {
@@ -507,6 +652,66 @@
         <p class="terms-footer">&copy; {{ date('Y') }} MangroveMap. Empowering coastal communities through spatial science.</p>
     </main>
     @include('partials.theme-toggle', ['floating' => true])
+
+    <div class="terms-progress" id="termsProgress" aria-hidden="true"></div>
+    <script>
+        // Sliding sections, contents links that highlight their section, and the reading progress bar.
+        (() => {
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const sections = [...document.querySelectorAll('.terms-card section')];
+
+            document.querySelectorAll('.toc li').forEach((item, index) => item.style.setProperty('--i', index));
+
+            if (!reduceMotion && 'IntersectionObserver' in window) {
+                document.documentElement.classList.add('js-slide');
+                const observer = new IntersectionObserver(entries => {
+                    entries.forEach(entry => {
+                        if (!entry.isIntersecting) return;
+                        entry.target.classList.add('is-in');
+                        observer.unobserve(entry.target);
+                    });
+                }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+                sections.forEach(section => observer.observe(section));
+            }
+
+            function highlight(section) {
+                section.classList.add('is-in');
+                section.classList.remove('is-target');
+                void section.offsetWidth; // replay when the same link is clicked again
+                section.classList.add('is-target');
+                clearTimeout(section._targetTimer);
+                section._targetTimer = setTimeout(() => section.classList.remove('is-target'), 1900);
+            }
+
+            document.querySelectorAll('.toc a').forEach(link => {
+                link.addEventListener('click', () => {
+                    const section = document.querySelector(link.getAttribute('href'));
+                    // Underline once the smooth scroll has mostly arrived.
+                    if (section) setTimeout(() => highlight(section), reduceMotion ? 0 : 450);
+                });
+            });
+
+            if (location.hash) {
+                const section = document.getElementById(location.hash.slice(1));
+                if (section && sections.includes(section)) setTimeout(() => highlight(section), 400);
+            }
+
+            const progress = document.getElementById('termsProgress');
+            let ticking = false;
+            function updateProgress() {
+                ticking = false;
+                const max = document.documentElement.scrollHeight - window.innerHeight;
+                progress.style.setProperty('--progress', max > 0 ? Math.min(1, window.scrollY / max) : 0);
+            }
+            window.addEventListener('scroll', () => {
+                if (!ticking) {
+                    ticking = true;
+                    requestAnimationFrame(updateProgress);
+                }
+            }, { passive: true });
+            updateProgress();
+        })();
+    </script>
 </body>
 
 </html>
