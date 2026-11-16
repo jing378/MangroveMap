@@ -76,6 +76,42 @@
       layers: [satL],
     }).setView([10.358, 124.973], 13);
 
+    // "Loading map…" over the map until the first imagery tiles arrive (they come from Esri and can be slow
+    // on a weak connection). Removed once they load, and after a while regardless, so it never stays.
+    (function showMapLoading() {
+      const container = mainMap.getContainer();
+      const style = document.createElement('style');
+      style.textContent = `
+        .map-loading { position: absolute; inset: 0; z-index: 900; display: flex; align-items: center; justify-content: center;
+          background: var(--bg-eef3ef, #eef3ef); transition: opacity .35s ease; pointer-events: none; }
+        .map-loading.is-done { opacity: 0; }
+        .map-loading-card { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px;
+          background: var(--bg-ffffff, #ffffff); color: var(--fg-2f4a3a, #2f4a3a); font: 700 13px 'Manrope', sans-serif;
+          box-shadow: 0 6px 18px rgba(15, 40, 25, .15); }
+        .map-loading-spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(30, 158, 98, .25);
+          border-top-color: #1e9e62; animation: map-loading-spin .8s linear infinite; }
+        @keyframes map-loading-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .map-loading-spinner { animation-duration: 2.4s; } }`;
+      document.head.appendChild(style);
+
+      const overlay = document.createElement('div');
+      overlay.className = 'map-loading';
+      overlay.setAttribute('role', 'status');
+      overlay.innerHTML = '<div class="map-loading-card"><span class="map-loading-spinner" aria-hidden="true"></span>Loading map…</div>';
+      container.appendChild(overlay);
+
+      let finished = false;
+      function finish() {
+        if (finished) return;
+        finished = true;
+        overlay.classList.add('is-done');
+        setTimeout(() => overlay.remove(), 400);
+      }
+      satL.once('load', finish);
+      mainMap.once('baselayerchange', finish);
+      setTimeout(finish, 12000);
+    })();
+
     @include('partials.map-place-labels')
     attachPlaceLabels(mainMap, [satL, mangroveL]);
 
