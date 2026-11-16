@@ -13,14 +13,14 @@
             <div class="stat-change positive">{{ $newSignups }} new this month</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Active Users</div>
-            <div class="stat-value">{{ $activeUsers }}</div>
-            <div class="stat-change positive">{{ $totalUsers ? round($activeUsers / $totalUsers * 100) : 0 }}% active rate</div>
+            <div class="stat-label">Verified Users</div>
+            <div class="stat-value">{{ $verifiedUsers }}</div>
+            <div class="stat-change positive">{{ $totalUsers ? round($verifiedUsers / $totalUsers * 100) : 0 }}% have verified their email</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">New Signups</div>
-            <div class="stat-value">{{ $newSignups }}</div>
-            <div class="stat-change positive">Since last 30 days</div>
+            <div class="stat-label">Active Now</div>
+            <div class="stat-value"><span class="presence-dot is-online" aria-hidden="true"></span> {{ $loggedInNowCount }}</div>
+            <div class="stat-change">Logged in as of {{ now(\App\Models\User::ACTIVITY_TIMEZONE)->format('g:i A') }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Admin Users</div>
@@ -104,12 +104,12 @@
                 <option value="{{ $roleValue }}">{{ $roleName }}</option>
                 @endforeach
             </select>
-            <select class="filter-select">
+            <select class="filter-select" aria-label="Filter by status">
                 <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="pending">Pending</option>
-                <option value="suspended">Suspended</option>
+                <option value="active">Active (logged in now)</option>
+                <option value="logged-out">Not logged in</option>
+                <option value="verified">Verified</option>
+                <option value="not-verified">Not verified</option>
             </select>
         </div>
 
@@ -122,7 +122,7 @@
                         <th>Role</th>
                         <th>Status</th>
                         <th>Joined</th>
-                        <th>Last Login</th>
+                        <th>Login Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -138,13 +138,20 @@
                     default => 'viewer',
                     };
                     $roleLabel = $user->roleLabel();
-                    $statusLabel = $user->email_verified_at ? 'Active' : 'Pending';
+                    $statusLabel = $user->email_verified_at ? 'Verified' : 'Not verified';
                     $statusClass = $user->email_verified_at ? 'success' : 'secondary';
+                    $loggedInNow = in_array($user->id, $loggedInNowIds ?? [], true);
                     @endphp
-                    <tr data-role="{{ $user->role }}">
+                    <tr data-role="{{ $user->role }}" data-login="{{ $loggedInNow ? 'active' : 'logged-out' }}"
+                        data-verified="{{ $user->email_verified_at ? 'verified' : 'not-verified' }}">
                         <td class="cell-user">
                             <div class="user-cell">
-                                <div class="user-avatar">{{ $initials }}</div>
+                                <div class="user-avatar">
+                                    {{ $initials }}
+                                    @if($loggedInNow)
+                                        <span class="presence-dot avatar-presence is-online" title="Active (logged in now)" aria-hidden="true"></span>
+                                    @endif
+                                </div>
                                 <div>
                                     <div class="user-name">{{ $user->name }}</div>
                                     <div class="user-info">{{ $user->organization ?? $roleLabel }}</div>
@@ -160,7 +167,12 @@
                         </td>
                         <td data-label="Status"><span class="badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
                         <td data-label="Joined">{{ $user->created_at?->format('M j, Y') ?? 'Unknown' }}</td>
-                        <td data-label="Last login">{{ $user->last_login_at ? $user->last_login_at->diffForHumans() : 'Never' }}</td>
+                        <td data-label="Login status">
+                            <span class="presence-status {{ $loggedInNow ? 'is-online' : '' }}">
+                                <span class="presence-dot {{ $loggedInNow ? 'is-online' : '' }}" aria-hidden="true"></span>
+                                <span>{{ $user->loginStatusLabel($loggedInNow) }}</span>
+                            </span>
+                        </td>
                         <td class="actions-cell">
                             <a class="action-btn view" href="{{ route('admin.users.show', $user) }}" title="View" data-action="show"><i class="bi bi-eye"></i></a>
                             <a class="action-btn edit" href="{{ route('admin.users.edit', $user) }}" title="Edit" data-action="edit"><i class="bi bi-pencil"></i></a>
@@ -618,6 +630,46 @@
         align-items: center;
         justify-content: center;
         font-size: 12px;
+        font-weight: 700;
+        position: relative;
+    }
+
+    /* Green when the user is logged in right now, grey otherwise. */
+    .presence-dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: var(--bg-b8c4bc, #b8c4bc);
+        vertical-align: middle;
+    }
+
+    .presence-dot.is-online {
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, .18);
+    }
+
+    .avatar-presence {
+        position: absolute;
+        right: -1px;
+        bottom: -1px;
+        width: 11px;
+        height: 11px;
+        border: 2px solid var(--bd-ffffff, #ffffff);
+        box-shadow: none !important;
+    }
+
+    .presence-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--fg-6a8a6a, #6a8a6a);
+        white-space: nowrap;
+    }
+
+    .presence-status.is-online {
+        color: var(--fg-15803d, #15803d);
         font-weight: 700;
     }
 
@@ -1662,6 +1714,7 @@
     function updateSearchFilter() {
         const searchTerm = document.querySelector('.search-input').value.toLowerCase();
         const roleFilter = document.querySelectorAll('.filter-select')[0].value;
+        const statusFilter = document.querySelectorAll('.filter-select')[1].value;
         const tableRows = document.querySelectorAll('.table tbody tr[data-role]');
 
         tableRows.forEach(row => {
@@ -1669,17 +1722,18 @@
             const userEmail = row.cells[1].textContent.toLowerCase();
             const matchesSearch = userName.includes(searchTerm) || userEmail.includes(searchTerm);
             const matchesRole = !roleFilter || row.dataset.role === roleFilter;
-            row.style.display = matchesSearch && matchesRole ? '' : 'none';
+            // Active / not logged in (live session), or verified / not verified (email).
+            const matchesStatus = !statusFilter
+                || row.dataset.login === statusFilter
+                || row.dataset.verified === statusFilter;
+            row.style.display = matchesSearch && matchesRole && matchesStatus ? '' : 'none';
         });
     }
 
     document.querySelector('.search-input').addEventListener('keyup', updateSearchFilter);
 
     document.querySelectorAll('.filter-select')[0].addEventListener('change', updateSearchFilter);
-
-    document.querySelectorAll('.filter-select')[1].addEventListener('change', function(e) {
-        console.log('Status filter:', e.target.value);
-    });
+    document.querySelectorAll('.filter-select')[1].addEventListener('change', updateSearchFilter);
 
     const userModalOverlay = document.getElementById('userModalOverlay');
     const userModalContent = document.getElementById('userModalContent');

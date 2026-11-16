@@ -40,7 +40,11 @@
                     </tr>
                     <tr>
                         <th>Status</th>
-                        <td>{{ $user->email_verified_at ? 'Active' : 'Pending' }}</td>
+                        <td>{{ $user->email_verified_at ? 'Verified' : 'Not verified' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Login status</th>
+                        <td>{{ $user->loginStatusLabel(in_array($user->id, \App\Models\User::loggedInNowIds(), true)) }}</td>
                     </tr>
                     <tr>
                         <th>Joined</th>

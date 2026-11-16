@@ -18,7 +18,7 @@
             <div class="stat-change">Activities this week</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Active Users</div>
+            <div class="stat-label">Users With Activity</div>
             <div class="stat-value">{{ $activeUsersWeek }}</div>
             <div class="stat-change">With activity in the last 7 days</div>
         </div>

@@ -56,7 +56,8 @@ class HomePageStatsTest extends TestCase
             ->assertViewHas('contributorCount', 2)
             ->assertViewHas('delineations', fn($records) => count($records) === 2);
 
-        $response->assertSee(number_format($expectedHa, 2) . '<span>ha</span>', false)
+        // The number sits in a <b> that the landing page animates up to it.
+        $response->assertSee(number_format($expectedHa, 2) . '</b><span>ha</span>', false)
             ->assertDontSee('km²');
     }
 
@@ -121,7 +122,7 @@ class HomePageStatsTest extends TestCase
     {
         $this->get('/')->assertOk()
             ->assertViewHas('mappedAreaHa', 0)
-            ->assertSee('0.00<span>ha</span>', false)
+            ->assertSee('0.00</b><span>ha</span>', false)
             ->assertDontSee('46,382');
     }
 }

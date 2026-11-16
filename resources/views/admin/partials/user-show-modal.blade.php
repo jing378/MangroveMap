@@ -40,7 +40,7 @@
             </div>
             <div>
                 <dt>Status</dt>
-                <dd><span class="badge {{ $user->email_verified_at ? 'success' : 'secondary' }}">{{ $user->email_verified_at ? 'Active' : 'Pending' }}</span></dd>
+                <dd><span class="badge {{ $user->email_verified_at ? 'success' : 'secondary' }}">{{ $user->email_verified_at ? 'Verified' : 'Not verified' }}</span></dd>
             </div>
             <div>
                 <dt>Organization</dt>
@@ -57,6 +57,10 @@
             <div>
                 <dt>Last login</dt>
                 <dd>{{ $user->last_login_at?->diffForHumans() ?? 'Never' }}</dd>
+            </div>
+            <div>
+                <dt>Login status</dt>
+                <dd>{{ $user->loginStatusLabel(in_array($user->id, \App\Models\User::loggedInNowIds(), true)) }}</dd>
             </div>
         </dl>
     </section>

@@ -4,6 +4,7 @@ use App\Http\Controllers\TileExplorerController;
 use App\Http\Middleware\EnsureUserIsEndUser;
 use App\Http\Middleware\EnsureUserIsExpert;
 use App\Http\Middleware\IsAdmin;
+use App\Http\Middleware\TrackUserPresence;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -20,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Tile Explorer: the page reads this cookie to see that a ZIP download has started.
         $middleware->encryptCookies(except: [TileExplorerController::DOWNLOAD_COOKIE]);
+
+        // "Last seen" for admins: remembers when each signed-in user was last on the site.
+        $middleware->appendToGroup('web', TrackUserPresence::class);
 
         $middleware->alias([
             'admin' => IsAdmin::class,

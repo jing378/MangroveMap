@@ -394,9 +394,12 @@ class AdminController extends Controller
 
         $users = User::paginate(20);
         $totalUsers = User::count();
-        $activeUsers = User::whereNotNull('email_verified_at')->count();
+        $verifiedUsers = User::whereNotNull('email_verified_at')->count();
         $newSignups = User::where('created_at', '>=', now()->subMonth())->count();
         $adminUsers = User::where('role', 'admin')->count();
+        // Logged in right now (a live session), and the ids so each row can say so.
+        $loggedInNowIds = User::loggedInNowIds();
+        $loggedInNowCount = count($loggedInNowIds);
         $roleCounts = User::select('role', DB::raw('count(*) as count'))
             ->groupBy('role')
             ->pluck('count', 'role')
@@ -415,9 +418,11 @@ class AdminController extends Controller
             'expertApplications' => $expertApplications,
             'users' => $users,
             'totalUsers' => $totalUsers,
-            'activeUsers' => $activeUsers,
+            'verifiedUsers' => $verifiedUsers,
             'newSignups' => $newSignups,
             'adminUsers' => $adminUsers,
+            'loggedInNowIds' => $loggedInNowIds,
+            'loggedInNowCount' => $loggedInNowCount,
             'roleCounts' => $roleCounts,
             'recentActivities' => $recentActivities,
         ]);

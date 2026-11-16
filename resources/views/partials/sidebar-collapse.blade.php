@@ -78,7 +78,7 @@
         html[data-sidebar="collapsed"] .sidebar-item {
             justify-content: center;
             gap: 0;
-            /* A fixed square for every item: links and buttons (Send Feedback, Install App) alike. A button
+            /* A fixed square for every item: links and buttons (feedback, install) alike. A button
                with width: auto shrinks to its icon and sits off-centre. */
             box-sizing: border-box;
             width: 44px;

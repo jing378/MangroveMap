@@ -64,6 +64,111 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public const EXPERT_CERTIFICATE_MAX_KB = 5120;
 
+    /**
+     * Times on the admin pages use the local calendar day (the app stores UTC). On those pages "Active"
+     * means logged in right now (a live session, loggedInNowIds); past visits are "Last seen".
+     */
+    public const ACTIVITY_TIMEZONE = 'Asia/Manila';
+
+    /** last_seen_at is written at most this often per user. */
+    public const PRESENCE_WRITE_SECONDS = 60;
+
+    public static function todayStart(): \Carbon\CarbonInterface
+    {
+        return now(self::ACTIVITY_TIMEZONE)->startOfDay()->utc();
+    }
+
+    /** When the user was last on the site: the later of their last visit and their last login. */
+    public function lastSeenAt(): ?\Carbon\CarbonInterface
+    {
+        $times = array_filter([$this->last_seen_at, $this->last_login_at]);
+
+        return $times ? max($times) : null;
+    }
+
+    /** Logged in or used the site today (local day), whether or not they are still logged in. */
+    public function wasSeenToday(): bool
+    {
+        return (bool) $this->lastSeenAt()?->gte(self::todayStart());
+    }
+
+    /** @param  \Illuminate\Database\Eloquent\Builder<User>  $query */
+    public function scopeSeenToday($query)
+    {
+        $start = self::todayStart();
+
+        return $query->where(fn ($inner) => $inner
+            ->where('last_seen_at', '>=', $start)
+            ->orWhere('last_login_at', '>=', $start));
+    }
+
+    /**
+     * Record that the user is on the site now (TrackUserPresence). Skipped when written in the last
+     * minute; does not touch updated_at or fire model events.
+     */
+    public function markSeen(): void
+    {
+        if ($this->last_seen_at !== null
+            && $this->last_seen_at->gt(now()->subSeconds(self::PRESENCE_WRITE_SECONDS))) {
+            return;
+        }
+
+        $this->forceFill(['last_seen_at' => now()]);
+        static::withoutTimestamps(fn () => $this->saveQuietly());
+    }
+
+    /**
+     * Ids of the users logged in right now: they have a session (database session driver) that has not
+     * expired. Logging out deletes the session, so they drop off straight away; a user who just closes the
+     * browser stays until the session expires (config session.lifetime). Empty with other session drivers.
+     *
+     * @return array<int, int>
+     */
+    public static function loggedInNowIds(): array
+    {
+        if (config('session.driver') !== 'database') {
+            return [];
+        }
+
+        return \Illuminate\Support\Facades\DB::table(config('session.table', 'sessions'))
+            ->whereNotNull('user_id')
+            ->where('last_activity', '>=', now()->subMinutes((int) config('session.lifetime', 120))->getTimestamp())
+            ->distinct()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /** Logged in right now: "Active · logged in 3:40 PM" (the time of their latest login). */
+    public function activeNowLabel(): string
+    {
+        $login = $this->last_login_at?->copy()->timezone(self::ACTIVITY_TIMEZONE);
+        if (! $login) {
+            return 'Active';
+        }
+
+        return 'Active · logged in '.$login->format($login->isToday() ? 'g:i A' : 'M j, g:i A');
+    }
+
+    /** Not logged in now: "Last seen today, 1:15 PM", "Last seen 3 days ago" or "Never logged in". */
+    public function lastSeenLabel(): string
+    {
+        $lastSeen = $this->lastSeenAt();
+        if (! $lastSeen) {
+            return 'Never logged in';
+        }
+
+        return $this->wasSeenToday()
+            ? 'Last seen today, '.$lastSeen->copy()->timezone(self::ACTIVITY_TIMEZONE)->format('g:i A')
+            : 'Last seen '.$lastSeen->diffForHumans();
+    }
+
+    /** The admin pages' login status line: active (logged in now) or when last seen. */
+    public function loginStatusLabel(bool $loggedInNow): string
+    {
+        return $loggedInNow ? $this->activeNowLabel() : $this->lastSeenLabel();
+    }
+
     protected $hidden = [
         'password',
         'remember_token',
@@ -73,6 +178,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
+        'last_seen_at' => 'datetime',
         'expert_applied_at' => 'datetime',
         'expert_reviewed_at' => 'datetime',
         'password' => 'hashed',

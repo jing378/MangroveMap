@@ -34,6 +34,8 @@ ML environment: `ml/.venv` (from `ml/requirements.txt`). `config/ml.php` automat
 ### Roles and routing
 `users.role` is `end_user` (resident), `expert`, or `admin`. Route groups in `routes/web.php` use the `end_user`, `expert`, and `admin` middleware aliases (`app/Http/Middleware`). `User::homeRoute()` decides where each role lands after login or verification. Shared map/delineate pages (`EndUserController::map/delineate`) serve all authenticated users. Experts get their own variants under `/expert/*` in `ExpertController`.
 
+Login status (admin Users page and user details): on the admin pages "Active" means only a live login session, from rows in the database `sessions` table (`User::loggedInNowIds`; empty with any other session driver). Logging out deletes the row; closing the browser leaves it until `SESSION_LIFETIME` (120 min) passes. Everyone else shows "Last seen …" from `users.last_seen_at` (written by `TrackUserPresence`, appended to the `web` group, at most once a minute) or `last_login_at` (`User::loginStatusLabel`). Email verification is "Verified" / "Not verified", never "Active".
+
 ### Delineation lifecycle
 `Delineation` stores GeoJSON in the `features` JSON column. Review state is tracked by the `is_approved`/`is_rejected` flags (there is no status enum). The flow is:
 1. A resident submits a delineation. `DelineationSubmittedForReview` notifies experts.
