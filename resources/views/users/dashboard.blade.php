@@ -321,6 +321,42 @@
         width: 100%;
     }
 
+    .chart-card-wide {
+        grid-column: 1 / -1;
+    }
+
+    .chart-card-wide .chart-header {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .chart-select {
+        max-width: 100%;
+        padding: 6px 10px;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-radius: 8px;
+        background: var(--bg-ffffff, #fff);
+        color: var(--fg-1a2e1a, #1a2e1a);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .chart-note {
+        margin: 10px 0 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #7a9a7a;
+    }
+
+    .chart-note strong {
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    .chart-note a {
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
     .chart-empty {
         height: 100%;
         display: flex;
@@ -713,6 +749,31 @@
                 @endif
             </div>
         </div>
+
+        {{-- Satellite estimate for the whole province: a different measure from the approved-area trend above. --}}
+        @if(!empty($mangroveHistory))
+            <div class="chart-card chart-card-wide">
+                <div class="chart-header">
+                    <div class="chart-title"><i class="bi bi-globe-asia-australia me-2"></i> Mangrove Extent by Year, Satellite (ha)</div>
+                    <select id="satelliteExtentPlace" class="chart-select" aria-label="Place">
+                        <option value="">{{ $mangroveHistory['province'] }}</option>
+                        @foreach($mangroveHistory['municipalities'] as $index => $place)
+                            <option value="{{ $index }}">{{ $place['name'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="satelliteExtentChart"></canvas>
+                </div>
+                <p class="chart-note" id="satelliteExtentSummary" aria-live="polite"></p>
+                <p class="chart-note">
+                    All mangroves seen by satellite at about 30 m, not only the areas mapped in this system. Small or narrow stands can be missed.
+                    Source:
+                    @if(!empty($mangroveHistory['source_url']))
+                        <a href="{{ $mangroveHistory['source_url'] }}" target="_blank" rel="noopener">{{ $mangroveHistory['source'] }}</a>@else{{ $mangroveHistory['source'] }}@endif{{ !empty($mangroveHistory['license']) ? ' ('.$mangroveHistory['license'].')' : '' }}.
+                </p>
+            </div>
+        @endif
     </div>
 
     <!-- Top Contributors Leaderboard -->
@@ -982,6 +1043,78 @@
                         }
                     }
                 }
+            });
+        }
+
+        // Mangrove extent by year (satellite): province total, or one municipality from the picker.
+        const satelliteCtx = document.getElementById('satelliteExtentChart');
+        const satellite = @json($mangroveHistory ?? null);
+        if (satelliteCtx && satellite) {
+            const placeEl = document.getElementById('satelliteExtentPlace');
+            const summaryEl = document.getElementById('satelliteExtentSummary');
+            const hectares = () => satellite.municipalities[placeEl.value]?.ha || satellite.total_ha;
+            const format = value => value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+            function summarise(values) {
+                const firstYear = satellite.years[0];
+                const lastYear = satellite.years[satellite.years.length - 1];
+                const first = values[0];
+                const last = values[values.length - 1];
+                const change = last - first;
+                const sign = change > 0 ? '+' : '';
+                const percent = first > 0 ? ` (${sign}${(change / first * 100).toFixed(1)}%)` : '';
+                const peak = Math.max(...values);
+                const peakYear = satellite.years[values.indexOf(peak)];
+
+                summaryEl.replaceChildren();
+                const latest = document.createElement('strong');
+                latest.textContent = `${format(last)} ha in ${lastYear}`;
+                summaryEl.append(latest, ` · ${sign}${format(change)} ha${percent} since ${firstYear} · highest ${format(peak)} ha in ${peakYear}`);
+            }
+
+            const satelliteChart = new Chart(satelliteCtx, {
+                type: 'line',
+                data: {
+                    labels: satellite.years,
+                    datasets: [{
+                        label: 'Mangrove extent (ha)',
+                        data: hectares(),
+                        borderColor: '#2b8fb8',
+                        backgroundColor: 'rgba(43, 143, 184, 0.10)',
+                        fill: true,
+                        tension: 0.25,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        pointHitRadius: 12
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: item => `${format(item.parsed.y)} ha` } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: () => (window.MangroveTheme?.get() === 'dark' ? 'rgba(255, 255, 255, 0.07)' : '#f0f4f0') },
+                            ticks: { font: { family: 'Manrope', size: 11 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Manrope', size: 11 }, maxTicksLimit: 9, maxRotation: 0 }
+                        }
+                    }
+                }
+            });
+            summarise(hectares());
+
+            placeEl.addEventListener('change', () => {
+                satelliteChart.data.datasets[0].data = hectares();
+                satelliteChart.update();
+                summarise(hectares());
             });
         }
     });

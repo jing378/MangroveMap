@@ -26,6 +26,11 @@
             animation: submit-spin 0.7s linear infinite;
         }
 
+        /* While loading, the spinner takes the place of the button's own icon. */
+        .submit-btn.is-loading > .bi {
+            display: none;
+        }
+
         .is-loading .submit-spinner {
             display: inline-block;
         }

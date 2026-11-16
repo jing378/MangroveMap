@@ -740,6 +740,14 @@
             <li><strong>Planting recommendations:</strong> the <i class="bi bi-flower1"></i> button shows or hides the recommendation layer.</li>
             <li><strong>Changes over time:</strong> when experts have recorded yearly observations, the <em>Changes over time</em> timeline shows
                 how the area grew or shrank.</li>
+            @if (config('map.mangrove_history.enabled'))
+                <li><strong>Mangrove extent by year:</strong> the <i class="bi bi-graph-up"></i> button shows where satellites mapped mangroves in
+                    each year since 1985. Drag the slider or press play, pick a municipality, and compare two years to see what was gained and lost.
+                    It is a satellite estimate (Global Mangrove Watch), not a ground survey.</li>
+            @else
+                <li><strong>Mangroves mapped by year:</strong> the <i class="bi bi-graph-up"></i> button opens a year slider. Drag it or press play
+                    to see the approved hectares for each year, and only the areas and drone uploads that had been added by then.</li>
+            @endif
             <li><strong>On a phone:</strong> the side panel opens as a sheet at the bottom. Drag it up for more, or tap outside it to close it.</li>
         </ul>
         <div class="guide-actions">
@@ -1065,6 +1073,11 @@
     <p class="guide-footer">
         @unless ($isAdmin)Still stuck? Use <strong>Send Feedback</strong> in the sidebar to reach the administrators. &middot;@endunless
         <a href="{{ route('terms') }}">Terms and Conditions</a></p>
+    {{-- Map credits live here instead of in a bar on the map (see partials/map-place-labels). --}}
+    <p class="guide-footer">Map credits: <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>.
+        Satellite imagery and roads &copy; Esri and its data providers.
+        Street map and place names &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.
+        Topo map &copy; OpenStreetMap contributors, SRTM; style &copy; <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC BY-SA).</p>
 </div>
 @endsection
 

@@ -120,6 +120,9 @@ class ImportAdminBoundaries extends Command
             return self::FAILURE;
         }
 
+        // The map's municipality picker zooms to boxes worked out from these boundaries.
+        \App\Services\MunicipalityBounds::forget();
+
         $this->info('Imported ' . count($features) . ' Southern Leyte barangay boundaries.');
 
         return self::SUCCESS;

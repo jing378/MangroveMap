@@ -49,8 +49,10 @@
       const esriPlaces = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
         pane: 'placeLabels',
         maxZoom: ESRI_PLACES_MAX_ZOOM,
-        attribution: 'Roads &copy; Esri; place names &copy; OpenStreetMap contributors',
       });
+
+      // No credits bar in the map corner.
+      map.attributionControl?.remove();
 
       const placeGroup = L.layerGroup();
       const placeMarkers = new Map();

@@ -25,6 +25,15 @@
     const plantingRecommendationsForMap = @json($plantingRecommendationsForMap ?? []);
     const plantingRecommendationsPageUrl = @json(Auth::user()?->isExpert() ? route('expert.recommendations.index') : null);
 
+    // Year chosen on the map's "Mangroves mapped by year" slider (map-timeline-scripts). Delineations, pins and
+    // drone layers added after it are left off the map; null (slider closed, or not on this page) shows everything.
+    let mapTimelineYear = null;
+    const mapRecordYear = value => {
+      const year = Number(String(value || '').slice(0, 4));
+      return year > 1900 ? year : null;
+    };
+    const mapTimelineHides = year => mapTimelineYear !== null && year !== null && year > mapTimelineYear;
+
     function showProcessingModal(title, subtitle) {
       const modal = document.getElementById('processingModal');
       if (!modal) return;
@@ -410,6 +419,7 @@
       return {
         id: record.id,
         name: record.name || `Delineation ${record.id}`,
+        created_year: mapRecordYear(record.created_at),
         feature,
         lat,
         lng,
@@ -518,6 +528,9 @@
     }
 
     @include('users.partials.map-base-scripts')
+    @if (config('map.mangrove_history.enabled'))
+      @include('users.partials.mangrove-history-scripts')
+    @endif
     const snapPixelThreshold = 15; // pixels
     let snapMarker = L.circleMarker([0, 0], {
       radius: 8,
@@ -666,7 +679,9 @@
         popupAnchor: [0, -26],
         tooltipAnchor: [0, -24],
       });
-      const p = L.marker([z.lat, z.lng], { icon: locationIcon, title: z.name, riseOnHover: true }).addTo(zoneMarkerLayer);
+      const p = L.marker([z.lat, z.lng], { icon: locationIcon, title: z.name, riseOnHover: true });
+      // Not on the map yet in the year chosen on the slider (still kept in `polys`, which is indexed like `zones`).
+      if (!mapTimelineHides(z.created_year)) p.addTo(zoneMarkerLayer);
 
       p.bindTooltip(`${z.name} · Mangrove location`, { direction: 'top' });
       p.on('click', (e) => {
@@ -833,6 +848,8 @@
         );
         features = features.slice(-MAX_FEATURES_PER_DELINEATION);
       }
+      // The record's municipality, worked out on the server (ApprovedCoverageStats::municipalityName).
+      const municipality = record.municipality || null;
       features.forEach(feature => {
         const key = `${record.id}:${featureGeometryKey(feature)}`;
         if (key && loadedGeometryKeys.has(key)) return;
@@ -850,6 +867,8 @@
           planting_recommendations: Array.isArray(record.planting_recommendations) ? record.planting_recommendations : [],
           approved_by_name: record.approved_by_name || null,
           delineation_id: record.id,
+          created_year: mapRecordYear(record.created_at),
+          municipality,
           drone_imagery_layer_id: record.drone_imagery_layer_id || null,
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
@@ -889,9 +908,15 @@
         });
       }
       redrawFeatures();
+      // The year slider's range and counts follow the records now on the map.
+      window.refreshMapTimeline?.();
     }
 
     loadDelineationsOnMap();
+
+    @unless (config('map.mangrove_history.enabled'))
+      @include('users.partials.map-timeline-scripts')
+    @endunless
 
     /**
      * Reloads every delineation from the server and redraws the map, the zone list, the search and the pins,
@@ -2671,6 +2696,8 @@
       // Draw completed features
       drawnFeatures.forEach((f, i) => {
         const isSelected = i === selectedDrawnIndex;
+        // Added after the year chosen on the slider: not on the map yet (the open one stays, with its panel).
+        if (!isSelected && mapTimelineHides(f.created_year ?? null)) return;
         const color = isSelected ? '#1a73e8' : getFeatureColor(f);
         const isSelectedEditable = (isEditingRejectedRevision && f.is_editing_revision)
           || (boundaryEdit !== null && f.is_editing_boundary)

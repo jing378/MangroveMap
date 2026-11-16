@@ -1,11 +1,15 @@
 {{--
   Quick guide card for the map pages (Map, Delineate, Planting Recommendation), opened by the "?" button in the
-  map controls (partials.map-quick-guide-button). Opens by itself on the first visit of each page; once closed,
-  it stays closed (remembered per browser) until the "?" is clicked again.
+  map controls (partials.map-quick-guide-button). It is open every time one of these pages loads; closing it
+  hides it for that visit only (the "?" brings it back).
   Usage: @include('users.partials.map-quick-guide', ['page' => 'map' | 'delineate' | 'recommendations'])
 --}}
 @php
     $isExpertGuide = auth()->user()?->isExpert();
+    // The year slider: satellite extent when that data is switched on, else this system's own records.
+    $yearSliderStep = config('map.mangrove_history.enabled')
+        ? '<i class="bi bi-graph-up"></i> See <strong>mangrove extent by year</strong> since 1985.'
+        : '<i class="bi bi-graph-up"></i> Drag the <strong>year slider</strong> to see what was mapped by each year.';
     $guides = [
         'map' => [
             'title' => 'Using the map',
@@ -16,12 +20,14 @@
                     'Pending resident areas: <strong>Approve</strong> or <strong>Reject</strong> in the panel.',
                     '<i class="bi bi-layers-fill"></i> Switch to <strong>Satellite</strong> to see the canopy.',
                     'Open an area\'s <strong>Changes over time</strong>.',
+                    $yearSliderStep,
                 ]
                 : [
                     '<strong>Click a shape</strong> to see its details.',
                     '<i class="bi bi-layers-fill"></i> Switch to <strong>Satellite</strong> to see the canopy.',
                     '<i class="bi bi-flower1"></i> Show or hide planting recommendations.',
                     'Open an area\'s <strong>Changes over time</strong>.',
+                    $yearSliderStep,
                 ],
         ],
         'delineate' => [
@@ -204,25 +210,18 @@
     (function () {
         const card = document.getElementById('mapGuideCard');
         if (!card) return;
-        const storageKey = `mapGuide.closed.${card.dataset.guidePage}`;
 
         window.toggleMapGuide = function (open) {
             const show = typeof open === 'boolean' ? open : card.hidden;
             card.hidden = !show;
             document.getElementById('mapGuideBtn')?.setAttribute('aria-expanded', String(show));
-            // Closing it remembers the choice, so it doesn't open by itself on the next visit.
-            if (!show) {
-                try { localStorage.setItem(storageKey, '1'); } catch (e) {}
-            }
         };
 
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape' && !card.hidden) window.toggleMapGuide(false);
         });
 
-        // First visit of this page: open it once.
-        let closedBefore = false;
-        try { closedBefore = localStorage.getItem(storageKey) === '1'; } catch (e) {}
-        if (!closedBefore) window.toggleMapGuide(true);
+        // Open every time the page loads, so users always see how the page works. Closing it lasts for that visit only.
+        window.toggleMapGuide(true);
     })();
 </script>

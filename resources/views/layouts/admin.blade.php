@@ -629,6 +629,7 @@
     </style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @include('partials.scrollbar-styles')
+    @include('partials.sidebar-collapse')
     @include('partials.action-feedback')
 </head>
 
@@ -639,6 +640,7 @@
                 <i class="bi bi-list"></i>
                 @include('partials.mobile-menu-badge')
             </button>
+            @include('partials.sidebar-collapse-button')
             {{-- Goes to the user's own dashboard (reloads it when already there). --}}
             <a href="{{ auth()->user()->homeRoute() }}" class="logo" aria-label="MangroveMap, go to your dashboard" title="Go to your dashboard">
                 <div class="logo-mark"><img src="/icon-192.png" alt=""></div>

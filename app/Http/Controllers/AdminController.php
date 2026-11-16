@@ -3,20 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Models\User;
 use App\Models\AIModel;
-use App\Models\MangroveData;
 use App\Models\Analysis;
 use App\Models\Delineation;
+use App\Models\MangroveData;
+use App\Models\User;
 use App\Models\UserActivity;
 use App\Notifications\ExpertApplicationReviewed;
 use App\Services\MangroveSegmentationService;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -24,6 +25,11 @@ use Throwable;
 
 class AdminController extends Controller
 {
+    /** The dashboard's "Today" counts follow the local day, not UTC. */
+    private const LOCAL_TIMEZONE = 'Asia/Manila';
+
+    private const TODAY_USERS_LIMIT = 25;
+
     public function dashboard()
     {
         abort_if(Auth::user()->role !== 'admin', 403);
@@ -44,6 +50,21 @@ class AdminController extends Controller
             ->get();
 
         $growthChart = $this->weeklyGrowthChartData();
+
+        // "Today" is the local calendar day (the app stores UTC).
+        $todayStart = now(self::LOCAL_TIMEZONE)->startOfDay()->utc();
+        $newUsersToday = User::where('created_at', '>=', $todayStart)->count();
+        $loggedInToday = User::where('last_login_at', '>=', $todayStart)->count();
+        $todayUsers = User::query()
+            ->where(fn ($query) => $query
+                ->where('created_at', '>=', $todayStart)
+                ->orWhere('last_login_at', '>=', $todayStart))
+            ->orderByRaw('CASE WHEN created_at >= ? THEN 0 ELSE 1 END', [$todayStart])
+            ->orderByDesc('last_login_at')
+            ->orderByDesc('created_at')
+            ->take(self::TODAY_USERS_LIMIT)
+            ->get(['id', 'name', 'email', 'role', 'created_at', 'last_login_at', 'email_verified_at'])
+            ->each(fn (User $user) => $user->setAttribute('signed_up_today', $user->created_at->gte($todayStart)));
 
         $totalContributors = Delineation::distinct()->count('user_id');
         $approvedContributors = Delineation::approved()->distinct()->count('user_id');
@@ -74,6 +95,10 @@ class AdminController extends Controller
             'growthChartLabels' => $growthChart['labels'],
             'growthChartZones' => $growthChart['zones'],
             'growthChartAnalyses' => $growthChart['analyses'],
+            'newUsersToday' => $newUsersToday,
+            'loggedInToday' => $loggedInToday,
+            'todayUsers' => $todayUsers,
+            'todayTimezone' => self::LOCAL_TIMEZONE,
             'totalContributors' => $totalContributors,
             'approvedContributors' => $approvedContributors,
             'activeContributorsThisMonth' => $activeContributorsThisMonth,
@@ -126,7 +151,7 @@ class AdminController extends Controller
             return $model;
         });
 
-        $activeModel = $models->first(fn(AIModel $model) => $model->model_type === 'segmentation'
+        $activeModel = $models->first(fn (AIModel $model) => $model->model_type === 'segmentation'
             && $model->is_active
             && $model->artifact_available
             && in_array(strtolower(pathinfo($model->artifact_path, PATHINFO_EXTENSION)), AIModel::runnableExtensions('segmentation'), true));
@@ -140,16 +165,16 @@ class AdminController extends Controller
 
         $availableModels = $models->where('artifact_available', true);
         $completedModels = $availableModels->where('status', 'completed');
-        $modelsWithAccuracy = $availableModels->filter(fn(AIModel $model) => $model->accuracy !== null)->count();
+        $modelsWithAccuracy = $availableModels->filter(fn (AIModel $model) => $model->accuracy !== null)->count();
         $runtimeModelIsRegistered = $runtimeModelPath !== null
-            && $availableModels->contains(fn(AIModel $model) => $model->artifact_path === $runtimeModelPath);
+            && $availableModels->contains(fn (AIModel $model) => $model->artifact_path === $runtimeModelPath);
         $availableModelCount = $availableModels->count() + ($runtimeModelPath !== null && ! $runtimeModelIsRegistered ? 1 : 0);
 
         $accuracyChart = $completedModels
-            ->filter(fn(AIModel $model) => $model->accuracy !== null)
+            ->filter(fn (AIModel $model) => $model->accuracy !== null)
             ->sortBy('created_at')
             ->values()
-            ->map(fn(AIModel $model) => $model);
+            ->map(fn (AIModel $model) => $model);
 
         // Genus suggestions run on their own model (YOLO .pt): an active registry model, else the configured file.
         $genusModelPath = app(MangroveSegmentationService::class)->genusWeightsPath();
@@ -161,11 +186,11 @@ class AdminController extends Controller
             'inferenceReady' => $runtimeModelPath !== null,
             'genusReady' => $genusModelPath !== null,
             'runtimeModelSource' => $runtimeModelSource,
-            'accuracyChartLabels' => $accuracyChart->map(fn(AIModel $model) => $model->name)->all(),
-            'accuracyChartValues' => $accuracyChart->map(fn(AIModel $model) => $model->accuracyPercent())->all(),
+            'accuracyChartLabels' => $accuracyChart->map(fn (AIModel $model) => $model->name)->all(),
+            'accuracyChartValues' => $accuracyChart->map(fn (AIModel $model) => $model->accuracyPercent())->all(),
             // Per bar: which model type it is (bars are colored by type) and what the figure measures.
-            'accuracyChartTypes' => $accuracyChart->map(fn(AIModel $model) => $model->model_type)->all(),
-            'accuracyChartMetrics' => $accuracyChart->map(fn(AIModel $model) => $model->accuracy_metric ?: 'Accuracy')->all(),
+            'accuracyChartTypes' => $accuracyChart->map(fn (AIModel $model) => $model->model_type)->all(),
+            'accuracyChartMetrics' => $accuracyChart->map(fn (AIModel $model) => $model->accuracy_metric ?: 'Accuracy')->all(),
             'completedModels' => $completedModels->sortByDesc('created_at')->take(5),
         ]);
     }
@@ -193,7 +218,7 @@ class AdminController extends Controller
             'name' => 'required|string|max:255|unique:ai_models,name',
             'version' => 'required|string|max:50',
             'model_type' => 'required|in:segmentation,classification',
-            'model_file' => 'required|file|extensions:' . $extension . '|max:524288',
+            'model_file' => 'required|file|extensions:'.$extension.'|max:524288',
         ] + AIModel::performanceRules(), AIModel::performanceMessages());
 
         $checkpoint = $request->file('model_file');
@@ -214,14 +239,14 @@ class AdminController extends Controller
             ])->withInput();
         }
 
-        $relativePath = $checkpoint->storeAs('models', Str::uuid() . '.' . $extension, 'local');
+        $relativePath = $checkpoint->storeAs('models', Str::uuid().'.'.$extension, 'local');
         if (! is_string($relativePath)) {
             return back()->withErrors(['model_file' => 'The checkpoint could not be stored.'])->withInput();
         }
 
         $performance = AIModel::performanceAttributes($validated);
         $description = $isGenusModel
-            ? 'Uploaded and validated YOLO genus model' . ($classes !== [] ? ' (' . implode(', ', $classes) . ')' : '') . '.'
+            ? 'Uploaded and validated YOLO genus model'.($classes !== [] ? ' ('.implode(', ', $classes).')' : '').'.'
             : 'Uploaded and validated PyTorch U-Net checkpoint.';
         $trainingDate = null;
 
@@ -271,7 +296,7 @@ class AdminController extends Controller
         abort_if(Auth::user()->role !== 'admin', 403);
 
         // Errors go to their own bag so the page can reopen this model's edit dialog with them.
-        $validator = \Illuminate\Support\Facades\Validator::make(
+        $validator = Validator::make(
             $request->all(),
             AIModel::performanceRules(),
             AIModel::performanceMessages(),
@@ -284,9 +309,9 @@ class AdminController extends Controller
 
         $model->update(AIModel::performanceAttributes($validator->validated()));
 
-        UserActivity::record(Auth::user(), 'Updated AI model performance: ' . $model->name, 'AI Models', 'success', $model);
+        UserActivity::record(Auth::user(), 'Updated AI model performance: '.$model->name, 'AI Models', 'success', $model);
 
-        return redirect()->route('admin.models')->with('success', 'Performance figures for ' . $model->name . ' saved.');
+        return redirect()->route('admin.models')->with('success', 'Performance figures for '.$model->name.' saved.');
     }
 
     /** Fill a YOLO genus model's figures from the validation results saved inside its checkpoint. */
@@ -302,19 +327,19 @@ class AdminController extends Controller
         try {
             ['classes' => $classes, 'training' => $training] = $segmentation->inspectGenusWeights($path);
         } catch (RuntimeException $exception) {
-            return redirect()->route('admin.models')->with('error', 'The model file could not be read: ' . $exception->getMessage());
+            return redirect()->route('admin.models')->with('error', 'The model file could not be read: '.$exception->getMessage());
         }
 
         if ($training === null || ! isset($training['map50_mask'])) {
-            return redirect()->route('admin.models')->with('error', $model->name . ' has no training results saved in its file. Enter the figures from Roboflow or your training run instead.');
+            return redirect()->route('admin.models')->with('error', $model->name.' has no training results saved in its file. Enter the figures from Roboflow or your training run instead.');
         }
 
         $model->update(AIModel::attributesFromYoloTraining($training, $classes));
 
-        UserActivity::record(Auth::user(), 'Read AI model performance from checkpoint: ' . $model->name, 'AI Models', 'success', $model);
+        UserActivity::record(Auth::user(), 'Read AI model performance from checkpoint: '.$model->name, 'AI Models', 'success', $model);
 
-        return redirect()->route('admin.models')->with('success', $model->name . ': ' . $model->accuracyPercent() . '% '
-            . $model->accuracy_metric . (! empty($training['dataset']) ? ' on ' . $training['dataset'] : '') . ', read from the model file.');
+        return redirect()->route('admin.models')->with('success', $model->name.': '.$model->accuracyPercent().'% '
+            .$model->accuracy_metric.(! empty($training['dataset']) ? ' on '.$training['dataset'] : '').', read from the model file.');
     }
 
     /** Make an earlier uploaded model the active one for its type again (no re-upload needed). */
@@ -329,7 +354,7 @@ class AdminController extends Controller
         }
 
         if ($model->is_active) {
-            return redirect()->route('admin.models')->with('success', $model->name . ' is already the active model.');
+            return redirect()->route('admin.models')->with('success', $model->name.' is already the active model.');
         }
 
         DB::transaction(function () use ($model): void {
@@ -340,10 +365,10 @@ class AdminController extends Controller
             $model->forceFill(['is_active' => true])->save();
         });
 
-        UserActivity::record(Auth::user(), 'Activated AI model: ' . $model->name, 'AI Models', 'success', $model);
+        UserActivity::record(Auth::user(), 'Activated AI model: '.$model->name, 'AI Models', 'success', $model);
 
-        return redirect()->route('admin.models')->with('success', $model->name . ' is now the active '
-            . ($model->model_type === 'classification' ? 'genus suggestion' : 'segmentation') . ' model.');
+        return redirect()->route('admin.models')->with('success', $model->name.' is now the active '
+            .($model->model_type === 'classification' ? 'genus suggestion' : 'segmentation').' model.');
     }
 
     private function weeklyGrowthChartData(): array
@@ -355,7 +380,7 @@ class AdminController extends Controller
         for ($i = 3; $i >= 0; $i--) {
             $start = now()->subWeeks($i + 1)->startOfDay();
             $end = now()->subWeeks($i)->endOfDay();
-            $labels[] = 'Week ' . (4 - $i);
+            $labels[] = 'Week '.(4 - $i);
             $zones[] = MangroveData::whereBetween('created_at', [$start, $end])->count();
             $analyses[] = Analysis::whereBetween('created_at', [$start, $end])->count();
         }
@@ -432,7 +457,7 @@ class AdminController extends Controller
     {
         abort_if(Auth::user()->role !== 'admin', 403);
 
-        if (!$request->filled('password') && !$request->filled('password_confirmation')) {
+        if (! $request->filled('password') && ! $request->filled('password_confirmation')) {
             $request->request->remove('password');
             $request->request->remove('password_confirmation');
         }
@@ -461,11 +486,11 @@ class AdminController extends Controller
         $passwordRules = array_values(array_diff(RegisteredUserController::passwordRules(), ['required']));
 
         $validated = $request->validate($nameRules + [
-            'email'                 => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
-            'role'                  => ['required', 'in:admin,end_user,expert'],
-            'organization'          => ['nullable', 'string', 'max:255'],
-            'phone'                 => ['nullable', 'regex:/^09[0-9]{9}$/', 'string'],
-            'password'              => array_merge(['nullable'], $passwordRules),
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'role' => ['required', 'in:admin,end_user,expert'],
+            'organization' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'regex:/^09[0-9]{9}$/', 'string'],
+            'password' => array_merge(['nullable'], $passwordRules),
             'password_confirmation' => ['nullable', 'string'],
         ], RegisteredUserController::passwordMessages() + [
             'first_name.required' => 'First name is required.',
@@ -503,13 +528,13 @@ class AdminController extends Controller
             : ['name' => $validated['name']];
 
         $user->fill($nameFields + [
-            'email'        => $validated['email'],
-            'role'         => $validated['role'],
+            'email' => $validated['email'],
+            'role' => $validated['role'],
             'organization' => $validated['organization'] ?? null,
-            'phone'        => $validated['phone'] ?? null,
+            'phone' => $validated['phone'] ?? null,
         ]);
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
         }
 
@@ -527,7 +552,7 @@ class AdminController extends Controller
 
         UserActivity::record(
             Auth::user(),
-            'Updated user profile: ' . $user->name,
+            'Updated user profile: '.$user->name,
             'User Management',
             'success',
             $user,
@@ -539,7 +564,7 @@ class AdminController extends Controller
 
             return response()->json([
                 'success' => 'User updated successfully.',
-                'user'    => $user,
+                'user' => $user,
             ]);
         }
 
@@ -580,11 +605,11 @@ class AdminController extends Controller
             'expert_rejection_notes' => null,
         ])->save();
 
-        UserActivity::record(Auth::user(), 'Approved expert application: ' . $user->name, 'User Management', 'success', $user);
+        UserActivity::record(Auth::user(), 'Approved expert application: '.$user->name, 'User Management', 'success', $user);
         $user->deleteExpertApplicationNotifications();
         $user->notify(new ExpertApplicationReviewed(true));
 
-        return redirect()->route('admin.users')->with('success', $user->name . ' is now an expert.');
+        return redirect()->route('admin.users')->with('success', $user->name.' is now an expert.');
     }
 
     public function rejectExpertApplication(Request $request, User $user): RedirectResponse
@@ -608,11 +633,11 @@ class AdminController extends Controller
             'expert_rejection_notes' => $notes,
         ])->save();
 
-        UserActivity::record(Auth::user(), 'Rejected expert application: ' . $user->name, 'User Management', 'rejected', $user);
+        UserActivity::record(Auth::user(), 'Rejected expert application: '.$user->name, 'User Management', 'rejected', $user);
         $user->deleteExpertApplicationNotifications();
         $user->notify(new ExpertApplicationReviewed(false, $notes));
 
-        return redirect()->route('admin.users')->with('success', 'Expert application from ' . $user->name . ' was rejected.');
+        return redirect()->route('admin.users')->with('success', 'Expert application from '.$user->name.' was rejected.');
     }
 
     public function destroy(User $user)

@@ -82,6 +82,11 @@
                 title="Hide planting recommendations" aria-label="Show or hide planting recommendations" aria-pressed="true">
                 <i class="bi bi-flower1"></i>
               </button>
+              <button id="mangroveHistoryToggle" type="button" onclick="toggleMangroveHistory()"
+                title="{{ config('map.mangrove_history.enabled') ? 'Mangrove extent by year' : 'Mangroves mapped by year' }}"
+                aria-label="Show or hide {{ config('map.mangrove_history.enabled') ? 'mangrove extent by year' : 'mangroves mapped by year' }}" aria-controls="mangroveHistoryCard" aria-pressed="true" class="active-toggle">
+                <i class="bi bi-graph-up"></i>
+              </button>
             @endif
             <button id="mapGuideBtn" type="button" onclick="toggleMapGuide()" title="Quick guide" aria-label="Quick guide"
               aria-controls="mapGuideCard" aria-expanded="false">
@@ -89,6 +94,9 @@
             </button>
           </x-map-layer-control>
           @include('users.partials.map-quick-guide', ['page' => request()->routeIs('delineate', 'expert.delineate') ? 'delineate' : 'map'])
+          @if (request()->routeIs('map', 'expert.map'))
+            @include('users.partials.mangrove-history')
+          @endif
 
         </div>
       </div>

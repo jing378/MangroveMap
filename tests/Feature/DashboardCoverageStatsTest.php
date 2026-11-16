@@ -60,6 +60,33 @@ class DashboardCoverageStatsTest extends TestCase
             ->assertDontSee('recovery');
     }
 
+    public function test_trend_is_split_by_municipality_for_the_map_year_slider(): void
+    {
+        $user = User::factory()->create(['role' => 'end_user']);
+        $inPlace = fn (string $name) => array_map(
+            fn (array $feature) => $feature + ['location_details' => ['municipality' => ['name' => $name]]],
+            $this->square(),
+        );
+        $approved = ['is_approved' => true, 'approved_at' => now()];
+
+        $this->delineation($user, $approved + ['features' => $inPlace('Sogod')]);
+        $this->delineation($user, $approved + ['features' => $inPlace('Sogod')]);
+        $this->delineation($user, $approved + ['features' => $inPlace('Bontoc')]);
+        // No barangay matched: in the overall trend only. Pending: nowhere.
+        $this->delineation($user, $approved + ['features' => $this->square()]);
+        $this->delineation($user, ['features' => $inPlace('Maasin City')]);
+
+        $oneSquare = ApprovedCoverageStats::areaHectares($this->square());
+        $summary = app(ApprovedCoverageStats::class)->summary();
+        $year = now()->year;
+
+        $this->assertSame(['Bontoc', 'Sogod'], array_keys($summary['trend_by_municipality']));
+        $this->assertEqualsWithDelta(4 * $oneSquare, $summary['trend'][$year], 0.01);
+        $this->assertEqualsWithDelta(2 * $oneSquare, $summary['trend_by_municipality']['Sogod'][$year], 0.01);
+        $this->assertEqualsWithDelta($oneSquare, $summary['trend_by_municipality']['Bontoc'][$year], 0.01);
+        $this->assertSame(array_keys($summary['trend']), array_keys($summary['trend_by_municipality']['Sogod']));
+    }
+
     public function test_empty_system_shows_zero_and_no_sample_charts(): void
     {
         $viewer = User::factory()->create(['role' => 'end_user']);

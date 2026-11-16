@@ -17,6 +17,7 @@ class ApprovedCoverageStats
      *     area_count: int,
      *     genera: array<string, int>,
      *     trend: array<int, float>,
+     *     trend_by_municipality: array<string, array<int, float>>,
      * }
      */
     public function summary(): array
@@ -32,7 +33,53 @@ class ApprovedCoverageStats
             'area_count' => $delineations->count(),
             'genera' => $this->generaCounts($delineations),
             'trend' => $this->trend($delineations, $areas),
+            'trend_by_municipality' => $this->trendByMunicipality($delineations, $areas),
         ];
+    }
+
+    /**
+     * The municipality a delineation is in: that of its first feature matched to a barangay
+     * (BoundaryResolver's location_details). Null when none was matched.
+     */
+    public static function municipalityName(array $features): ?string
+    {
+        foreach ($features as $feature) {
+            $name = is_array($feature) ? ($feature['location_details']['municipality']['name'] ?? null) : null;
+            if (is_string($name) && trim($name) !== '') {
+                return trim($name);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The same trend for each municipality with approved areas, by name, over the same years as the
+     * overall trend. Areas not matched to a barangay are only in the overall trend.
+     *
+     * @return array<string, array<int, float>>
+     */
+    private function trendByMunicipality(Collection $delineations, Collection $areas): array
+    {
+        if ($delineations->isEmpty()) {
+            return [];
+        }
+
+        $firstYear = $this->firstYear($delineations);
+
+        return $delineations
+            ->groupBy(fn (Delineation $d) => self::municipalityName($d->features ?? []) ?? '')
+            ->forget('')
+            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)
+            ->map(fn (Collection $group) => $this->trend($group, $areas, $firstYear))
+            ->all();
+    }
+
+    private function firstYear(Collection $delineations): int
+    {
+        $currentYear = now()->year;
+
+        return min($currentYear, (int) $delineations->min(fn (Delineation $d) => $d->created_at?->year ?? $currentYear));
     }
 
     /**
@@ -72,14 +119,14 @@ class ApprovedCoverageStats
      *
      * @return array<int, float>
      */
-    private function trend(Collection $delineations, Collection $areas): array
+    private function trend(Collection $delineations, Collection $areas, ?int $firstYear = null): array
     {
         if ($delineations->isEmpty()) {
             return [];
         }
 
         $currentYear = now()->year;
-        $firstYear = min($currentYear, (int) $delineations->min(fn (Delineation $d) => $d->created_at?->year ?? $currentYear));
+        $firstYear ??= $this->firstYear($delineations);
 
         $trend = [];
         for ($year = $firstYear; $year <= $currentYear; $year++) {

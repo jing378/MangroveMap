@@ -2947,6 +2947,11 @@
     <div class="footer-bottom">
       <p>&copy; {{ date('Y') }} MangroveMap. Environmental Geospatial Intelligence &amp; Ecosystem Monitoring.</p>
       <p>Empowering coastal communities through spatial science.</p>
+      {{-- Map credits live here instead of in a bar on the map (see partials/map-place-labels). --}}
+      <p style="flex-basis: 100%; opacity: 0.8;">Map: <a href="https://leafletjs.com" target="_blank" rel="noopener" style="color: inherit;">Leaflet</a>.
+        Satellite imagery and roads &copy; Esri and its data providers.
+        Street map and place names &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" style="color: inherit;">OpenStreetMap</a> contributors.
+        Topo map &copy; OpenStreetMap contributors, SRTM; style &copy; <a href="https://opentopomap.org" target="_blank" rel="noopener" style="color: inherit;">OpenTopoMap</a> (CC BY-SA).</p>
     </div>
   </footer>
 

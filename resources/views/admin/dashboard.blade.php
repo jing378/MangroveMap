@@ -29,6 +29,71 @@
         </div>
     </div>
 
+    <div class="section" id="today-users">
+        <div class="section-title"><i class="bi bi-calendar-check"></i> Today
+            <span class="section-note">{{ now($todayTimezone)->format('F j, Y') }}</span>
+            <a href="{{ route('admin.users') }}" class="section-link">All users <i class="bi bi-arrow-right"></i></a>
+        </div>
+        <div class="contributor-summary today-summary">
+            <div class="contributor-metric">
+                <div class="stat-value green">{{ number_format($newUsersToday) }}</div>
+                <div class="stat-label">New sign-ups today</div>
+            </div>
+            <div class="contributor-metric">
+                <div class="stat-value">{{ number_format($loggedInToday) }}</div>
+                <div class="stat-label">Users who logged in today</div>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Today</th>
+                        <th>Email</th>
+                        <th>Signed up</th>
+                        <th>Last login</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($todayUsers as $todayUser)
+                    <tr>
+                        <td>
+                            <a href="{{ route('admin.users.show', $todayUser) }}" class="activity-link">{{ $todayUser->name }}</a>
+                            <div class="cell-sub">{{ $todayUser->email }}</div>
+                        </td>
+                        <td>{{ $todayUser->roleLabel() }}</td>
+                        <td>
+                            @if($todayUser->signed_up_today)
+                                <span class="badge success">New sign-up</span>
+                            @else
+                                <span class="badge secondary">Logged in</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if($todayUser->email_verified_at)
+                                <span class="badge success">Verified</span>
+                            @else
+                                <span class="badge pending">Not verified</span>
+                            @endif
+                        </td>
+                        <td>{{ $todayUser->created_at->timezone($todayTimezone)->format($todayUser->signed_up_today ? 'g:i A' : 'M j, Y') }}</td>
+                        <td>{{ $todayUser->last_login_at?->timezone($todayTimezone)->format($todayUser->last_login_at->timezone($todayTimezone)->isToday() ? 'g:i A' : 'M j, Y') ?? 'Not yet' }}</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="6">No sign-ups or logins yet today.</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if($todayUsers->count() >= 25)
+            <p class="section-footnote">Showing the first {{ $todayUsers->count() }}. See All users for the rest.</p>
+        @endif
+    </div>
+
     <div class="section">
         <div class="section-title"><i class="bi bi-people-fill"></i> Delineation Contributors</div>
         <div class="contributor-summary">
@@ -226,6 +291,28 @@
         grid-template-columns: repeat(3, 1fr);
         gap: 16px;
         margin-bottom: 20px;
+    }
+
+    .today-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .section-note {
+        margin-left: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    .cell-sub {
+        font-size: 11px;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    .section-footnote {
+        margin: 10px 0 0;
+        font-size: 12px;
+        color: var(--fg-6a8a6a, #6a8a6a);
     }
 
     .contributor-metric {

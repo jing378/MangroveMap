@@ -572,6 +572,7 @@
       layers.forEach(layer => {
         const row = document.createElement('div');
         row.className = 'drone-imagery-layer';
+        row.dataset.layerId = layer.id;
         const checkbox = document.createElement('input');
         checkbox.setAttribute('aria-label', `Show ${layer.name}`);
         checkbox.type = 'checkbox';
@@ -725,6 +726,8 @@
       }
 
       renderDroneImageryLayers(payload.layers, activateId);
+      // The map's year slider (map-timeline-scripts) counts these and hides the ones uploaded after its year.
+      window.onDroneImageryLayers?.(payload.layers);
       droneOwnedLayers = payload.layers.filter(layer => layer.is_owner);
       updateDroneProgressChip();
       scheduleDroneImageryPoll(payload.layers);

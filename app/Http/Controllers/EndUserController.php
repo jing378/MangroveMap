@@ -14,6 +14,7 @@ use App\Services\ApprovedCoverageStats;
 use App\Services\BoundaryResolver;
 use App\Services\DelineationObservationRecorder;
 use App\Services\FieldWeatherService;
+use App\Services\MangroveHistoryStats;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -84,6 +85,10 @@ class EndUserController extends Controller
         $data = $this->buildDashboardData();
         $data['page'] = 'dashboard';
         $data += $this->buildContributorData(Auth::user());
+        // Satellite hectares per year (Global Mangrove Watch), shown beside the approved-area trend when enabled.
+        $data['mangroveHistory'] = config('map.mangrove_history.enabled')
+            ? app(MangroveHistoryStats::class)->summary()
+            : null;
 
         return view('users.dashboard', $data);
     }
@@ -126,6 +131,8 @@ class EndUserController extends Controller
     {
         $data = $this->buildDashboardData();
         $data['page'] = 'map';
+        // Where each municipality is, so the year slider's place picker can zoom to it.
+        $data['municipalityBounds'] = app(\App\Services\MunicipalityBounds::class)->all();
         $data['plantingRecommendationsForMap'] = PlantingRecommendation::query()
             ->visibleOnMapTo(Auth::user())
             ->with(['user:id,name', 'delineation:id,name'])
@@ -211,6 +218,8 @@ class EndUserController extends Controller
         $payload = array_merge(Arr::except($delineation->toArray(), ['latest_revision']), $extra, [
             'planting_recommendations' => $plantingRecommendations,
             'features' => self::sanitizeFeaturesForMap($delineation->features),
+            // For the year slider's municipality picker (the features above are sent without location details).
+            'municipality' => ApprovedCoverageStats::municipalityName(is_array($delineation->features) ? $delineation->features : []),
             'user_name' => $delineation->user?->name ?? null,
             'created_by' => $delineation->user?->name ?? null,
             'approved_by_name' => $delineation->approvedBy?->name ?? $delineation->approved_by_name ?? null,
@@ -433,6 +442,8 @@ class EndUserController extends Controller
             'genusSeries' => $genusSeries,
             'trendYears' => $trendYears,
             'trendValues' => $trendValues,
+            // The same trend per municipality, for the place picker on the map's year slider.
+            'trendByMunicipality' => $coverage['trend_by_municipality'],
             'delineations' => $delineations,
             'dashboardDelineations' => $user->isExpert() ? $residentDelineationsForMap : $delineations,
             'approvedDelineations' => $approvedDelineations,

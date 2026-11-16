@@ -13,13 +13,15 @@ use App\Http\Controllers\EndUserController;
 use App\Http\Controllers\ExpertController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\MapLayerController;
+use App\Http\Controllers\MapMangroveHistoryController;
 use App\Http\Controllers\MapPlaceLabelController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlantingRecommendationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicController;
 use App\Http\Controllers\TileExplorerController;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Models\User;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -78,11 +80,17 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->midd
 // Email Verification Routes
 
 Route::middleware('auth')->group(function () {
-    Route::get('/email/verify', function () {
+    Route::get('/email/verify', function (Request $request) {
         $user = Auth::user();
 
+        // Verified meanwhile (the link was opened on another device while this page stayed open):
+        // sign in again with the credentials instead of going straight to the dashboard.
         if ($user->hasVerifiedEmail()) {
-            return redirect($user->homeRoute());
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')->with('status', 'Email verified successfully! Please log in to continue.');
         }
 
         return view('auth.verify-email');
@@ -99,20 +107,39 @@ Route::middleware('auth')->group(function () {
 
         return back()->with('message', 'Verification link sent!');
     })->middleware('throttle:6,1')->name('verification.send');
-
-    Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
-        $user = $request->user();
-
-        if ($user->hasVerifiedEmail()) {
-            return redirect($user->homeRoute());
-        }
-
-        $request->fulfill();
-
-        return redirect($user->homeRoute())
-            ->with('success', 'Email verified successfully!');
-    })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 });
+
+// The link in the verification email. It works without being logged in (it is often opened in another
+// browser or on a phone): the signed URL and the email hash prove who it is for. After verifying, the
+// user is always sent to the login page to sign in with their credentials, never straight to the dashboard.
+Route::get('/email/verify/{id}/{hash}', function (Request $request, string $id, string $hash) {
+    $user = User::find($id);
+
+    if (! $user || ! hash_equals(sha1($user->getEmailForVerification()), $hash)) {
+        abort(403);
+    }
+
+    $alreadyVerified = $user->hasVerifiedEmail();
+
+    if (! $alreadyVerified && $user->markEmailAsVerified()) {
+        event(new Verified($user));
+    }
+
+    // Someone already signed in with a verified account just reopened an old link.
+    if ($alreadyVerified && Auth::id() === $user->id) {
+        return redirect($user->homeRoute());
+    }
+
+    if (Auth::check()) {
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+    }
+
+    return redirect()->route('login')->with('status', $alreadyVerified
+        ? 'Your email is already verified. Please log in.'
+        : 'Email verified successfully! Please log in to continue.');
+})->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 
 // Public routes
 Route::get('/', function () {
@@ -134,6 +161,11 @@ Route::get('/imagery/{layerId}/tiles/{z}/{x}/{y}', [DroneImageryController::clas
 Route::get('/map/place-labels', MapPlaceLabelController::class)
     ->middleware('throttle:60,1')
     ->name('map.place-labels');
+
+// Where mangroves stood in each year since 1985 (Global Mangrove Watch, public data) for the map's year slider.
+Route::get('/map/mangrove-history', MapMangroveHistoryController::class)
+    ->middleware('throttle:60,1')
+    ->name('map.mangrove-history');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Drone Upload tab: upload GeoTIFFs, then review and manage them

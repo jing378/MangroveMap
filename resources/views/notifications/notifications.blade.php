@@ -49,6 +49,16 @@ if ($currentUser && $currentUser->role === 'admin') {
         gap: 10px;
     }
 
+    .notifications-heading {
+        min-width: 0;
+    }
+
+    .notifications-description {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: var(--fg-6b8a78, #6b8a78);
+    }
+
     .notifications-header h1 i {
         color: var(--fg-1e9e62, #1e9e62);
     }
@@ -312,7 +322,12 @@ if ($currentUser && $currentUser->role === 'admin') {
 @section('content')
 <div class="notifications-page">
     <div class="notifications-header">
-        <h1><i class="bi bi-bell"></i> Notifications</h1>
+        <div class="notifications-heading">
+            <h1><i class="bi bi-bell"></i> Notifications</h1>
+            <p class="notifications-description">{{ $currentUser?->role === 'admin'
+                ? 'Updates that need your attention in MangroveMap. New ones are highlighted until you read them.'
+                : 'Updates about your delineations, expert reviews and drone uploads. New ones are highlighted until you read them.' }}</p>
+        </div>
         @if($unreadCount > 0)
         <form action="{{ route('notifications.mark-all-as-read') }}" method="POST" class="mark-all-read-form" data-ajax-mark-all>
             @csrf

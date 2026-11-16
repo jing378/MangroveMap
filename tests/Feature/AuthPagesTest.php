@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class AuthPagesTest extends TestCase
@@ -76,5 +77,46 @@ class AuthPagesTest extends TestCase
             ->assertOk()
             ->assertDontSee('href="#"', false)
             ->assertSee('id="resendSubmitBtn"', false);
+    }
+
+    private function verificationLink(User $user, ?string $email = null): string
+    {
+        return URL::temporarySignedRoute('verification.verify', now()->addHour(), [
+            'id' => $user->id, 'hash' => sha1($email ?? $user->email),
+        ]);
+    }
+
+    public function test_verification_link_verifies_then_sends_the_user_to_login_not_the_dashboard(): void
+    {
+        $user = User::factory()->unverified()->create();
+
+        // Still signed in from registration, same browser: verified, signed out, sent to login.
+        $this->actingAs($user)->get($this->verificationLink($user))
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status', 'Email verified successfully! Please log in to continue.');
+
+        $this->assertTrue($user->fresh()->hasVerifiedEmail());
+        $this->assertGuest();
+    }
+
+    public function test_verification_link_works_without_being_logged_in_and_rejects_a_wrong_hash(): void
+    {
+        $user = User::factory()->unverified()->create();
+
+        $this->get($this->verificationLink($user))->assertRedirect(route('login'));
+        $this->assertTrue($user->fresh()->hasVerifiedEmail());
+
+        $other = User::factory()->unverified()->create();
+        $this->get($this->verificationLink($other, 'someone@else.test'))->assertForbidden();
+        $this->get($this->verificationLink($other).'x')->assertForbidden(); // broken signature
+        $this->assertFalse($other->fresh()->hasVerifiedEmail());
+    }
+
+    public function test_verify_notice_sends_an_already_verified_user_to_login(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get(route('verification.notice'))->assertRedirect(route('login'));
+        $this->assertGuest();
     }
 }

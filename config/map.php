@@ -16,6 +16,20 @@ return [
     ],
 
     /*
+    | "Mangrove extent by year" on the map: where mangroves stood in each year since 1985, from Global
+    | Mangrove Watch satellite maps (about 30 m, CC BY 4.0). Built once by
+    | scripts/gmw/build_mangrove_history.py and kept in the repository; the map draws it in the browser.
+    |
+    | Hidden for now ('enabled' off): the map's year slider then shows this system's own records instead
+    | (approved hectares from the coverage trend, delineations and drone uploads by the year they were added),
+    | and the dashboard leaves out its satellite chart. Set MAP_MANGROVE_HISTORY_ENABLED=true to bring it back.
+    */
+    'mangrove_history' => [
+        'enabled' => (bool) env('MAP_MANGROVE_HISTORY_ENABLED', false),
+        'path' => resource_path('data/mangrove-history.json'),
+    ],
+
+    /*
     | "Field conditions" card on the resident and expert dashboards: a short forecast from Open-Meteo
     | (free, no API key; non-commercial use, attribution required). Given for the user's location when the
     | browser shares it (rounded to ~1 km, cached per spot), else for the place below; the dashboard loads

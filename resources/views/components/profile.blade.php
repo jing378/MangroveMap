@@ -18,7 +18,10 @@ if ($currentUser && $currentUser->role === 'admin') {
 @section('content')
 <div id="profile-section">
     <div class="page-header">
-        <div class="page-title">My Profile</div>
+        <div class="page-heading">
+            <div class="page-title">My Profile</div>
+            <p class="page-description">View and update your name, contact details, profile photo and password.</p>
+        </div>
     </div>
 
 
@@ -412,6 +415,16 @@ if ($currentUser && $currentUser->role === 'admin') {
 
     .page-title {
         margin-bottom: 0 !important;
+    }
+
+    .page-heading {
+        min-width: 0;
+    }
+
+    .page-description {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: var(--fg-6b8a78, #6b8a78);
     }
 
     .page-title {
