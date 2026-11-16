@@ -187,29 +187,6 @@
       gap: 12px;
     }
 
-    .nav-btn-explore {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      background: var(--primary-green);
-      color: #ffffff !important;
-      font-size: 13.5px;
-      font-weight: 600;
-      padding: 8px 18px;
-      border-radius: var(--radius-sm);
-      text-decoration: none;
-      border: 1px solid var(--primary-green);
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 8px rgba(30, 158, 98, 0.25);
-    }
-
-    .nav-btn-explore:hover {
-      background: #188653;
-      border-color: #188653;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(30, 158, 98, 0.35);
-    }
-
     .nav-btn-login {
       display: inline-flex;
       align-items: center;
@@ -1750,7 +1727,7 @@
         height: 62px;
       }
 
-      .nav-links, .nav-btn-explore {
+      .nav-links {
         display: none;
       }
 
@@ -2614,10 +2591,6 @@
 
     <!-- Header Actions & Authentication Section -->
     <div class="nav-actions">
-      <a href="#map-section" onclick="scrollToMap(event)" class="nav-btn-explore">
-        <i class="bi bi-map-fill"></i> Explore Map
-      </a>
-
       @guest
         <a href="{{ route('login') }}" class="nav-btn-login">
           <i class="bi bi-box-arrow-in-right"></i> Login
