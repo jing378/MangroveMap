@@ -118,6 +118,19 @@ class HomePageStatsTest extends TestCase
             ->assertSee('bi-geo-alt-fill', false);
     }
 
+    public function test_landing_page_invites_visitors_to_sign_up(): void
+    {
+        $this->get('/')->assertOk()
+            ->assertSee('Get Started')
+            ->assertSee('Sign Up')
+            ->assertSee('href="'.route('register').'"', false)
+            ->assertSee('href="'.route('login').'"', false);
+
+        // Signed-in users skip the landing page and go straight to their dashboard.
+        $resident = \App\Models\User::factory()->create(['role' => 'end_user']);
+        $this->actingAs($resident)->get('/')->assertRedirect($resident->homeRoute());
+    }
+
     public function test_empty_system_shows_zeros_not_sample_numbers(): void
     {
         $this->get('/')->assertOk()

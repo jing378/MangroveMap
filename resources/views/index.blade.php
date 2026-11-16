@@ -230,6 +230,146 @@
       border-color: var(--primary-green);
     }
 
+    /* Sign Up: the strongest button in the bar for visitors without an account. */
+    .nav-btn-signup {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #1e9e62 0%, #15803d 100%);
+      color: #ffffff !important;
+      font-size: 13.5px;
+      font-weight: 700;
+      padding: 8px 18px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      border: 1px solid #15803d;
+      box-shadow: 0 2px 8px rgba(30, 158, 98, 0.3);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .nav-btn-signup:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(30, 158, 98, 0.4);
+    }
+
+    /* The line under the hero buttons: "See how it works · Already have an account? Log in". */
+    .hero-links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 6px 12px;
+      margin: -30px 0 44px;
+      font-size: 14.5px;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .hero-links a {
+      color: #ffffff;
+      font-weight: 700;
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 255, 255, 0.45);
+      text-underline-offset: 4px;
+      transition: text-decoration-color .2s ease;
+    }
+
+    .hero-links a:hover {
+      text-decoration-color: #ffffff;
+    }
+
+    .hero-link-how {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hero-links-sep {
+      opacity: 0.6;
+    }
+
+    /* Closing call to action, between the impact section and the footer. */
+    .cta-section {
+      padding: 80px 24px;
+      background: var(--bg-f3faf6, #f3faf6);
+      border-top: 1px solid var(--bd-dcefe3, #dcefe3);
+    }
+
+    .cta-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .cta-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      margin-bottom: 18px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #1e9e62 0%, #15803d 100%);
+      color: #ffffff;
+      font-size: 26px;
+      box-shadow: 0 8px 20px rgba(30, 158, 98, 0.3);
+    }
+
+    .cta-title {
+      margin: 0 0 12px;
+      font-size: clamp(26px, 4vw, 36px);
+      font-weight: 800;
+      color: var(--fg-10301c, #10301c);
+      letter-spacing: -0.02em;
+    }
+
+    .cta-text {
+      margin: 0 auto 28px;
+      max-width: 600px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--fg-4c6b5d, #4c6b5d);
+    }
+
+    .cta-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .cta-btn-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 14px 28px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(30, 158, 98, 0.4);
+      background: var(--bg-ffffff, #ffffff);
+      color: var(--fg-176d46, #176d46);
+      font-size: 15.5px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .cta-btn-outline:hover {
+      border-color: var(--primary-green);
+      transform: translateY(-2px);
+    }
+
+    .mobile-menu-drawer a.drawer-signup {
+      color: var(--fg-15803d, #15803d);
+      font-weight: 800;
+    }
+
+    @media (max-width: 480px) {
+      .cta-actions > a {
+        flex: 1 1 100%;
+        justify-content: center;
+      }
+    }
+
     .nav-mobile-toggle {
       display: none;
       position: relative;
@@ -1618,6 +1758,30 @@
         display: none;
       }
 
+      /* On phones Sign Up is in the menu (hamburger), not the top bar. */
+      .nav-btn-signup {
+        display: none;
+      }
+
+      .hero-links {
+        margin: -24px 0 34px;
+        font-size: 14px;
+      }
+
+      /* Each part on its own line rather than wrapping mid-sentence. */
+      .hero-links-sep {
+        display: none;
+      }
+
+      .hero-links > * {
+        flex-basis: 100%;
+        justify-content: center;
+      }
+
+      .cta-section {
+        padding: 56px 18px;
+      }
+
       .nav-mobile-toggle {
         display: block;
       }
@@ -1864,6 +2028,39 @@
     @keyframes btnShine {
       0%, 70% { left: -60%; }
       100% { left: 130%; }
+    }
+
+    /* Phones: Get Started and Explore Map side by side, sharing the width equally. */
+    @media (max-width: 768px) {
+      .hero-actions {
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 10px;
+        width: 100%;
+        max-width: 420px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .hero-actions > a {
+        flex: 1 1 0;
+        min-width: 0;
+        gap: 7px;
+        padding: 13px 10px;
+        font-size: 15px;
+        white-space: nowrap;
+      }
+    }
+
+    @media (max-width: 340px) {
+      .hero-actions > a {
+        font-size: 14px;
+        padding: 12px 6px;
+      }
+
+      .hero-actions > a .bi {
+        display: none;
+      }
     }
 
     .hero-stat-card {
@@ -2422,8 +2619,15 @@
       </a>
 
       @guest
-        <a href="/login" class="nav-btn-login">
+        <a href="{{ route('login') }}" class="nav-btn-login">
           <i class="bi bi-box-arrow-in-right"></i> Login
+        </a>
+        <a href="{{ route('register') }}" class="nav-btn-signup">
+          <i class="bi bi-person-plus-fill"></i> Sign Up
+        </a>
+      @else
+        <a href="{{ Auth::user()->homeRoute() }}" class="nav-btn-login">
+          <i class="bi bi-speedometer2"></i> Dashboard
         </a>
       @endguest
 
@@ -2450,8 +2654,8 @@
     @auth
       <a href="{{ Auth::user()->homeRoute() }}"><i class="bi bi-speedometer2"></i> My Dashboard</a>
     @else
-      <a href="/login"><i class="bi bi-box-arrow-in-right"></i> Sign In to Portal</a>
-      <a href="/register"><i class="bi bi-person-plus"></i> Create Account</a>
+      <a href="{{ route('register') }}" class="drawer-signup"><i class="bi bi-person-plus-fill"></i> Sign Up / Get Started</a>
+      <a href="{{ route('login') }}"><i class="bi bi-box-arrow-in-right"></i> Log In</a>
     @endauth
   </div>
 
@@ -2477,13 +2681,28 @@
       </p>
 
       <div class="hero-actions hero-enter" style="--d:3">
-        <a href="#map-section" onclick="scrollToMap(event)" class="btn-hero-primary" id="exploreMapHeroBtn">
+        {{-- Get Started: new visitors create an account; signed-in users go to their dashboard. --}}
+        @guest
+          <a href="{{ route('register') }}" class="btn-hero-primary" id="getStartedHeroBtn">
+            <i class="bi bi-rocket-takeoff-fill"></i> Get Started
+          </a>
+        @else
+          <a href="{{ Auth::user()->homeRoute() }}" class="btn-hero-primary" id="getStartedHeroBtn">
+            <i class="bi bi-speedometer2"></i> Go to Dashboard
+          </a>
+        @endguest
+        <a href="#map-section" onclick="scrollToMap(event)" class="btn-hero-secondary" id="exploreMapHeroBtn">
           <i class="bi bi-compass-fill"></i> Explore Map
         </a>
-        <a href="#how-it-works" class="btn-hero-secondary">
-          <i class="bi bi-play-circle-fill"></i> See How It Works
-        </a>
       </div>
+      {{-- One quiet line under the two buttons: the walkthrough below, and log in for returning users. --}}
+      <p class="hero-links hero-enter" style="--d:3">
+        <a href="#how-it-works" class="hero-link-how"><i class="bi bi-play-circle" aria-hidden="true"></i> See how it works</a>
+        @guest
+          <span class="hero-links-sep" aria-hidden="true">·</span>
+          <span>Already have an account? <a href="{{ route('login') }}">Log in</a></span>
+        @endguest
+      </p>
 
       <!-- Live GIS KPI / Statistics Strip -->
       <div class="hero-stats-strip hero-enter" style="--d:4">
@@ -2921,6 +3140,27 @@
     </div>
   </section>
 
+  <!-- Closing call to action: sign up (guests) or open the dashboard -->
+  <section class="cta-section" id="get-started">
+    <div class="cta-inner reveal">
+      <div class="cta-icon" aria-hidden="true"><i class="bi bi-tree-fill"></i></div>
+      <h2 class="cta-title">Help map the mangroves of Southern Leyte</h2>
+      <p class="cta-text">
+        Create a free account to draw mangrove areas on the map, upload drone imagery for the AI to check, and follow
+        how each area changes over the years. Experts review every submission.
+      </p>
+      <div class="cta-actions">
+        @guest
+          <a href="{{ route('register') }}" class="btn-hero-primary"><i class="bi bi-person-plus-fill"></i> Sign Up Free</a>
+          <a href="{{ route('login') }}" class="cta-btn-outline"><i class="bi bi-box-arrow-in-right"></i> Log In</a>
+        @else
+          <a href="{{ Auth::user()->homeRoute() }}" class="btn-hero-primary"><i class="bi bi-speedometer2"></i> Go to Dashboard</a>
+          <a href="#map-section" onclick="scrollToMap(event)" class="cta-btn-outline"><i class="bi bi-compass-fill"></i> Explore Map</a>
+        @endguest
+      </div>
+    </div>
+  </section>
+
   <!-- Minimal Professional Footer -->
   <footer class="site-footer">
     <div class="footer-container">
@@ -2936,7 +3176,8 @@
         <li><a href="#features">Capabilities</a></li>
         <li><a href="#map-section" onclick="scrollToMap(event)">GIS Map</a></li>
         @guest
-          <li><a href="/login">Portal Login</a></li>
+          <li><a href="{{ route('login') }}">Portal Login</a></li>
+          <li><a href="{{ route('register') }}">Sign Up</a></li>
         @else
           <li><a href="{{ Auth::user()->homeRoute() }}">Dashboard</a></li>
         @endguest
