@@ -750,6 +750,16 @@
             @endif
             <li><strong>On a phone:</strong> the side panel opens as a sheet at the bottom. Drag it up for more, or tap outside it to close it.</li>
         </ul>
+
+        <h3>Keeping the map up to date</h3>
+        <ul>
+            <li><strong>Refresh:</strong> the <i class="bi bi-arrow-repeat"></i> button in the map controls loads the latest areas without
+                reloading the page. The map stays where it is, and the area you have open stays open.</li>
+            <li><strong>Automatic updates:</strong> when you get a notification about a delineation (submitted, approved, rejected, or removed),
+                the Map and Delineate pages update by themselves within about 20 seconds.</li>
+            <li><strong>While you draw or edit:</strong> updates wait so nothing you're working on is lost. A note at the top of the map says
+                there are new updates, and the map refreshes as soon as you save or cancel.</li>
+        </ul>
         <div class="guide-actions">
             <a class="guide-link" href="{{ $mapRoute }}"><i class="bi bi-map"></i> Open the map</a>
             <a class="guide-top" href="#guide-top"><i class="bi bi-arrow-up"></i> Back to top</a>
@@ -1013,7 +1023,9 @@
             <dd>Update your name, contact number, and photo, or change your password.</dd>
             <dt><i class="bi bi-bell"></i> Notifications</dt>
             <dd>Tell you when a delineation is approved, rejected, or removed, when an expert application is decided, and when there is work
-                to review. A red badge shows how many are unread.</dd>
+                to review. A red badge shows how many are unread. New ones pop up on whatever page you have open, without refreshing.
+                To get them on your phone or computer even when MangroveMap is closed, click <strong>Turn on</strong> at the top of the
+                Notifications page.</dd>
             <dt><i class="bi bi-moon-stars"></i> Dark mode</dt>
             <dd>Click the theme button in the header to switch between light and dark. MangroveMap remembers your choice.</dd>
             @unless ($isAdmin)
@@ -1034,6 +1046,11 @@
             <summary>The map is blank or slow to load.</summary>
             <p>Check your internet connection and refresh the page. Base maps load from online services, so a weak signal in coastal areas
                 slows them down. The Street base map is lighter.</p>
+        </details>
+        <details>
+            <summary>I don't see a new delineation, or the page looks out of date.</summary>
+            <p>On the Map or Delineate page, click the <i class="bi bi-arrow-repeat"></i> refresh button in the map controls. On other pages
+                on a phone, pull down from the top of the page to reload it. This also works in the installed app.</p>
         </details>
         <details>
             <summary>I can't finish drawing my area.</summary>

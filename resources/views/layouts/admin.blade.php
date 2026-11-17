@@ -636,6 +636,7 @@
 
 <body>
     @include('partials.nav-progress')
+    @include('partials.pull-to-refresh')
     <header class="header">
         <div class="header-left">
             <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" style="display: none;" aria-label="Open navigation menu">

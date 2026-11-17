@@ -1996,6 +1996,52 @@
     color: #fff;
   }
 
+  /* Refresh button in the map controls spins while the delineations are downloading. */
+  #mapRefreshBtn.is-refreshing i {
+    display: inline-block;
+    animation: save-btn-spin 0.8s linear infinite;
+  }
+
+  /* "New updates" chip: updates wait while the user draws or edits (workspace-scripts, refreshMapKeepingView). */
+  .map-update-chip {
+    position: absolute;
+    top: 62px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 901;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100% - 120px);
+    padding: 8px 14px;
+    border: 1px solid var(--bd-c8e6d4, #c8e6d4);
+    border-radius: 999px;
+    background: var(--bg-ffffff, #ffffff);
+    color: var(--fg-14653f, #14653f);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    pointer-events: none;
+  }
+
+  .map-update-chip[hidden] {
+    display: none;
+  }
+
+  .map-update-chip i {
+    color: var(--fg-1e9e62, #1e9e62);
+    font-size: 14px;
+  }
+
+  @media (max-width: 780px) {
+    .map-update-chip {
+      top: 64px;
+      max-width: calc(100% - 32px);
+      border-radius: 12px;
+    }
+  }
+
   .delineation-toolbar {
     position: absolute;
     top: 12px;

@@ -1,7 +1,7 @@
 {{--
   Quick guide card for the map pages (Map, Delineate, Planting Recommendation), opened by the "?" button in the
-  map controls (partials.map-quick-guide-button). It is open every time one of these pages loads; closing it
-  hides it for that visit only (the "?" brings it back).
+  map controls (partials.map-quick-guide-button). It opens by itself the first time each of these pages is
+  opened in a browser tab (sessionStorage); after that only the "?" opens it.
   Usage: @include('users.partials.map-quick-guide', ['page' => 'map' | 'delineate' | 'recommendations'])
 --}}
 @php
@@ -10,6 +10,8 @@
     $yearSliderStep = config('map.mangrove_history.enabled')
         ? '<i class="bi bi-graph-up"></i> See <strong>mangrove extent by year</strong> since 1985.'
         : '<i class="bi bi-graph-up"></i> Drag the <strong>year slider</strong> to see what was mapped by each year.';
+    // The map-controls refresh button (workspace-map): Map and Delineate only.
+    $refreshStep = '<i class="bi bi-arrow-repeat"></i> <strong>Refresh</strong> for the latest areas. New ones also appear by themselves.';
     $guides = [
         'map' => [
             'title' => 'Using the map',
@@ -21,6 +23,7 @@
                     '<i class="bi bi-layers-fill"></i> Switch to <strong>Satellite</strong> to see the canopy.',
                     'Open an area\'s <strong>Changes over time</strong>.',
                     $yearSliderStep,
+                    $refreshStep,
                 ]
                 : [
                     '<strong>Click a shape</strong> to see its details.',
@@ -28,6 +31,7 @@
                     '<i class="bi bi-flower1"></i> Show or hide planting recommendations.',
                     'Open an area\'s <strong>Changes over time</strong>.',
                     $yearSliderStep,
+                    $refreshStep,
                 ],
         ],
         'delineate' => [
@@ -39,12 +43,14 @@
                     'Click a pending area, then <strong>Approve</strong> or <strong>Reject</strong>.',
                     '<i class="bi bi-bounding-box-circles"></i> <strong>Edit Delineation</strong> to fix a boundary or record a change.',
                     '<strong>Save</strong> when you\'re done.',
+                    $refreshStep,
                 ]
                 : [
                     '<i class="bi bi-pentagon"></i> Click <strong>Draw area</strong> and trace the mangroves.',
                     'Click the first point to finish.',
                     'Choose the <strong>genus</strong> and add notes.',
                     '<strong>Save</strong>. An expert reviews it.',
+                    $refreshStep,
                 ],
         ],
         'recommendations' => [
@@ -221,7 +227,16 @@
             if (event.key === 'Escape' && !card.hidden) window.toggleMapGuide(false);
         });
 
-        // Open every time the page loads, so users always see how the page works. Closing it lasts for that visit only.
-        window.toggleMapGuide(true);
+        // Open by itself only the first time this page is opened in this browser tab, so it doesn't come back
+        // every time the user goes back and forth between pages. A new tab shows it again; "?" opens it any time.
+        const seenKey = 'mangrovemap-guide-seen:' + (card.dataset.guidePage || 'map');
+        let seen = false;
+        try {
+            seen = sessionStorage.getItem(seenKey) === '1';
+            sessionStorage.setItem(seenKey, '1');
+        } catch (e) {
+            // Storage blocked (private mode, site data off): fall back to showing it.
+        }
+        window.toggleMapGuide(!seen);
     })();
 </script>

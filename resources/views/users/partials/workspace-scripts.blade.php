@@ -924,7 +924,9 @@
      * review or removal. Unsaved shapes are kept. selectDelineationId reopens that delineation in the panel;
      * null closes the panel (e.g. it was removed). Returns false when the reload failed.
      */
-    async function refreshMapData({ selectDelineationId = null, fly = false } = {}) {
+    // keepPanel: when nothing is reselected, leave the right panel as it is (used by the refresh button and
+    // live updates, so a refresh never closes what the user is looking at).
+    async function refreshMapData({ selectDelineationId = null, fly = false, keepPanel = false } = {}) {
       let body;
       try {
         const response = await fetch(mapDelineationsUrl, {
@@ -969,6 +971,8 @@
       if (index >= 0) {
         selectDrawnFeature(index, { fly });
         redrawFeatures();
+      } else if (keepPanel && selectDelineationId == null) {
+        selectedDrawnIndex = -1;
       } else {
         selectedDrawnIndex = -1;
         const infoCard = document.getElementById('delineationInfoCard');
@@ -2696,6 +2700,92 @@
         return;
       }
       submitExpertReview('reject');
+    });
+
+    // ---- Refreshing the map without reloading the page ----------------------------------------------------
+    // The refresh button in the map controls, and live updates: when a new delineation notification arrives
+    // (submitted, approved, rejected, removed...), the delineations are downloaded again. Never while the user
+    // is in the middle of something a refresh would disturb: then the update waits (a chip says so) and runs
+    // as soon as they finish. The view, the selected delineation and the open panel are kept.
+    let mapUpdatePending = false;
+    let mapRefreshInFlight = false;
+    let mapUpdateWaitTimer = null;
+
+    function mapIsBusy() {
+      return drawingMode !== null
+        || isGeometryEditLocked()
+        || isSavingDelineation
+        || (Array.isArray(drawnFeatures) && drawnFeatures.some(feature => !feature.delineation_id))
+        || (typeof isWritingRejection === 'function' && isWritingRejection());
+    }
+
+    function selectedDelineationIdForRefresh() {
+      const panel = document.getElementById('mapRightPanel');
+      if (!panel?.classList.contains('open')) return null;
+      const feature = selectedDrawnIndex >= 0 ? drawnFeatures[selectedDrawnIndex] : null;
+      return feature?.delineation_id ?? null;
+    }
+
+    function setMapUpdateChip(visible) {
+      const chip = document.getElementById('mapUpdateChip');
+      if (chip) chip.hidden = !visible;
+    }
+
+    function waitForIdleThenRefresh() {
+      setMapUpdateChip(true);
+      if (mapUpdateWaitTimer) return;
+      mapUpdateWaitTimer = setInterval(() => {
+        if (!mapUpdatePending) {
+          clearInterval(mapUpdateWaitTimer);
+          mapUpdateWaitTimer = null;
+          return;
+        }
+        if (!mapIsBusy() && !mapRefreshInFlight) refreshMapKeepingView();
+      }, 2000);
+    }
+
+    async function refreshMapKeepingView({ manual = false } = {}) {
+      if (mapRefreshInFlight) return false;
+      if (mapIsBusy()) {
+        mapUpdatePending = true;
+        if (manual) {
+          window.AppActions?.notify('Finish or cancel what you are drawing or editing first. The map refreshes right after.', 'error');
+        }
+        waitForIdleThenRefresh();
+        return false;
+      }
+
+      const panel = document.getElementById('mapRightPanel');
+      const wasExpanded = panel?.classList.contains('expanded');
+      const button = document.getElementById('mapRefreshBtn');
+      mapRefreshInFlight = true;
+      button?.classList.add('is-refreshing');
+      if (button) button.disabled = true;
+      try {
+        const ok = await refreshMapData({ selectDelineationId: selectedDelineationIdForRefresh(), fly: false, keepPanel: true });
+        if (ok) {
+          mapUpdatePending = false;
+          setMapUpdateChip(false);
+          if (wasExpanded && panel?.classList.contains('open') && typeof expandRightPanel === 'function') expandRightPanel();
+          if (manual) window.AppActions?.notify('Map is up to date.', 'success', { timeout: 2500 });
+        } else if (manual) {
+          window.AppActions?.notify('Could not refresh the map. Check your connection and try again.', 'error');
+        }
+        return ok;
+      } finally {
+        mapRefreshInFlight = false;
+        button?.classList.remove('is-refreshing');
+        if (button) button.disabled = false;
+      }
+    }
+
+    window.refreshMapFromButton = () => refreshMapKeepingView({ manual: true });
+
+    document.addEventListener('live-notifications', event => {
+      const fresh = event.detail?.fresh || [];
+      if (fresh.some(item => String(item.type || '').startsWith('delineation_'))) {
+        refreshMapKeepingView();
+      }
     });
 
     // Clicking a shape changes which one is highlighted and (for unsaved shapes while delineating)

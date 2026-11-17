@@ -39,6 +39,7 @@ class LiveNotificationsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('unread', 2)
             ->assertJsonCount(1, 'fresh')
+            ->assertJsonPath('fresh.0.type', 'delineation_submitted')
             ->assertJsonPath('fresh.0.title', 'Delineation resubmitted for review')
             ->assertJsonPath('fresh.0.icon', 'bi-hourglass-split')
             ->assertJsonPath('fresh.0.url', route('expert.delineate', ['delineation' => $delineation->id], false));

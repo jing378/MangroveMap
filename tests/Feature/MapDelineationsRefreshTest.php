@@ -79,4 +79,19 @@ class MapDelineationsRefreshTest extends TestCase
     {
         $this->getJson(route('map.delineations'))->assertUnauthorized();
     }
+
+    public function test_map_and_delineate_pages_have_the_refresh_button_and_update_chip(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+
+        foreach ([[$resident, 'map'], [$resident, 'delineate'], [$expert, 'expert.map'], [$expert, 'expert.delineate']] as [$user, $page]) {
+            $this->actingAs($user)->get(route($page))
+                ->assertOk()
+                ->assertSee('id="mapRefreshBtn"', false)
+                ->assertSee('id="mapUpdateChip"', false)
+                // Live notifications about delineations refresh the map (only when the user is not busy).
+                ->assertSee("document.addEventListener('live-notifications'", false);
+        }
+    }
 }

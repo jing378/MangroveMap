@@ -20,8 +20,12 @@ class MapQuickGuideTest extends TestCase
             ->assertSee('Quick guide: Using the map')
             ->assertSee(route('guide').'#map', false);
 
+        $this->actingAs($resident)->get(route('map'))
+            ->assertSee('<strong>Refresh</strong> for the latest areas', false);
+
         $this->actingAs($resident)->get(route('delineate'))
             ->assertOk()
+            ->assertSee('<strong>Refresh</strong> for the latest areas', false)
             ->assertSee('Quick guide: Delineating')
             ->assertSee('An expert reviews it.')
             ->assertSee(route('guide').'#delineate', false);

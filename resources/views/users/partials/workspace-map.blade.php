@@ -73,6 +73,11 @@
               Click to add points. Click the starting point or double-click to finish the area. Esc cancels.
             </div>
           @endif
+          {{-- Shown when new delineation updates arrived while the user is drawing or editing (workspace-scripts). --}}
+          <div class="map-update-chip" id="mapUpdateChip" role="status" aria-live="polite" hidden>
+            <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+            <span>New updates. The map refreshes when you finish drawing or editing.</span>
+          </div>
           <x-map-layer-control>
             <button id="editModeBtn" type="button" onclick="showEditMode()" title="Delineate" aria-label="Delineate">
               <i class="bi bi-pencil-square"></i>
@@ -88,6 +93,10 @@
                 <i class="bi bi-graph-up"></i>
               </button>
             @endif
+            <button id="mapRefreshBtn" type="button" onclick="refreshMapFromButton()" title="Refresh map data"
+              aria-label="Refresh map data">
+              <i class="bi bi-arrow-repeat"></i>
+            </button>
             <button id="mapGuideBtn" type="button" onclick="toggleMapGuide()" title="Quick guide" aria-label="Quick guide"
               aria-controls="mapGuideCard" aria-expanded="false">
               <i class="bi bi-question-lg"></i>

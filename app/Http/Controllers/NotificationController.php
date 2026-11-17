@@ -103,6 +103,7 @@ class NotificationController extends Controller
 
                     return [
                         'id' => $notification->id,
+                        'type' => (string) ($data['type'] ?? ''),
                         'title' => (string) ($data['title'] ?? Str::headline((string) ($data['type'] ?? 'Notification'))),
                         'message' => Str::limit((string) ($data['message'] ?? ''), 160),
                         'icon' => preg_match('/^bi-[a-z0-9-]+$/', $icon) ? $icon : 'bi-bell-fill',

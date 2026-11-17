@@ -2,7 +2,8 @@
     Live notifications: while a page is open and visible, asks notifications.poll every 20 s.
     - keeps the sidebar bell badge current (the mobile menu dot follows it, see partials/mobile-menu-badge);
     - pops up new notifications with AppActions.notify (title, message and a View link);
-    - on the Notifications page, shows a "N new notifications · Show" bar instead (opens page 1 again).
+    - on the Notifications page, shows a "N new notifications · Show" bar instead (opens page 1 again);
+    - fires a `live-notifications` event on document ({ detail: { fresh: [{ id, type, title, ... }] } }).
     Pauses while the tab is hidden and checks right away when it comes back. Stops if the session ends.
     Included in the enduser and admin layouts, after partials/action-feedback.
 --}}
@@ -113,7 +114,11 @@
                 setUnread(Number(data.unread) || 0);
                 const fresh = (data.fresh || []).filter(item => !item.read && !seen.has(item.id));
                 fresh.forEach(item => seen.add(item.id));
-                if (fresh.length) announce(fresh);
+                if (fresh.length) {
+                    announce(fresh);
+                    // Pages can react too, e.g. the map reloads its delineations (workspace-scripts).
+                    document.dispatchEvent(new CustomEvent('live-notifications', { detail: { fresh } }));
+                }
             } catch (e) {
                 failures++; // offline or server busy: back off up to 2 minutes
             } finally {
