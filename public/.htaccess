@@ -14,6 +14,16 @@
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
     # Redirect Trailing Slashes If Not A Folder...
+    # Through the Cloudflare tunnel, Apache sees Host "mangrovemap.test" (cloudflared's httpHostHeader) and
+    # would redirect visitors there. cloudflared runs on this machine and sends the real address in
+    # X-Forwarded-Host / X-Forwarded-Proto, so use those for requests coming from localhost.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REMOTE_ADDR} ^(127\.0\.0\.1|::1)$
+    RewriteCond %{HTTP:X-Forwarded-Proto} ^https$
+    RewriteCond %{HTTP:X-Forwarded-Host} ^[A-Za-z0-9.-]+$
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ https://%{HTTP:X-Forwarded-Host}%1 [L,R=301]
+
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
