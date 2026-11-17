@@ -3,8 +3,8 @@
 namespace App\Notifications;
 
 use App\Models\Delineation;
+use App\Support\NotificationChannels;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class DelineationSubmittedForReview extends Notification
@@ -15,7 +15,7 @@ class DelineationSubmittedForReview extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', ...NotificationChannels::push($notifiable)];
     }
 
     public function toArray(object $notifiable): array
@@ -30,8 +30,8 @@ class DelineationSubmittedForReview extends Notification
             'delineation_id' => $this->delineation->id,
             'delineation_name' => $this->delineation->name,
             'submitted_by' => $this->delineation->user?->name,
-            'url' => $this->delineation->mapDashboardUrlFor($notifiable),
-            'actionLabel' => 'View on map',
+            'url' => $this->delineation->delineateUrlFor($notifiable),
+            'actionLabel' => 'View delineation',
         ];
     }
 }

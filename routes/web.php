@@ -19,6 +19,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlantingRecommendationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\TileExplorerController;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
@@ -272,6 +273,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/profile/expert-application', [ProfileController::class, 'reapplyExpert'])
         ->middleware('throttle:5,1')
         ->name('profile.expert-application');
+    // Device (Web Push) notifications for the current browser, turned on/off on My Profile.
+    Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('push-subscriptions.store');
+    Route::delete('/push-subscriptions', [PushSubscriptionController::class, 'destroy'])
+        ->middleware('throttle:20,1')
+        ->name('push-subscriptions.destroy');
 
     // Help & user guide (sections shown depend on the user's role)
     Route::view('/guide', 'guide')->name('guide');
@@ -299,6 +307,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Notification routes (accessible to all authenticated users)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    // Live updates for the bell badge and pop-ups (partials/live-notifications), asked every ~20 s.
+    Route::get('/notifications/poll', [NotificationController::class, 'poll'])
+        ->middleware('throttle:30,1')
+        ->name('notifications.poll');
     Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');

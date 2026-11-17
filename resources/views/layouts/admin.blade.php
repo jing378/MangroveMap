@@ -631,6 +631,7 @@
     @include('partials.scrollbar-styles')
     @include('partials.sidebar-collapse')
     @include('partials.action-feedback')
+    @include('partials.live-notifications')
 </head>
 
 <body>

@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use App\Notifications\DelineationSubmittedForReview;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class Delineation extends Model
@@ -61,7 +64,7 @@ class Delineation extends Model
     public const REJECTED_REMOVAL_GRACE_DAYS = 7;
 
     /** When experts may remove this rejected delineation (null when it is not rejected). */
-    public function rejectedRemovableAt(): ?\Illuminate\Support\Carbon
+    public function rejectedRemovableAt(): ?Carbon
     {
         if (! $this->is_rejected || $this->is_approved) {
             return null;
@@ -157,6 +160,22 @@ class Delineation extends Model
             : route('map', $params);
     }
 
+    /**
+     * The Delineate page with this record opened: where "View delineation" in notifications goes
+     * (bell, pop-ups, phone pushes and emails).
+     */
+    public function delineateUrlFor(User $user, bool $absolute = true): string
+    {
+        return self::delineateUrlForId($this->id, $user, $absolute);
+    }
+
+    public static function delineateUrlForId(int|string $id, object $user, bool $absolute = true): string
+    {
+        $isExpert = method_exists($user, 'isExpert') && $user->isExpert();
+
+        return route($isExpert ? 'expert.delineate' : 'delineate', ['delineation' => $id], $absolute);
+    }
+
     /** Approved and published: delineations an admin hid from the map are excluded. */
     public function scopeApproved($query)
     {
@@ -193,10 +212,10 @@ class Delineation extends Model
     /**
      * Sort/limit on ids only, then hydrate full rows (keeps ORDER BY off large JSON columns).
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<Delineation>  $query
-     * @return \Illuminate\Database\Eloquent\Collection<int, Delineation>
+     * @param  Builder<Delineation>  $query
+     * @return Collection<int, Delineation>
      */
-    public static function fetchForMap($query, int $limit, array $with = []): \Illuminate\Database\Eloquent\Collection
+    public static function fetchForMap($query, int $limit, array $with = []): Collection
     {
         $ids = (clone $query)
             ->select('delineations.id')
@@ -206,7 +225,7 @@ class Delineation extends Model
             ->pluck('delineations.id');
 
         if ($ids->isEmpty()) {
-            return new \Illuminate\Database\Eloquent\Collection;
+            return new Collection;
         }
 
         return static::query()
@@ -219,9 +238,9 @@ class Delineation extends Model
     /**
      * Pending resident submissions first, then newest (experts reviewing the queue).
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Delineation>
+     * @return Collection<int, Delineation>
      */
-    public static function fetchResidentDelineationsForExpertMap(int $limit = self::MAP_QUERY_LIMIT): \Illuminate\Database\Eloquent\Collection
+    public static function fetchResidentDelineationsForExpertMap(int $limit = self::MAP_QUERY_LIMIT): Collection
     {
         $ids = static::query()
             ->fromEndUsers()
@@ -232,7 +251,7 @@ class Delineation extends Model
             ->pluck('delineations.id');
 
         if ($ids->isEmpty()) {
-            return new \Illuminate\Database\Eloquent\Collection;
+            return new Collection;
         }
 
         return static::query()

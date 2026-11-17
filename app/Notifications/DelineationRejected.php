@@ -16,18 +16,18 @@ class DelineationRejected extends Notification
 
     public function via(object $notifiable): array
     {
-        return NotificationChannels::databaseAndMail();
+        return NotificationChannels::databaseAndMail($notifiable);
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         $mail = (new MailMessage)
             ->subject('Delineation Needs Revision')
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line('Your delineation "' . $this->delineation->name . '" was reviewed and needs changes before it can be published.');
+            ->greeting('Hello '.$notifiable->name.',')
+            ->line('Your delineation "'.$this->delineation->name.'" was reviewed and needs changes before it can be published.');
 
         if ($this->delineation->rejection_notes) {
-            $mail->line('Expert notes: ' . $this->delineation->rejection_notes);
+            $mail->line('Expert notes: '.$this->delineation->rejection_notes);
         }
 
         return $mail
@@ -40,15 +40,15 @@ class DelineationRejected extends Notification
     {
         return [
             'title' => 'Delineation rejected',
-            'message' => 'Your delineation "' . $this->delineation->name . '" needs revision.'
-                . ($this->delineation->rejection_notes ? ' Notes: ' . $this->delineation->rejection_notes : '')
-                . ' ' . $this->removalNotice(),
+            'message' => 'Your delineation "'.$this->delineation->name.'" needs revision.'
+                .($this->delineation->rejection_notes ? ' Notes: '.$this->delineation->rejection_notes : '')
+                .' '.$this->removalNotice(),
             'type' => 'delineation_rejected',
             'icon' => 'bi-x-circle',
             'delineation_id' => $this->delineation->id,
             'delineation_name' => $this->delineation->name,
-            'url' => $this->delineation->mapDashboardUrlFor($notifiable),
-            'actionLabel' => 'View on map',
+            'url' => $this->delineation->delineateUrlFor($notifiable),
+            'actionLabel' => 'View delineation',
             'removable_after' => $this->delineation->rejectedRemovableAt()?->toIso8601String(),
         ];
     }
@@ -62,10 +62,10 @@ class DelineationRejected extends Notification
     {
         $removableAt = $this->delineation->rejectedRemovableAt();
         $deadline = $removableAt
-            ? ' (' . $removableAt->timezone(config('app.timezone'))->format('M j, Y') . ')'
+            ? ' ('.$removableAt->timezone(config('app.timezone'))->format('M j, Y').')'
             : '';
 
-        return 'If it is not revised within ' . Delineation::REJECTED_REMOVAL_GRACE_DAYS . ' days' . $deadline
-            . ', experts may remove it.';
+        return 'If it is not revised within '.Delineation::REJECTED_REMOVAL_GRACE_DAYS.' days'.$deadline
+            .', experts may remove it.';
     }
 }

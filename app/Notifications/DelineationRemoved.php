@@ -17,15 +17,15 @@ class DelineationRemoved extends Notification
 
     public function via(object $notifiable): array
     {
-        return NotificationChannels::databaseAndMail();
+        return NotificationChannels::databaseAndMail($notifiable);
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject(ucfirst($this->status) . ' Delineation Removed')
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line('Your ' . $this->status . ' delineation "' . $this->delineationName . '" was removed by an expert.')
+            ->subject(ucfirst($this->status).' Delineation Removed')
+            ->greeting('Hello '.$notifiable->name.',')
+            ->line('Your '.$this->status.' delineation "'.$this->delineationName.'" was removed by an expert.')
             ->action('Open Map', route('delineate'))
             ->line('You can draw and submit a new delineation of the area at any time.');
     }
@@ -34,7 +34,7 @@ class DelineationRemoved extends Notification
     {
         return [
             'title' => 'Delineation removed',
-            'message' => 'Your ' . $this->status . ' delineation "' . $this->delineationName . '" was removed by an expert. You can draw and submit a new one.',
+            'message' => 'Your '.$this->status.' delineation "'.$this->delineationName.'" was removed by an expert. You can draw and submit a new one.',
             'type' => 'delineation_removed',
             'icon' => 'bi-trash',
             'delineation_name' => $this->delineationName,

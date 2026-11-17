@@ -16,15 +16,15 @@ class DelineationApproved extends Notification
 
     public function via(object $notifiable): array
     {
-        return NotificationChannels::databaseAndMail();
+        return NotificationChannels::databaseAndMail($notifiable);
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
             ->subject('Delineation Approved')
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line('Your delineation "' . $this->delineation->name . '" has been approved by an expert.')
+            ->greeting('Hello '.$notifiable->name.',')
+            ->line('Your delineation "'.$this->delineation->name.'" has been approved by an expert.')
             ->line('It is now visible on the public community map.')
             ->action('View Dashboard', route('dashboard'))
             ->line('Thank you for contributing to MangroveMap!');
@@ -34,13 +34,13 @@ class DelineationApproved extends Notification
     {
         return [
             'title' => 'Delineation approved',
-            'message' => 'Your delineation "' . $this->delineation->name . '" was approved and is now on the public map.',
+            'message' => 'Your delineation "'.$this->delineation->name.'" was approved and is now on the public map.',
             'type' => 'delineation_approved',
             'icon' => 'bi-check-circle',
             'delineation_id' => $this->delineation->id,
             'delineation_name' => $this->delineation->name,
-            'url' => $this->delineation->mapDashboardUrlFor($notifiable),
-            'actionLabel' => 'View on map',
+            'url' => $this->delineation->delineateUrlFor($notifiable),
+            'actionLabel' => 'View delineation',
         ];
     }
 }

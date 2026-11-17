@@ -27,7 +27,7 @@ class AnalysisCompleted extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return NotificationChannels::databaseAndMail();
+        return NotificationChannels::databaseAndMail($notifiable);
     }
 
     /**
@@ -37,8 +37,8 @@ class AnalysisCompleted extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject('Analysis Completed')
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line('Your analysis "' . $this->analysisTitle . '" has been completed.')
+            ->greeting('Hello '.$notifiable->name.',')
+            ->line('Your analysis "'.$this->analysisTitle.'" has been completed.')
             ->action('View Analysis', route('dashboard'))
             ->line('Thank you for using our platform!');
     }

@@ -3132,6 +3132,16 @@
     color: var(--fg-b42318, #b42318);
     border-color: var(--bd-d04030, #d04030);
   }
+  /* While writing rejection notes, Approve turns into a neutral Cancel next to "Confirm reject". */
+  #mapRightPanel #expertApproveBtn.is-cancel {
+    background: var(--bg-ffffff, #ffffff);
+    color: var(--fg-3a5a3a, #3a5a3a);
+    border: 1px solid var(--bd-d4dfd4, #d4dfd4);
+  }
+  #mapRightPanel #expertApproveBtn.is-cancel:hover:not(:disabled) {
+    background: var(--bg-f5f7f6, #f5f7f6);
+    border-color: var(--bd-b8c8b8, #b8c8b8);
+  }
   .panel-delete-zone {
     margin: 6px 0 14px;
     padding-top: 10px;

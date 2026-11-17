@@ -79,6 +79,7 @@
         --bg-d8e5db: #1f2e22;
         --bg-d8eee1: #163221;
         --bg-dfe7df: #1f291f;
+        --bg-dff1e7: #142e1f;
         --bg-dff2e7: #132e1e;
         --bg-e0e8e0: #1e291e;
         --bg-e0f2e8: #132e1f;
@@ -134,6 +135,7 @@
         --bg-f7faf7: #121c12;
         --bg-f7faf8: #121c15;
         --bg-f7fbf8: #0f1e13;
+        --bg-f8e6c4: #382c15;
         --bg-f8faf7: #151c12;
         --bg-f8faf8: #131b13;
         --bg-f8fcfa: #16231c;
@@ -167,6 +169,7 @@
         --fg-125a39: #b6edd3;
         --fg-127046: #a7e9cb;
         --fg-145a33: #b4eccd;
+        --fg-14653f: #adeacd;
         --fg-147a46: #9ee7c2;
         --fg-155724: #b6edc2;
         --fg-15803d: #9ae6b6;

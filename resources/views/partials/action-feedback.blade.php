@@ -279,6 +279,24 @@
         overflow-wrap: anywhere;
     }
 
+    .app-toast-title {
+        display: block;
+        margin-bottom: 2px;
+        font-weight: 700;
+    }
+
+    .app-toast-action {
+        display: inline-block;
+        margin-top: 6px;
+        color: var(--fg-1e9e62, #1e9e62);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .app-toast-action:hover {
+        text-decoration: underline;
+    }
+
     .app-toast-close {
         flex: none;
         width: 24px;
@@ -466,7 +484,8 @@
         let toastStack = null;
         const supportsPopover = typeof HTMLElement.prototype.showPopover === 'function';
 
-        function notify(message, type = 'success', { timeout } = {}) {
+        // Options: timeout (ms), icon (a bi-* class), title (bold first line), action ({ label, href }: a link in the toast).
+        function notify(message, type = 'success', { timeout, icon, title, action } = {}) {
             if (!message) return;
             if (!toastStack || !document.body.contains(toastStack)) {
                 toastStack = document.createElement('div');
@@ -484,8 +503,13 @@
             const toast = document.createElement('div');
             toast.className = `app-toast${isError ? ' is-error' : ''}`;
             toast.setAttribute('role', isError ? 'alert' : 'status');
-            toast.innerHTML = `<i class="bi ${isError ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill'}" aria-hidden="true"></i>
-                <div class="app-toast-text">${escapeHtml(message)}</div>
+            const iconClass = /^bi-[a-z0-9-]+$/.test(icon || '') ? icon : (isError ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill');
+            const titleHtml = title ? `<strong class="app-toast-title">${escapeHtml(title)}</strong>` : '';
+            const actionHtml = action && action.href
+                ? `<a class="app-toast-action" href="${escapeHtml(action.href)}">${escapeHtml(action.label || 'View')}</a>`
+                : '';
+            toast.innerHTML = `<i class="bi ${iconClass}" aria-hidden="true"></i>
+                <div class="app-toast-text">${titleHtml}${escapeHtml(message)}${actionHtml}</div>
                 <button type="button" class="app-toast-close" aria-label="Dismiss" title="Dismiss"><i class="bi bi-x-lg" aria-hidden="true"></i></button>`;
             const dismiss = () => {
                 toast.classList.remove('is-shown');

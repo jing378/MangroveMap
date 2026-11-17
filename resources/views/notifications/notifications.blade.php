@@ -32,12 +32,24 @@ if ($currentUser && $currentUser->role === 'admin') {
     }
 
     .notifications-header {
+        margin-bottom: 24px;
+    }
+
+    /* Title and "Mark all as read" on one line, centred on each other. */
+    .notifications-title-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 24px;
+        gap: 12px 16px;
         flex-wrap: wrap;
+    }
+
+    .notifications-title-row h1 {
+        margin: 0;
+    }
+
+    .mark-all-read-form {
+        margin: 0;
     }
 
     .notifications-header h1 {
@@ -47,10 +59,6 @@ if ($currentUser && $currentUser->role === 'admin') {
         display: flex;
         align-items: center;
         gap: 10px;
-    }
-
-    .notifications-heading {
-        min-width: 0;
     }
 
     .notifications-description {
@@ -322,21 +330,23 @@ if ($currentUser && $currentUser->role === 'admin') {
 @section('content')
 <div class="notifications-page">
     <div class="notifications-header">
-        <div class="notifications-heading">
+        <div class="notifications-title-row">
             <h1><i class="bi bi-bell"></i> Notifications</h1>
-            <p class="notifications-description">{{ $currentUser?->role === 'admin'
-                ? 'Updates that need your attention in MangroveMap. New ones are highlighted until you read them.'
-                : 'Updates about your delineations, expert reviews and drone uploads. New ones are highlighted until you read them.' }}</p>
+            @if($unreadCount > 0)
+            <form action="{{ route('notifications.mark-all-as-read') }}" method="POST" class="mark-all-read-form" data-ajax-mark-all>
+                @csrf
+                <button type="submit" class="mark-all-read-btn">
+                    <i class="bi bi-check-all"></i> Mark all as read
+                </button>
+            </form>
+            @endif
         </div>
-        @if($unreadCount > 0)
-        <form action="{{ route('notifications.mark-all-as-read') }}" method="POST" class="mark-all-read-form" data-ajax-mark-all>
-            @csrf
-            <button type="submit" class="mark-all-read-btn">
-                <i class="bi bi-check-all"></i> Mark all as read
-            </button>
-        </form>
-        @endif
+        <p class="notifications-description">{{ $currentUser?->role === 'admin'
+            ? 'Updates that need your attention in MangroveMap. New ones are highlighted until you read them.'
+            : 'Updates about your delineations, expert reviews and drone uploads. New ones are highlighted until you read them.' }}</p>
     </div>
+
+    @include('partials.device-push')
 
     @if($unreadCount > 0)
     <div class="unread-banner" id="unreadBanner">
@@ -374,9 +384,7 @@ if ($currentUser && $currentUser->role === 'admin') {
         $viewUrl = $urlMatch[1] ?? '/';
         }
         if ($delineationId) {
-        $viewUrl = Auth::user()->isExpert()
-        ? route('expert.map', ['delineation' => $delineationId])
-        : route('map', ['delineation' => $delineationId]);
+        $viewUrl = \App\Models\Delineation::delineateUrlForId($delineationId, Auth::user());
         }
         $iconColor = $colorMap[$type] ?? '#1e9e62';
         @endphp
@@ -406,7 +414,7 @@ if ($currentUser && $currentUser->role === 'admin') {
                 {{-- One-word labels, like the delineation cards: expert applications are reviewed, everything else is viewed. --}}
                 <a href="{{ $viewUrl }}" class="btn-view-delineation" @if(!$notification->read_at) data-mark-read-url="{{ route('notifications.mark-as-read', $notification->id) }}" @endif>
                     @if($delineationId)
-                    <i class="bi bi-map"></i> View
+                    <i class="bi bi-pencil-square"></i> View
                     @elseif($type === 'expert_application')
                     <i class="bi bi-person-check"></i> Review
                     @elseif($type === 'expert_application_rejected')

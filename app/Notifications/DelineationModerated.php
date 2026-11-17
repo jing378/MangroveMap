@@ -21,14 +21,14 @@ class DelineationModerated extends Notification
 
     public function via(object $notifiable): array
     {
-        return NotificationChannels::databaseAndMail();
+        return NotificationChannels::databaseAndMail($notifiable);
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         $mail = (new MailMessage)
             ->subject($this->title())
-            ->greeting('Hello ' . $notifiable->name . ',')
+            ->greeting('Hello '.$notifiable->name.',')
             ->line($this->message());
 
         return $mail->line('If you have questions, please contact a MangroveMap administrator.');
@@ -39,7 +39,7 @@ class DelineationModerated extends Notification
         return [
             'title' => $this->title(),
             'message' => $this->message(),
-            'type' => 'delineation_' . $this->action,
+            'type' => 'delineation_'.$this->action,
             'icon' => match ($this->action) {
                 'hidden' => 'bi-eye-slash',
                 'restored' => 'bi-eye',
@@ -64,11 +64,11 @@ class DelineationModerated extends Notification
     private function message(): string
     {
         $message = match ($this->action) {
-            'hidden' => 'An administrator hid your delineation "' . $this->delineationName . '" from the shared map.',
-            'restored' => 'An administrator restored your delineation "' . $this->delineationName . '" to the shared map.',
-            default => 'An administrator deleted your delineation "' . $this->delineationName . '".',
+            'hidden' => 'An administrator hid your delineation "'.$this->delineationName.'" from the shared map.',
+            'restored' => 'An administrator restored your delineation "'.$this->delineationName.'" to the shared map.',
+            default => 'An administrator deleted your delineation "'.$this->delineationName.'".',
         };
 
-        return $this->reason ? $message . ' Reason: ' . $this->reason : $message;
+        return $this->reason ? $message.' Reason: '.$this->reason : $message;
     }
 }

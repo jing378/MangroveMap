@@ -35,12 +35,13 @@ class AdminAlert extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return NotificationChannels::databaseAndMail();
+        return NotificationChannels::databaseAndMail($notifiable);
     }
 
     /**
      * The in-app notification is stored right away so admins see it without a queue worker running;
      * only the email waits for the queue (so a slow mail server never holds up the request).
+     * The phone push goes out with the bell item, also without the worker.
      *
      * @return array<string, string>
      */
@@ -48,6 +49,7 @@ class AdminAlert extends Notification implements ShouldQueue
     {
         return [
             'database' => 'sync',
+            'webpush' => 'sync',
         ];
     }
 
@@ -57,13 +59,13 @@ class AdminAlert extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $mailMessage = (new MailMessage)
-            ->subject('[Alert] ' . $this->title)
+            ->subject('[Alert] '.$this->title)
             ->greeting('Hello Admin,')
             ->line($this->message);
 
         foreach ($this->details as $key => $value) {
             if (filled($value)) {
-                $mailMessage->line(ucfirst(str_replace('_', ' ', $key)) . ': ' . $value);
+                $mailMessage->line(ucfirst(str_replace('_', ' ', $key)).': '.$value);
             }
         }
 

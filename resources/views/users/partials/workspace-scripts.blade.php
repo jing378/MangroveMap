@@ -1387,6 +1387,13 @@
         expertReview.dataset.delineationId = canReview ? String(feature.delineation_id) : '';
       }
 
+      // "Save delineation" only saves new drawings. On a saved record (e.g. opened from a notification) it
+      // would just float, disabled, over Approve / Reject and the other record buttons.
+      const newDrawingSaveBtn = document.getElementById('saveBtn');
+      if (newDrawingSaveBtn) {
+        newDrawingSaveBtn.style.display = feature.delineation_id ? 'none' : '';
+      }
+
       // Fly/fit to the clicked delineated feature (skipped when restoring undo/redo history)
       if (options.fly !== false && typeof mainMap !== 'undefined' && mainMap && Array.isArray(feature.coords) && feature.coords.length > 0) {
         if (feature.type === 'point') {
@@ -2555,6 +2562,23 @@
       if (section) section.style.display = 'none';
       if (notes) notes.value = '';
       if (rejectButton) rejectButton.innerHTML = '<i class="bi bi-x-circle"></i> Reject';
+      setApproveButtonAsCancel(false);
+    }
+
+    // Rejecting is two steps: Reject opens the notes box, then "Confirm reject" sends it. During that step
+    // the Approve button becomes Cancel, which closes the notes box again.
+    function isWritingRejection() {
+      return document.getElementById('expertRejectionNotesSection')?.style.display === 'block';
+    }
+
+    function setApproveButtonAsCancel(asCancel) {
+      const approveButton = document.getElementById('expertApproveBtn');
+      if (!approveButton) return;
+      approveButton.classList.toggle('is-cancel', asCancel);
+      approveButton.classList.toggle('btn-g', !asCancel);
+      approveButton.innerHTML = asCancel
+        ? '<i class="bi bi-x-lg"></i> Cancel'
+        : '<i class="bi bi-check-circle"></i> Approve';
     }
 
     async function submitExpertReview(action) {
@@ -2566,7 +2590,8 @@
       if (action === 'reject') {
         rejectionNotes = document.getElementById('expertRejectionNotes')?.value.trim() || '';
         if (rejectionNotes.length < 10) {
-          alert('Please enter at least 10 characters for rejection notes.');
+          window.AppActions.notify('Please enter at least 10 characters for rejection notes.', 'error');
+          document.getElementById('expertRejectionNotes')?.focus();
           return;
         }
       }
@@ -2654,12 +2679,19 @@
       }
     }
 
-    document.getElementById('expertApproveBtn')?.addEventListener('click', () => submitExpertReview('approve'));
+    document.getElementById('expertApproveBtn')?.addEventListener('click', () => {
+      if (isWritingRejection()) {
+        resetExpertRejectionPrompt(); // the button is "Cancel" right now
+        return;
+      }
+      submitExpertReview('approve');
+    });
     document.getElementById('expertRejectBtn')?.addEventListener('click', () => {
       const section = document.getElementById('expertRejectionNotesSection');
-      if (section?.style.display === 'none') {
+      if (section && !isWritingRejection()) {
         section.style.display = 'block';
         document.getElementById('expertRejectBtn').innerHTML = '<i class="bi bi-x-circle"></i> Confirm reject';
+        setApproveButtonAsCancel(true);
         document.getElementById('expertRejectionNotes')?.focus();
         return;
       }

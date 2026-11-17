@@ -15,14 +15,14 @@ class ExpertApplicationReviewed extends Notification
 
     public function via(object $notifiable): array
     {
-        return NotificationChannels::databaseAndMail();
+        return NotificationChannels::databaseAndMail($notifiable);
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         $mail = (new MailMessage)
             ->subject($this->approved ? 'Expert Application Approved' : 'Expert Application Not Approved')
-            ->greeting('Hello ' . $notifiable->name . ',');
+            ->greeting('Hello '.$notifiable->name.',');
 
         if ($this->approved) {
             return $mail
@@ -34,12 +34,12 @@ class ExpertApplicationReviewed extends Notification
         $mail->line('Your application for an expert account was not approved.');
 
         if ($this->notes) {
-            $mail->line('Reason: ' . $this->notes);
+            $mail->line('Reason: '.$this->notes);
         }
 
         return $mail
             ->line('You can keep using MangroveMap with your resident account, and you can apply again from your profile with a new certificate.')
-            ->action('Reapply from your profile', route('profile.show') . '#expert-application');
+            ->action('Reapply from your profile', route('profile.show').'#expert-application');
     }
 
     public function toArray(object $notifiable): array
@@ -58,12 +58,12 @@ class ExpertApplicationReviewed extends Notification
         return [
             'title' => 'Expert application not approved',
             'message' => 'Your expert account application was not approved.'
-                . ($this->notes ? ' Reason: ' . $this->notes : ''),
+                .($this->notes ? ' Reason: '.$this->notes : ''),
             'type' => 'expert_application_rejected',
             'icon' => 'bi-x-circle',
             'rejection_notes' => $this->notes,
             // Relative, so the link keeps working if the site's address changes.
-            'url' => route('profile.show', [], false) . '#expert-application',
+            'url' => route('profile.show', [], false).'#expert-application',
             'actionLabel' => 'Reapply',
         ];
     }

@@ -178,17 +178,6 @@ if ($currentUser && $currentUser->role === 'admin') {
                         <i class="bi bi-check-circle"></i>
                         Save Changes
                     </button>
-                    @if($user->role === 'admin')
-                    <a href="{{ route('admin.dashboard') }}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i>
-                        Back to Dashboard
-                    </a>
-                    @else
-                    <a href="{{ route('dashboard') }}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i>
-                        Back to Dashboard
-                    </a>
-                    @endif
                 </div>
             </form>
 
