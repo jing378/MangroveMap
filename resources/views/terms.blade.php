@@ -368,11 +368,18 @@
 <body>
     <header class="terms-header">
         <div class="terms-header-inner">
-            <a class="back-link" href="{{ url()->previous() !== url()->current() ? url()->previous() : '/' }}">
+            {{-- Opened from the sign-up form (?from=register, in a new tab): Back returns to sign-up. --}}
+            @php
+                $fromRegister = request()->query('from') === 'register';
+                $backUrl = $fromRegister
+                    ? route('register')
+                    : (url()->previous() !== url()->current() ? url()->previous() : url('/'));
+            @endphp
+            <a class="back-link" href="{{ $backUrl }}" @if ($fromRegister) data-back-to-register @endif>
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                     <path d="M12.5 16.25L5.75 9.5L12.5 2.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                Back
+                {{ $fromRegister ? 'Back to sign up' : 'Back' }}
             </a>
             <h1>Terms and Conditions</h1>
             <p>Web-Based Mangrove Extent Mapping, Genus Classification, and Expert-Based Planting Suitability Recommendation System &middot; Last updated {{ $lastUpdated }}</p>
@@ -655,6 +662,35 @@
 
     <div class="terms-progress" id="termsProgress" aria-hidden="true"></div>
     <script>
+        // "Back to sign up" returns to the sign-up form with what the user already typed:
+        // - came here from sign-up in this window (always the case in the installed app): go back in history;
+        // - a separate browser tab opened by sign-up: close it, which shows the sign-up tab again;
+        // - otherwise (or if the browser refuses): the link's href opens the sign-up page.
+        // Never window.close() in the installed app: there the window is the app itself, so it would exit.
+        document.querySelector('[data-back-to-register]')?.addEventListener('click', event => {
+            const link = event.currentTarget;
+            const installedApp = window.matchMedia('(display-mode: standalone)').matches
+                || window.matchMedia('(display-mode: fullscreen)').matches
+                || window.matchMedia('(display-mode: minimal-ui)').matches
+                || window.navigator.standalone === true;
+            let cameFromSignUp = false;
+            try {
+                cameFromSignUp = document.referrer !== '' && new URL(document.referrer).pathname === new URL(link.href).pathname;
+            } catch (e) { /* no usable referrer */ }
+
+            if (cameFromSignUp && window.history.length > 1) {
+                event.preventDefault();
+                window.history.back();
+                return;
+            }
+            if (installedApp || window.history.length > 1) return; // follow the link
+
+            event.preventDefault();
+            window.close();
+            setTimeout(() => { window.location.href = link.href; }, 300); // still open: close was refused
+        });
+    </script>
+    <script>
         // Sliding sections, contents links that highlight their section, and the reading progress bar.
         (() => {
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -684,10 +720,16 @@
             }
 
             document.querySelectorAll('.toc a').forEach(link => {
-                link.addEventListener('click', () => {
+                link.addEventListener('click', event => {
                     const section = document.querySelector(link.getAttribute('href'));
+                    if (!section) return;
+                    // Scroll without adding a history entry: otherwise every contents click is one more step
+                    // that Back (the browser's, or "Back to sign up") has to undo before leaving the page.
+                    event.preventDefault();
+                    section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+                    history.replaceState(history.state, '', link.getAttribute('href'));
                     // Underline once the smooth scroll has mostly arrived.
-                    if (section) setTimeout(() => highlight(section), reduceMotion ? 0 : 450);
+                    setTimeout(() => highlight(section), reduceMotion ? 0 : 450);
                 });
             });
 

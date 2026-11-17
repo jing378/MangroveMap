@@ -692,11 +692,29 @@
                 display: none;
             }
 
-            /* Left panel takes full width and full height */
+            /* Phones: the whole page scrolls (like login), not a box inside a locked page. A locked page can't
+               be scrolled in the installed app or once the keyboard covers its lower half, so the last
+               fields and the Create account button were out of reach. */
+            html,
+            body {
+                height: auto;
+                overflow: visible;
+            }
+
+            body {
+                min-height: 100vh;
+                min-height: 100dvh;
+            }
+
+            /* Left panel takes full width and at least the full height */
             /* Top padding keeps the card clear of the floating dark-mode button. */
             .register-left {
                 flex: none;
                 width: 100%;
+                height: auto;
+                min-height: 100vh;
+                min-height: 100dvh;
+                overflow: visible;
                 padding: 72px 16px 20px;
             }
 
@@ -1078,7 +1096,7 @@
                     <div class="form-group terms-agree">
                         <label class="terms-agree-toggle" for="terms">
                             <input type="checkbox" id="terms" name="terms" value="1" required @checked(old('terms'))>
-                            <span>I have read and agree to the <a href="{{ route('terms') }}" target="_blank" rel="noopener">Terms and Conditions</a>, including how my data is used.</span>
+                            <span>I have read and agree to the <a href="{{ route('terms', ['from' => 'register']) }}" target="_blank" rel="noopener">Terms and Conditions</a>, including how my data is used.</span>
                         </label>
                         @error('terms')
                         <div class="error-message">{{ $message }}</div>
@@ -1492,6 +1510,18 @@
                     }
                 });
         });
+    </script>
+    <script>
+        // In the installed app there are no tabs: a new-tab link either opens outside the app or replaces it.
+        // Open the terms in the same window instead; their "Back to sign up" goes back to this form.
+        (() => {
+            const installedApp = window.matchMedia('(display-mode: standalone)').matches
+                || window.matchMedia('(display-mode: fullscreen)').matches
+                || window.matchMedia('(display-mode: minimal-ui)').matches
+                || window.navigator.standalone === true;
+            if (!installedApp) return;
+            document.querySelectorAll('a[href*="/terms"][target="_blank"]').forEach(link => link.removeAttribute('target'));
+        })();
     </script>
     @include('partials.theme-toggle', ['floating' => true])
 </body>
