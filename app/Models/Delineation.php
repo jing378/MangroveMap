@@ -228,7 +228,10 @@ class Delineation extends Model
             return new Collection;
         }
 
+        // Keep the eager loads given on $query (e.g. user, approvedBy): the rows are hydrated by a new
+        // query, and without them each map payload looked its owner and approver up one by one.
         return static::query()
+            ->setEagerLoads($query->getEagerLoads())
             ->with($with)
             ->whereIn('id', $ids)
             ->orderByDesc('created_at')

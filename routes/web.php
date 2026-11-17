@@ -34,7 +34,7 @@ Route::middleware('guest')->group(function () {
         return view('auth.login');
     })->name('login');
 
-    Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+    Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:login');
 
     Route::get('/register', function () {
         // Debug: Check authentication status
@@ -51,7 +51,7 @@ Route::middleware('guest')->group(function () {
         return view('auth.register');
     })->name('register');
 
-    Route::post('/register', [RegisteredUserController::class, 'store']);
+    Route::post('/register', [RegisteredUserController::class, 'store'])->middleware('throttle:register');
 
     // Live "email already taken" check for the sign-up form (rate limited).
     Route::get('/register/check-email', [RegisteredUserController::class, 'checkEmail'])
@@ -62,7 +62,9 @@ Route::middleware('guest')->group(function () {
         return view('auth.forgot-password');
     })->name('password.request');
 
+    // Login, sign-up and password forms are rate limited per IP (AppServiceProvider::configureAuthRateLimits).
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:password-email')
         ->name('password.email');
 
     Route::get('/reset-password/{token}', function ($token) {
@@ -73,6 +75,7 @@ Route::middleware('guest')->group(function () {
     })->name('password.reset');
 
     Route::post('/reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:password-reset')
         ->name('password.update');
 });
 

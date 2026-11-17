@@ -31,6 +31,9 @@ ML environment: `ml/.venv` (from `ml/requirements.txt`). `config/ml.php` automat
 
 ## Architecture
 
+### JSON endpoints
+All routes are in `routes/web.php` (session auth + CSRF, for MangroveMap's own pages); there is no `routes/api.php` or token API. `docs/API.md` documents the JSON endpoints, their roles, bodies, responses and rate limits. Update it when you add or change one.
+
 ### Roles and routing
 `users.role` is `end_user` (resident), `expert`, or `admin`. Route groups in `routes/web.php` use the `end_user`, `expert`, and `admin` middleware aliases (`app/Http/Middleware`). `User::homeRoute()` decides where each role lands after login or verification. Shared map/delineate pages (`EndUserController::map/delineate`) serve all authenticated users. Experts get their own variants under `/expert/*` in `ExpertController`.
 

@@ -80,6 +80,42 @@ class MapDelineationsRefreshTest extends TestCase
         $this->getJson(route('map.delineations'))->assertUnauthorized();
     }
 
+    public function test_map_data_query_count_does_not_grow_with_the_number_of_delineations(): void
+    {
+        $viewer = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+
+        $addApproved = function (int $count) use ($expert, $viewer) {
+            for ($i = 0; $i < $count; $i++) {
+                // Each from a different resident, so per-row owner lookups would show up as extra queries.
+                $this->delineation(User::factory()->create(['role' => 'end_user']), [
+                    'is_approved' => true,
+                    'approved_by' => $expert->id,
+                ]);
+                $this->delineation($viewer);
+            }
+        };
+
+        $countQueries = function () use ($viewer) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($viewer)->getJson(route('map.delineations'))->assertOk();
+            $count = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $count;
+        };
+
+        $addApproved(2);
+        $countQueries(); // warm-up: the first request also records "last seen" (once a minute)
+        $few = $countQueries();
+
+        $addApproved(8);
+        $many = $countQueries();
+
+        $this->assertSame($few, $many, "Map data ran $few queries for 4 delineations but $many for 20.");
+    }
+
     public function test_map_and_delineate_pages_have_the_refresh_button_and_update_chip(): void
     {
         $resident = User::factory()->create(['role' => 'end_user']);
