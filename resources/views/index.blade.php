@@ -2641,7 +2641,7 @@
     <div class="hero-content">
       <div class="hero-eyebrow hero-enter" style="--d:0">
         <span class="pulse-dot"></span>
-        <span>Geospatial Environmental Intelligence &amp; Coastal Conservation</span>
+        <span>Southern Leyte, Philippines · Coastal Conservation</span>
       </div>
 
       <h1 class="hero-title hero-enter" style="--d:1">
@@ -2811,17 +2811,17 @@
       <ul class="how-steps" id="howSteps" role="tablist" aria-label="How MangroveMap works">
         <li><button type="button" class="how-step active" role="tab" aria-selected="true" aria-controls="howPanel0" data-step="0">
           <span class="how-step-num"><i class="bi bi-pencil-fill"></i></span>
-          <span><span class="how-step-title">1. Draw the area</span><br><span class="how-step-sub">Residents outline mangroves on the map</span></span>
+          <span><span class="how-step-title">1. Draw the area</span><br><span class="how-step-sub">Trace mangroves on the map</span></span>
           <span class="how-step-bar"></span>
         </button></li>
         <li><button type="button" class="how-step" role="tab" aria-selected="false" aria-controls="howPanel1" data-step="1" tabindex="-1">
           <span class="how-step-num"><i class="bi bi-airplane-fill"></i></span>
-          <span><span class="how-step-title">2. Detect with drone AI</span><br><span class="how-step-sub">Orthomosaics segmented by U-Net &amp; YOLO</span></span>
+          <span><span class="how-step-title">2. Or upload drone imagery</span><br><span class="how-step-sub">AI outlines mangroves and detects their genus</span></span>
           <span class="how-step-bar"></span>
         </button></li>
         <li><button type="button" class="how-step" role="tab" aria-selected="false" aria-controls="howPanel2" data-step="2" tabindex="-1">
           <span class="how-step-num"><i class="bi bi-patch-check-fill"></i></span>
-          <span><span class="how-step-title">3. Expert review</span><br><span class="how-step-sub">Approve, correct, or send back with feedback</span></span>
+          <span><span class="how-step-title">3. Expert review</span><br><span class="how-step-sub">Approve, correct, or send back</span></span>
           <span class="how-step-bar"></span>
         </button></li>
         <li><button type="button" class="how-step" role="tab" aria-selected="false" aria-controls="howPanel3" data-step="3" tabindex="-1">
@@ -2849,7 +2849,7 @@
             </svg>
           </div>
           <h3>Draw the mangrove boundary</h3>
-          <p>Residents trace mangrove stands on satellite imagery. The area is measured in hectares and matched to its barangay and municipality automatically.</p>
+          <p>Residents trace mangrove stands on satellite imagery and choose the genus. The area is measured in hectares and matched to its barangay and municipality automatically.</p>
         </div>
 
         {{-- Step 2: a drone sweeps over the canopy while a scan line passes. --}}
@@ -2880,8 +2880,8 @@
               </g>
             </svg>
           </div>
-          <h3>Detect mangroves from drone imagery</h3>
-          <p>Upload a GeoTIFF orthomosaic and it is tiled for the map, segmented by a U-Net, and checked canopy by canopy by a YOLO model that suggests the genus.</p>
+          <h3>Or let AI outline it from drone imagery</h3>
+          <p>Upload a drone orthomosaic (GeoTIFF) and an AI model outlines the mangrove areas and suggests the genus of each canopy. You correct the areas, confirm the genus, and submit it like any drawn area.</p>
         </div>
 
         {{-- Step 3: a submission card gets the expert's check mark. --}}
@@ -2898,7 +2898,7 @@
             </svg>
           </div>
           <h3>Experts review every submission</h3>
-          <p>Experts approve an area, correct its boundary, or reject it with feedback. Rejected areas can be revised and resubmitted, and only approved records reach the public map.</p>
+          <p>Experts approve an area, correct its boundary, or reject it with feedback. A rejected area can be revised and resubmitted within 7 days, and only approved records reach the public map.</p>
         </div>
 
         {{-- Step 4: yearly coverage bars grow. --}}
