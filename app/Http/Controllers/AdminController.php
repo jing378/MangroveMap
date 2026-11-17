@@ -88,6 +88,7 @@ class AdminController extends Controller
             'totalUsers' => $totalUsers,
             'mappedZones' => $mappedZones,
             'generaClassified' => $generaClassified,
+            'totalAnalyses' => $totalAnalyses,
             'systemHealth' => $systemHealth,
             'newUsersThisMonth' => $newUsersThisMonth,
             'newZonesThisMonth' => $newZonesThisMonth,
@@ -377,12 +378,17 @@ class AdminController extends Controller
         $zones = [];
         $analyses = [];
 
+        // The last 4 weeks as back-to-back 7-day windows ending today (local time), so no day is counted twice.
+        $today = now(self::LOCAL_TIMEZONE)->startOfDay();
+
         for ($i = 3; $i >= 0; $i--) {
-            $start = now()->subWeeks($i + 1)->startOfDay();
-            $end = now()->subWeeks($i)->endOfDay();
-            $labels[] = 'Week '.(4 - $i);
-            $zones[] = MangroveData::whereBetween('created_at', [$start, $end])->count();
-            $analyses[] = Analysis::whereBetween('created_at', [$start, $end])->count();
+            $start = $today->copy()->subDays(7 * $i + 6);
+            $end = $today->copy()->subDays(7 * $i)->addDay();
+            $labels[] = $start->format('M j').' – '.$end->copy()->subDay()->format('M j');
+            $zones[] = MangroveData::where('created_at', '>=', $start->copy()->utc())
+                ->where('created_at', '<', $end->copy()->utc())->count();
+            $analyses[] = Analysis::where('created_at', '>=', $start->copy()->utc())
+                ->where('created_at', '<', $end->copy()->utc())->count();
         }
 
         return compact('labels', 'zones', 'analyses');

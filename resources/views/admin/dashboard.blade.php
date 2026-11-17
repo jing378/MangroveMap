@@ -4,7 +4,17 @@
 
 @section('content')
 <div id="dashboard-section">
-    <div class="page-title">Welcome back, {{ Auth::user()->name }}</div>
+    <!-- Hero Banner (same as the resident/expert dashboard) -->
+    <div class="dash-hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <i class="bi bi-shield-lock"></i>
+                <span>Administrator</span>
+            </div>
+            <h1>Welcome back, {{ Auth::user()->name }}</h1>
+            <p>Manage user accounts, oversee mangrove delineation records, and keep the AI models and analysis pipeline running smoothly.</p>
+        </div>
+    </div>
 
     <div class="grid cols-4">
         <div class="stat-card">
@@ -20,7 +30,7 @@
         <div class="stat-card">
             <div class="stat-label">Completed Analyses</div>
             <div class="stat-value">{{ number_format($generaClassified) }}</div>
-            <div class="stat-change positive">Demo &amp; field data</div>
+            <div class="stat-change">Out of {{ number_format($totalAnalyses) }} total runs</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Analysis Success Rate</div>
@@ -177,7 +187,7 @@
     </div>
 
     <div class="section">
-        <div class="section-title"><i class="bi bi-arrow-up-right-circle"></i> Monthly Growth Trend</div>
+        <div class="section-title"><i class="bi bi-arrow-up-right-circle"></i> Weekly Growth (last 4 weeks)</div>
         <div class="chart-container">
             <canvas id="growthChart"></canvas>
         </div>
@@ -187,11 +197,79 @@
 
 @section('styles')
 <style>
-    .page-title {
-        font-size: 28px;
+    /* Hero greeting: dark green in both themes, matching the resident/expert dashboard */
+    .dash-hero {
+        background: linear-gradient(135deg, #1b382b 0%, #165337 100%);
+        border-radius: 16px;
+        padding: 32px 36px;
+        margin-bottom: 28px;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(22, 83, 55, 0.15);
+    }
+
+    .dash-hero::after {
+        content: "";
+        position: absolute;
+        right: -40px;
+        bottom: -40px;
+        width: 240px;
+        height: 240px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(30, 158, 98, 0.25) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    .hero-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .hero-content h1 {
+        font-size: 26px;
         font-weight: 800;
-        color: var(--fg-1a2e1a, #1a2e1a);
-        margin-bottom: 24px;
+        margin: 0 0 6px;
+        letter-spacing: -0.5px;
+        color: #fff;
+    }
+
+    .hero-content p {
+        font-size: 14px;
+        color: #b8d9c6;
+        max-width: 600px;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #a3e6be;
+    }
+
+    @media (max-width: 768px) {
+        .dash-hero {
+            padding: 22px 20px;
+            margin-bottom: 18px;
+        }
+
+        .hero-content h1 {
+            font-size: 21px;
+            overflow-wrap: anywhere;
+        }
+
+        .hero-content p {
+            font-size: 13px;
+        }
     }
 
     .grid {
@@ -412,11 +490,6 @@
     }
 
     @media (max-width: 768px) {
-        .page-title {
-            font-size: 22px;
-            margin-bottom: 16px;
-        }
-
         .grid.cols-4 {
             grid-template-columns: repeat(2, 1fr);
         }
