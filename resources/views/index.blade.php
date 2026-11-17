@@ -2852,10 +2852,11 @@
           <p>Residents trace mangrove stands on satellite imagery and choose the genus. The area is measured in hectares and matched to its barangay and municipality automatically.</p>
         </div>
 
-        {{-- Step 2: a drone sweeps over the canopy while a scan line passes. --}}
+        {{-- Step 2: a drone sweeps over the canopy, the AI traces the mangrove area, then labels each canopy's genus. --}}
         <div class="how-panel" id="howPanel1" role="tabpanel">
           <div class="how-art" aria-hidden="true">
             <svg viewBox="0 0 400 200">
+              <path class="fill-in" style="animation-delay:2.7s" d="M40 128 C40 96 70 88 110 100 C140 86 165 80 205 90 C240 100 265 88 300 86 C340 86 372 112 372 140 C372 168 340 170 300 166 C250 168 200 168 150 166 C100 170 40 160 40 128 Z" fill="rgba(74,222,128,.18)" />
               <g>
                 <circle class="pop" style="--d:100" cx="70" cy="120" r="26" fill="rgba(34,197,94,.55)" />
                 <circle class="pop" style="--d:250" cx="120" cy="140" r="20" fill="rgba(74,222,128,.5)" />
@@ -2864,11 +2865,13 @@
                 <circle class="pop" style="--d:700" cx="300" cy="118" r="28" fill="rgba(34,197,94,.55)" />
                 <circle class="pop" style="--d:850" cx="350" cy="145" r="18" fill="rgba(134,239,172,.5)" />
               </g>
-              <g class="fill-in" fill="none" stroke="#facc15" stroke-width="2" stroke-dasharray="5 4">
+              <path class="draw-path" style="animation-delay:.9s" d="M40 128 C40 96 70 88 110 100 C140 86 165 80 205 90 C240 100 265 88 300 86 C340 86 372 112 372 140 C372 168 340 170 300 166 C250 168 200 168 150 166 C100 170 40 160 40 128 Z" fill="none" stroke="#4ade80" stroke-width="3" stroke-linejoin="round" />
+              <text class="fill-in" style="animation-delay:2.7s" x="44" y="190" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#bbf7d0">AI mangrove outline · 3.12 ha</text>
+              <g class="fill-in" style="animation-delay:3.3s" fill="none" stroke="#facc15" stroke-width="2" stroke-dasharray="5 4">
                 <rect x="150" y="85" width="60" height="60" rx="6" />
                 <rect x="272" y="90" width="56" height="56" rx="6" />
               </g>
-              <g class="fill-in" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#fde68a">
+              <g class="fill-in" style="animation-delay:3.3s" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#fde68a">
                 <text x="150" y="80">Rhizophora 92%</text>
                 <text x="272" y="85">Avicennia 87%</text>
               </g>
