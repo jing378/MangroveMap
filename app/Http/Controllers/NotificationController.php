@@ -73,6 +73,23 @@ class NotificationController extends Controller
         return back()->with('success', 'Notification deleted');
     }
 
+    /** Deletes every notification of the signed-in user (the "Delete all" button on the Notifications page). */
+    public function destroyAll(Request $request)
+    {
+        $deleted = Auth::user()->notifications()->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $deleted === 1 ? '1 notification deleted' : $deleted.' notifications deleted',
+                'deleted' => $deleted,
+                'unreadCount' => 0,
+            ]);
+        }
+
+        return back()->with('success', 'All notifications deleted');
+    }
+
     /**
      * Live updates (partials/live-notifications): every open page asks this every ~20 s while visible.
      * Returns the unread count and the notifications created since `since` (the `now` of the previous

@@ -355,4 +355,14 @@
       render();
       // Shown as soon as the map page opens, on the latest year (everything on the map).
       window.toggleMangroveHistory(true);
+
+      // ?municipality=Name (the dashboard report's "View"): open on that municipality's areas, after the
+      // map's own first fit (same delay as ?delineation=).
+      const askedPlace = new URLSearchParams(window.location.search).get('municipality');
+      if (askedPlace) {
+        setTimeout(() => {
+          setMinimized(false, false);
+          changePlace(askedPlace);
+        }, 400);
+      }
     })();

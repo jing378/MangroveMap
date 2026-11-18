@@ -321,6 +321,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('notifications.poll');
     Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
+    Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.destroy-all');
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
     // Dashboard "Field conditions" card (residents and experts): weather forecast from Open-Meteo, cached.

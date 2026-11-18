@@ -104,6 +104,30 @@ class DevicePushNotificationTest extends TestCase
         );
     }
 
+    public function test_pages_turn_notifications_back_on_after_logging_in_again(): void
+    {
+        $user = User::factory()->create(['role' => 'end_user']);
+
+        // Logged in, this session has no subscription yet: pages carry the script that restores a remembered choice.
+        $this->actingAs($user)->get(route('notifications.index'))
+            ->assertOk()
+            ->assertSee('mangrovemap.push.wanted', false)
+            ->assertSee('device-push-restored', false)
+            ->assertSee('data-user-id="'.$user->id.'"', false);
+
+        // Once this browser is subscribed in this session, the pages no longer carry it.
+        $this->postJson(route('push-subscriptions.store'), [
+            'endpoint' => self::ENDPOINT,
+            'keys' => ['p256dh' => 'p256dh-key', 'auth' => 'auth-token'],
+        ])->assertOk();
+        $this->get(route('dashboard'))->assertOk()->assertDontSee('pushManager.subscribe({ userVisibleOnly', false);
+
+        // Without push keys on the server there is nothing to restore.
+        config(['webpush.vapid.public_key' => null]);
+        $this->withSession([])->flushSession();
+        $this->actingAs($user)->get(route('dashboard'))->assertOk()->assertDontSee('mangrovemap.push.wanted', false);
+    }
+
     public function test_notifications_push_only_to_users_who_turned_it_on(): void
     {
         $resident = User::factory()->create(['role' => 'end_user']);

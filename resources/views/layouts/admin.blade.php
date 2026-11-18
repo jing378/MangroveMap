@@ -632,6 +632,7 @@
     @include('partials.sidebar-collapse')
     @include('partials.action-feedback')
     @include('partials.live-notifications')
+    @include('partials.device-push-restore')
 </head>
 
 <body>

@@ -231,6 +231,7 @@ The live check. Every open page calls it every 20 seconds while visible.
 | `PUT /notifications/{id}/read` | Mark one as read. Returns `{"success": true, "unreadCount": 2}`. |
 | `POST /notifications/read-all` | Mark all as read |
 | `DELETE /notifications/{id}` | Delete one |
+| `DELETE /notifications` | Delete all of the user's notifications, read and unread. Returns `{"success": true, "deleted": 12, "unreadCount": 0}` |
 
 ### Device notifications (Web Push)
 | Method and URL | Purpose |

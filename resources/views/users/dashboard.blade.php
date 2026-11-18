@@ -321,6 +321,39 @@
         width: 100%;
     }
 
+    /* Side by side (types + trend): same height, the chart fills its card. The types card keeps a steady
+       height (a type's tip shows in .gen-hint), so the chart only resizes when the municipality changes. */
+    .charts-grid > .chart-card {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .charts-grid > .chart-card > .chart-canvas-wrap {
+        flex: 1 1 auto;
+        min-height: 240px;
+    }
+
+    /* Fixed size: six types fit; more scroll inside the list, so neither card ever changes height. */
+    .charts-grid > .chart-card:not(.chart-card-wide) {
+        height: 456px;
+    }
+
+    #genusCard .gen-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        align-content: start;
+        overflow-y: auto;
+        padding-right: 6px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--bg-c9dccf, #c9dccf) transparent;
+    }
+
+    /* More types below: the list fades out at the bottom until it is scrolled to the end. */
+    #genusCard .gen-list.has-more {
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+        mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+    }
+
     .chart-card-wide {
         grid-column: 1 / -1;
     }
@@ -631,6 +664,535 @@
             grid-template-columns: 1fr;
         }
     }
+    /* "Total Monitored Area" card: opens the Mangrove Report below the cards */
+    .kpi-card-toggle {
+        width: 100%;
+        color: inherit;
+        font-family: inherit;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .kpi-card-toggle .kpi-info,
+    .kpi-card-toggle .kpi-val,
+    .kpi-card-toggle .kpi-label {
+        display: block;
+    }
+
+    .kpi-card-toggle:hover {
+        border-color: var(--bd-b8d9c6, #b8d9c6);
+        box-shadow: 0 4px 14px rgba(30, 158, 98, 0.10);
+    }
+
+    .kpi-card-toggle[aria-expanded="true"] {
+        border-color: #1e9e62;
+        background: var(--bg-f5f7f6, #f5f7f6);
+        box-shadow: 0 0 0 2px rgba(30, 158, 98, 0.15);
+    }
+
+    .kpi-card-toggle[aria-expanded="true"] .kpi-icon {
+        background: var(--bg-edf7f2, #edf7f2);
+    }
+
+    .kpi-report-hint {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .kpi-report-hint i {
+        font-size: 11px;
+        transition: transform 0.15s ease;
+    }
+
+    .kpi-card-toggle[aria-expanded="true"] .kpi-report-hint i {
+        transform: rotate(180deg);
+    }
+
+    .rep-panel {
+        border-color: #1e9e62;
+        animation: rep-panel-in 0.2s ease-out;
+    }
+
+    .rep-panel[hidden] {
+        display: none;
+    }
+
+    @keyframes rep-panel-in {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rep-panel {
+            animation: none;
+        }
+    }
+
+    .rep-close {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-radius: 8px;
+        background: var(--bg-ffffff, #ffffff);
+        color: var(--fg-4a6a4a, #4a6a4a);
+        cursor: pointer;
+    }
+
+    .rep-close:hover {
+        background: var(--bg-f5f7f6, #f5f7f6);
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    /* Mangrove report: a bar per municipality, each area under it */
+    button.btn-table-action {
+        border: 0;
+        font-family: inherit;
+        cursor: pointer;
+    }
+
+    .rep-head-tools {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .rep-places {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .rep-place-btn {
+        display: grid;
+        grid-template-columns: minmax(110px, 180px) minmax(0, 1fr) auto auto 16px;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-radius: 10px;
+        background: var(--bg-ffffff, #ffffff);
+        color: var(--fg-1a2e1a, #1a2e1a);
+        font-family: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .rep-place-btn:hover {
+        border-color: var(--bd-b8d9c6, #b8d9c6);
+        background: var(--bg-fbfdfb, #fbfdfb);
+    }
+
+    .rep-place-btn[aria-expanded="true"] {
+        border-color: #1e9e62;
+        background: var(--bg-f5f7f6, #f5f7f6);
+    }
+
+    .rep-place-name {
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .rep-place-name.is-unknown {
+        font-weight: 600;
+        color: #7a9a7a;
+    }
+
+    .rep-bar {
+        height: 12px;
+        border-radius: 6px;
+        background: var(--bg-edf7f2, #edf7f2);
+        overflow: hidden;
+    }
+
+    .rep-bar span {
+        display: block;
+        height: 100%;
+        min-width: 4px;
+        border-radius: 6px;
+        background: #1e9e62;
+    }
+
+    .rep-place-ha {
+        font-size: 13px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .rep-count {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .rep-chevron {
+        font-size: 12px;
+        color: #7a9a7a;
+        transition: transform 0.15s ease;
+    }
+
+    .rep-place-btn[aria-expanded="true"] .rep-chevron {
+        transform: rotate(180deg);
+    }
+
+    .type-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        flex: 0 0 10px;
+        border-radius: 50%;
+    }
+
+    .rep-areas {
+        list-style: none;
+        margin: 6px 0 4px 14px;
+        padding: 0 0 0 14px;
+        border-left: 2px solid var(--bd-e0e8e0, #e0e8e0);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .rep-areas[hidden] {
+        display: none;
+    }
+
+    .rep-area {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) auto 28px;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 4px;
+        font-size: 12px;
+    }
+
+    .rep-area-name {
+        min-width: 0;
+        font-weight: 700;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .rep-area-brgy {
+        display: block;
+        font-weight: 500;
+        color: #7a9a7a;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .rep-area .rep-bar {
+        height: 8px;
+    }
+
+    .rep-area .rep-bar span {
+        background: #5ab88a;
+    }
+
+    .rep-area-ha {
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .rep-area-map {
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
+        text-decoration: none;
+    }
+
+    .rep-area-map:hover {
+        background: #1e9e62;
+        color: #ffffff;
+    }
+
+    .rep-area-all {
+        padding: 6px 4px 4px;
+    }
+
+    /* Mangrove types: one bar per type */
+    .gen-caption {
+        margin: -10px 0 14px;
+        font-size: 12px;
+        color: #7a9a7a;
+    }
+
+    /* The tapped type's tip shows here, in a slot of fixed height, so the card never changes height. */
+    .gen-hint {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        min-height: calc(2 * 1.45em);
+        line-height: 1.45;
+    }
+
+    .gen-hint strong {
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    .gen-hint .type-dot {
+        margin-top: 3px;
+    }
+
+    .gen-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+        gap: 4px 28px;
+    }
+
+    .gen-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 5px 10px;
+        align-items: center;
+        width: 100%;
+        padding: 6px 0;
+        border: 0;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        background: none;
+        color: inherit;
+        font-family: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .gen-row[aria-pressed="true"] .gen-name {
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .gen-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    .gen-name small {
+        font-size: 11px;
+        font-weight: 600;
+        font-style: italic;
+        color: #7a9a7a;
+    }
+
+    .gen-count {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--fg-4a6a4a, #4a6a4a);
+        white-space: nowrap;
+    }
+
+    .gen-count strong {
+        font-size: 15px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    .gen-row .rep-bar {
+        grid-column: 1 / -1;
+        height: 8px;
+        background: var(--bg-f0f4f0, #f0f4f0);
+    }
+
+    @media (max-width: 768px) {
+
+        /* Name, hectares and count on top; the bar underneath. */
+        .rep-place-btn {
+            grid-template-columns: minmax(0, 1fr) auto auto 16px;
+            gap: 8px 10px;
+        }
+
+        .rep-place-btn .rep-bar {
+            grid-column: 1 / -1;
+            grid-row: 2;
+        }
+
+        .rep-areas {
+            margin-left: 6px;
+            padding-left: 10px;
+        }
+
+        .rep-area {
+            grid-template-columns: minmax(0, 1fr) auto 28px;
+            gap: 6px 10px;
+        }
+
+        .rep-area .rep-bar {
+            grid-column: 1 / -1;
+            grid-row: 2;
+        }
+    }
+
+    .rep-subtitle {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #7a9a7a;
+    }
+
+    /* Phones: compact cards, report close button in the corner, natural-height charts, and the recent
+       delineations as stacked rows instead of a table wider than the screen. */
+    @media (max-width: 768px) {
+        /* The icon sits in the corner, so the figures get the card's full width. */
+        .kpi-card {
+            position: relative;
+            display: block;
+            padding: 12px;
+        }
+
+        .kpi-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 28px;
+            height: 28px;
+            font-size: 13px;
+        }
+
+        .kpi-val {
+            padding-right: 32px;
+        }
+
+        .kpi-val {
+            font-size: 18px;
+        }
+
+        .kpi-label {
+            margin-top: 2px;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .kpi-badge {
+            margin-top: 4px;
+            font-size: 10px;
+        }
+
+        .kpi-report-hint {
+            margin-top: 6px;
+        }
+
+        .rep-panel {
+            position: relative;
+        }
+
+        .rep-panel .table-header {
+            padding-right: 40px;
+        }
+
+        .rep-panel .rep-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+        }
+
+        .charts-grid > .chart-card:not(.chart-card-wide) {
+            height: auto;
+        }
+
+        /* Phones: every type shows and the page scrolls normally (no scroll area inside the card that
+           would catch the swipe). */
+        #genusCard .gen-list,
+        #genusCard .gen-list.has-more {
+            max-height: none;
+            overflow: visible;
+            -webkit-mask-image: none;
+            mask-image: none;
+            padding-right: 0;
+        }
+
+        .charts-grid > .chart-card > .chart-canvas-wrap {
+            flex: none;
+            min-height: 0;
+            height: 220px;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .recent-table,
+        .recent-table tbody {
+            display: block;
+        }
+
+        .recent-table thead {
+            display: none;
+        }
+
+        .recent-table tr {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 6px 12px;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        }
+
+        .recent-table tr:hover td {
+            background: none;
+        }
+
+        .recent-table td {
+            display: block;
+            padding: 0;
+            border: 0;
+        }
+
+        .recent-table td:nth-child(1) {
+            grid-column: 1 / -1;
+        }
+
+        .recent-table td:nth-child(2) {
+            display: none;
+        }
+
+        .recent-table td:nth-child(3) {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .recent-table td:nth-child(4) {
+            grid-column: 1;
+            grid-row: 3;
+        }
+
+        .recent-table td:nth-child(5) {
+            grid-column: 2;
+            grid-row: 2 / span 2;
+        }
+    }
 </style>
 @endsection
 
@@ -667,19 +1229,21 @@
 
     <!-- KPI Statistics Grid -->
     <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-icon"><i class="bi bi-pie-chart-fill"></i></div>
-            <div class="kpi-info">
+        {{-- Opens the Mangrove Report (by municipality) right below the cards. --}}
+        <button type="button" class="kpi-card kpi-card-toggle" id="reportToggle" aria-expanded="false" aria-controls="municipalityReport">
+            <span class="kpi-icon"><i class="bi bi-pie-chart-fill"></i></span>
+            <span class="kpi-info">
                 {{-- Expert-approved delineations, system-wide. --}}
-                <div class="kpi-val">{{ number_format($totalCoverage ?? 0, ($totalCoverage ?? 0) < 100 ? 2 : 0) }} ha</div>
-                <div class="kpi-label">Total Monitored Area</div>
+                <span class="kpi-val">{{ number_format($totalCoverage ?? 0, ($totalCoverage ?? 0) < 100 ? 2 : 0) }} ha</span>
+                <span class="kpi-label">Total Monitored Area</span>
                 @if(isset($coverageChangePct))
                     <span class="kpi-badge {{ $coverageChangePct >= 0 ? 'g' : 'a' }}">{{ $coverageChangePct >= 0 ? '+' : '' }}{{ number_format($coverageChangePct, 1) }}% since last year</span>
                 @else
                     <span class="kpi-badge g">{{ number_format($approvedAreaCount ?? 0) }} approved {{ Str::plural('area', $approvedAreaCount ?? 0) }}</span>
                 @endif
-            </div>
-        </div>
+                <span class="kpi-report-hint"><span data-label-closed>View report</span><span data-label-open hidden>Hide report</span> <i class="bi bi-chevron-down"></i></span>
+            </span>
+        </button>
 
         <div class="kpi-card">
             <div class="kpi-icon"><i class="bi bi-flower1"></i></div>
@@ -722,20 +1286,104 @@
         </div>
     </div>
 
-    <!-- Charts Row -->
-    <div class="charts-grid">
-        <div class="chart-card">
-            <div class="chart-header">
-                <div class="chart-title"><i class="bi bi-pie-chart me-2"></i> Genus Distribution</div>
+    @php
+        $mapRoute = auth()->user()->isExpert() ? route('expert.map') : route('map');
+        $report = collect($municipalityReport ?? []);
+        $reportPlaces = $report->whereNotNull('name');
+        $provinceTotal = (float) ($totalCoverage ?? 0);
+        $largestPlaceHa = max(0.0001, (float) $report->max('area_ha'));
+        $formatHa = fn ($ha) => number_format((float) $ha, $ha < 100 ? 2 : 0);
+        $municipalityTotal = $reportPlaces->count() + count($municipalitiesWithoutAreas ?? []);
+    @endphp
+
+    <!-- Mangrove report by municipality: approved areas only, shown as tiles and bars -->
+    {{-- Hidden until the "Total Monitored Area" card is clicked. --}}
+    <section class="table-card rep-panel" id="municipalityReport" aria-labelledby="municipalityReportTitle" hidden>
+        <div class="table-header">
+            <div>
+                <div class="table-title" id="municipalityReportTitle"><i class="bi bi-geo-alt me-2"></i> Mangrove Report</div>
+                <div class="rep-subtitle">
+                    Approved areas only @if($report->isNotEmpty())· {{ $reportPlaces->count() }}{{ !empty($municipalitiesWithoutAreas) ? ' of '.$municipalityTotal : '' }} {{ Str::plural('municipality', $municipalityTotal ?: $reportPlaces->count()) }} mapped @endif
+                </div>
             </div>
-            <div class="chart-canvas-wrap">
-                @if(!empty($genusSeries))
-                    <canvas id="genusPieChart"></canvas>
-                @else
-                    <div class="chart-empty">No genera recorded in approved areas yet.</div>
+            <div class="rep-head-tools">
+                @if($report->isNotEmpty())
+                    <button type="button" class="btn-table-action" id="municipalityReportCsv" title="Download as a spreadsheet (CSV)">
+                        <i class="bi bi-download"></i> <span>CSV</span>
+                    </button>
                 @endif
+                <button type="button" class="rep-close" id="reportClose" title="Hide the report" aria-label="Hide the report"><i class="bi bi-x-lg"></i></button>
             </div>
         </div>
+
+        @if($report->isEmpty())
+            <div class="chart-empty" style="padding: 24px 0;">No approved mangrove areas yet.</div>
+        @else
+            {{-- One bar per municipality (longest = most hectares); tap it for its areas, one by one. --}}
+            <ul class="rep-places">
+                @foreach($report as $rowIndex => $row)
+                    @php
+                        $placeKey = $row['name'] ?? '__unknown';
+                        $share = $provinceTotal > 0 ? $row['area_ha'] / $provinceTotal * 100 : 0;
+                        $largestAreaHa = max(0.0001, (float) collect($row['areas'] ?? [])->max('area_ha'));
+                    @endphp
+                    <li data-place="{{ $placeKey }}">
+                        <button type="button" class="rep-place-btn" aria-expanded="false" aria-controls="reportAreas{{ $rowIndex }}" data-place="{{ $placeKey }}"
+                            title="{{ $row['name'] ?? 'Location not identified' }}: {{ $formatHa($row['area_ha']) }} ha, {{ number_format($share, $share < 10 ? 1 : 0) }}% of all mapped">
+                            <span class="rep-place-name {{ $row['name'] ? '' : 'is-unknown' }}">{{ $row['name'] ?? 'Location not identified' }}</span>
+                            <span class="rep-bar" aria-hidden="true"><span style="width: {{ round($row['area_ha'] / $largestPlaceHa * 100, 1) }}%"></span></span>
+                            <span class="rep-place-ha">{{ $formatHa($row['area_ha']) }} ha</span>
+                            <span class="rep-count">{{ number_format($row['area_count']) }} {{ Str::plural('area', $row['area_count']) }}</span>
+                            <i class="bi bi-chevron-down rep-chevron" aria-hidden="true"></i>
+                        </button>
+                        <ul class="rep-areas" id="reportAreas{{ $rowIndex }}" hidden>
+                            @foreach($row['areas'] ?? [] as $area)
+                                <li class="rep-area">
+                                    <span class="rep-area-name" title="{{ $area['name'] ?: 'Unnamed area' }}">
+                                        {{ $area['name'] ?: 'Unnamed area' }}
+                                        <span class="rep-area-brgy"><i class="bi bi-geo-alt"></i> {{ !empty($area['barangays']) ? implode(', ', $area['barangays']) : '—' }}</span>
+                                    </span>
+                                    <span class="rep-bar" aria-hidden="true"><span style="width: {{ round($area['area_ha'] / $largestAreaHa * 100, 1) }}%"></span></span>
+                                    <span class="rep-area-ha">{{ $formatHa($area['area_ha']) }} ha</span>
+                                    <a href="{{ $mapRoute }}?delineation={{ $area['id'] }}" class="rep-area-map" title="View on map" aria-label="View {{ $area['name'] ?: 'this area' }} on the map"><i class="bi bi-map"></i></a>
+                                </li>
+                            @endforeach
+                            @if($row['name'])
+                                <li class="rep-area-all">
+                                    <a href="{{ $mapRoute }}?municipality={{ urlencode($row['name']) }}" class="btn-table-action"><i class="bi bi-map"></i> All of {{ $row['name'] }} on the map</a>
+                                </li>
+                            @endif
+                        </ul>
+                    </li>
+                @endforeach
+            </ul>
+
+        @endif
+    </section>
+
+
+    <!-- Charts Row -->
+    <div class="charts-grid">
+        <!-- Mangrove types (genus distribution): one bar per type -->
+        <section class="chart-card" id="genusCard" aria-labelledby="genusCardTitle">
+            <div class="chart-header" style="flex-wrap: wrap; gap: 10px;">
+                <div class="chart-title" id="genusCardTitle"><i class="bi bi-tree me-2"></i> Mangrove Types (Genus)</div>
+                @if(!empty($generaCounts) && $reportPlaces->count() > 0)
+                    <select id="genusPlace" class="chart-select" aria-label="Show mangrove types for">
+                        <option value="">All municipalities</option>
+                        @foreach($reportPlaces->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE) as $row)
+                            <option value="{{ $row['name'] }}">{{ $row['name'] }}</option>
+                        @endforeach
+                    </select>
+                @endif
+            </div>
+            @if(empty($generaCounts))
+                <div class="chart-empty" style="padding: 24px 0;">No mangrove types recorded yet.</div>
+            @else
+                <p class="gen-caption gen-hint" id="genusHint" aria-live="polite"><i class="bi bi-info-circle"></i> <span>Bar = share of approved areas where the type grows. Tap a type for how to recognise it.</span></p>
+                <ul class="gen-list" id="genusList"></ul>
+            @endif
+        </section>
 
         <div class="chart-card">
             <div class="chart-header">
@@ -825,7 +1473,7 @@
             </div>
         @else
             <div style="overflow-x: auto;">
-                <table class="custom-table">
+                <table class="custom-table recent-table">
                     <thead>
                         <tr>
                             <th>Zone Name / Notes</th>
@@ -967,39 +1615,184 @@
     })();
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Genus Distribution Doughnut
-        const genusCtx = document.getElementById('genusPieChart');
-        if (genusCtx) {
-            // Number of approved areas each genus is recorded in.
-            const labels = @json($genusLabels ?? []);
-            const data = @json($genusSeries ?? []);
+        // Mangrove types: one bar per type (share of approved areas where it grows), for all or one municipality.
+        // Tapping a type shows how to recognise it.
+        const genusList = document.getElementById('genusList');
+        if (genusList) {
+            const genusInfo = @json(\App\Support\MangroveGenera::INFO);
+            const otherColor = @json(\App\Support\MangroveGenera::OTHER_COLOR);
+            const all = {
+                area_count: @json((int) ($approvedAreaCount ?? 0)),
+                genera: @json((object) ($generaCounts ?? [])),
+                genera_ha: @json((object) ($generaHectares ?? [])),
+            };
+            const places = Object.fromEntries(@json($municipalityReport ?? [])
+                .filter(row => row.name)
+                .map(row => [row.name, row]));
+            const placeEl = document.getElementById('genusPlace');
+            const formatHa = value => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: value < 100 ? 2 : 0 });
+            const make = (tag, className, text) => {
+                const node = document.createElement(tag);
+                if (className) node.className = className;
+                if (text !== undefined) node.textContent = text;
+                return node;
+            };
 
-            new Chart(genusCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: ['#1e9e62', '#16a34a', '#5ab8de', '#c07818', '#e6a23c', '#909399'],
-                        borderWidth: 2,
-                        // Matches the card background in either theme (re-read on chart.update()).
-                        borderColor: () => (window.MangroveTheme?.get() === 'dark' ? '#141d18' : '#fff')
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                boxWidth: 12,
-                                font: { family: 'Manrope', size: 11, weight: 600 }
-                            }
-                        }
-                    },
-                    cutout: '65%'
+            const hintEl = document.getElementById('genusHint');
+            const defaultHint = hintEl.innerHTML;
+            let pickedGenus = null;
+            // Tap a type: its tip replaces the caption (tap it again for the caption back).
+            const showHint = (genus, info) => {
+                pickedGenus = pickedGenus === genus ? null : genus;
+                genusList.querySelectorAll('.gen-row').forEach(button => {
+                    button.setAttribute('aria-pressed', button.dataset.genus === pickedGenus ? 'true' : 'false');
+                });
+                if (!pickedGenus) {
+                    hintEl.innerHTML = defaultHint;
+                    return;
                 }
+                const dot = make('span', 'type-dot');
+                dot.style.background = info.color || otherColor;
+                const text = make('span');
+                text.append(make('strong', '', info.local ? `${info.local}:` : `${genus}:`), ` ${info.about}`);
+                hintEl.replaceChildren(dot, text);
+            };
+
+            const render = () => {
+                pickedGenus = null;
+                hintEl.innerHTML = defaultHint;
+                const data = placeEl?.value ? places[placeEl.value] : all;
+                if (!data) return;
+                const total = data.area_count || 0;
+                const entries = Object.entries(data.genera || {});
+                if (!entries.length) {
+                    genusList.replaceChildren(make('li', 'gen-caption', 'No mangrove types recorded here yet.'));
+                    return;
+                }
+
+                genusList.replaceChildren(...entries.map(([genus, count]) => {
+                    const info = genusInfo[genus] || {};
+                    const share = total ? Math.round(count / total * 100) : 0;
+                    const item = make('li');
+                    const row = make('button', 'gen-row');
+                    row.type = 'button';
+                    row.dataset.genus = genus;
+                    row.setAttribute('aria-pressed', 'false');
+                    row.title = `${info.local ? `${info.local} (${genus})` : genus}: in ${count} of ${total} areas (${share}%), about ${formatHa(data.genera_ha?.[genus])} ha${info.about ? `. ${info.about}` : ''}`;
+
+                    const name = make('span', 'gen-name');
+                    const dot = make('span', 'type-dot');
+                    dot.style.background = info.color || otherColor;
+                    name.append(dot, info.local || genus);
+                    if (info.local) name.append(make('small', '', genus));
+
+                    const figure = make('span', 'gen-count');
+                    figure.append(make('strong', '', String(count)), ` / ${total} · ${share}%`);
+
+                    const bar = make('span', 'rep-bar');
+                    const fill = make('span');
+                    fill.style.width = `${share}%`;
+                    fill.style.background = info.color || otherColor;
+                    bar.append(fill);
+
+                    row.append(name, figure, bar);
+                    item.append(row);
+                    if (info.about) row.addEventListener('click', () => showHint(genus, info));
+                    return item;
+                }));
+            };
+
+            // Fade the bottom while more types are hidden below (the list scrolls inside its fixed-size card).
+            const markMore = () => {
+                genusList.classList.toggle('has-more', genusList.scrollTop + genusList.clientHeight < genusList.scrollHeight - 2);
+            };
+            genusList.addEventListener('scroll', markMore, { passive: true });
+            window.addEventListener('resize', markMore);
+
+            placeEl?.addEventListener('change', () => { render(); genusList.scrollTop = 0; markMore(); });
+            render();
+            markMore();
+        }
+
+        // "Total Monitored Area" card opens and closes the Mangrove Report (remembered in this browser).
+        (() => {
+            const toggle = document.getElementById('reportToggle');
+            const panel = document.getElementById('municipalityReport');
+            if (!toggle || !panel) return;
+            const KEY = 'mangrovemap.dashboardReportOpen';
+            const setOpen = (open, { scroll = false, remember = true } = {}) => {
+                panel.hidden = !open;
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                toggle.querySelector('[data-label-closed]').hidden = open;
+                toggle.querySelector('[data-label-open]').hidden = !open;
+                if (remember) {
+                    try { localStorage.setItem(KEY, open ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+                }
+                if (open && scroll) {
+                    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    panel.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+                }
+            };
+            toggle.addEventListener('click', () => setOpen(panel.hidden, { scroll: true }));
+            document.getElementById('reportClose')?.addEventListener('click', () => {
+                setOpen(false);
+                toggle.focus();
+            });
+            let remembered = null;
+            try { remembered = localStorage.getItem(KEY); } catch (e) { /* storage unavailable */ }
+            if (remembered === '1' || window.location.hash === '#municipalityReport') {
+                setOpen(true, { remember: false });
+            }
+        })();
+
+        // Mangrove report: a bar per municipality; tapping it opens its areas one by one. CSV: everything.
+        const reportEl = document.getElementById('municipalityReport');
+        const csvButton = document.getElementById('municipalityReportCsv');
+        if (reportEl && csvButton) {
+            const rows = @json($municipalityReport ?? []);
+            reportEl.querySelectorAll('.rep-place-btn').forEach(button => button.addEventListener('click', () => {
+                const open = button.getAttribute('aria-expanded') !== 'true';
+                button.setAttribute('aria-expanded', open ? 'true' : 'false');
+                document.getElementById(button.getAttribute('aria-controls')).hidden = !open;
+            }));
+
+            // As a spreadsheet (opens in Excel or Google Sheets): municipality totals, then each area.
+            csvButton.addEventListener('click', () => {
+                const cell = value => {
+                    const text = String(value ?? '');
+                    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+                };
+                const lines = [
+                    ['Municipality', 'Approved areas', 'Mangrove area (ha)', 'Mangrove types found (areas)', 'Mappers', 'Last approved'],
+                    ...rows.map(row => [
+                        row.name || 'Location not identified',
+                        row.area_count,
+                        Number(row.area_ha).toFixed(2),
+                        Object.entries(row.genera || {}).map(([genus, count]) => `${genus} (${count})`).join('; '),
+                        row.contributors,
+                        row.last_approved_at ? row.last_approved_at.slice(0, 10) : '',
+                    ]),
+                    [],
+                    ['Each approved area'],
+                    ['Municipality', 'Area', 'Barangay', 'Mangrove area (ha)', 'Mangrove types found', 'Mapped by', 'Approved'],
+                    ...rows.flatMap(row => (row.areas || []).map(area => [
+                        row.name || 'Location not identified',
+                        area.name || 'Unnamed area',
+                        (area.barangays || []).join('; '),
+                        Number(area.area_ha).toFixed(2),
+                        (area.genera || []).join('; '),
+                        area.mapped_by || '',
+                        area.approved_at ? area.approved_at.slice(0, 10) : '',
+                    ])),
+                ].map(line => line.map(cell).join(','));
+                const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `mangrove-report-by-municipality-${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.append(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(link.href), 1000);
             });
         }
 

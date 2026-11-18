@@ -11,6 +11,7 @@ $pushConfigured = \App\Notifications\Channels\DevicePushChannel::configured();
     data-configured="{{ $pushConfigured ? '1' : '0' }}"
     data-public-key="{{ $pushConfigured ? config('webpush.vapid.public_key') : '' }}"
     data-endpoints='@json($pushUser->pushSubscriptions()->pluck('endpoint'))'
+    data-user-id="{{ $pushUser->getAuthIdentifier() }}"
     data-store-url="{{ route('push-subscriptions.store') }}"
     data-destroy-url="{{ route('push-subscriptions.destroy') }}">
     <div class="push-card-icon" aria-hidden="true"><i class="bi bi-phone-vibrate"></i></div>
@@ -194,6 +195,18 @@ $pushConfigured = \App\Notifications\Channels\DevicePushChannel::configured();
         let serverEndpoints = [];
         try { serverEndpoints = JSON.parse(card.dataset.endpoints || '[]'); } catch (e) { /* none */ }
 
+        // Remembered per account in this browser, so logging in again turns them back on by itself
+        // (partials/device-push-restore). Turning them off here forgets it.
+        const WANTED_KEY = 'mangrovemap.push.wanted';
+        const userId = card.dataset.userId;
+        function rememberChoice(on) {
+            try {
+                const wanted = JSON.parse(localStorage.getItem(WANTED_KEY) || '{}') || {};
+                if (on) wanted[userId] = 1; else delete wanted[userId];
+                localStorage.setItem(WANTED_KEY, JSON.stringify(wanted));
+            } catch (e) { /* storage unavailable: they just need turning on again after logging in */ }
+        }
+
         const icons = { 'is-on': 'bi-bell-fill', 'is-off': 'bi-phone-vibrate', 'is-blocked': 'bi-exclamation-triangle', 'is-checking': 'bi-phone-vibrate' };
         const blockedHelp = 'Allow notifications for this site in your browser\'s site settings, then reload this page.';
 
@@ -276,9 +289,12 @@ $pushConfigured = \App\Notifications\Channels\DevicePushChannel::configured();
             try {
                 const reg = await registration();
                 const subscription = await reg.pushManager.getSubscription();
-                subscription && Notification.permission === 'granted' && serverEndpoints.includes(subscription.endpoint)
-                    ? showOn()
-                    : showOff();
+                if (subscription && Notification.permission === 'granted' && serverEndpoints.includes(subscription.endpoint)) {
+                    rememberChoice(true); // also for those who turned them on before this was remembered
+                    showOn();
+                } else {
+                    showOff();
+                }
             } catch (e) {
                 showOff();
             }
@@ -334,6 +350,7 @@ $pushConfigured = \App\Notifications\Channels\DevicePushChannel::configured();
                 contentEncoding: encodings.includes('aes128gcm') ? 'aes128gcm' : 'aesgcm',
             });
             serverEndpoints.push(json.endpoint);
+            rememberChoice(true);
         }
 
         async function turnOff() {
@@ -344,6 +361,7 @@ $pushConfigured = \App\Notifications\Channels\DevicePushChannel::configured();
                 await subscription.unsubscribe();
                 serverEndpoints = serverEndpoints.filter(endpoint => endpoint !== subscription.endpoint);
             }
+            rememberChoice(false);
         }
 
         toggle.addEventListener('click', async () => {
@@ -361,6 +379,12 @@ $pushConfigured = \App\Notifications\Channels\DevicePushChannel::configured();
                 AppActions.clearBusy(toggle);
                 if (render) render();
             }
+        });
+
+        // Turned back on by itself after logging in (partials/device-push-restore).
+        window.addEventListener('device-push-restored', event => {
+            if (event.detail?.endpoint) serverEndpoints.push(event.detail.endpoint);
+            showOn();
         });
 
         init();

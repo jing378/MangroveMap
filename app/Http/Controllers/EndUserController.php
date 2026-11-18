@@ -10,11 +10,13 @@ use App\Models\PlantingRecommendation;
 use App\Models\User;
 use App\Models\UserActivity;
 use App\Notifications\DelineationSubmittedForReview;
+use App\Notifications\DelineationWithdrawn;
 use App\Services\ApprovedCoverageStats;
 use App\Services\BoundaryResolver;
 use App\Services\DelineationObservationRecorder;
 use App\Services\FieldWeatherService;
 use App\Services\MangroveHistoryStats;
+use App\Services\MunicipalityBounds;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -89,6 +91,13 @@ class EndUserController extends Controller
         $data['mangroveHistory'] = config('map.mangrove_history.enabled')
             ? app(MangroveHistoryStats::class)->summary()
             : null;
+        // Municipalities of the province with no approved area yet (needs the imported boundaries).
+        $reported = array_filter(array_column($data['municipalityReport'], 'name'));
+        $data['municipalitiesWithoutAreas'] = array_values(array_diff(
+            array_keys(app(MunicipalityBounds::class)->all()),
+            $reported,
+        ));
+        sort($data['municipalitiesWithoutAreas'], SORT_NATURAL | SORT_FLAG_CASE);
 
         return view('users.dashboard', $data);
     }
@@ -132,7 +141,7 @@ class EndUserController extends Controller
         $data = $this->buildDashboardData();
         $data['page'] = 'map';
         // Where each municipality is, so the year slider's place picker can zoom to it.
-        $data['municipalityBounds'] = app(\App\Services\MunicipalityBounds::class)->all();
+        $data['municipalityBounds'] = app(MunicipalityBounds::class)->all();
         $data['plantingRecommendationsForMap'] = PlantingRecommendation::query()
             ->visibleOnMapTo(Auth::user())
             ->with(['user:id,name', 'delineation:id,name'])
@@ -444,6 +453,10 @@ class EndUserController extends Controller
             'trendValues' => $trendValues,
             // The same trend per municipality, for the place picker on the map's year slider.
             'trendByMunicipality' => $coverage['trend_by_municipality'],
+            // Dashboard report: approved areas per municipality, and every genus with its areas and hectares.
+            'municipalityReport' => $coverage['by_municipality'],
+            'generaCounts' => $coverage['genera'],
+            'generaHectares' => $coverage['genera_ha'],
             'delineations' => $delineations,
             'dashboardDelineations' => $user->isExpert() ? $residentDelineationsForMap : $delineations,
             'approvedDelineations' => $approvedDelineations,
@@ -761,7 +774,28 @@ class EndUserController extends Controller
             ], 422);
         }
 
+        $name = $delineation->name ?: 'Delineation #'.$delineation->id;
+        $status = $delineation->is_rejected ? 'rejected' : 'pending';
+        $rejectedBy = $delineation->rejected_by;
+
         $delineation->delete();
+
+        // Experts learn it is gone: a pending one was waiting for all of them; a rejected one concerns the
+        // expert who rejected it (all experts when that is not recorded).
+        $experts = User::where('role', 'expert')
+            ->when($status === 'rejected' && $rejectedBy, fn ($query) => $query->whereKey($rejectedBy))
+            ->get();
+        if ($experts->isEmpty() && $status === 'rejected') {
+            $experts = User::where('role', 'expert')->get();
+        }
+        $notification = new DelineationWithdrawn($name, $status, $request->user()->name);
+        $experts->each(function (User $expert) use ($notification) {
+            try {
+                $expert->notify($notification);
+            } catch (\Throwable $e) {
+                report($e); // never fails the deletion
+            }
+        });
 
         return response()->json([
             'message' => 'Delineation deleted.',

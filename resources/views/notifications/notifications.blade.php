@@ -52,6 +52,22 @@ if ($currentUser && $currentUser->role === 'admin') {
         margin: 0;
     }
 
+    .notifications-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .mark-all-read-btn.delete-all-btn {
+        color: var(--fg-d04030, #d04030);
+        border-color: var(--bd-e8b8b0, #e8b8b0);
+    }
+
+    .mark-all-read-btn.delete-all-btn:hover {
+        background: var(--bg-fef2f2, #fef2f2);
+        border-color: #d04030;
+    }
+
     .notifications-header h1 {
         font-size: 24px;
         font-weight: 800;
@@ -324,6 +340,79 @@ if ($currentUser && $currentUser->role === 'admin') {
     .pagination-wrap {
         margin-top: 24px;
     }
+
+    /* Phones: the buttons go under the message, side by side, so the text gets the card's full width. */
+    @media (max-width: 640px) {
+        .notifications-description {
+            margin-top: 12px;
+        }
+
+        /* Title and both buttons on one line: the buttons become icons (their names stay as tooltip and
+           for screen readers; each still asks for confirmation). */
+        .notifications-title-row {
+            flex-wrap: nowrap;
+        }
+
+        .notifications-header h1 {
+            font-size: 22px;
+            min-width: 0;
+        }
+
+        .notifications-actions {
+            flex-wrap: nowrap;
+            flex-shrink: 0;
+        }
+
+        .notifications-actions .mark-all-read-btn {
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            font-size: 18px;
+        }
+
+        .notifications-actions .action-label {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        .notification-card {
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 14px;
+        }
+
+        .notification-card-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 16px;
+        }
+
+        .notification-card-body {
+            flex: 1 1 calc(100% - 48px);
+        }
+
+        .notification-card-actions {
+            display: flex;
+            flex: 1 1 100%;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 0;
+        }
+
+        .notification-card-actions > * {
+            flex: 1 1 0;
+            min-width: 120px;
+        }
+
+        .notification-card-actions > .notification-reject-form {
+            flex-basis: 100%;
+        }
+    }
 </style>
 @endsection
 
@@ -332,14 +421,25 @@ if ($currentUser && $currentUser->role === 'admin') {
     <div class="notifications-header">
         <div class="notifications-title-row">
             <h1><i class="bi bi-bell"></i> Notifications</h1>
-            @if($unreadCount > 0)
-            <form action="{{ route('notifications.mark-all-as-read') }}" method="POST" class="mark-all-read-form" data-ajax-mark-all>
-                @csrf
-                <button type="submit" class="mark-all-read-btn">
-                    <i class="bi bi-check-all"></i> Mark all as read
-                </button>
-            </form>
-            @endif
+            <div class="notifications-actions">
+                @if($unreadCount > 0)
+                <form action="{{ route('notifications.mark-all-as-read') }}" method="POST" class="mark-all-read-form" data-ajax-mark-all>
+                    @csrf
+                    <button type="submit" class="mark-all-read-btn" title="Mark all as read" aria-label="Mark all as read">
+                        <i class="bi bi-check-all"></i> <span class="action-label">Mark all as read</span>
+                    </button>
+                </form>
+                @endif
+                @if($notifications->total() > 0)
+                <form action="{{ route('notifications.destroy-all') }}" method="POST" class="mark-all-read-form" data-ajax-delete-all data-total="{{ $notifications->total() }}">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="mark-all-read-btn delete-all-btn" title="Delete all" aria-label="Delete all">
+                        <i class="bi bi-trash"></i> <span class="action-label">Delete all</span>
+                    </button>
+                </form>
+                @endif
+            </div>
         </div>
         <p class="notifications-description">{{ $currentUser?->role === 'admin'
             ? 'Updates that need your attention in MangroveMap. New ones are highlighted until you read them.'
@@ -356,7 +456,7 @@ if ($currentUser && $currentUser->role === 'admin') {
     @endif
 
     @if($notifications->count() > 0)
-    <div class="notifications-list">
+    <div class="notifications-list" id="notificationsList">
         @foreach($notifications as $notification)
         @php
         $icon = $notification->data['icon'] ?? 'bi-info-circle';
@@ -436,7 +536,7 @@ if ($currentUser && $currentUser->role === 'admin') {
         @endforeach
     </div>
 
-    <div class="pagination-wrap">
+    <div class="pagination-wrap" id="notificationsPagination">
         {{ $notifications->links() }}
     </div>
     @else
@@ -609,6 +709,35 @@ if ($currentUser && $currentUser->role === 'admin') {
                         card.classList.remove('unread');
                         card.querySelector('[data-ajax-mark-read]')?.remove();
                     });
+                    updateUnreadUi(0);
+                });
+            });
+        }
+
+        // "Delete all": every notification, on every page of the list.
+        const deleteAllForm = document.querySelector('[data-ajax-delete-all]');
+        if (deleteAllForm) {
+            deleteAllForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const total = Number(deleteAllForm.dataset.total) || 0;
+                await ajaxAction(deleteAllForm, {
+                    confirm: {
+                        title: 'Delete all notifications?',
+                        message: `All ${total} notification${total === 1 ? '' : 's'} are removed, read and unread. This cannot be undone.`,
+                        confirmLabel: 'Delete all',
+                        tone: 'danger',
+                        icon: 'bi-trash',
+                    },
+                    busyLabel: 'Deleting...',
+                    successMessage: 'All notifications deleted',
+                }, () => {
+                    document.getElementById('notificationsList')?.remove();
+                    document.getElementById('notificationsPagination')?.remove();
+                    deleteAllForm.remove();
+                    const empty = document.createElement('div');
+                    empty.className = 'empty-state';
+                    empty.innerHTML = '<i class="bi bi-inbox"></i><p>No notifications yet</p>';
+                    document.querySelector('.notifications-page')?.append(empty);
                     updateUnreadUi(0);
                 });
             });

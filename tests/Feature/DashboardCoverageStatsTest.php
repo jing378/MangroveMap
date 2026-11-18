@@ -87,6 +87,75 @@ class DashboardCoverageStatsTest extends TestCase
         $this->assertSame(array_keys($summary['trend']), array_keys($summary['trend_by_municipality']['Sogod']));
     }
 
+    public function test_report_by_municipality_lists_areas_hectares_and_genera_for_each_place(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $other = User::factory()->create(['role' => 'end_user']);
+        $inPlace = fn (string $name, array $genera) => array_map(
+            fn (array $feature) => $feature + ['location_details' => ['municipality' => ['name' => $name]]],
+            $this->square($genera),
+        );
+        $approved = ['is_approved' => true, 'approved_at' => now()];
+
+        $this->delineation($resident, $approved + ['features' => $inPlace('Sogod', ['Rhizophora', 'Avicennia'])]);
+        $this->delineation($other, $approved + ['features' => $inPlace('Sogod', ['Rhizophora'])]);
+        $bontocArea = $this->delineation($resident, $approved + ['name' => 'Bontoc riverside stand', 'features' => array_map(
+            fn (array $feature) => array_replace_recursive($feature, ['location_details' => ['barangay' => ['name' => 'Union']]]),
+            $inPlace('Bontoc', ['Nypa']),
+        )]);
+        $this->delineation($resident, $approved + ['features' => $this->square(['Sonneratia'])]);
+        // Pending, or approved and later marked rejected: not in the report or its dropdown.
+        $this->delineation($resident, ['features' => $inPlace('Libagon', ['Ceriops'])]);
+        $this->delineation($resident, $approved + ['is_rejected' => true, 'features' => $inPlace('Malitbog', ['Xylocarpus'])]);
+
+        $oneSquare = ApprovedCoverageStats::areaHectares($this->square());
+        $summary = app(ApprovedCoverageStats::class)->summary();
+
+        $this->assertSame(['Sogod', 'Bontoc', null], array_column($summary['by_municipality'], 'name'));
+        [$sogod, $bontoc, $unknown] = $summary['by_municipality'];
+        $this->assertSame(2, $sogod['area_count']);
+        $this->assertSame(2, $sogod['contributors']);
+        $this->assertEqualsWithDelta(2 * $oneSquare, $sogod['area_ha'], 0.01);
+        $this->assertSame(['Rhizophora' => 2, 'Avicennia' => 1], $sogod['genera']);
+        $this->assertEqualsWithDelta(2 * $oneSquare, $sogod['genera_ha']['Rhizophora'], 0.01);
+        $this->assertSame(['Nypa' => 1], $bontoc['genera']);
+        $this->assertCount(2, $sogod['areas']);
+        $this->assertSame([[
+            'id' => $bontocArea->id,
+            'name' => 'Bontoc riverside stand',
+            'barangays' => ['Union'],
+            'area_ha' => round($oneSquare, 2),
+            'genera' => ['Nypa'],
+            'mapped_by' => $resident->name,
+            'approved_at' => $bontocArea->approved_at->toIso8601String(),
+        ]], $bontoc['areas']);
+        $this->assertSame(1, $unknown['area_count']);
+
+        // An area with two genera counts under both.
+        $this->assertEqualsWithDelta(2 * $oneSquare, $summary['genera_ha']['Rhizophora'], 0.01);
+        $this->assertEqualsWithDelta($oneSquare, $summary['genera_ha']['Avicennia'], 0.01);
+        $this->assertArrayNotHasKey('Ceriops', $summary['genera_ha']);
+
+        $this->actingAs($resident)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Mangrove Report')
+            ->assertSee('<option value="Sogod">Sogod</option>', false)
+            ->assertSee('Location not identified')
+            ->assertSee(route('map').'?municipality=Sogod', false)
+            ->assertSee('Mangrove Types (Genus)')
+            ->assertSee('Bakawan')
+            ->assertSee('Bontoc riverside stand')
+            ->assertSee('Union')
+            ->assertSee(route('map').'?delineation='.$bontocArea->id, false)
+            ->assertDontSee('Libagon')
+            ->assertDontSee('Malitbog');
+
+        $expert = User::factory()->create(['role' => 'expert']);
+        $this->actingAs($expert)->get(route('expert.dashboard'))
+            ->assertOk()
+            ->assertSee(route('expert.map').'?municipality=Sogod', false);
+    }
+
     public function test_empty_system_shows_zero_and_no_sample_charts(): void
     {
         $viewer = User::factory()->create(['role' => 'end_user']);

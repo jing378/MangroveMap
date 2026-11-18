@@ -285,16 +285,30 @@
         font-weight: 700;
     }
 
+    /* The notification's link ("View" …): its own line, as a small button, clearly apart from the message. */
     .app-toast-action {
-        display: inline-block;
-        margin-top: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        width: fit-content;
+        margin-top: 10px;
+        padding: 5px 12px;
+        border-radius: 8px;
+        background: var(--bg-edf7f2, #edf7f2);
         color: var(--fg-1e9e62, #1e9e62);
+        font-size: 12px;
         font-weight: 700;
+        line-height: 1.3;
         text-decoration: none;
     }
 
+    .app-toast-action::after {
+        content: '\2192';
+    }
+
     .app-toast-action:hover {
-        text-decoration: underline;
+        background: #1e9e62;
+        color: #ffffff;
     }
 
     .app-toast-close {
@@ -438,7 +452,10 @@
 
         // ---- Busy buttons ----------------------------------------------------------------------
         // Icon-only buttons (no visible text) keep their size: spinner only, the label goes to the tooltip.
-        const isIconOnly = button => !button.textContent.trim();
+        // No text, or its text (.action-label) is hidden on this screen, e.g. icon buttons on phones:
+        // busy then shows just a spinner instead of a label that would not fit.
+        const isIconOnly = button => !button.textContent.trim()
+            || [...button.querySelectorAll('.action-label')].some(label => label.getBoundingClientRect().width <= 1);
 
         function setBusy(button, label = 'Processing...') {
             if (!(button instanceof HTMLElement) || button.dataset.loading === 'true') return;

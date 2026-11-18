@@ -32,7 +32,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->make(ChannelManager::class)->extend('webpush', fn () => new DevicePushChannel);
 
         // Logging out stops this browser's notifications, so the next person on a shared
-        // device doesn't get them. Turning them back on is one tap on My Profile.
+        // device doesn't get them. The browser remembers per account that they were on, and
+        // partials/device-push-restore turns them back on when that user logs in again.
         Event::listen(Logout::class, function (Logout $event) {
             $endpoint = session('push_endpoint');
 

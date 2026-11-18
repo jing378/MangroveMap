@@ -16,15 +16,19 @@ class ApprovedCoverageStats
      *     area_ha: float,
      *     area_count: int,
      *     genera: array<string, int>,
+     *     genera_ha: array<string, float>,
      *     trend: array<int, float>,
      *     trend_by_municipality: array<string, array<int, float>>,
+     *     by_municipality: array<int, array{name: ?string, area_count: int, area_ha: float, contributors: int, genera: array<string, int>, genera_ha: array<string, float>, last_approved_at: ?string}>,
      * }
      */
     public function summary(): array
     {
+        // Expert-approved areas only: never pending ones, and never one also marked rejected.
         $delineations = Delineation::approved()
-            ->with('annualObservations:id,delineation_id,year,coverage_area_ha')
-            ->get(['id', 'features', 'created_at']);
+            ->where('is_rejected', false)
+            ->with(['annualObservations:id,delineation_id,year,coverage_area_ha', 'user:id,name'])
+            ->get(['id', 'user_id', 'name', 'features', 'created_at', 'approved_at']);
 
         $areas = $delineations->mapWithKeys(fn (Delineation $d) => [$d->id => self::areaHectares($d->features ?? [])]);
 
@@ -32,9 +36,98 @@ class ApprovedCoverageStats
             'area_ha' => round($areas->sum(), 2),
             'area_count' => $delineations->count(),
             'genera' => $this->generaCounts($delineations),
+            'genera_ha' => $this->generaHectares($delineations),
             'trend' => $this->trend($delineations, $areas),
             'trend_by_municipality' => $this->trendByMunicipality($delineations, $areas),
+            'by_municipality' => $this->byMunicipality($delineations, $areas),
         ];
+    }
+
+    /**
+     * The dashboard's report: approved areas, hectares, contributors and genera for each municipality,
+     * largest first, each with its approved areas one by one (largest first). Areas not matched to a
+     * barangay come last, as one row with a null name.
+     *
+     * @return array<int, array{name: ?string, area_count: int, area_ha: float, contributors: int, genera: array<string, int>, genera_ha: array<string, float>, last_approved_at: ?string, areas: array<int, array{id: int, name: ?string, barangays: array<int, string>, area_ha: float, genera: array<int, string>, mapped_by: ?string, approved_at: ?string}>}>
+     */
+    private function byMunicipality(Collection $delineations, Collection $areas): array
+    {
+        $rows = $delineations
+            ->groupBy(fn (Delineation $d) => self::municipalityName($d->features ?? []) ?? '')
+            ->map(fn (Collection $group, string $name) => [
+                'name' => $name === '' ? null : $name,
+                'area_count' => $group->count(),
+                'area_ha' => round($group->sum(fn (Delineation $d) => $areas[$d->id]), 2),
+                'contributors' => $group->pluck('user_id')->unique()->count(),
+                'genera' => $this->generaCounts($group),
+                'genera_ha' => $this->generaHectares($group),
+                'last_approved_at' => $group->max(fn (Delineation $d) => $d->approved_at ?? $d->created_at)?->toIso8601String(),
+                'areas' => $group
+                    ->map(fn (Delineation $d) => [
+                        'id' => $d->id,
+                        'name' => $d->name,
+                        'barangays' => self::barangayNames($d->features ?? []),
+                        'area_ha' => round($areas[$d->id], 2),
+                        'genera' => DelineationObservationRecorder::generaPresent(array_filter($d->features ?? [], 'is_array')),
+                        'mapped_by' => $d->user?->name,
+                        'approved_at' => ($d->approved_at ?? $d->created_at)?->toIso8601String(),
+                    ])
+                    ->sortByDesc('area_ha')
+                    ->values()
+                    ->all(),
+            ])
+            ->values();
+
+        return $rows
+            ->sortBy([
+                fn (array $a, array $b) => ($a['name'] === null) <=> ($b['name'] === null),
+                fn (array $a, array $b) => $b['area_ha'] <=> $a['area_ha'],
+                fn (array $a, array $b) => strnatcasecmp((string) $a['name'], (string) $b['name']),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The barangays a delineation's features were matched to, in order, without repeats.
+     *
+     * @return array<int, string>
+     */
+    public static function barangayNames(array $features): array
+    {
+        return collect($features)
+            ->map(fn ($feature) => is_array($feature) ? ($feature['location_details']['barangay']['name'] ?? null) : null)
+            ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+            ->map(fn (string $name) => trim($name))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Hectares of approved area where each genus was recorded, largest first. Each drawn area counts
+     * for every genus recorded in it, so an area with two genera is counted under both.
+     *
+     * @return array<string, float>
+     */
+    private function generaHectares(Collection $delineations): array
+    {
+        $hectares = [];
+        foreach ($delineations as $delineation) {
+            foreach (array_filter($delineation->features ?? [], 'is_array') as $feature) {
+                $genera = DelineationObservationRecorder::generaPresent([$feature]);
+                if ($genera === [] || ! isset($feature['coords'])) {
+                    continue;
+                }
+                $area = self::areaHectares([$feature]);
+                foreach ($genera as $genus) {
+                    $hectares[$genus] = ($hectares[$genus] ?? 0) + $area;
+                }
+            }
+        }
+        arsort($hectares);
+
+        return array_map(fn (float $ha) => round($ha, 2), $hectares);
     }
 
     /**
