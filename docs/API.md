@@ -178,10 +178,13 @@ Large GeoTIFFs are uploaded in pieces so that a dropped connection doesn't resta
 | `GET /drone-imagery` | The user's layers and the published layers they can see |
 | `GET /drone-imagery/{id}` | One layer, with processing status and review details |
 | `GET /drone-imagery/{id}/segmentation` | The AI-detected mangrove areas (GeoJSON) |
-| `POST /drone-imagery/{id}/segmentation` | Run the AI detection again |
-| `PUT /drone-imagery/{id}/segmentation` | Save edited areas. Body: `areas`, `offset` (`east_m`, `north_m`) |
-| `POST /drone-imagery/{id}/segmentation/genus-preview` | Recount the AI genus suggestion for unsaved areas, without saving. Returns `{"genus_suggestion": {...}}` |
-| `GET /drone-imagery/{id}/canopies` · `PUT` | The tree canopies the AI found, and removing wrong ones |
+| `POST /drone-imagery/{id}/segmentation` | Run the AI delineation again (owner). The genus classification follows automatically when it is done |
+| `POST /drone-imagery/{id}/classification` | Run only the genus classification again (owner); the areas stay. `202` with `{"classification_status": "queued"}`, `409` while either AI job runs, before the areas exist or without a genus model. Throttled 10/min |
+| `PUT /drone-imagery/{id}/segmentation` | Save edited areas. Body: `areas`, `offset` (`east_m`, `north_m`). Allowed while the genus is still being classified |
+| `POST /drone-imagery/{id}/segmentation/genus-preview` | Recount the AI genus suggestion for unsaved areas, without saving. Returns `{"genus_suggestion": {...}}`; `409` until the genus classification is ready |
+| `GET /drone-imagery/{id}/canopies` · `PUT` | The tree canopies the genus classification found, and removing wrong ones |
+
+The AI runs in two separate jobs, each with its own status in the layer payloads: the delineation (`segmentation_status`, `segmentation_error`, `segmented_at`) and the genus classification (`classification_status`, `classification_error`, `classified_at`). Each status is `null` (not run), `queued`, `processing`, `ready` or `failed`. `segmentation_stats` also carries the classification's `genus_suggestion`, `canopy_count` and `canopies_by_genus`.
 | `PUT /drone-imagery/{id}/edits` | Save review edits |
 | `POST /drone-imagery/{id}/confirm` | Confirm the review. The first confirm also needs `delineation_details` (genus). Creates the delineation. |
 | `DELETE /drone-imagery/{id}` | Delete your own layer (`{"action": "deleted"}`) or hide someone else's (`{"action": "hidden"}`) |

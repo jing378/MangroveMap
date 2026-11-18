@@ -962,6 +962,37 @@
             font-variant-numeric: tabular-nums;
         }
 
+        .drone-editor-genus-running small {
+            opacity: .8;
+        }
+
+        /* Re-runs only the genus detection (the areas stay). */
+        .drone-editor-genus-rerun {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 6px;
+            padding: 4px 10px;
+            border: 1px solid var(--bd-9fc9e8, #9fc9e8);
+            border-radius: 6px;
+            background: var(--bg-ffffff, #ffffff);
+            color: var(--fg-1d4fa3, #1d4fa3);
+            font: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .drone-editor-genus-rerun:hover:not(:disabled) {
+            border-color: #1d4fa3;
+            background: var(--bg-e3effa, #e3effa);
+        }
+
+        .drone-editor-genus-rerun:disabled {
+            cursor: default;
+            opacity: .6;
+        }
+
         .drone-editor-genus-freshness {
             margin: 0 0 6px;
             padding: 4px 8px;

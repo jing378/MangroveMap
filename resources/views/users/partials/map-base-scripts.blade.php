@@ -180,6 +180,11 @@
       return ['queued', 'processing'].includes(layer.segmentation_status);
     }
 
+    // Genus classification (ClassifyDroneImagery): runs after the mangrove areas are ready.
+    function isDroneClassifying(layer) {
+      return ['queued', 'processing'].includes(layer.classification_status);
+    }
+
     // Upload → prepare preview (ProcessDroneImagery) → AI detection (SegmentDroneImagery) → owner review
     // in the editor → apply edits & tile (FinalizeDroneImagery; AI re-runs on the edited raster) → ready.
     const DRONE_PIPELINE_STEPS = ['Upload', 'Prepare', 'AI detection', 'Review', 'Tile', 'Ready'];
@@ -196,6 +201,7 @@
       if (layer.status === 'finalizing') return { step: 4, label: 'Applying your edits & tiling…' };
       if (layer.status === 'ready' && layer.segmentation_status === 'queued') return { step: 5, label: 'Waiting for AI mangrove detection…' };
       if (layer.status === 'ready' && layer.segmentation_status === 'processing') return { step: 5, label: 'Detecting mangroves with AI…' };
+      if (layer.status === 'ready' && isDroneClassifying(layer)) return { step: 5, label: 'Detecting the genus with AI…' };
       return null;
     }
 
@@ -332,7 +338,7 @@
     const droneEscape = text => String(text ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
     async function fetchDroneCanopies(layer) {
-      const key = `${layer.id}:${layer.segmented_at}`;
+      const key = `${layer.id}:${layer.classified_at}`; // the genus classification has its own runs
       if (droneCanopyCache.has(key)) return droneCanopyCache.get(key);
       const response = await fetch(layer.canopies_url, {
         headers: { Accept: 'application/json' },
@@ -365,7 +371,7 @@
     mainMap.on('zoomend', syncDroneCanopyOutlines);
 
     async function showDroneCanopyOverlay(layer) {
-      const key = `${layer.id}:${layer.segmented_at}`;
+      const key = `${layer.id}:${layer.classified_at}`;
       let overlay = droneCanopyOverlays.get(layer.id);
       if (!overlay || overlay.key !== key) {
         removeDroneCanopyOverlay(layer.id);
@@ -488,7 +494,7 @@
           const canopyToggle = document.createElement('input');
           canopyToggle.type = 'checkbox';
           const canopyOverlay = droneCanopyOverlays.get(layer.id);
-          canopyToggle.checked = Boolean(canopyOverlay && canopyOverlay.key === `${layer.id}:${layer.segmented_at}` && mainMap.hasLayer(canopyOverlay.pins));
+          canopyToggle.checked = Boolean(canopyOverlay && canopyOverlay.key === `${layer.id}:${layer.classified_at}` && mainMap.hasLayer(canopyOverlay.pins));
           canopyToggle.addEventListener('change', async () => {
             if (!canopyToggle.checked) {
               const current = droneCanopyOverlays.get(layer.id);
@@ -661,7 +667,7 @@
           'aria-label',
           layer.is_owner ? `Delete ${layer.name}` : `Remove ${layer.name} from your map`
         );
-        removeButton.disabled = layer.is_owner && (['queued', 'processing', 'finalizing'].includes(layer.status) || isDroneSegmenting(layer));
+        removeButton.disabled = layer.is_owner && (['queued', 'processing', 'finalizing'].includes(layer.status) || isDroneSegmenting(layer) || isDroneClassifying(layer));
         removeButton.title = removeButton.disabled
           ? 'Wait until processing finishes before deleting this layer.'
           : (layer.is_owner ? 'Delete this TIFF layer and its files' : 'Hide this shared layer from your map');
@@ -774,7 +780,8 @@
     function scheduleDroneImageryPoll(layers) {
       clearTimeout(droneSegmentationPollTimer);
       droneSegmentationPollTimer = null;
-      if (!layers.some(dronePipelineStage)) return;
+      // Also while the genus is detected for imagery under review (it has no pipeline stage: the owner can edit).
+      if (!layers.some(layer => dronePipelineStage(layer) || isDroneClassifying(layer))) return;
       const tiling = layers.some(layer => ['queued', 'processing', 'finalizing'].includes(layer.status));
       droneSegmentationPollTimer = setTimeout(() => {
         loadDroneImageryLayers().catch(error => console.error('Unable to refresh drone imagery status.', error));

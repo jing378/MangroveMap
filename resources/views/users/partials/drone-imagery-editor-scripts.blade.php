@@ -112,6 +112,10 @@
       url: editor.segmentation_url,
       loaded: false,
       pollTimer: null,
+      // Genus classification: its own job (ClassifyDroneImagery), run after the areas are ready.
+      classification: editor.classification_status || null,
+      classificationError: editor.classification_error || null,
+      classifying: false, // the re-run request is being sent
     };
     // Every canopy the canopy model pinpointed (canopies_url): clickable shapes coloured by genus, plus pins when
     // zoomed out. Loaded the first time they are shown; a new AI run replaces them.
@@ -121,6 +125,7 @@
     const GENUS_MIN_CONFIDENT_PERCENT = 1; // "Confident" tag only when confident detections cover >= 1% of the area
     const genusPreview = { snapshot: null, suggestion: null, loading: false, failed: false, timer: null, sequence: 0 };
     const aiIsRunning = () => ['queued', 'processing'].includes(ai.status);
+    const classificationIsRunning = () => ['queued', 'processing'].includes(ai.classification);
 
     // ---- Map, base layers and preview ------------------------------------------------------
     const tileOptions = { maxZoom: MAP_MAX_ZOOM };
@@ -853,7 +858,8 @@
         aiStatusElement.textContent = `${all.length} mangrove area${all.length === 1 ? '' : 's'}, ${totalHa.toFixed(2)} ha`
           + (edited ? ' · corrected by you' : ' · as detected by the AI')
           + (unsavedAreas ? ' (not saved yet)' : '')
-          + (canopyCount > 0 ? ` · ${canopyCount.toLocaleString()} canop${canopyCount === 1 ? 'y' : 'ies'} pinpointed` : '');
+          + (classificationIsRunning() ? ' · detecting the genus…'
+            : (canopyCount > 0 ? ` · ${canopyCount.toLocaleString()} canop${canopyCount === 1 ? 'y' : 'ies'} pinpointed` : ''));
       } else if (ai.status === 'ready' && ai.loaded) {
         aiStatusElement.textContent = 'No mangrove areas found. Draw any the AI missed.';
       } else if (ai.status === 'ready') {
@@ -863,22 +869,34 @@
       }
     }
 
+    // Polls while either AI job runs: the areas come first (editable straight away), the genus after.
     function scheduleAiPoll() {
       clearTimeout(ai.pollTimer);
-      if (!aiIsRunning()) return;
+      if (!aiIsRunning() && !classificationIsRunning()) return;
       ai.pollTimer = setTimeout(async () => {
         try {
           const response = await fetch(editor.status_url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
           const body = await response.json();
           if (response.ok) {
+            const wasSegmenting = aiIsRunning();
+            const wasClassifying = classificationIsRunning();
             ai.status = body.segmentation_status;
             ai.stats = body.segmentation_stats;
             ai.error = body.segmentation_error;
             ai.url = body.segmentation_url;
-            if (ai.status === 'ready') {
+            ai.classification = body.classification_status || null;
+            ai.classificationError = body.classification_error || null;
+            if (wasSegmenting && ai.status === 'ready') {
               resetCanopies(body.canopies_url);
               await loadAiAreas();
               await showClassificationFirst();
+            } else if (wasClassifying && !classificationIsRunning()) {
+              resetCanopies(body.canopies_url);
+              scheduleGenusPreview(); // unsaved edits: recount them with the new genus map
+              showMessage(ai.classification === 'ready'
+                ? 'Genus detection finished. See the AI genus suggestion in step 3.'
+                : `Genus detection failed: ${ai.classificationError || 'unknown error'}. You can retry it, or choose the genus yourself.`,
+              ai.classification !== 'ready');
             }
           }
         } catch (error) {
@@ -914,6 +932,7 @@
       });
       if (outcome.status === 'done') {
         ai.status = 'queued';
+        ai.classification = null; // queued again once the new areas are ready
         ai.loaded = false;
         resetCanopies(null);
         setEditing(false);
@@ -1066,7 +1085,7 @@
     // (State: genusPreview, declared next to `ai` because refresh() can run before this point.)
     function genusSuggestionFollowsEdits() {
       return editor.needs_delineation && !editor.read_only && Boolean(editor.genus_preview_url)
-        && ai.status === 'ready' && ai.stats?.genus_suggestion?.recountable === true;
+        && ai.status === 'ready' && ai.classification === 'ready' && ai.stats?.genus_suggestion?.recountable === true;
     }
 
     function scheduleGenusPreview() {
@@ -1119,7 +1138,9 @@
       const edited = Boolean(ai.stats?.edited);
       if (suggestion.recountable === false || (suggestion.recountable === undefined && edited)) {
         return edited
-          ? 'Based on the AI’s original areas. Re-run AI to follow your edits (replaces them).'
+          ? (editor.classify_url
+            ? 'Based on the AI’s original areas. Re-run genus detection to follow your edits.'
+            : 'Based on the AI’s original areas.')
           : null;
       }
       if (areasChanged()) {
@@ -1135,8 +1156,11 @@
     function renderGenusSuggestion() {
       const box = document.getElementById('droneEditorGenusSuggestion');
       if (!box) return;
-      const suggestion = editor.needs_delineation && !editor.read_only ? currentGenusSuggestion() : null;
-      if (!suggestion || ai.status !== 'ready') {
+      const editable = editor.needs_delineation && !editor.read_only;
+      const suggestion = editable ? currentGenusSuggestion() : null;
+      const running = classificationIsRunning();
+      // Without a suggestion the box still offers genus detection when it can run (not run yet, or failed).
+      if (!editable || ai.status !== 'ready' || (!suggestion && !running && !editor.classify_url)) {
         box.hidden = true;
         box.replaceChildren();
         return;
@@ -1144,10 +1168,23 @@
 
       box.replaceChildren();
       box.hidden = false;
-      if (suggestion.error) {
+      if (running) {
         const message = document.createElement('p');
-        message.textContent = 'No AI suggestion for this imagery. Choose the genus yourself.';
+        message.className = 'drone-editor-genus-running';
+        message.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> '
+          + (ai.classification === 'queued' ? 'Waiting for genus detection to start…' : 'AI is detecting the genus…')
+          + '<br><small>You can correct the mangrove areas meanwhile. The suggestion follows them.</small>';
         box.append(message);
+        return;
+      }
+      if (!suggestion || suggestion.error) {
+        const failed = ai.classification === 'failed' || Boolean(suggestion?.error);
+        const message = document.createElement('p');
+        message.textContent = failed
+          ? 'Genus detection failed for this imagery. Retry it, or choose the genus yourself.'
+          : 'The genus has not been detected yet. Run genus detection, or choose it yourself.';
+        box.append(message);
+        appendGenusRerunButton(box, failed ? 'Retry genus detection' : 'Detect genus');
         return;
       }
 
@@ -1234,6 +1271,50 @@
         : 'Still in training: check the imagery before choosing.';
       section.append(note);
       box.append(section);
+      appendGenusRerunButton(box, 'Re-run genus detection');
+    }
+
+    // Re-runs only the genus classification: the mangrove areas (and the owner's corrections) stay.
+    function appendGenusRerunButton(box, label) {
+      if (!editor.classify_url || editor.read_only) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'drone-editor-genus-rerun';
+      button.innerHTML = `<i class="bi bi-arrow-repeat" aria-hidden="true"></i> ${label}`;
+      button.disabled = ai.classifying || aiIsRunning();
+      button.addEventListener('click', rerunGenusDetection);
+      box.append(button);
+    }
+
+    async function rerunGenusDetection(event) {
+      const button = event.currentTarget;
+      if (areasChanged()) {
+        showMessage('Save your area corrections first (Save draft), so the genus is counted inside them.', true);
+        return;
+      }
+      ai.classifying = true;
+      const outcome = await window.AppActions.run({
+        button,
+        busyLabel: 'Starting...',
+        errorMessage: false,
+        task: () => send(editor.classify_url, 'POST', {}),
+      });
+      ai.classifying = false;
+      if (outcome.status === 'done') {
+        ai.classification = 'queued';
+        ai.classificationError = null;
+        if (ai.stats) {
+          delete ai.stats.genus_suggestion;
+          delete ai.stats.canopy_count;
+          delete ai.stats.canopies_by_genus;
+        }
+        resetCanopies(null);
+        scheduleAiPoll();
+        showMessage('Genus detection started. The suggestion appears here when it is done.');
+      } else if (outcome.status === 'failed') {
+        showMessage(outcome.error.message, true);
+      }
+      refresh();
     }
 
     const delineationNameInput = document.getElementById('droneEditorDelineationName');
@@ -1381,6 +1462,7 @@
       ai.status = body.segmentation_status;
       ai.stats = body.segmentation_stats;
       ai.url = body.segmentation_url;
+      ai.classification = body.classification_status || null;
       canopies.url = body.canopies_url || canopies.url; // the canopies are the model's: area edits keep them
       saved.areas = sent;
       if (body.location) editor.location = body.location;

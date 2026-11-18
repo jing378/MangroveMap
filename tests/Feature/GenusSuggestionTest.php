@@ -197,7 +197,7 @@ class GenusSuggestionTest extends TestCase
     {
         Process::fake();
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('mangrove mask or an extent output');
+        $this->expectExceptionMessage('mangrove mask, mangrove areas or an extent output');
 
         app(MangroveSegmentationService::class)->predictGenera($this->file('seg_input.tif'), null, $this->file('best.pt'));
     }
@@ -213,8 +213,11 @@ class GenusSuggestionTest extends TestCase
             'bounds' => $bounds,
             'preview_bounds' => $bounds,
             'segmentation_status' => 'ready',
-            'segmentation_stats' => ['surveyed_area_ha' => 10, 'edited' => false, 'genus_suggestion' => $genusSuggestion],
+            'segmentation_stats' => ['surveyed_area_ha' => 10, 'edited' => false],
             'segmented_at' => now()->subHour(),
+            'classification_status' => 'ready',
+            'classification_stats' => ['genus_suggestion' => $genusSuggestion],
+            'classified_at' => now()->subHour(),
         ]);
         $layer->update([
             'mosaic_path' => "drone-imagery/processed/{$layer->id}/mosaic_3857.tif",
@@ -271,8 +274,9 @@ class GenusSuggestionTest extends TestCase
             ->assertJsonPath('segmentation_stats.genus_suggestion.probabilities.1.genus', 'Sonneratia')
             ->assertJsonPath('segmentation_stats.genus_suggestion.recountable', true);
 
-        $this->assertSame('Avicennia', $layer->fresh()->segmentation_stats['genus_suggestion']['genera'][0]['genus']);
-        $this->assertNotNull($layer->fresh()->segmentation_stats['genus_suggestion']['recounted_at']);
+        $this->assertSame('Avicennia', $layer->fresh()->classification_stats['genus_suggestion']['genera'][0]['genus']);
+        $this->assertNotNull($layer->fresh()->classification_stats['genus_suggestion']['recounted_at']);
+        $this->assertArrayNotHasKey('genus_suggestion', $layer->fresh()->segmentation_stats);
         Process::assertRan(function (PendingProcess $process) use ($layer) {
             $command = $process->command;
 
@@ -300,6 +304,7 @@ class GenusSuggestionTest extends TestCase
         $owner = User::factory()->create(['role' => 'expert']);
         $layer = $this->editableLayer($owner, self::ORIGINAL_SUGGESTION, true);
         $statsBefore = $layer->segmentation_stats;
+        $classificationBefore = $layer->classification_stats;
 
         $this->actingAs($owner)
             ->postJson(route('drone-imagery.segmentation.genus-preview', $layer->id), [
@@ -312,6 +317,7 @@ class GenusSuggestionTest extends TestCase
 
         // Nothing saved: the stored areas and suggestion are untouched.
         $this->assertEquals($statsBefore, $layer->fresh()->segmentation_stats);
+        $this->assertEquals($classificationBefore, $layer->fresh()->classification_stats);
         $this->assertNull($layer->fresh()->segmentation_path);
         Process::assertRan(fn (PendingProcess $process) => is_array($process->command) && in_array('--recount', $process->command, true));
 

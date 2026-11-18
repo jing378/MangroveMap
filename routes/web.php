@@ -240,6 +240,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('layerId')
         ->middleware('throttle:10,1')
         ->name('drone-imagery.segmentation.store');
+    // Re-run only the genus classification (ClassifyDroneImagery); the mangrove areas stay.
+    Route::post('/drone-imagery/{layerId}/classification', [DroneImageryController::class, 'classify'])
+        ->whereNumber('layerId')
+        ->middleware('throttle:10,1')
+        ->name('drone-imagery.classification.store');
     // Review editor: preview the prepared mosaic, mask non-mangrove areas, adjust, then confirm onto the map
     Route::get('/drone-imagery/{layerId}/edit', [DroneImageryController::class, 'edit'])
         ->whereNumber('layerId')

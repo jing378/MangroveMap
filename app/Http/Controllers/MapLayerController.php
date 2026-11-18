@@ -236,8 +236,8 @@ class MapLayerController extends Controller
     {
         abort_if(Auth::user()->role !== 'admin', 403);
 
-        if ($layer->isProcessing() || $layer->isSegmenting()) {
-            return $this->backToImagery('Wait until processing and AI segmentation finish before deleting this layer.', 'error');
+        if ($layer->isProcessing() || $layer->isRunningAi()) {
+            return $this->backToImagery('Wait until processing and AI detection finish before deleting this layer.', 'error');
         }
 
         $name = $layer->name;

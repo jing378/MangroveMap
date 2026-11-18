@@ -165,9 +165,12 @@ class MangroveSegmentationService
 
     /**
      * Runs the canopy model over a raster: the share of each genus inside $maskAbsolutePath (a U-Net mask on
-     * the same pixel grid) or, without a mask, inside the model's own extent (options extent_out).
+     * the same pixel grid), inside options areas, or, without either, inside the model's own extent (options
+     * extent_out).
      *
-     * Options: extent_out (write the model's mangrove extent mask PNG there), canopies_out (write every
+     * Options: areas (JSON file with the mangrove areas to count in: rings [[lng, lat]...], the offset they
+     * were drawn at and the raster position, see ml/predict_genus.py draw_areas; used by ClassifyDroneImagery),
+     * extent_out (write the model's mangrove extent mask PNG there), canopies_out (write every
      * canopy as JSON there; needs bounds = EPSG:3857 corners [ulx, uly, lrx, lry]), pixel_m (ground metres
      * per pixel, for canopy areas), canopy_min_px, close_iterations.
      *
@@ -193,11 +196,12 @@ class MangroveSegmentationService
             throw new RuntimeException('Genus prediction script is missing: '.$script);
         }
 
-        if ($maskAbsolutePath === null && empty($options['extent_out'])) {
-            throw new RuntimeException('The canopy model needs a mangrove mask or an extent output path.');
+        $areasPath = isset($options['areas']) ? (string) $options['areas'] : null;
+        if ($maskAbsolutePath === null && $areasPath === null && empty($options['extent_out'])) {
+            throw new RuntimeException('The canopy model needs a mangrove mask, mangrove areas or an extent output path.');
         }
 
-        foreach (array_filter([$weightsPath, $rasterAbsolutePath, $maskAbsolutePath]) as $path) {
+        foreach (array_filter([$weightsPath, $rasterAbsolutePath, $maskAbsolutePath, $areasPath]) as $path) {
             if (! is_file($path)) {
                 throw new RuntimeException('File not found: '.$path);
             }
@@ -215,6 +219,7 @@ class MangroveSegmentationService
             '--raster',
             $rasterAbsolutePath,
             ...($maskAbsolutePath !== null ? ['--mask', $maskAbsolutePath] : []),
+            ...($maskAbsolutePath === null && $areasPath !== null ? ['--areas', $areasPath] : []),
             '--weights',
             $weightsPath,
             '--size',

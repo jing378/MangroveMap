@@ -432,6 +432,7 @@ def predict_genera(
     canopy_max: int = 3000,
     canopy_conf: float | None = None,
     canopy_overlap: float = 0.5,
+    areas_path: Path | None = None,
 ) -> dict:
     import torch
 
@@ -457,6 +458,13 @@ def predict_genera(
         if mask.shape != target.shape:
             raise RuntimeError(f"Mask size {mask.shape[::-1]} does not match raster size {target.shape[::-1]}.")
         target &= mask
+    elif areas_path is not None:
+        # The current mangrove areas (the AI delineation, or the owner's corrections), drawn onto this raster.
+        areas = json.loads(Path(areas_path).read_text(encoding="utf-8"))
+        if not isinstance(areas.get("raster"), dict):
+            raise RuntimeError("The areas file needs the raster position (raster.bounds, latitude, offset).")
+        target &= draw_areas(areas, areas["raster"], rgb.shape[1], rgb.shape[0])
+    has_target = mask_path is not None or areas_path is not None
 
     canopies: list[dict] | None = [] if canopies_out is not None else None
     if canopies_out is not None and bounds is None:
@@ -468,7 +476,7 @@ def predict_genera(
     class_map, conf_map, tiles = label_raster(
         model, rgb, label_area, size, min(conf, prob_conf), batch_size, device, len(names),
         canopies, canopy_min_px, conf if canopy_conf is None else canopy_conf,
-        target if mask_path is not None else None, canopy_overlap,
+        target if has_target else None, canopy_overlap,
     )
     if labels_out is not None:
         save_label_map(labels_out, class_map, conf_map, valid)
@@ -480,7 +488,7 @@ def predict_genera(
         extent = close_mask(extent, close_iterations) & valid
         extent_out.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(extent.astype(np.uint8), mode="L").save(extent_out, format="PNG", optimize=True)
-        if mask_path is None:
+        if not has_target:
             target = extent
         valid_pixels = int(valid.sum())
         extent_pixels = int(extent.sum())
@@ -504,8 +512,8 @@ def predict_genera(
     })
 
     if canopies is not None and canopies_out is not None:
-        # Only the canopies inside the mangrove extent (the U-Net mask, or this model's own extent): the two
-        # models are combined, so a crown the delineation does not cover is not pinpointed.
+        # Only the canopies inside the mangrove extent (the U-Net mask or areas, or this model's own extent):
+        # a crown the delineation does not cover is not pinpointed.
         canopies = [
             canopy for canopy in canopies
             if target[min(rgb.shape[0] - 1, int(canopy["center"][1])), min(rgb.shape[1] - 1, int(canopy["center"][0]))]
@@ -526,29 +534,23 @@ def predict_genera(
     return result
 
 
-def recount(labels_path: Path, meta_path: Path, areas_path: Path, min_patch_m2: float | None = None) -> dict:
-    """Genus result for the owner's corrected areas, counted from a saved genus map (no model run).
+def draw_areas(areas: dict, raster: dict, width: int, height: int) -> np.ndarray:
+    """Mangrove areas drawn onto a raster's pixel grid (True inside).
 
-    meta: {"classes", "bounds": [ulx, uly, lrx, lry] (EPSG:3857), "latitude", "offset": {east_m, north_m},
-           "conf", "prob_conf"} written when the map was made.
-    areas: {"rings": [[[lng, lat], ...], ...], "offset": {east_m, north_m}} as saved by the editor. The rings
-    sit on the imagery at the saved offset; the map was made at meta.offset, so they are moved back by the
-    difference first.
+    areas: {"rings": [[[lng, lat], ...], ...], "offset": {east_m, north_m}} as saved by the editor; the rings
+    sit on the imagery at that offset.
+    raster: {"bounds": [ulx, uly, lrx, lry] (EPSG:3857), "latitude", "offset": {east_m, north_m}}: where the
+    raster sits and the offset already contained in it. The rings are moved back by the difference first.
     """
     import math
 
-    meta = json.loads(Path(meta_path).read_text(encoding="utf-8"))
-    areas = json.loads(Path(areas_path).read_text(encoding="utf-8"))
-    class_map, conf_map, valid = load_label_map(labels_path)
-    height, width = class_map.shape
-    ulx, uly, lrx, lry = (float(value) for value in meta["bounds"])
-
+    ulx, uly, lrx, lry = (float(value) for value in raster["bounds"])
     # Ground metres to Web Mercator units at the survey latitude.
-    scale = 1 / max(0.01, math.cos(math.radians(float(meta.get("latitude", 0.0)))))
+    scale = 1 / max(0.01, math.cos(math.radians(float(raster.get("latitude", 0.0)))))
     saved_offset = areas.get("offset") or {}
-    map_offset = meta.get("offset") or {}
-    shift_x = (float(saved_offset.get("east_m", 0)) - float(map_offset.get("east_m", 0))) * scale
-    shift_y = (float(saved_offset.get("north_m", 0)) - float(map_offset.get("north_m", 0))) * scale
+    raster_offset = raster.get("offset") or {}
+    shift_x = (float(saved_offset.get("east_m", 0)) - float(raster_offset.get("east_m", 0))) * scale
+    shift_y = (float(saved_offset.get("north_m", 0)) - float(raster_offset.get("north_m", 0))) * scale
 
     radius = 6378137.0
     drawn = Image.new("L", (width, height), 0)
@@ -561,8 +563,26 @@ def recount(labels_path: Path, meta_path: Path, areas_path: Path, min_patch_m2: 
             points.append(((x - ulx) / (lrx - ulx) * width, (uly - y) / (uly - lry) * height))
         if len(points) >= 3:
             pen.polygon(points, fill=255)
+    return np.asarray(drawn) > 0
 
-    target = (np.asarray(drawn) > 0) & valid
+
+def recount(labels_path: Path, meta_path: Path, areas_path: Path, min_patch_m2: float | None = None) -> dict:
+    """Genus result for the owner's corrected areas, counted from a saved genus map (no model run).
+
+    meta: {"classes", "bounds": [ulx, uly, lrx, lry] (EPSG:3857), "latitude", "offset": {east_m, north_m},
+           "conf", "prob_conf"} written when the map was made.
+    areas: {"rings": [[[lng, lat], ...], ...], "offset": {east_m, north_m}} as saved by the editor (see draw_areas).
+    """
+    import math
+
+    meta = json.loads(Path(meta_path).read_text(encoding="utf-8"))
+    areas = json.loads(Path(areas_path).read_text(encoding="utf-8"))
+    class_map, conf_map, valid = load_label_map(labels_path)
+    height, width = class_map.shape
+    ulx, uly, lrx, lry = (float(value) for value in meta["bounds"])
+    scale = 1 / max(0.01, math.cos(math.radians(float(meta.get("latitude", 0.0)))))
+
+    target = draw_areas(areas, meta, width, height) & valid
     # Smallest patch that counts: from the current setting (ground m²) when given, so maps made before the
     # setting existed are filtered too; else what was used when the map was made.
     if min_patch_m2 is not None:
@@ -584,6 +604,8 @@ def main() -> int:
     mode.add_argument("--recount", metavar="AREAS_JSON", help="Count the genus inside edited areas from a saved genus map")
     parser.add_argument("--weights", help="YOLO weights (.pt); needed for --raster and --validate-weights")
     parser.add_argument("--mask", default=None, help="U-Net mangrove mask PNG (same size as the raster)")
+    parser.add_argument("--areas", default=None,
+                        help="Count inside these mangrove areas instead of a mask (JSON: rings, offset, raster position)")
     parser.add_argument("--size", type=int, default=640)
     parser.add_argument("--conf", type=float, default=0.1)
     parser.add_argument("--batch", type=int, default=4)
@@ -643,6 +665,7 @@ def main() -> int:
                 args.canopy_max,
                 args.canopy_conf,
                 args.canopy_overlap,
+                Path(args.areas) if args.areas else None,
             )
     except Exception as exc:
         print(json.dumps({"ok": False, "error": str(exc)}), flush=True)

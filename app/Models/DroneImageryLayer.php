@@ -16,6 +16,12 @@ class DroneImageryLayer extends Model
     /** Edits that leave the mosaic untouched. */
     public const EMPTY_EDITS = ['mode' => 'remove', 'polygons' => [], 'offset' => ['east_m' => 0, 'north_m' => 0]];
 
+    /**
+     * What the genus classification (ClassifyDroneImagery) adds to the AI results, kept in classification_stats.
+     * Payloads still show them inside segmentation_stats (see aiStats), where they lived before the split.
+     */
+    public const CLASSIFICATION_STAT_KEYS = ['genus_suggestion', 'canopy_count', 'canopies_by_genus'];
+
     protected $fillable = [
         'user_id',
         'name',
@@ -42,6 +48,10 @@ class DroneImageryLayer extends Model
         'segmentation_stats',
         'segmentation_error',
         'segmented_at',
+        'classification_status',
+        'classification_stats',
+        'classification_error',
+        'classified_at',
         'delineation_details',
     ];
 
@@ -58,6 +68,8 @@ class DroneImageryLayer extends Model
             'reviewed_at' => 'datetime',
             'segmentation_stats' => 'array',
             'segmented_at' => 'datetime',
+            'classification_stats' => 'array',
+            'classified_at' => 'datetime',
             'delineation_details' => 'array',
         ];
     }
@@ -116,9 +128,41 @@ class DroneImageryLayer extends Model
         };
     }
 
+    /** The AI delineation (SegmentDroneImagery) is queued or running. */
     public function isSegmenting(): bool
     {
         return in_array($this->segmentation_status, ['queued', 'processing'], true);
+    }
+
+    /** The genus classification (ClassifyDroneImagery) is queued or running. */
+    public function isClassifying(): bool
+    {
+        return in_array($this->classification_status, ['queued', 'processing'], true);
+    }
+
+    /** Either AI job is queued or running (the layer's files are in use). */
+    public function isRunningAi(): bool
+    {
+        return $this->isSegmenting() || $this->isClassifying();
+    }
+
+    /**
+     * The AI results as one set of stats: the delineation's ($segmentationStats, default the stored ones)
+     * plus the genus classification's (genus_suggestion, canopy_count, canopies_by_genus). Copies of the
+     * genus results stored with the delineation before the two were split are ignored. Null without a
+     * delineation.
+     */
+    public function aiStats(?array $segmentationStats = null): ?array
+    {
+        $stats = $segmentationStats ?? $this->segmentation_stats;
+        if (! is_array($stats)) {
+            return null;
+        }
+
+        $stats = array_diff_key($stats, array_flip(self::CLASSIFICATION_STAT_KEYS));
+        $classification = is_array($this->classification_stats) ? $this->classification_stats : [];
+
+        return [...$stats, ...array_intersect_key($classification, array_flip(self::CLASSIFICATION_STAT_KEYS))];
     }
 
     /** A GDAL job is queued or running (preparing the preview, or applying edits and tiling). */
@@ -145,8 +189,8 @@ class DroneImageryLayer extends Model
     }
 
     /**
-     * Per-pixel genus map from the last AI run (RGB PNG, see ml/predict_genus.py) and its metadata JSON
-     * (position, offset, thresholds). Used to recount the genus when the owner edits the areas.
+     * Per-pixel genus map from the last genus classification (RGB PNG, see ml/predict_genus.py) and its
+     * metadata JSON (position, offset, thresholds). Used to recount the genus when the owner edits the areas.
      */
     public function genusLabelsPath(): string
     {
@@ -159,8 +203,8 @@ class DroneImageryLayer extends Model
     }
 
     /**
-     * Every canopy the AI pinpointed in the last run (genus, confidence, area, centre and outline), see
-     * ml/predict_genus.py --canopies-out. Shown as pins on the map and in the review editor.
+     * Every canopy the last genus classification pinpointed (genus, confidence, area, centre and outline),
+     * see ml/predict_genus.py --canopies-out. Shown as pins on the map and in the review editor.
      */
     public function canopiesPath(): string
     {

@@ -104,7 +104,11 @@ class DroneImagerySegmentationTest extends TestCase
                 ['genus' => 'Rhizophora', 'confidence' => 0.41, 'area_m2' => 3.1, 'center' => [9.953, 124.053], 'coords' => []],
             ],
         ]));
-        $layer->update(['segmentation_stats' => $layer->segmentation_stats + ['canopy_count' => 2, 'canopies_by_genus' => ['Rhizophora' => 2], 'offset' => ['east_m' => 0, 'north_m' => 0]]]);
+        $layer->update([
+            'classification_status' => 'ready',
+            'classification_stats' => ['canopy_count' => 2, 'canopies_by_genus' => ['Rhizophora' => 2], 'offset' => ['east_m' => 0, 'north_m' => 0]],
+            'classified_at' => now(),
+        ]);
 
         $this->actingAs($expert)
             ->get(route('drone-imagery.index'))
@@ -154,7 +158,10 @@ class DroneImagerySegmentationTest extends TestCase
                 ['genus' => 'Rhizophora', 'confidence' => 0.41, 'center' => [9.953, 124.053]],
             ],
         ]));
-        $layer->update(['segmentation_stats' => $layer->segmentation_stats + ['canopy_count' => 3, 'canopies_by_genus' => ['Rhizophora' => 2, 'Avicennia' => 1]]]);
+        $layer->update([
+            'classification_status' => 'ready',
+            'classification_stats' => ['canopy_count' => 3, 'canopies_by_genus' => ['Rhizophora' => 2, 'Avicennia' => 1]],
+        ]);
         $url = route('drone-imagery.canopies.update', $layer->id);
 
         // Someone else cannot remove them.
@@ -172,13 +179,14 @@ class DroneImagerySegmentationTest extends TestCase
             ->assertJsonPath('by_genus.Avicennia', 0)
             ->assertJsonPath('by_genus.Rhizophora', 1);
 
+        // Kept with the classification's results; the delineation's stats are not touched.
         $layer->refresh();
-        $this->assertSame(1, $layer->segmentation_stats['canopy_count']);
-        $this->assertSame(0, $layer->segmentation_stats['canopies_by_genus']['Avicennia']);
+        $this->assertSame(1, $layer->classification_stats['canopy_count']);
+        $this->assertSame(0, $layer->classification_stats['canopies_by_genus']['Avicennia']);
+        $this->assertArrayNotHasKey('canopy_count', $layer->segmentation_stats);
+        $this->assertSame(1, $layer->aiStats()['canopy_count']);
         $stored = json_decode(Storage::disk('local')->get($layer->canopiesPath()), true);
         $this->assertSame(['Rhizophora'], array_column($stored['canopies'], 'genus'));
-        $extent = json_decode(Storage::disk('local')->get($layer->segmentation_path), true);
-        $this->assertSame(1, $extent['stats']['canopy_count']);
 
         // Sending the same removals again changes nothing.
         $this->actingAs($resident)
@@ -209,8 +217,12 @@ class DroneImagerySegmentationTest extends TestCase
             ->assertJsonCount(0, 'canopies')
             ->assertJsonPath('by_genus.Sonneratia', 0);
 
-        // Not while the AI is running.
-        $layer->update(['segmentation_status' => 'processing']);
+        // Not while either AI job is running.
+        $layer->update(['classification_status' => 'processing']);
+        $this->actingAs($resident)
+            ->putJson($url, ['removed' => [[9.951, 124.051]]])
+            ->assertStatus(409);
+        $layer->update(['classification_status' => 'ready', 'segmentation_status' => 'processing']);
         $this->actingAs($resident)
             ->putJson($url, ['removed' => [[9.951, 124.051]]])
             ->assertStatus(409);
@@ -275,12 +287,17 @@ class DroneImagerySegmentationTest extends TestCase
         Storage::fake('local');
         $owner = User::factory()->create(['role' => 'expert']);
         $layer = $this->readyLayer($owner, ['segmentation_status' => 'processing']);
+        $classifying = $this->readyLayer($owner, ['segmentation_status' => 'ready', 'classification_status' => 'queued']);
 
         $this->actingAs($owner)
             ->delete(route('drone-imagery.destroy', $layer->id))
             ->assertStatus(409);
+        $this->actingAs($owner)
+            ->delete(route('drone-imagery.destroy', $classifying->id))
+            ->assertStatus(409);
 
         $this->assertDatabaseHas('drone_imagery_layers', ['id' => $layer->id]);
+        $this->assertDatabaseHas('drone_imagery_layers', ['id' => $classifying->id]);
     }
 
     public function test_job_marks_segmentation_failed_when_mosaic_is_missing(): void

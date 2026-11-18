@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ClassifyDroneImagery;
 use App\Jobs\FinalizeDroneImagery;
 use App\Jobs\ProcessDroneImagery;
 use App\Jobs\SegmentDroneImagery;
@@ -128,18 +129,30 @@ class DroneImageryController extends Controller
         ];
     }
 
+    /**
+     * The two AI steps: the delineation (segmentation_*, SegmentDroneImagery) and the genus classification
+     * (classification_*, ClassifyDroneImagery). segmentation_stats also carries the classification's
+     * genus_suggestion / canopy_count / canopies_by_genus (DroneImageryLayer::aiStats).
+     */
     private function segmentationPayload(DroneImageryLayer $layer): array
     {
+        $segmented = $layer->segmentation_status === 'ready';
+        $stats = $segmented ? $layer->aiStats() : null;
+
         return [
             'segmentation_status' => $layer->segmentation_status,
-            'segmentation_stats' => $layer->segmentation_status === 'ready' ? $layer->segmentation_stats : null,
+            'segmentation_stats' => $stats,
             'segmentation_error' => $layer->segmentation_status === 'failed' ? $layer->segmentation_error : null,
             'segmented_at' => $layer->segmented_at?->toIso8601String(),
-            'segmentation_url' => $layer->segmentation_status === 'ready'
+            'segmentation_url' => $segmented
                 ? route('drone-imagery.segmentation.show', $layer->id)
                 : null,
-            // Every canopy the AI pinpointed (null when the canopy model did not run).
-            'canopies_url' => $layer->segmentation_status === 'ready' && ($layer->segmentation_stats['canopy_count'] ?? null) !== null
+            // Genus classification: null = not run (or no genus model), queued | processing | ready | failed.
+            'classification_status' => $segmented ? $layer->classification_status : null,
+            'classification_error' => $segmented && $layer->classification_status === 'failed' ? $layer->classification_error : null,
+            'classified_at' => $segmented ? $layer->classified_at?->toIso8601String() : null,
+            // Every canopy the classification pinpointed (null when it has not run).
+            'canopies_url' => $segmented && $layer->classification_status === 'ready' && ($stats['canopy_count'] ?? null) !== null
                 ? route('drone-imagery.canopies.show', $layer->id)
                 : null,
         ];
@@ -162,15 +175,15 @@ class DroneImageryController extends Controller
             'id' => $layer->id,
             'name' => $layer->name,
             'features' => $result['features'] ?? [],
-            'stats' => $result['stats'] ?? $layer->segmentation_stats,
+            'stats' => $layer->aiStats(is_array($result['stats'] ?? null) ? $result['stats'] : null),
             'segmented_at' => $layer->segmented_at?->toIso8601String(),
         ]);
     }
 
     /**
-     * Every canopy the AI pinpointed on this imagery (genus, confidence, ground area, centre and outline in
-     * [lat, lng]), from the last AI run. Same visibility as the extent. The owner's area corrections do not
-     * change them: they are what the model saw.
+     * Every canopy the genus classification pinpointed on this imagery (genus, confidence, ground area, centre
+     * and outline in [lat, lng]), from its last run. Same visibility as the extent. The owner's area
+     * corrections do not change them: they are what the model saw.
      */
     public function canopies(Request $request, int $layerId): JsonResponse
     {
@@ -193,17 +206,26 @@ class DroneImageryController extends Controller
             'kept' => (int) ($result['kept'] ?? 0),
             'by_genus' => (array) ($result['by_genus'] ?? []),
             'canopies' => array_values((array) ($result['canopies'] ?? [])),
-            // Position nudge the canopies were placed at (same as the extent's), for the review editor.
-            'offset' => $layer->segmentation_stats['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'],
+            // Position nudge the canopies were placed at, for the review editor.
+            'offset' => $this->canopiesOffset($layer),
             'segmented_at' => $layer->segmented_at?->toIso8601String(),
+            'classified_at' => $layer->classified_at?->toIso8601String(),
         ]);
+    }
+
+    /** Offset contained in the canopy coordinates: the raster's at classification (older runs: the extent's). */
+    private function canopiesOffset(DroneImageryLayer $layer): array
+    {
+        return $layer->classification_stats['offset']
+            ?? $layer->segmentation_stats['offset']
+            ?? DroneImageryLayer::EMPTY_EDITS['offset'];
     }
 
     /**
      * The owner's canopy corrections (review editor): Save draft / Confirm sends the centres of the pins the
      * owner removed, like the mangrove area corrections. A centre that matches no canopy (already removed)
-     * is ignored. The counts in canopies.json, segmentation_stats and ai_extent.json follow. The genus
-     * suggestion is unchanged: it is counted from the genus map, not from the pins.
+     * is ignored. The counts in canopies.json and classification_stats follow. The genus suggestion is
+     * unchanged: it is counted from the genus map, not from the pins.
      */
     public function updateCanopies(Request $request, int $layerId): JsonResponse
     {
@@ -212,7 +234,7 @@ class DroneImageryController extends Controller
             return $layer;
         }
 
-        if ($layer->isSegmenting() || $layer->segmentation_status !== 'ready') {
+        if ($layer->isRunningAi() || $layer->segmentation_status !== 'ready' || $layer->classification_status !== 'ready') {
             return response()->json([
                 'message' => 'Wait until AI detection finishes before removing canopies.',
             ], 409);
@@ -272,23 +294,11 @@ class DroneImageryController extends Controller
         $result['by_genus'] = $byGenus;
         $disk->put($layer->canopiesPath(), json_encode($result, JSON_UNESCAPED_SLASHES));
 
-        $stats = [
-            ...($layer->segmentation_stats ?? []),
+        $layer->update(['classification_stats' => [
+            ...($layer->classification_stats ?? []),
             'canopy_count' => $result['count'],
             'canopies_by_genus' => $byGenus,
-        ];
-        $layer->update(['segmentation_stats' => $stats]);
-
-        // The editor reads the AI stats from ai_extent.json: keep its canopy counts in step.
-        $extentPath = "drone-imagery/processed/{$layer->id}/ai_extent.json";
-        if ($layer->segmentation_path === $extentPath && $disk->exists($extentPath)) {
-            $extent = json_decode((string) $disk->get($extentPath), true);
-            if (is_array($extent) && is_array($extent['stats'] ?? null)) {
-                $extent['stats']['canopy_count'] = $result['count'];
-                $extent['stats']['canopies_by_genus'] = $byGenus;
-                $disk->put($extentPath, json_encode($extent, JSON_UNESCAPED_SLASHES));
-            }
-        }
+        ]]);
 
         return response()->json([
             'id' => $layer->id,
@@ -296,9 +306,9 @@ class DroneImageryController extends Controller
             'kept' => $result['kept'],
             'by_genus' => $byGenus,
             'canopies' => $canopies,
-            'offset' => $stats['offset'] ?? DroneImageryLayer::EMPTY_EDITS['offset'],
+            'offset' => $this->canopiesOffset($layer),
             'segmented_at' => $layer->segmented_at?->toIso8601String(),
-            'stats' => $stats,
+            'stats' => $layer->aiStats(),
         ]);
     }
 
@@ -409,6 +419,56 @@ class DroneImageryController extends Controller
         return response()->json([
             'id' => $layer->id,
             'segmentation_status' => 'queued',
+        ], 202);
+    }
+
+    /**
+     * Queue (or re-run) only the genus classification for the owner's layer: the mangrove areas, AI-drawn or
+     * corrected, stay as they are and the genus is counted inside them (ClassifyDroneImagery).
+     */
+    public function classify(Request $request, int $layerId, MangroveSegmentationService $segmentation): JsonResponse
+    {
+        $layer = DroneImageryLayer::query()
+            ->where('user_id', $request->user()->id)
+            ->findOrFail($layerId);
+
+        if (! in_array($layer->status, ['ready', 'awaiting_review'], true)) {
+            return response()->json([
+                'message' => 'Wait until the imagery has finished processing before detecting the genus.',
+            ], 409);
+        }
+
+        if ($layer->isApproved()) {
+            return response()->json(['message' => self::APPROVED_VIEW_ONLY_MESSAGE], 409);
+        }
+
+        if ($layer->isRunningAi()) {
+            return response()->json([
+                'message' => 'Wait until AI detection finishes.',
+            ], 409);
+        }
+
+        if ($layer->segmentation_status !== 'ready') {
+            return response()->json([
+                'message' => 'Detect or draw the mangrove areas before detecting the genus.',
+            ], 409);
+        }
+
+        if ($segmentation->genusWeightsPath() === null) {
+            return response()->json([
+                'message' => 'No genus model is installed. An admin can upload one on the AI Models page.',
+            ], 409);
+        }
+
+        if (! ClassifyDroneImagery::queueFor($layer)) {
+            return response()->json([
+                'message' => 'Genus detection could not be queued.',
+            ], 503);
+        }
+
+        return response()->json([
+            'id' => $layer->id,
+            'classification_status' => 'queued',
         ], 202);
     }
 
@@ -557,6 +617,8 @@ class DroneImageryController extends Controller
                 'upload_url' => route('drone-imagery.store'),
                 'uploads_url' => url('/drone-imagery/uploads'),
                 'upload_parallel' => max(1, min(8, (int) config('gdal.upload_parallel', 4))),
+                // Files of one batch farther apart than this are blocked before upload (and by ProcessDroneImagery).
+                'batch_max_gap_m' => (float) config('gdal.batch_max_gap_m', 1000),
                 'layer_url' => url('/drone-imagery'),
                 // Residents' imagery reaches the map only once an expert approves its delineation.
                 'needs_expert_review' => ! $viewer->isExpert(),
@@ -599,6 +661,10 @@ class DroneImageryController extends Controller
                 'segmentation_update_url' => route('drone-imagery.segmentation.update', $layer->id),
                 'genus_preview_url' => route('drone-imagery.segmentation.genus-preview', $layer->id),
                 'segment_url' => route('drone-imagery.segmentation.store', $layer->id),
+                // Re-run only the genus classification (the areas stay); null without a genus model.
+                'classify_url' => app(MangroveSegmentationService::class)->genusWeightsPath() !== null
+                    ? route('drone-imagery.classification.store', $layer->id)
+                    : null,
                 'save_url' => route('drone-imagery.edits.update', $layer->id),
                 'confirm_url' => route('drone-imagery.confirm', $layer->id),
                 'back_url' => route('drone-imagery.page', ['layer' => $layer->id]),
@@ -617,8 +683,6 @@ class DroneImageryController extends Controller
                 'needs_expert_review' => ! $viewer->isExpert(),
                 'max_delineation_areas' => DroneImageryDelineationPublisher::MAX_AREAS,
             ],
-                // Files of one batch farther apart than this are blocked before upload (and by ProcessDroneImagery).
-                'batch_max_gap_m' => (float) config('gdal.batch_max_gap_m', 1000),
         ]);
     }
 
@@ -1066,7 +1130,8 @@ class DroneImageryController extends Controller
             $features[] = ['type' => 'area', 'coords' => array_map(fn (array $point) => [$point[1], $point[0]], $ring)];
         }
 
-        $previous = $layer->segmentation_stats ?? [];
+        // Genus results from before the classification got its own column are dropped from the areas' stats.
+        $previous = array_diff_key($layer->segmentation_stats ?? [], array_flip(DroneImageryLayer::CLASSIFICATION_STAT_KEYS));
         $areaHa = round($areaM2 / 10000, 3);
         $surveyedHa = (float) ($previous['surveyed_area_ha'] ?? 0);
         $stats = [
@@ -1083,10 +1148,12 @@ class DroneImageryController extends Controller
             'edited' => true,
             'edited_at' => now()->toIso8601String(),
         ];
-        // The genus suggestion follows the corrected areas (recounted from the genus map of the last AI run).
-        if (array_key_exists('genus_suggestion', $previous)) {
-            $stats['genus_suggestion'] = $this->recountedGenusSuggestion(
-                $layer, $rings, $stats['offset'], $previous['genus_suggestion'], $segmentation
+        // The genus suggestion follows the corrected areas (recounted from the genus map of the last
+        // classification). While the classification still runs, it counts inside these areas when it finishes.
+        $classification = $layer->classification_stats;
+        if ($layer->classification_status === 'ready' && is_array($classification) && array_key_exists('genus_suggestion', $classification)) {
+            $classification['genus_suggestion'] = $this->recountedGenusSuggestion(
+                $layer, $rings, $stats['offset'], $classification['genus_suggestion'], $segmentation
             );
         }
 
@@ -1098,6 +1165,7 @@ class DroneImageryController extends Controller
             'segmentation_stats' => $stats,
             'segmentation_error' => null,
             'segmented_at' => now(), // also the cache key the map uses for the AI extent
+            ...($layer->classification_status === 'ready' ? ['classification_stats' => $classification] : []),
         ]);
 
         return response()->json([
@@ -1119,9 +1187,9 @@ class DroneImageryController extends Controller
             return $layer;
         }
 
-        if ($layer->isSegmenting()) {
+        if ($layer->isRunningAi() || $layer->classification_status !== 'ready') {
             return response()->json([
-                'message' => 'Wait until AI detection finishes.',
+                'message' => 'Wait until genus detection finishes.',
             ], 409);
         }
 
@@ -1132,7 +1200,7 @@ class DroneImageryController extends Controller
             'offset.north_m' => ['required', 'numeric', 'between:-'.self::MAX_OFFSET_METRES.','.self::MAX_OFFSET_METRES],
         ]);
         $rings = $this->validatedRings($validated['areas'], $layer, 'areas');
-        $previous = $layer->segmentation_stats['genus_suggestion'] ?? null;
+        $previous = $layer->classification_stats['genus_suggestion'] ?? null;
 
         $suggestion = $this->recountedGenusSuggestion($layer, $rings, [
             'east_m' => round((float) $validated['offset']['east_m'], 2),
@@ -1148,8 +1216,9 @@ class DroneImageryController extends Controller
 
     /**
      * The genus suggestion for the owner's corrected areas: counted from the per-pixel genus map that the
-     * last AI run saved (ml/predict_genus.py --recount, no model run). Without a map (older results, no genus
-     * model) or when the recount fails, the previous suggestion is kept and marked as not following the edits.
+     * last classification saved (ml/predict_genus.py --recount, no model run). Without a map (older results,
+     * no genus model) or when the recount fails, the previous suggestion is kept and marked as not following
+     * the edits.
      *
      * @param  array<int, array<int, array{0: float, 1: float}>>  $lngLatRings
      * @param  array{east_m: float, north_m: float}  $offset
@@ -1237,9 +1306,9 @@ class DroneImageryController extends Controller
             ], 409);
         }
 
-        if ($layer->isSegmenting()) {
+        if ($layer->isRunningAi()) {
             return response()->json([
-                'message' => 'Wait until AI segmentation finishes before deleting this layer.',
+                'message' => 'Wait until AI detection finishes before deleting this layer.',
             ], 409);
         }
 
