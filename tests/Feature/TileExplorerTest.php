@@ -188,57 +188,60 @@ class TileExplorerTest extends TestCase
         $this->get(route('tile-explorer.tiles.image', [$set->id, 'r000_c000', 'thumb']))->assertNotFound();
     }
 
-    public function test_download_zips_only_the_selected_tiles_with_an_index(): void
+    public function test_one_selected_tile_downloads_as_its_geotiff_without_a_zip(): void
     {
         $owner = User::factory()->create();
         $set = $this->readySet($this->source($owner));
 
         $response = $this->actingAs($owner)->post(route('tile-explorer.sets.download', $set->id), [
             'ids' => 'r000_c000',
-            'format' => 'both',
+            'token' => 'abc123def456',
+        ]);
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'image/tiff')
+            ->assertCookie(TileExplorerController::DOWNLOAD_COOKIE, 'abc123def456', false);
+        $this->assertStringContainsString('brgy-san-isidro-march_r000_c000.tif', $response->headers->get('Content-Disposition'));
+        $this->assertSame('tif-r000_c000', file_get_contents($response->baseResponse->getFile()->getPathname()));
+    }
+
+    public function test_several_selected_tiles_download_as_a_zip_of_only_their_geotiffs(): void
+    {
+        $owner = User::factory()->create();
+        $set = $this->readySet($this->source($owner));
+
+        $response = $this->actingAs($owner)->post(route('tile-explorer.sets.download', $set->id), [
+            'ids' => ['r000_c000', 'r000_c001'],
             'token' => 'abc123def456',
         ]);
 
         $response->assertOk()
             ->assertHeader('Content-Type', 'application/zip')
             ->assertCookie(TileExplorerController::DOWNLOAD_COOKIE, 'abc123def456', false);
-        $this->assertStringContainsString('brgy-san-isidro-march_640px_1-tiles.zip', $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('brgy-san-isidro-march_640px_2-tiles.zip', $response->headers->get('Content-Disposition'));
 
         $zip = $response->streamedContent();
         $this->assertStringStartsWith("PK\x03\x04", $zip);
-        foreach ([
-            'brgy-san-isidro-march_640px/geotiff/brgy-san-isidro-march_r000_c000.tif',
-            'brgy-san-isidro-march_640px/jpeg/brgy-san-isidro-march_r000_c000.jpg',
-            'brgy-san-isidro-march_640px/jpeg/brgy-san-isidro-march_r000_c000.wld',
-            'brgy-san-isidro-march_640px/tiles.csv',
-            'brgy-san-isidro-march_640px/tiles.geojson',
-            'brgy-san-isidro-march_640px/README.txt',
-            'tif-r000_c000',
-        ] as $expected) {
+        foreach (['brgy-san-isidro-march_r000_c000.tif', 'brgy-san-isidro-march_r000_c001.tif', 'tif-r000_c000', 'tif-r000_c001'] as $expected) {
             $this->assertStringContainsString($expected, $zip);
         }
-        $this->assertStringNotContainsString('r000_c001', $zip);
+        foreach (['.jpg', '.wld', 'tiles.csv', 'tiles.geojson', 'README', 'geotiff/'] as $unexpected) {
+            $this->assertStringNotContainsString($unexpected, $zip);
+        }
     }
 
-    public function test_download_in_one_format_and_rejects_bad_requests(): void
+    public function test_download_rejects_bad_requests_and_other_users(): void
     {
         $owner = User::factory()->create();
         $set = $this->readySet($this->source($owner));
 
-        $zip = $this->actingAs($owner)->post(route('tile-explorer.sets.download', $set->id), [
-            'ids' => ['r000_c000', 'r000_c001'],
-            'format' => 'jpg',
-        ])->assertOk()->streamedContent();
-        $this->assertStringContainsString('jpeg/brgy-san-isidro-march_r000_c001.jpg', $zip);
-        $this->assertStringNotContainsString('.tif', $zip);
-
-        $this->postJson(route('tile-explorer.sets.download', $set->id), ['ids' => '../x', 'format' => 'jpg'])
+        $this->actingAs($owner)->postJson(route('tile-explorer.sets.download', $set->id), ['ids' => '../x'])
             ->assertUnprocessable();
-        $this->postJson(route('tile-explorer.sets.download', $set->id), ['ids' => 'r000_c000', 'format' => 'png'])
+        $this->postJson(route('tile-explorer.sets.download', $set->id), ['ids' => 'r009_c009'])
             ->assertUnprocessable();
 
         $this->actingAs(User::factory()->create())
-            ->postJson(route('tile-explorer.sets.download', $set->id), ['ids' => 'r000_c000', 'format' => 'jpg'])
+            ->postJson(route('tile-explorer.sets.download', $set->id), ['ids' => 'r000_c000'])
             ->assertNotFound();
     }
 

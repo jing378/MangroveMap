@@ -23,8 +23,8 @@ use ZipStream\ZipStream;
 
 /**
  * Tile Explorer (sidebar): upload a GeoTIFF (chunked, DroneImageryUploadController with purpose "tiles"),
- * cut it into equal tiles, browse them with their AI mangrove coverage and download a selection as one ZIP
- * (GeoTIFF and/or JPEG + world file, plus an index). Uploads here are private to the uploader and never
+ * cut it into equal tiles, browse them with their AI mangrove coverage and download a selection as GeoTIFFs
+ * (one tile as its .tif, several as a ZIP of .tif files). Uploads here are private to the uploader and never
  * become drone surveys, map layers or delineations.
  */
 class TileExplorerController extends Controller
@@ -161,7 +161,10 @@ class TileExplorerController extends Controller
     }
 
     /** Streams the selected tiles as one ZIP, written while it is sent (no temp file, constant memory). */
-    public function download(Request $request, int $tileSetId): StreamedResponse
+    /**
+     * The selected tiles as GeoTIFFs: one tile is sent as its .tif, two or more as a ZIP holding only the .tif files.
+     */
+    public function download(Request $request, int $tileSetId): BinaryFileResponse|StreamedResponse
     {
         $tileSet = $this->tileSet($request, $tileSetId);
         $ids = $request->input('ids');
@@ -171,57 +174,49 @@ class TileExplorerController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['string', 'regex:'.self::TILE_ID_PATTERN],
-            'format' => ['required', 'in:tif,jpg,both'],
             'token' => ['nullable', 'string', 'regex:/^[A-Za-z0-9]{8,64}$/'],
         ]);
 
         $manifest = $tileSet->status === 'ready' ? $tileSet->manifest() : null;
         abort_if($manifest === null, 409, 'These tiles are not ready.');
 
+        $root = Storage::disk('local')->path($tileSet->directory());
         $wanted = array_flip($validated['ids']);
-        $tiles = array_values(array_filter($manifest['tiles'], fn (array $tile) => isset($wanted[$tile['id']])));
+        $tiles = array_values(array_filter(
+            $manifest['tiles'],
+            fn (array $tile) => isset($wanted[$tile['id']]) && is_file("{$root}/tif/{$tile['id']}.tif"),
+        ));
         abort_if($tiles === [], 422, 'None of the selected tiles exist any more. Reload the page.');
 
-        $source = $tileSet->source;
-        $folder = GenerateTiles::filePrefix($source)."_{$tileSet->tile_size}px";
-        $format = $validated['format'];
-        $root = Storage::disk('local')->path($tileSet->directory());
-        $threshold = GenerateTiles::mangroveThreshold();
-
-        $response = new StreamedResponse(function () use ($tiles, $format, $root, $folder, $manifest, $source, $tileSet, $threshold) {
-            set_time_limit(0);
-            $zip = new ZipStream(
-                sendHttpHeaders: false,
-                defaultCompressionMethod: CompressionMethod::STORE, // JPEG / DEFLATE GeoTIFF: already compressed
-                defaultEnableZeroHeader: true,
-                enableZip64: true,
-            );
-
-            foreach ($tiles as $tile) {
-                $id = $tile['id'];
-                if ($format !== 'jpg' && is_file("{$root}/tif/{$id}.tif")) {
-                    $zip->addFileFromPath("{$folder}/geotiff/{$tile['name']}.tif", "{$root}/tif/{$id}.tif");
+        if (count($tiles) === 1) {
+            $tile = $tiles[0];
+            $response = new BinaryFileResponse("{$root}/tif/{$tile['id']}.tif", 200, [
+                'Content-Type' => 'image/tiff',
+                'Cache-Control' => 'no-store',
+            ]);
+            $response->setContentDisposition('attachment', "{$tile['name']}.tif");
+        } else {
+            $response = new StreamedResponse(function () use ($tiles, $root) {
+                set_time_limit(0);
+                $zip = new ZipStream(
+                    sendHttpHeaders: false,
+                    defaultCompressionMethod: CompressionMethod::STORE, // DEFLATE GeoTIFFs: already compressed
+                    defaultEnableZeroHeader: true,
+                    enableZip64: true,
+                );
+                foreach ($tiles as $tile) {
+                    $zip->addFileFromPath("{$tile['name']}.tif", "{$root}/tif/{$tile['id']}.tif");
                 }
-                if ($format !== 'tif' && is_file("{$root}/jpg/{$id}.jpg")) {
-                    $zip->addFileFromPath("{$folder}/jpeg/{$tile['name']}.jpg", "{$root}/jpg/{$id}.jpg");
-                    foreach (['.wld', '.jpg.aux.xml'] as $sidecar) {
-                        if (is_file("{$root}/jpg/{$id}{$sidecar}")) {
-                            $zip->addFileFromPath("{$folder}/jpeg/{$tile['name']}{$sidecar}", "{$root}/jpg/{$id}{$sidecar}");
-                        }
-                    }
-                }
-            }
+                $zip->finish();
+            });
 
-            $zip->addFile("{$folder}/tiles.csv", $this->indexCsv($tiles, $threshold), compressionMethod: CompressionMethod::DEFLATE);
-            $zip->addFile("{$folder}/tiles.geojson", $this->indexGeoJson($tiles, $threshold), compressionMethod: CompressionMethod::DEFLATE);
-            $zip->addFile("{$folder}/README.txt", $this->readme($source, $tileSet, $manifest, count($tiles), $threshold), compressionMethod: CompressionMethod::DEFLATE);
-            $zip->finish();
-        });
+            $folder = GenerateTiles::filePrefix($tileSet->source)."_{$tileSet->tile_size}px";
+            $response->headers->set('Content-Type', 'application/zip');
+            $response->headers->set('Content-Disposition', $response->headers->makeDisposition('attachment', "{$folder}_".count($tiles).'-tiles.zip'));
+            $response->headers->set('X-Accel-Buffering', 'no');
+            $response->headers->set('Cache-Control', 'no-store');
+        }
 
-        $response->headers->set('Content-Type', 'application/zip');
-        $response->headers->set('Content-Disposition', $response->headers->makeDisposition('attachment', "{$folder}_".count($tiles).'-tiles.zip'));
-        $response->headers->set('X-Accel-Buffering', 'no');
-        $response->headers->set('Cache-Control', 'no-store');
         if (! empty($validated['token'])) {
             $response->headers->setCookie(Cookie::create(self::DOWNLOAD_COOKIE, $validated['token'], 0, '/', null, $request->isSecure(), false, false, Cookie::SAMESITE_LAX));
         }
@@ -282,73 +277,6 @@ class TileExplorerController extends Controller
         return str_contains((string) $error, 'weights are missing') || str_contains((string) $error, 'Python interpreter')
             ? 'The mangrove AI model is not installed on the server.'
             : 'The AI could not check this image for mangroves.';
-    }
-
-    private function indexCsv(array $tiles, float $threshold): string
-    {
-        $lines = ['file,row,column,mangrove,mangrove_percent,imagery_percent,west,south,east,north'];
-        foreach ($tiles as $tile) {
-            $mangrove = $tile['mangrove'] ?? null;
-            [$west, $south, $east, $north] = $tile['bounds'];
-            $lines[] = implode(',', [
-                $tile['name'], $tile['row'], $tile['col'],
-                $mangrove === null ? '' : ($mangrove >= $threshold ? 'yes' : 'no'),
-                $mangrove ?? '', $tile['valid'], $west, $south, $east, $north,
-            ]);
-        }
-
-        return implode("\n", $lines)."\n";
-    }
-
-    private function indexGeoJson(array $tiles, float $threshold): string
-    {
-        return json_encode([
-            'type' => 'FeatureCollection',
-            'features' => array_map(function (array $tile) use ($threshold) {
-                [$west, $south, $east, $north] = $tile['bounds'];
-                $mangrove = $tile['mangrove'] ?? null;
-
-                return [
-                    'type' => 'Feature',
-                    'properties' => [
-                        'file' => $tile['name'],
-                        'row' => $tile['row'],
-                        'column' => $tile['col'],
-                        'mangrove' => $mangrove === null ? null : $mangrove >= $threshold,
-                        'mangrove_percent' => $mangrove,
-                        'imagery_percent' => $tile['valid'],
-                    ],
-                    'geometry' => [
-                        'type' => 'Polygon',
-                        'coordinates' => [[[$west, $south], [$east, $south], [$east, $north], [$west, $north], [$west, $south]]],
-                    ],
-                ];
-            }, $tiles),
-        ], JSON_UNESCAPED_SLASHES);
-    }
-
-    private function readme(TileSource $source, TileSet $tileSet, array $manifest, int $count, float $threshold): string
-    {
-        $pixel = isset($manifest['pixel_size']) ? round((float) $manifest['pixel_size'], 6).' map units' : 'unknown';
-
-        return implode("\n", [
-            "MangroveMap tiles: {$source->name} ({$source->original_name})",
-            '',
-            "{$count} tiles of {$tileSet->tile_size} x {$tileSet->tile_size} px, cut from the uploaded GeoTIFF.",
-            'Coordinate system: '.($manifest['crs'] ?? 'unknown')." (same as the uploaded file), pixel size {$pixel}.",
-            'File names end in _r<row>_c<column> (row 0 = top, column 0 = left of the image).',
-            '',
-            'geotiff/  GeoTIFF tiles (RGB + transparency) with their coordinates and coordinate system.',
-            'jpeg/     JPEG tiles (RGB, e.g. for Roboflow). The .wld world file and .jpg.aux.xml keep their',
-            '          position for GIS software. Areas outside the image are black.',
-            'tiles.csv / tiles.geojson  every tile with its mangrove coverage and WGS84 footprint.',
-            '',
-            "\"mangrove = yes\" means the MangroveMap AI found mangroves in at least {$threshold}% of the tile's imagery.",
-            'Empty when the AI could not check the image.',
-            '',
-            'Downloaded '.now()->toDateTimeString().'.',
-            '',
-        ]);
     }
 
     private function source(Request $request, int $sourceId): TileSource

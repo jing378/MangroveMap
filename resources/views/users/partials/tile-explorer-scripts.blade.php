@@ -46,7 +46,6 @@
     const selbar = $('txSelbar');
     const selectMangroveButton = $('txSelectMangrove');
     const clearButton = $('txClear');
-    const formatSelect = $('txFormat');
     const downloadButton = $('txDownload');
     const dialog = $('txDialog');
 
@@ -118,9 +117,57 @@
     function describeFile() {
       const file = chosenFile();
       const problem = file ? uploadProblem(file) : null;
-      fileInfo.textContent = file ? `${file.name} (${formatBytes(file.size)})` : '';
+      renderChosenFile();
       setUploadMessage(problem || '', Boolean(problem));
       uploadButton.disabled = uploading || !file || Boolean(problem);
+    }
+
+    // Set (or clear, with null) the chosen GeoTIFF. One file per upload, so choosing another replaces it.
+    function setChosenFile(file) {
+      const transfer = new DataTransfer();
+      if (file) transfer.items.add(file);
+      fileInput.files = transfer.files;
+      describeFile();
+    }
+
+    // The chosen file with its size, a remove button and Clear, like the Drone Upload page.
+    function renderChosenFile() {
+      const file = chosenFile();
+      fileInfo.replaceChildren();
+      if (!file) return;
+
+      const head = document.createElement('div');
+      head.className = 'tx-files-head';
+      const summary = document.createElement('span');
+      summary.textContent = `1 file selected (${formatBytes(file.size)})`;
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'tx-btn tx-files-clear';
+      clear.disabled = uploading;
+      clear.innerHTML = '<i class="bi bi-x-lg"></i> Clear';
+      clear.addEventListener('click', () => setChosenFile(null));
+      head.append(summary, clear);
+
+      const list = document.createElement('ul');
+      list.className = 'tx-file-list';
+      const item = document.createElement('li');
+      const name = document.createElement('span');
+      name.className = 'tx-file-name';
+      name.textContent = file.name;
+      const size = document.createElement('span');
+      size.className = 'tx-file-size';
+      size.textContent = formatBytes(file.size);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'tx-file-remove';
+      remove.disabled = uploading;
+      remove.title = `Remove ${file.name}`;
+      remove.setAttribute('aria-label', `Remove ${file.name}`);
+      remove.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+      remove.addEventListener('click', () => setChosenFile(null));
+      item.append(name, size, remove);
+      list.append(item);
+      fileInfo.append(head, list);
     }
 
     function setUploadMessage(text, isError = false) {
@@ -136,7 +183,15 @@
       uploadPercent.textContent = value < 100 ? `${value}%${detail ? ` · ${detail}` : ''}` : 'Finishing…';
     }
 
-    fileInput.addEventListener('change', describeFile);
+    let uploadingFile = null; // the file being sent; choosing another meanwhile is undone
+
+    fileInput.addEventListener('change', () => {
+      if (uploading) {
+        setChosenFile(uploadingFile);
+        return;
+      }
+      describeFile();
+    });
     ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
       event.preventDefault();
       drop.classList.add('is-over');
@@ -151,14 +206,81 @@
         setUploadMessage('Only .tif or .tiff files can be uploaded.', true);
         return;
       }
-      const transfer = new DataTransfer();
-      transfer.items.add(file);
-      fileInput.files = transfer.files;
-      describeFile();
+      if (!uploading) setChosenFile(file);
     });
 
+    // ---- Leaving with a chosen file or a running upload ----------------------------------------
+    // Same as Drone Upload: browsers forget the chosen file when the page goes, and leaving stops an upload.
+    // Links, Logout, F5 / Ctrl+R / Cmd+R and phone pull-to-refresh ask first in our modal. The browser's
+    // reload button, closing the tab or typing another address only get the browser's own prompt (its text
+    // can't be set by pages).
+    let leaving = false;
+    let asking = false;
+    const hasWorkToLose = () => !leaving && (uploading || Boolean(chosenFile()));
+
+    // Resolves true (and stops the browser prompt) when the user chooses to leave or reload.
+    async function askToLeave(reload = false) {
+      if (asking) return false;
+      const going = reload ? 'reload the page' : 'leave';
+      asking = true;
+      const confirmed = await window.AppActions.confirm(uploading
+        ? {
+          title: 'Stop the upload?',
+          message: `The upload is still running and stops if you ${going}. To continue it later, choose the same file again and click Upload.`,
+          confirmLabel: reload ? 'Reload and stop upload' : 'Leave and stop upload',
+          cancelLabel: reload ? 'Keep uploading' : 'Stay on this page',
+          tone: 'danger',
+          icon: 'bi-exclamation-triangle',
+        }
+        : {
+          title: reload ? 'Reload without uploading?' : 'Leave without uploading?',
+          message: `You chose "${chosenFile()?.name}" but did not upload it. If you ${going}, you will need to choose it again.`,
+          confirmLabel: reload ? 'Reload' : 'Leave',
+          cancelLabel: reload ? 'Keep my file' : 'Stay on this page',
+          tone: 'danger',
+          icon: 'bi-exclamation-triangle',
+        });
+      asking = false;
+      if (confirmed) leaving = true;
+      return Boolean(confirmed);
+    }
+
+    // Phone pull-to-refresh (partials/pull-to-refresh) asks through this before reloading.
+    window.confirmReload = () => (hasWorkToLose() ? askToLeave(true) : Promise.resolve(true));
+
+    // Keyboard reload: F5, Ctrl+R / Cmd+R (with or without Shift).
+    document.addEventListener('keydown', event => {
+      const isReload = event.key === 'F5'
+        || ((event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 'r' || event.key === 'R'));
+      if (!isReload || !hasWorkToLose()) return;
+      event.preventDefault();
+      askToLeave(true).then(reload => { if (reload) window.location.reload(); });
+    });
+
+    document.addEventListener('click', event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest('a[href]');
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+      const url = new URL(link.href, window.location.href);
+      // Same-page anchors (href="#") do not leave the page.
+      if (url.origin !== window.location.origin || (url.pathname === window.location.pathname && url.search === window.location.search)) return;
+      if (!hasWorkToLose()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      askToLeave().then(leave => { if (leave) window.location.href = url.href; });
+    }, true);
+
+    document.addEventListener('submit', event => {
+      const target = event.target;
+      if (!(target instanceof HTMLFormElement) || !/\/logout$/.test(new URL(target.action, window.location.href).pathname)) return;
+      if (!hasWorkToLose()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      askToLeave().then(leave => { if (leave) target.submit(); });
+    }, true);
+
     window.addEventListener('beforeunload', event => {
-      if (!uploading) return;
+      if (!hasWorkToLose()) return;
       event.preventDefault();
       event.returnValue = '';
     });
@@ -173,6 +295,8 @@
       }
 
       uploading = true;
+      uploadingFile = file;
+      renderChosenFile(); // remove/Clear are disabled while the file uploads
       uploadButton.disabled = true;
       uploadButton.innerHTML = '<span class="tx-spinner" aria-hidden="true"></span> <span>Uploading…</span>';
       setUploadProgress(0, 'starting');
@@ -199,6 +323,7 @@
         setUploadMessage(error.message, true);
       } finally {
         uploading = false;
+        uploadingFile = null;
         uploadProgress.hidden = true;
         uploadButton.innerHTML = '<i class="bi bi-upload"></i> <span>Upload and make tiles</span>';
         describeFile();
@@ -613,9 +738,13 @@
       selbar.classList.toggle('has-selection', count > 0);
       grid.classList.toggle('is-selecting', count > 0);
       clearButton.hidden = count === 0;
-      if (!downloading) downloadButton.disabled = count === 0;
-      const label = downloadButton.querySelector('span:not(.tx-spinner)');
-      if (label && !downloading) label.textContent = count ? `Download ${count} selected` : 'Download selected';
+      if (!downloading) {
+        downloadButton.disabled = count === 0;
+        // One tile downloads as its GeoTIFF; two or more come as one ZIP of GeoTIFFs.
+        downloadButton.innerHTML = count > 1
+          ? `<i class="bi bi-file-earmark-zip"></i> <span>Download ${count} as ZIP</span>`
+          : `<i class="bi bi-download"></i> <span>${count === 1 ? 'Download GeoTIFF' : 'Download selected'}</span>`;
+      }
       if (dialog.open) paintPreviewButton();
     }
 
@@ -775,8 +904,9 @@
     });
 
     // ---- Download ------------------------------------------------------------------------
-    // The form posts into a hidden frame, so the browser streams the ZIP to disk like any download.
-    // The server sets a cookie with our token when the ZIP starts; an error page loads in the frame instead.
+    // The form posts into a hidden frame, so the browser saves the file like any download: one tile as its
+    // GeoTIFF, several as a ZIP of GeoTIFFs. The server sets a cookie with our token when the file starts;
+    // an error page loads in the frame instead.
     const frame = $('txDownloadFrame');
 
     function finishDownload(message, type) {
@@ -784,8 +914,7 @@
       clearInterval(downloadWatch);
       document.cookie = `${page.download_cookie}=; Max-Age=0; path=/`;
       downloadButton.classList.remove('is-saving');
-      downloadButton.innerHTML = '<i class="bi bi-file-earmark-zip"></i> <span></span>';
-      updateSelectionUi();
+      updateSelectionUi(); // restores the button's label
       if (message) notify(message, type);
     }
 
@@ -811,7 +940,7 @@
       form.action = `${page.sets_url}/${currentSet.id}/download`;
       form.target = 'txDownloadFrame';
       form.hidden = true;
-      Object.entries({ _token: csrfToken, ids: ids.join(','), format: formatSelect.value, token }).forEach(([name, value]) => {
+      Object.entries({ _token: csrfToken, ids: ids.join(','), token }).forEach(([name, value]) => {
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = name;
@@ -822,11 +951,14 @@
       downloading = true;
       downloadButton.disabled = true;
       downloadButton.classList.add('is-saving');
-      downloadButton.innerHTML = `<span class="tx-spinner" aria-hidden="true"></span> Preparing ZIP of ${ids.length}…`;
+      const single = ids.length === 1;
+      downloadButton.innerHTML = single
+        ? '<span class="tx-spinner" aria-hidden="true"></span> Downloading…'
+        : `<span class="tx-spinner" aria-hidden="true"></span> Preparing ZIP of ${ids.length}…`;
       const startedAt = Date.now();
       downloadWatch = setInterval(() => {
         if (document.cookie.split('; ').includes(`${page.download_cookie}=${token}`)) {
-          finishDownload(`Your ZIP with ${ids.length} tile${ids.length === 1 ? '' : 's'} is downloading.`, 'success');
+          finishDownload(single ? 'Your GeoTIFF is downloading.' : `Your ZIP with ${ids.length} GeoTIFFs is downloading.`, 'success');
         } else if (Date.now() - startedAt > 5 * 60 * 1000) {
           finishDownload('The download is taking long. Check your browser’s downloads.', 'success');
         }

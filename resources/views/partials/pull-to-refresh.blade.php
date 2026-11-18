@@ -127,7 +127,9 @@
             place(pull);
         }, { passive: false });
 
-        const finish = () => {
+        // A page with something to lose (e.g. Drone Upload's chosen files) can set window.confirmReload to an
+        // async function that asks first in the app's modal; it resolves true to go ahead with the reload.
+        const finish = async () => {
             if (!pulling) {
                 startY = null;
                 return;
@@ -136,6 +138,11 @@
             startY = null;
             if (pull >= threshold) {
                 reloading = true;
+                if (typeof window.confirmReload === 'function' && !(await window.confirmReload())) {
+                    reloading = false;
+                    reset();
+                    return;
+                }
                 indicator.classList.add('is-settling', 'is-loading', 'is-ready');
                 indicator.style.opacity = '1';
                 indicator.style.transform = `translateY(${threshold - 48 + 12}px)`;

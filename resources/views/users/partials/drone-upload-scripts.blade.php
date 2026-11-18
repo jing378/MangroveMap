@@ -345,8 +345,85 @@
       return result;
     }
 
+    // ---- Leaving with chosen files or a running upload ------------------------------------------
+    // Browsers forget chosen files when the page goes, and leaving stops an upload. Links, Logout, F5 /
+    // Ctrl+R / Cmd+R and phone pull-to-refresh ask first in our modal (like the review editor). The browser's
+    // reload button, closing the tab or typing another address can't be caught by a page: those only get
+    // the browser's own "Leave site?" prompt (beforeunload below), whose text browsers don't let pages set.
+    let leaving = false;
+    let asking = false;
+    const hasWorkToLose = () => !leaving && (uploading || chosenFiles.length > 0);
+
+    // Resolves true (and stops the browser prompt) when the user chooses to leave or reload.
+    async function askToLeave(reload = false) {
+      if (asking) return false;
+      const count = chosenFiles.length;
+      const them = count === 1 ? 'it' : 'them';
+      const going = reload ? 'reload the page' : 'leave';
+      asking = true;
+      const confirmed = await window.AppActions.confirm(uploading
+        ? {
+          title: 'Stop the upload?',
+          message: `The upload is still running and stops if you ${going}. To continue it later, choose the same files again and click Upload.`,
+          confirmLabel: reload ? 'Reload and stop upload' : 'Leave and stop upload',
+          cancelLabel: reload ? 'Keep uploading' : 'Stay on this page',
+          tone: 'danger',
+          icon: 'bi-exclamation-triangle',
+        }
+        : {
+          title: reload ? 'Reload without uploading?' : 'Leave without uploading?',
+          message: `You chose ${count === 1 ? '1 file' : `${count} files`} but did not upload ${them}. `
+            + `If you ${going}, you will need to choose ${them} again.`,
+          confirmLabel: reload ? 'Reload' : 'Leave',
+          cancelLabel: reload ? 'Keep my files' : 'Stay on this page',
+          tone: 'danger',
+          icon: 'bi-exclamation-triangle',
+        });
+      asking = false;
+      if (confirmed) leaving = true;
+      return Boolean(confirmed);
+    }
+
+    async function confirmLeave(leave) {
+      if (await askToLeave()) leave();
+    }
+
+    // Phone pull-to-refresh (partials/pull-to-refresh) asks through this before reloading.
+    window.confirmReload = () => (hasWorkToLose() ? askToLeave(true) : Promise.resolve(true));
+
+    // Keyboard reload: F5, Ctrl+R / Cmd+R (with or without Shift).
+    document.addEventListener('keydown', event => {
+      const isReload = event.key === 'F5'
+        || ((event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 'r' || event.key === 'R'));
+      if (!isReload || !hasWorkToLose()) return;
+      event.preventDefault();
+      askToLeave(true).then(reload => { if (reload) window.location.reload(); });
+    });
+
+    document.addEventListener('click', event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest('a[href]');
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+      const url = new URL(link.href, window.location.href);
+      // Same-page anchors (href="#") do not leave the page.
+      if (url.origin !== window.location.origin || (url.pathname === window.location.pathname && url.search === window.location.search)) return;
+      if (!hasWorkToLose()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      confirmLeave(() => { window.location.href = url.href; });
+    }, true);
+
+    document.addEventListener('submit', event => {
+      const target = event.target;
+      if (!(target instanceof HTMLFormElement) || !/\/logout$/.test(new URL(target.action, window.location.href).pathname)) return;
+      if (!hasWorkToLose()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      confirmLeave(() => target.submit());
+    }, true);
+
     window.addEventListener('beforeunload', event => {
-      if (!uploading) return;
+      if (!hasWorkToLose()) return;
       event.preventDefault();
       event.returnValue = '';
     });
@@ -411,11 +488,16 @@
       : ['Upload', 'Preview', 'AI detection', 'Your review', 'On the map'];
     const MAP_STEP = STEPS.length - 1;
     const isSegmenting = layer => ['queued', 'processing'].includes(layer.segmentation_status);
+    // Genus classification: its own job, run after the mangrove areas are ready.
+    const isClassifying = layer => ['queued', 'processing'].includes(layer.classification_status);
 
     // A tiled layer: where its submitted delineation stands with the experts.
     function readyStage(layer) {
       if (isSegmenting(layer)) {
         return { step: 4, busy: true, badge: 'AI running', tone: 'busy', text: 'The AI is detecting mangroves…' };
+      }
+      if (isClassifying(layer)) {
+        return { step: 4, busy: true, badge: 'AI running', tone: 'busy', text: 'The AI is detecting the genus…' };
       }
       const unapplied = layer.has_pending_edits ? ' You saved edits that are not applied yet; open the editor and confirm them.' : '';
       if (layer.review_state === 'pending') {
@@ -439,9 +521,10 @@
         case 'awaiting_review':
           return isSegmenting(layer)
             ? { step: 2, busy: true, badge: 'AI running', tone: 'busy', text: 'The AI is detecting mangroves. You can already open the review, but you can only confirm once the AI has finished.' }
-            : { step: 3, waiting: true, badge: 'Ready for your review', tone: 'review', text: page.needs_expert_review
+            : { step: 3, waiting: true, badge: 'Ready for your review', tone: 'review', text: (page.needs_expert_review
               ? 'Check the mangrove areas (the AI result does most of the work), choose the genus present, then confirm and submit them for expert review.'
-              : 'Check the mangrove areas (the AI result does most of the work), choose the genus present, then confirm to publish them with the imagery.' };
+              : 'Check the mangrove areas (the AI result does most of the work), choose the genus present, then confirm to publish them with the imagery.')
+              + (isClassifying(layer) ? ' The AI is still detecting the genus; its suggestion appears in the editor when it is done.' : '') };
         case 'finalizing': return { step: 3, busy: true, badge: 'Building map', tone: 'busy', text: 'Applying your edits and building the map tiles…' };
         case 'ready': return readyStage(layer);
         default: return { step: -1, badge: 'Failed', tone: 'failed', text: `Processing failed: ${layer.error_message || 'unknown error'}` };
@@ -454,7 +537,8 @@
         const canopyCount = Number(stats.canopy_count ?? 0);
         return `${stats.edited ? 'Mangrove areas (corrected by you)' : 'AI'}: ${Number(stats.mangrove_area_ha || 0).toFixed(2)} ha of mangrove`
           + `${stats.mangrove_coverage_percent ? ` (${Number(stats.mangrove_coverage_percent).toFixed(1)}% of the imagery)` : ''}.`
-          + (canopyCount > 0 ? ` ${canopyCount.toLocaleString()} canop${canopyCount === 1 ? 'y' : 'ies'} pinpointed.` : '');
+          + (isClassifying(layer) ? ' Detecting the genus…'
+            : (canopyCount > 0 ? ` ${canopyCount.toLocaleString()} canop${canopyCount === 1 ? 'y' : 'ies'} pinpointed.` : ''));
       }
       if (layer.segmentation_status === 'failed') return `AI detection failed: ${layer.segmentation_error || 'unknown error'}`;
       return '';
@@ -518,7 +602,7 @@
       const remove = element('button', 'drone-btn danger');
       remove.type = 'button';
       remove.innerHTML = '<i class="bi bi-trash"></i> Delete';
-      remove.disabled = Boolean(stage.busy); // the server refuses deletes while a job uses the files
+      remove.disabled = Boolean(stage.busy) || isClassifying(layer); // the server refuses deletes while a job uses the files
       remove.title = remove.disabled ? 'Wait until processing finishes before deleting.' : 'Delete this imagery and its files';
       remove.addEventListener('click', async () => {
         // Confirmation → Processing → Success or Error (partials.action-feedback).
@@ -653,7 +737,7 @@
       renderOthers(others);
 
       clearTimeout(pollTimer);
-      if (owned.some(layer => stageOf(layer).busy) || others.some(layer => otherStage(layer).busy)) {
+      if (owned.some(layer => stageOf(layer).busy || isClassifying(layer)) || others.some(layer => otherStage(layer).busy)) {
         pollTimer = setTimeout(() => loadLayers().catch(error => console.error('Unable to refresh drone imagery.', error)), 5000);
       }
       return owned;

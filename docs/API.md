@@ -194,7 +194,7 @@ Large GeoTIFFs are uploaded in pieces so that a dropped connection doesn't resta
 |---|---|
 | `GET /tile-explorer/sets/{id}` | A tile set's tiles, with mangrove % per tile |
 | `POST /tile-explorer/sources/{id}/sets` | Cut the GeoTIFF at another `tile_size`. Returns `202` while working, `200` if it already exists. |
-| `POST /tile-explorer/sets/{id}/download` | ZIP of the chosen tiles. Body: `ids`, `format` (`tif`, `jpg` or `both`). Streams the file. |
+| `POST /tile-explorer/sets/{id}/download` | The chosen tiles as GeoTIFFs: one tile is sent as its `.tif`, two or more as a ZIP holding only the `.tif` files (streamed). Body: `ids`, optional `token` (set as the `tile_download_token` cookie when the file starts). |
 | `GET /tile-explorer/sets/{id}/tiles/{tileId}/{variant}` | One tile image or thumbnail |
 | `DELETE /tile-explorer/sources/{id}` | Delete the GeoTIFF and its tiles. Returns `409` while tiles are still being made. |
 

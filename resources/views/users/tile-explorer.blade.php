@@ -317,6 +317,76 @@
             color: var(--fg-b42318, #b42318);
         }
 
+        .tx-files-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .tx-files-clear {
+            flex: none;
+            padding: 4px 10px;
+            font-size: 12.5px;
+        }
+
+        .tx-file-list {
+            list-style: none;
+            margin: 8px 0 0;
+            padding: 0;
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 9px;
+        }
+
+        .tx-file-list li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 6px 5px 10px;
+            border-top: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        }
+
+        .tx-file-list li:first-child {
+            border-top: 0;
+        }
+
+        .tx-file-name {
+            flex: 1;
+            min-width: 0;
+            color: var(--fg-1a2e1a, #1a2e1a);
+        }
+
+        .tx-file-size {
+            flex: none;
+            color: var(--fg-6b8a78, #6b8a78);
+        }
+
+        .tx-file-remove {
+            flex: none;
+            display: inline-grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--fg-6b8a78, #6b8a78);
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .tx-file-remove:hover:not(:disabled) {
+            background: var(--bg-fdecea, #fdecea);
+            color: var(--fg-b42318, #b42318);
+        }
+
+        .tx-file-remove:disabled {
+            cursor: not-allowed;
+            opacity: .4;
+        }
+
         .tx-upload-progress[hidden] {
             display: none;
         }
@@ -726,12 +796,6 @@
             flex-wrap: wrap;
         }
 
-        .tx-format {
-            width: auto;
-            padding: 8px 10px;
-            font-size: 13px;
-            font-weight: 600;
-        }
 
         .tx-grid {
             --tx-card-min: 190px;
@@ -1219,12 +1283,6 @@
                 display: inline;
             }
 
-            .tx-format {
-                order: 6;
-                flex: 0 1 auto;
-                max-width: 48%;
-            }
-
             #txDownload {
                 order: 7;
                 flex: 1 1 0;
@@ -1290,7 +1348,7 @@
 @section('content')
     <div class="tx-page">
         <h1>Tile Explorer</h1>
-        <p class="tx-sub">Upload a GeoTIFF, cut it into equal tiles, pick the ones with mangroves and download them together as one ZIP.
+        <p class="tx-sub">Upload a GeoTIFF, cut it into equal tiles, pick the ones with mangroves and download them as GeoTIFFs (several at once come as one ZIP).
             Files uploaded here are only for tiles: they are not added to the map or sent for review.</p>
 
         <div class="tx-top">
@@ -1393,12 +1451,7 @@
                     <button type="button" class="tx-btn ghost" id="txSelectMangrove"><i class="bi bi-tree"></i> <span class="tx-long">Select mangrove tiles</span><span class="tx-short">Mangrove</span></button>
                     <button type="button" class="tx-btn ghost" id="txClear"><i class="bi bi-x-lg"></i> Clear</button>
                     <span class="tx-selbar-break" aria-hidden="true"></span>
-                    <select id="txFormat" class="tx-select tx-format" aria-label="Download format">
-                        <option value="both">GeoTIFF + JPEG</option>
-                        <option value="tif">GeoTIFF only</option>
-                        <option value="jpg">JPEG only (Roboflow)</option>
-                    </select>
-                    <button type="button" class="tx-btn primary" id="txDownload"><i class="bi bi-file-earmark-zip"></i> <span>Download selected</span></button>
+                    <button type="button" class="tx-btn primary" id="txDownload"><i class="bi bi-download"></i> <span>Download selected</span></button>
                 </div>
             </div>
 
