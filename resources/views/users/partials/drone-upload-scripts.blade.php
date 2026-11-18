@@ -40,7 +40,163 @@
       const count = fileInput.files?.length || 0;
       if (!count) return 'Choose at least one .tif or .tiff file first.';
       if (page.max_files && count > page.max_files) return `Up to ${page.max_files} files per upload.`;
+      if (placeCheck.state === 'checking') return 'Checking where the files are…';
+      if (placeCheck.state === 'far') return placeCheck.message;
       return null;
+    }
+
+    // ---- Same-place check ------------------------------------------------------------------
+    // One upload becomes one mosaic, so its files must come from one site: files from different towns
+    // (e.g. Macrohon + Bontoc) would make a huge, mostly empty image. Before anything is sent, read each
+    // GeoTIFF's header (geotiff.js only fetches the bytes it needs) and group the footprints by distance,
+    // like DroneBatchFootprints on the server. Unknown CRS or unreadable headers skip the check here;
+    // ProcessDroneImagery still checks every batch after upload.
+    const MAX_GAP_M = Number(page.batch_max_gap_m) || 1000;
+    let placeCheck = { state: 'idle', message: '' };
+    let placeCheckRun = 0;
+
+    const WGS84 = { a: 6378137, f: 1 / 298.257223563 };
+    const CLARKE_1866 = { a: 6378206.4, f: 1 / 294.9786982 };
+
+    // Inverse transverse Mercator (Snyder), latitude of origin 0. Returns [lng, lat] in degrees.
+    function inverseTransverseMercator(x, y, { lon0, k0, fe, fn, a, f }) {
+      const e2 = f * (2 - f);
+      const ep2 = e2 / (1 - e2);
+      const mu = ((y - fn) / k0) / (a * (1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256));
+      const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+      const phi1 = mu + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu)
+        + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
+        + (151 * e1 ** 3 / 96) * Math.sin(6 * mu)
+        + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+      const sin1 = Math.sin(phi1);
+      const cos1 = Math.cos(phi1);
+      const c1 = ep2 * cos1 ** 2;
+      const t1 = Math.tan(phi1) ** 2;
+      const n1 = a / Math.sqrt(1 - e2 * sin1 ** 2);
+      const r1 = a * (1 - e2) / (1 - e2 * sin1 ** 2) ** 1.5;
+      const d = (x - fe) / (n1 * k0);
+      const lat = phi1 - (n1 * Math.tan(phi1) / r1) * (d ** 2 / 2
+        - (5 + 3 * t1 + 10 * c1 - 4 * c1 ** 2 - 9 * ep2) * d ** 4 / 24
+        + (61 + 90 * t1 + 298 * c1 + 45 * t1 ** 2 - 252 * ep2 - 3 * c1 ** 2) * d ** 6 / 720);
+      const lng = lon0 + (d - (1 + 2 * t1 + c1) * d ** 3 / 6
+        + (5 - 2 * c1 + 28 * t1 - 3 * c1 ** 2 + 8 * ep2 + 24 * t1 ** 2) * d ** 5 / 120) / cos1;
+      return [lng * 180 / Math.PI, lat * 180 / Math.PI];
+    }
+
+    // [x, y] in the file's CRS → [lng, lat], for the CRSs drone software exports here; null when unknown.
+    function projector(geoKeys) {
+      const projected = geoKeys.ProjectedCSTypeGeoKey;
+      if (!projected && geoKeys.GTModelTypeGeoKey === 2) return (x, y) => [x, y]; // geographic (degrees)
+      if ([3857, 3785, 900913].includes(projected)) {
+        return (x, y) => [x / WGS84.a * 180 / Math.PI, Math.atan(Math.sinh(y / WGS84.a)) * 180 / Math.PI];
+      }
+      const rad = degrees => degrees * Math.PI / 180;
+      if (projected >= 32601 && projected <= 32760 && projected % 100 >= 1 && projected % 100 <= 60) {
+        const zone = projected % 100; // UTM / WGS 84, north (326xx) or south (327xx)
+        const params = { ...WGS84, lon0: rad(zone * 6 - 183), k0: 0.9996, fe: 500000, fn: projected >= 32701 ? 10000000 : 0 };
+        return (x, y) => inverseTransverseMercator(x, y, params);
+      }
+      // PRS92 / Philippines zones I–V (3121–3125) and Luzon 1911 (25391–25395): Clarke 1866.
+      const philippineZone = projected >= 3121 && projected <= 3125 ? projected - 3120
+        : (projected >= 25391 && projected <= 25395 ? projected - 25390 : 0);
+      if (philippineZone) {
+        const params = { ...CLARKE_1866, lon0: rad(115 + philippineZone * 2), k0: 0.99995, fe: 500000, fn: 0 };
+        return (x, y) => inverseTransverseMercator(x, y, params);
+      }
+      return null;
+    }
+
+    // WGS84 box of one GeoTIFF, or null when it can't be told from the header.
+    async function readFootprint(file) {
+      const tiff = await window.GeoTIFF.fromBlob(file);
+      const image = await tiff.getImage();
+      const toLngLat = projector(image.getGeoKeys() || {});
+      if (!toLngLat) return null;
+      const [minX, minY, maxX, maxY] = image.getBoundingBox();
+      const corners = [[minX, minY], [minX, maxY], [maxX, minY], [maxX, maxY]].map(([x, y]) => toLngLat(x, y));
+      const lngs = corners.map(corner => corner[0]);
+      const lats = corners.map(corner => corner[1]);
+      const box = { west: Math.min(...lngs), south: Math.min(...lats), east: Math.max(...lngs), north: Math.max(...lats) };
+      return Object.values(box).every(Number.isFinite) && Math.abs(box.south) <= 90 && Math.abs(box.west) <= 180 ? box : null;
+    }
+
+    function gapMetres(a, b) {
+      const lngGap = Math.max(0, a.west - b.east, b.west - a.east);
+      const latGap = Math.max(0, a.south - b.north, b.south - a.north);
+      const latitude = (a.south + a.north + b.south + b.north) / 4 * Math.PI / 180;
+      return Math.hypot(lngGap * 111320 * Math.cos(latitude), latGap * 110574);
+    }
+
+    // Files within MAX_GAP_M of each other (directly or through other files) form one place; largest first.
+    function groupByPlace(footprints) {
+      const parent = footprints.map((_, index) => index);
+      const find = index => (parent[index] === index ? index : (parent[index] = find(parent[index])));
+      footprints.forEach((first, i) => footprints.slice(i + 1).forEach((second, offset) => {
+        if (gapMetres(first.box, second.box) <= MAX_GAP_M) parent[find(i)] = find(i + 1 + offset);
+      }));
+      const groups = new Map();
+      footprints.forEach((footprint, index) => {
+        const root = find(index);
+        groups.set(root, [...(groups.get(root) || []), footprint]);
+      });
+      return [...groups.values()].sort((a, b) => b.length - a.length);
+    }
+
+    function unionBox(footprints) {
+      return {
+        west: Math.min(...footprints.map(item => item.box.west)),
+        south: Math.min(...footprints.map(item => item.box.south)),
+        east: Math.max(...footprints.map(item => item.box.east)),
+        north: Math.max(...footprints.map(item => item.box.north)),
+      };
+    }
+
+    function farApartMessage(groups) {
+      const names = group => group.slice(0, 3).map(item => item.name).join(', ')
+        + (group.length > 3 ? ` and ${group.length - 3} more` : '');
+      const kilometres = gapMetres(unionBox(groups[0]), unionBox(groups[1])) / 1000;
+      const distance = kilometres >= 1 ? `${kilometres.toFixed(1)} km` : `${Math.round(kilometres * 1000)} m`;
+      const places = groups.map((group, index) => `place ${index + 1}: ${names(group)}`).join('; ');
+      return `These files come from ${groups.length} places about ${distance} apart (${places}). `
+        + 'One upload becomes one image: remove the files of the other place (× next to each file) and upload them separately.';
+    }
+
+    async function checkSamePlace(files) {
+      const run = ++placeCheckRun;
+      const hadNote = ['far', 'checking'].includes(placeCheck.state);
+      if (files.length < 2 || !window.GeoTIFF) {
+        placeCheck = { state: 'idle', message: '' };
+        if (hadNote) showMessage('');
+        updateSubmitState();
+        return;
+      }
+
+      placeCheck = { state: 'checking', message: '' };
+      showMessage('Checking that all files come from one place…');
+      updateSubmitState();
+      const footprints = [];
+      for (const [index, file] of files.entries()) {
+        let box = null;
+        try {
+          box = await readFootprint(file);
+        } catch {
+          box = null; // unreadable header: the server reports it after upload
+        }
+        if (run !== placeCheckRun) return; // a newer selection replaced this one
+        if (box) footprints.push({ index, name: file.name, box });
+      }
+
+      const groups = groupByPlace(footprints);
+      placeCheck = groups.length > 1
+        ? {
+          state: 'far',
+          message: farApartMessage(groups),
+          places: new Map(groups.flatMap((group, place) => group.map(item => [item.index, place + 1]))),
+        }
+        : { state: 'ok', message: '' };
+      showMessage(placeCheck.message, placeCheck.state === 'far');
+      updateSubmitState();
+      renderSelection();
     }
 
     function updateSubmitState() {
@@ -53,21 +209,96 @@
     }
 
     // ---- File selection and drag & drop ------------------------------------------------------
+    let autoName = ''; // survey name filled in from the first file, cleared again with the selection
+
     function describeSelection() {
-      updateSubmitState();
       const files = [...(fileInput.files || [])];
+      checkSamePlace(files); // updates the Upload button and the place tags when done
       if (!files.length) {
-        selected.textContent = '';
-        return;
+        if (autoName && nameInput.value === autoName) nameInput.value = '';
+        autoName = '';
+      } else if (!nameInput.value.trim()) {
+        nameInput.value = autoName = files[0].name.replace(/\.(tiff?|TIFF?)$/, '').slice(0, 120);
       }
-      const total = files.reduce((sum, file) => sum + file.size, 0);
-      selected.textContent = files.length === 1
-        ? `${files[0].name} (${formatBytes(total)})`
-        : `${files.length} files selected (${formatBytes(total)}), stitched into one mosaic`;
-      if (!nameInput.value.trim()) nameInput.value = files[0].name.replace(/\.(tiff?|TIFF?)$/, '').slice(0, 120);
+      renderSelection();
     }
 
-    fileInput.addEventListener('change', describeSelection);
+    // The selection lives here: picking or dropping files again adds to it (a plain <input type=file>
+    // would replace it), and × / Clear take files out.
+    let chosenFiles = [];
+    const fileKey = file => `${file.name}|${file.size}|${file.lastModified}`;
+
+    function addFiles(files) {
+      const known = new Set(chosenFiles.map(fileKey));
+      const added = files.filter(file => !known.has(fileKey(file)) && known.add(fileKey(file)));
+      setFiles([...chosenFiles, ...added]);
+      const skipped = files.length - added.length;
+      if (skipped) {
+        window.AppActions?.notify(skipped === 1 ? 'That file is already in the list.' : `${skipped} files were already in the list.`, 'success', { icon: 'bi-info-circle-fill' });
+      }
+    }
+
+    // Set the chosen files (an <input type=file> list can only be swapped whole).
+    function setFiles(files) {
+      chosenFiles = files;
+      const transfer = new DataTransfer();
+      files.forEach(file => transfer.items.add(file));
+      fileInput.files = transfer.files;
+      describeSelection();
+    }
+
+    // Selected files with a remove button each, a Clear button, and (files far apart) the place of each file.
+    function renderSelection() {
+      const files = [...(fileInput.files || [])];
+      selected.replaceChildren();
+      if (!files.length) return;
+
+      const total = files.reduce((sum, file) => sum + file.size, 0);
+      const head = element('div', 'drone-files-head');
+      head.append(element('span', '', files.length === 1
+        ? `1 file selected (${formatBytes(total)})`
+        : `${files.length} files selected (${formatBytes(total)}), stitched into one mosaic`));
+      const clear = element('button', 'drone-btn drone-files-clear');
+      clear.type = 'button';
+      clear.disabled = uploading;
+      clear.innerHTML = '<i class="bi bi-x-lg"></i> Clear';
+      clear.addEventListener('click', () => {
+        setFiles([]);
+      });
+      head.append(clear);
+      selected.append(head);
+
+      const listNode = element('ul', 'drone-file-list');
+      files.forEach((file, index) => {
+        const item = element('li');
+        item.append(element('span', 'drone-file-name', file.name));
+        const place = placeCheck.places?.get(index);
+        if (place) {
+          const tag = element('span', `drone-file-place place-${place}`, `Place ${place}`);
+          tag.title = place === 1 ? 'Most of the files are here' : 'Far from the other files';
+          item.append(tag);
+        }
+        item.append(element('span', 'drone-file-size', formatBytes(file.size)));
+        const remove = element('button', 'drone-file-remove');
+        remove.type = 'button';
+        remove.disabled = uploading;
+        remove.title = `Remove ${file.name}`;
+        remove.setAttribute('aria-label', `Remove ${file.name}`);
+        remove.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+        remove.addEventListener('click', () => setFiles(files.filter((_, other) => other !== index)));
+        item.append(remove);
+        listNode.append(item);
+      });
+      selected.append(listNode);
+    }
+
+    fileInput.addEventListener('change', () => {
+      if (uploading) {
+        setFiles(chosenFiles); // keep the batch being uploaded
+        return;
+      }
+      addFiles([...(fileInput.files || [])]);
+    });
     ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
       event.preventDefault();
       drop.classList.add('is-over');
@@ -82,10 +313,7 @@
         showMessage('Only .tif or .tiff files can be uploaded.', true);
         return;
       }
-      const transfer = new DataTransfer();
-      files.forEach(file => transfer.items.add(file));
-      fileInput.files = transfer.files;
-      describeSelection();
+      if (!uploading) addFiles(files);
     });
 
     // ---- Upload ---------------------------------------------------------------------------
@@ -133,6 +361,10 @@
         showMessage(`You selected ${fileInput.files.length} files, but the server accepts up to ${page.max_files} per upload. Upload them in smaller batches.`, true);
         return;
       }
+      if (placeCheck.state === 'far') {
+        showMessage(placeCheck.message, true);
+        return;
+      }
 
       // Confirmation → Processing (button label + progress bar) → Success or Error (message below the form).
       const count = fileInput.files.length;
@@ -147,12 +379,15 @@
 
       uploading = true;
       updateSubmitState();
+      renderSelection(); // remove/Clear buttons are disabled while the files upload
       setProgress(0);
       showMessage('Uploading… keep this page open until the upload finishes.');
       try {
         const payload = await upload([...fileInput.files], nameInput.value.trim());
         form.reset();
-        selected.textContent = '';
+        chosenFiles = [];
+        autoName = '';
+        placeCheck = { state: 'idle', message: '' };
         highlightId = payload.id;
         showMessage('Upload complete. The server is preparing a preview and running AI mangrove detection. You can leave this page; come back when it says "Ready for your review".');
         await loadLayers();
@@ -162,6 +397,7 @@
       } finally {
         uploading = false;
         updateSubmitState(); // the form was reset on success, so this disables it again
+        renderSelection(); // empty after a successful upload; buttons usable again after a failed one
         progress.hidden = true;
       }
     });

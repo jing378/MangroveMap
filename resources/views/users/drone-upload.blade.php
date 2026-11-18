@@ -146,6 +146,95 @@
             overflow-wrap: anywhere;
         }
 
+        .drone-files:empty {
+            display: none;
+        }
+
+        .drone-files-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .drone-files-clear {
+            flex: none;
+            padding: 4px 10px;
+            font-size: 12.5px;
+        }
+
+        .drone-file-list {
+            list-style: none;
+            margin: 8px 0 0;
+            padding: 0;
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 9px;
+        }
+
+        .drone-file-list li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 6px 5px 10px;
+            border-top: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        }
+
+        .drone-file-list li:first-child {
+            border-top: 0;
+        }
+
+        .drone-file-name {
+            flex: 1;
+            min-width: 0;
+            color: var(--fg-1a2e1a, #1a2e1a);
+        }
+
+        .drone-file-size {
+            flex: none;
+            color: var(--fg-6b8a78, #6b8a78);
+        }
+
+        .drone-file-place {
+            flex: none;
+            padding: 1px 7px;
+            border-radius: 999px;
+            background: var(--bg-fdecea, #fdecea);
+            color: var(--fg-b42318, #b42318);
+            font-size: 11.5px;
+            font-weight: 700;
+        }
+
+        .drone-file-place.place-1 {
+            background: var(--bg-edf7f2, #edf7f2);
+            color: var(--fg-16824f, #16824f);
+        }
+
+        .drone-file-remove {
+            flex: none;
+            display: inline-grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--fg-6b8a78, #6b8a78);
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .drone-file-remove:hover:not(:disabled) {
+            background: var(--bg-fdecea, #fdecea);
+            color: var(--fg-b42318, #b42318);
+        }
+
+        .drone-file-remove:disabled {
+            cursor: not-allowed;
+            opacity: .4;
+        }
+
         .drone-btn {
             display: inline-flex;
             align-items: center;
@@ -492,7 +581,7 @@
                     <label for="droneUploadFiles">GeoTIFF files</label>
                     <label class="drone-drop" id="droneUploadDrop">
                         <i class="bi bi-cloud-arrow-up"></i>
-                        <strong>Drop GeoTIFF files here or click to choose</strong>
+                        <strong>Drop GeoTIFF files here or click to add</strong>
                         <span>.tif / .tiff, 8-bit RGB orthomosaic · up to {{ $page['max_files'] }} files per upload</span>
                         <input id="droneUploadFiles" name="files[]" type="file" accept=".tif,.tiff,image/tiff" multiple required>
                     </label>
@@ -534,6 +623,8 @@
 @endsection
 
 @section('scripts')
+    {{-- Reads each GeoTIFF's header in the browser to check the files come from one place before uploading. --}}
+    <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     @include('partials.chunked-upload')
     @include('users.partials.drone-upload-scripts')
 @endsection

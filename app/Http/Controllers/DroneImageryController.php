@@ -617,6 +617,8 @@ class DroneImageryController extends Controller
                 'needs_expert_review' => ! $viewer->isExpert(),
                 'max_delineation_areas' => DroneImageryDelineationPublisher::MAX_AREAS,
             ],
+                // Files of one batch farther apart than this are blocked before upload (and by ProcessDroneImagery).
+                'batch_max_gap_m' => (float) config('gdal.batch_max_gap_m', 1000),
         ]);
     }
 

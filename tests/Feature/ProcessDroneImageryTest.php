@@ -162,9 +162,11 @@ class ProcessDroneImageryTest extends TestCase
 
     /**
      * @param  array<int, string>  $creationOptions  extra gdal_create arguments (band layout)
+     * @param  array<int, array{0: string, 1: string, 2: string}>|null  $tiles  [name, west, east] per file
      */
-    private function processSyntheticBatch(array $creationOptions): DroneImageryLayer
+    private function processSyntheticBatch(array $creationOptions, ?array $tiles = null): DroneImageryLayer
     {
+        $tiles ??= [['tile_a.tif', '124', '124.01'], ['tile_b.tif', '124.01', '124.02']];
         $localDisk = Storage::disk('local');
         $sourceDirectory = storage_path('app/private/drone-imagery-test-inputs/'.uniqid('', true));
         File::ensureDirectoryExists($sourceDirectory);
@@ -176,7 +178,7 @@ class ProcessDroneImageryTest extends TestCase
                 'source_type' => 'batch',
             ]);
 
-            foreach ([['tile_a.tif', '124', '124.01'], ['tile_b.tif', '124.01', '124.02']] as $index => [$name, $west, $east]) {
+            foreach ($tiles as $index => [$name, $west, $east]) {
                 $sourcePath = $sourceDirectory.DIRECTORY_SEPARATOR.$name;
                 app(GdalCommandRunner::class)->run([
                     'gdal_create', '-of', 'GTiff', '-outsize', '16', '16',
@@ -272,6 +274,29 @@ class ProcessDroneImageryTest extends TestCase
             File::deleteDirectory($sourceDirectory);
             File::deleteDirectory(storage_path('app/private/drone-imagery-test-inputs'));
         }
+    }
+
+    public function test_batch_with_files_from_places_far_apart_is_rejected_before_mosaicking(): void
+    {
+        $environmentScript = config('gdal.qgis_env');
+        if (! is_string($environmentScript) || ! is_file($environmentScript)) {
+            $this->markTestSkipped('QGIS GDAL is not installed in this test environment.');
+        }
+
+        Storage::fake('local');
+        config(['gdal.tile_zoom' => '12-14', 'gdal.batch_max_gap_m' => 1000, 'ml.drone.auto_segment' => false]);
+
+        // ~11 km apart in longitude, like two different towns.
+        $layer = $this->processSyntheticBatch(['-bands', '3'], [
+            ['macrohon.tif', '124', '124.01'],
+            ['bontoc.tif', '124.11', '124.12'],
+        ]);
+
+        $this->assertSame('failed', $layer->status);
+        $this->assertStringContainsString('far apart', $layer->error_message ?? '');
+        $this->assertStringContainsString('macrohon.tif', $layer->error_message ?? '');
+        $this->assertStringContainsString('bontoc.tif', $layer->error_message ?? '');
+        $this->assertNull($layer->mosaic_path);
     }
 
     public function test_multispectral_batch_is_rejected_with_a_clear_message(): void

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\InteractsWithDroneRasters;
 use App\Models\DroneImageryLayer;
+use App\Services\DroneBatchFootprints;
 use App\Services\GdalCommandRunner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -61,6 +62,7 @@ class ProcessDroneImagery implements ShouldQueue
             $sourceCrs = null;
             $totalSize = 0;
             $alphaSources = [];
+            $footprints = [];
             foreach ($layer->files as $file) {
                 if (! $localDisk->exists($file->stored_path)) {
                     throw new RuntimeException("Uploaded file is missing: {$file->original_name}");
@@ -70,9 +72,21 @@ class ProcessDroneImagery implements ShouldQueue
                 $info = $this->readRasterInfo($gdal, $inputPath, $workDirectory);
                 $this->validateSourceRaster($info, $file->original_name);
                 $alphaSources[$file->original_name] = $this->hasAlphaBand($info);
+                $footprintKey = $file->original_name;
+                for ($copy = 2; isset($footprints[$footprintKey]); $copy++) {
+                    $footprintKey = "{$file->original_name} (#{$copy})";
+                }
+                $footprints[$footprintKey] = $this->readWgs84Bounds($info);
                 $sourceCrs ??= $info['coordinateSystem']['wkt'];
                 $inputPaths[] = $inputPath;
                 $totalSize += $file->file_size;
+            }
+
+            // One batch is one mosaic: files from different places would make a huge, mostly empty raster.
+            $batch = app(DroneBatchFootprints::class);
+            $groups = $batch->group($footprints, (float) config('gdal.batch_max_gap_m', 1000));
+            if (count($groups) > 1) {
+                throw new RuntimeException($batch->farApartMessage($groups, $footprints));
             }
 
             // gdalwarp only auto-detects source alpha for a single input; with several RGBA

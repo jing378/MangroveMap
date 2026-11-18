@@ -15,6 +15,9 @@ return [
     'preview_max_dimension' => (int) env('GDAL_PREVIEW_MAX_DIMENSION', 2048),
     // Files per drone imagery batch. PHP's max_file_uploads (php.ini) must be at least this high.
     'max_upload_files' => (int) env('DRONE_MAX_UPLOAD_FILES', 100),
+    // Files of one batch must lie within this distance (m) of each other, directly or through other files.
+    // A batch is one mosaic, so files from different places (e.g. Macrohon + Bontoc) are rejected.
+    'batch_max_gap_m' => (float) env('DRONE_BATCH_MAX_GAP_M', 1000),
     // Drone Upload sends files in slices of this many MB, several at once (upload_parallel), resuming after
     // dropped connections. Each slice is one request, so the web server's body limit must allow it.
     'upload_chunk_mb' => (int) env('DRONE_UPLOAD_CHUNK_MB', 8),
