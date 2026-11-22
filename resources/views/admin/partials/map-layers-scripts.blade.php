@@ -136,16 +136,77 @@
                 if (reveal) revealPreviewMap();
         }
 
-        document.querySelectorAll('[data-preview]').forEach(button => {
-            button.addEventListener('click', () => showPreview(button));
+        // Delegated: the list is replaced in place when switching tabs, filtering or paging (see below).
+        document.addEventListener('click', event => {
+            const button = event.target.closest('[data-preview]');
+            if (button && !button.disabled) showPreview(button);
         });
 
-        // Preview the first previewable row so the map is never empty on load (without scrolling the page).
-        const firstPreview = document.querySelector('[data-preview]:not(:disabled)');
-        if (firstPreview) showPreview(firstPreview, { reveal: false });
+        // Preview the first previewable row so the map is never empty (without scrolling the page).
+        function previewFirstRow() {
+            const firstPreview = document.querySelector('#layerList [data-preview]:not(:disabled)');
+            if (firstPreview) {
+                showPreview(firstPreview, { reveal: false });
+            } else {
+                previewGroup.clearLayers();
+                previewLabel.textContent = 'Select a layer below to preview it';
+            }
+        }
+        previewFirstRow();
 
         // The map sits in a card that can change width (sidebar, rotation); keep its tiles filling it.
         window.addEventListener('resize', () => previewMap.invalidateSize());
+
+        // ---- Expand ----
+        // The preview card fills the window (imagery, outline and label), keeping the same view; Esc or the
+        // button again puts it back. A CSS overlay rather than the Fullscreen API, which iPhones do not support.
+        const previewSection = previewMapEl.closest('.preview-section');
+        // Where the card sits in the page: while expanded it is moved to <body>, so no page wrapper (scroll
+        // container, stacking context) can clip it or keep it under the header, then put back here.
+        const previewHome = document.createComment('preview-section');
+        previewSection.before(previewHome);
+        let expandButton = null;
+
+        function setExpanded(expanded) {
+            if (expanded) {
+                document.body.appendChild(previewSection);
+            } else {
+                previewHome.after(previewSection);
+            }
+            previewSection.classList.toggle('is-expanded', expanded);
+            document.documentElement.classList.toggle('preview-expanded', expanded);
+            expandButton.innerHTML = `<i class="bi ${expanded ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}" aria-hidden="true"></i>`;
+            expandButton.title = expanded ? 'Back to normal size (Esc)' : 'Expand map';
+            expandButton.setAttribute('aria-label', expandButton.title);
+            expandButton.setAttribute('aria-pressed', String(expanded));
+            previewMap.invalidateSize();
+            // Once more after the browser has laid out the new size, so the newly visible tiles load.
+            requestAnimationFrame(() => previewMap.invalidateSize());
+        }
+
+        const ExpandControl = L.Control.extend({
+            options: { position: 'topleft' },
+            onAdd() {
+                const bar = L.DomUtil.create('div', 'leaflet-bar');
+                expandButton = L.DomUtil.create('a', 'preview-expand', bar);
+                expandButton.href = '#';
+                expandButton.setAttribute('role', 'button');
+                L.DomEvent.disableClickPropagation(bar);
+                L.DomEvent.on(expandButton, 'click', event => {
+                    L.DomEvent.preventDefault(event);
+                    setExpanded(!previewSection.classList.contains('is-expanded'));
+                });
+                return bar;
+            },
+        });
+        new ExpandControl().addTo(previewMap);
+        setExpanded(false);
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && previewSection.classList.contains('is-expanded')) {
+                setExpanded(false);
+            }
+        });
 
         // ---- Dialogs ----
         function openDialog(id, action, fill) {
@@ -156,24 +217,30 @@
             dialog.showModal();
         }
 
-        document.querySelectorAll('[data-edit-delineation]').forEach(button => {
-            button.addEventListener('click', () => openDialog('editDelineationDialog', button.dataset.url, () => {
-                document.getElementById('editDelineationName').value = button.dataset.name || '';
-                document.getElementById('editDelineationNotes').value = button.dataset.notes || '';
-            }));
-        });
-
-        document.querySelectorAll('[data-hide-delineation]').forEach(button => {
-            button.addEventListener('click', () => openDialog('hideDelineationDialog', button.dataset.url, () => {
-                document.getElementById('hideDelineationName').textContent = button.dataset.name || '';
-                document.getElementById('hideDelineationReason').value = '';
-            }));
-        });
-
-        document.querySelectorAll('[data-rename-imagery]').forEach(button => {
-            button.addEventListener('click', () => openDialog('renameImageryDialog', button.dataset.url, () => {
-                document.getElementById('renameImageryName').value = button.dataset.name || '';
-            }));
+        // Delegated, like the preview buttons: rows are replaced when the list is swapped in place.
+        document.addEventListener('click', event => {
+            const edit = event.target.closest('[data-edit-delineation]');
+            if (edit) {
+                openDialog('editDelineationDialog', edit.dataset.url, () => {
+                    document.getElementById('editDelineationName').value = edit.dataset.name || '';
+                    document.getElementById('editDelineationNotes').value = edit.dataset.notes || '';
+                });
+                return;
+            }
+            const hide = event.target.closest('[data-hide-delineation]');
+            if (hide) {
+                openDialog('hideDelineationDialog', hide.dataset.url, () => {
+                    document.getElementById('hideDelineationName').textContent = hide.dataset.name || '';
+                    document.getElementById('hideDelineationReason').value = '';
+                });
+                return;
+            }
+            const rename = event.target.closest('[data-rename-imagery]');
+            if (rename) {
+                openDialog('renameImageryDialog', rename.dataset.url, () => {
+                    document.getElementById('renameImageryName').value = rename.dataset.name || '';
+                });
+            }
         });
 
         document.querySelectorAll('[data-close-dialog]').forEach(button => {
@@ -187,5 +254,77 @@
             });
         });
         // Forms with data-confirm / data-busy-label are handled by partials.action-feedback.
+
+        // ---- Tabs, filters and pages without a reload ----
+        // The page is fetched in the background and only the list card is swapped, so the preview map, the
+        // stat cards and the scroll position stay put. The address bar follows (back/forward work). Anything
+        // unexpected (an error, a redirect elsewhere) falls back to a normal page load.
+        const listId = 'layerList';
+        let loadController = null;
+
+        // Same host and page. The protocol is ignored and then set to the page's: links Laravel builds can come
+        // out as http:// behind the https tunnel, which would otherwise not match (or be blocked when fetched).
+        function isListUrl(url) {
+            return url.host === location.host && url.pathname === location.pathname;
+        }
+
+        function listUrl(href) {
+            const url = new URL(href, location.href);
+            url.protocol = location.protocol;
+            return url;
+        }
+
+        async function loadList(url, { push = true } = {}) {
+            const list = document.getElementById(listId);
+            loadController?.abort();
+            loadController = new AbortController();
+            list.classList.add('is-loading');
+            try {
+                const response = await fetch(url, {
+                    headers: { Accept: 'text/html' },
+                    credentials: 'same-origin',
+                    signal: loadController.signal,
+                });
+                const responseUrl = new URL(response.url);
+                if (!response.ok || !isListUrl(responseUrl)) throw new Error('fallback');
+
+                const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+                const fresh = doc.getElementById(listId);
+                if (!fresh) throw new Error('fallback');
+
+                list.replaceWith(fresh);
+                if (push) history.pushState({ mapLayersList: true }, '', url.href);
+                previewFirstRow();
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                location.href = url.href;
+            } finally {
+                document.getElementById(listId)?.classList.remove('is-loading');
+            }
+        }
+
+        document.addEventListener('click', event => {
+            if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            const link = event.target.closest(`#${listId} a[href]`);
+            if (!link || link.hasAttribute('download') || link.target === '_blank') return;
+            const url = listUrl(link.href);
+            if (!isListUrl(url)) return;
+            event.preventDefault();
+            loadList(url);
+        });
+
+        document.addEventListener('submit', event => {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement) || !form.closest(`#${listId}`) || (form.method || 'get').toLowerCase() !== 'get') return;
+            const url = listUrl(form.action || location.href);
+            if (!isListUrl(url)) return;
+            event.preventDefault();
+            url.search = new URLSearchParams(new FormData(form)).toString();
+            // Leave out empty fields, like a normal submit of this filter would show them.
+            [...url.searchParams.entries()].filter(([, value]) => value === '').forEach(([key]) => url.searchParams.delete(key));
+            loadList(url);
+        });
+
+        window.addEventListener('popstate', () => loadList(listUrl(location.href), { push: false }));
     })();
 </script>

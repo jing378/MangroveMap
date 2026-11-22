@@ -12,10 +12,55 @@
     }
 
     .preview-map {
-        height: 380px;
+        /* Grows with the window on big monitors, never smaller than before. */
+        height: clamp(380px, 45vh, 600px);
         border-radius: 10px;
         border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         z-index: 0;
+    }
+
+    /* While the next tab / filter / page loads in the background (the list is swapped in place). */
+    .layer-list {
+        transition: opacity 0.15s ease;
+    }
+
+    .layer-list.is-loading {
+        opacity: 0.55;
+        pointer-events: none;
+    }
+
+    /* Expanded (button in the map corner): the preview card fills the window. */
+    .preview-section.is-expanded {
+        position: fixed;
+        inset: 0;
+        z-index: 3000;
+        margin: 0;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 14px 16px 16px;
+    }
+
+    .preview-section.is-expanded .section-title {
+        margin-bottom: 10px;
+    }
+
+    .preview-section.is-expanded .preview-map {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+    }
+
+    html.preview-expanded,
+    html.preview-expanded body {
+        overflow: hidden;
+    }
+
+    .preview-expand {
+        font-size: 14px;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
     }
 
     .tabs {

@@ -35,7 +35,8 @@
         <div id="layerPreviewMap" class="preview-map" aria-label="Layer preview map"></div>
     </div>
 
-    <div class="section">
+    {{-- Swapped in place (no page reload) by map-layers-scripts when switching tabs, filtering or paging. --}}
+    <div class="section layer-list" id="layerList">
         <nav class="tabs" aria-label="Layer types">
             <a href="{{ route('admin.map-layers.index') }}" class="tab {{ $tab === 'delineations' ? 'active' : '' }}" @if($tab === 'delineations') aria-current="page" @endif>
                 <i class="bi bi-bounding-box"></i> {{-- one flex item, so the tab's gap does not split the words --}}<span><span class="tab-long">Mangrove </span>Delineations</span>
@@ -151,4 +152,46 @@
 @include('partials.flash-toast', ['withValidationErrors' => true])
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 @include('admin.partials.map-layers-scripts')
+<script>
+    // Row actions (edit, hide, delete, ...) reload this page; keep the reader where they were instead of
+    // jumping back to the top. Tabs, filters and pages swap the list without a reload (map-layers-scripts);
+    // they are only saved here when that falls back to a normal load. Restored only coming from this page.
+    (function () {
+        const KEY = 'mapLayers.scroll';
+        const page = location.pathname;
+        // Desktop scrolls the layout's .content box; phones scroll the window.
+        const box = document.querySelector('.content');
+
+        function save() {
+            try {
+                sessionStorage.setItem(KEY, JSON.stringify({
+                    page, at: Date.now(), box: box ? box.scrollTop : 0, win: window.scrollY,
+                }));
+            } catch (error) {}
+        }
+
+        // On window (bubbling), so it runs after the in-place navigation, which marks the clicks it handles.
+        window.addEventListener('click', event => {
+            if (event.defaultPrevented) return;
+            const link = event.target.closest('#map-layers-section a[href]');
+            if (link && new URL(link.href, location.href).pathname === page) save();
+        });
+        // Capture: forms with a confirm dialog stop the event later and submit again after confirming.
+        // Only POST forms (row actions): the GET filter is swapped in place.
+        document.getElementById('map-layers-section').addEventListener('submit', event => {
+            if ((event.target.method || 'get').toLowerCase() === 'post') save();
+        }, true);
+
+        let saved = null;
+        try {
+            saved = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+            sessionStorage.removeItem(KEY);
+        } catch (error) {}
+        const fromHere = document.referrer && new URL(document.referrer).pathname === page;
+        if (saved && saved.page === page && fromHere && Date.now() - saved.at < 30000) {
+            if (box) box.scrollTop = saved.box;
+            window.scrollTo(0, saved.win);
+        }
+    })();
+</script>
 @endsection
