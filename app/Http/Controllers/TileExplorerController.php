@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\GenerateTiles;
+use App\Models\DroneImageryLayer;
 use App\Models\TileSet;
 use App\Models\TileSource;
 use App\Models\User;
@@ -24,8 +25,8 @@ use ZipStream\ZipStream;
 /**
  * Tile Explorer (sidebar): upload a GeoTIFF (chunked, DroneImageryUploadController with purpose "tiles"),
  * cut it into equal tiles, browse them with their AI mangrove coverage and download a selection as GeoTIFFs
- * (one tile as its .tif, several as a ZIP of .tif files). Uploads here are private to the uploader and never
- * become drone surveys, map layers or delineations.
+ * (one tile as its .tif, several as a ZIP of .tif files). Uploads here are private to the uploader and become a
+ * drone layer only when the owner sends selected tiles to Drone Imagery (sendToDroneImagery, a copy of their GeoTIFFs).
  */
 class TileExplorerController extends Controller
 {
@@ -220,6 +221,74 @@ class TileExplorerController extends Controller
         if (! empty($validated['token'])) {
             $response->headers->setCookie(Cookie::create(self::DOWNLOAD_COOKIE, $validated['token'], 0, '/', null, $request->isSecure(), false, false, Cookie::SAMESITE_LAX));
         }
+
+        return $response;
+    }
+
+    /**
+     * "Send to Drone Imagery": the selected tiles' GeoTIFFs become one new drone layer (copied, so the tiles stay
+     * here), processed like a Drone Upload batch: mosaic, map tiles, then the AI delineation.
+     */
+    public function sendToDroneImagery(Request $request, int $tileSetId): JsonResponse
+    {
+        $tileSet = $this->tileSet($request, $tileSetId);
+        $maxFiles = max(1, (int) config('gdal.max_upload_files', 100));
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', "max:{$maxFiles}"],
+            'ids.*' => ['string', 'distinct', 'regex:'.self::TILE_ID_PATTERN],
+            'name' => ['nullable', 'string', 'max:120'],
+        ], [
+            'ids.max' => "Select at most {$maxFiles} tiles to send to Drone Imagery at once.",
+        ]);
+
+        $manifest = $tileSet->status === 'ready' ? $tileSet->manifest() : null;
+        abort_if($manifest === null, 409, 'These tiles are not ready.');
+
+        $disk = Storage::disk('local');
+        $wanted = array_flip($validated['ids']);
+        $tiles = array_values(array_filter(
+            $manifest['tiles'],
+            fn (array $tile) => isset($wanted[$tile['id']]) && $disk->exists("{$tileSet->directory()}/tif/{$tile['id']}.tif"),
+        ));
+        abort_if($tiles === [], 422, 'None of the selected tiles exist any more. Reload the page.');
+
+        $source = $tileSet->source;
+        $copied = [];
+        try {
+            $layer = DB::transaction(function () use ($request, $validated, $tiles, $tileSet, $source, $disk, &$copied) {
+                $layer = DroneImageryLayer::create([
+                    'user_id' => $request->user()->id,
+                    'name' => Str::limit(trim((string) ($validated['name'] ?? '')) ?: $source->name, 120, ''),
+                    'status' => 'queued',
+                    'source_type' => count($tiles) > 1 ? 'batch' : 'single',
+                ]);
+
+                foreach ($tiles as $index => $tile) {
+                    $from = "{$tileSet->directory()}/tif/{$tile['id']}.tif";
+                    $storedPath = "drone-imagery/uploads/{$layer->id}/".Str::random(40).'.tif';
+                    if (! $disk->copy($from, $storedPath)) {
+                        throw new RuntimeException('Unable to copy a tile GeoTIFF.');
+                    }
+                    $copied[] = $storedPath;
+
+                    $layer->files()->create([
+                        'original_name' => Str::limit("{$tile['name']}.tif", 255, ''),
+                        'stored_path' => $storedPath,
+                        'mime_type' => 'image/tiff',
+                        'file_size' => $disk->size($storedPath),
+                        'sort_order' => $index,
+                    ]);
+                }
+
+                return $layer;
+            });
+        } catch (Throwable $exception) {
+            $disk->delete($copied);
+            throw $exception;
+        }
+
+        $response = DroneImageryController::queueProcessing($layer, count($tiles));
+        $response->setData($response->getData(true) + ['drone_upload_url' => route('drone-imagery.page')]);
 
         return $response;
     }

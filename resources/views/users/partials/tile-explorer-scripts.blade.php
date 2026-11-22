@@ -47,6 +47,7 @@
     const selectMangroveButton = $('txSelectMangrove');
     const clearButton = $('txClear');
     const downloadButton = $('txDownload');
+    const sendDroneButton = $('txSendDrone');
     const dialog = $('txDialog');
 
     const PAGE_SIZE = 120;
@@ -68,6 +69,7 @@
     let previewIndex = -1;
     let uploading = false;
     let downloading = false;
+    let sendingToDrone = false;
     let downloadWatch = null;
 
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -745,6 +747,7 @@
           ? `<i class="bi bi-file-earmark-zip"></i> <span>Download ${count} as ZIP</span>`
           : `<i class="bi bi-download"></i> <span>${count === 1 ? 'Download GeoTIFF' : 'Download selected'}</span>`;
       }
+      if (!sendingToDrone) sendDroneButton.disabled = count === 0;
       if (dialog.open) paintPreviewButton();
     }
 
@@ -967,6 +970,43 @@
       document.body.appendChild(form);
       form.submit();
       form.remove();
+    });
+
+    // ---- Send to Drone Imagery ----------------------------------------------------------
+    // The selected tiles' GeoTIFFs are copied into a new drone layer (one mosaic) and processed like a Drone
+    // Upload; the tiles stay here. Then the Drone Upload page shows its progress.
+    sendDroneButton.addEventListener('click', async () => {
+      const ids = tiles.filter(tile => selection.has(tile.id)).map(tile => tile.id);
+      if (!ids.length || sendingToDrone || !currentSet) return;
+      const source = currentSource();
+      const many = ids.length > 1;
+      const confirmed = await window.AppActions.confirm({
+        title: 'Send to Drone Imagery?',
+        message: `${many ? `The ${ids.length} selected tiles are joined into one drone imagery layer` : 'The selected tile becomes a drone imagery layer'}`
+          + ` named "${source?.name || 'Drone imagery'}". It is processed like a Drone Upload (map tiles, then the AI mangrove areas),`
+          + ' and you review it on the Drone Upload page before it is submitted. The tiles stay here too.',
+        confirmLabel: 'Send',
+        tone: 'primary',
+      });
+      if (!confirmed) return;
+
+      sendingToDrone = true;
+      window.AppActions.setBusy(sendDroneButton, 'Sending…');
+      try {
+        const payload = await request('POST', `${page.sets_url}/${currentSet.id}/drone-imagery`, { ids });
+        notify(`"${payload.name}" was sent to Drone Imagery with ${payload.file_count} tile${payload.file_count === 1 ? '' : 's'}. It is being processed.`, 'success', {
+          title: 'Sent to Drone Imagery',
+          icon: 'bi-send-check',
+          action: { label: 'Open Drone Upload', href: payload.drone_upload_url },
+          timeout: 10000,
+        });
+      } catch (error) {
+        notify(error.message, 'error');
+      } finally {
+        sendingToDrone = false;
+        window.AppActions.clearBusy(sendDroneButton);
+        updateSelectionUi();
+      }
     });
 
     // ---- Start ---------------------------------------------------------------------------

@@ -58,6 +58,7 @@ Limits are per user (or per IP for guests), per minute. Going over returns `429`
 | `POST /forgot-password` | 5 per IP (and one reset email per address per 60 seconds) |
 | `POST /reset-password` | 10 per IP |
 | `POST /tile-explorer/sources/{id}/sets`, `.../download` | 20 |
+| `POST /tile-explorer/sets/{id}/drone-imagery` | 10 |
 
 ## Map data
 
@@ -198,6 +199,7 @@ The AI runs in two separate jobs, each with its own status in the layer payloads
 | `GET /tile-explorer/sets/{id}` | A tile set's tiles, with mangrove % per tile |
 | `POST /tile-explorer/sources/{id}/sets` | Cut the GeoTIFF at another `tile_size`. Returns `202` while working, `200` if it already exists. |
 | `POST /tile-explorer/sets/{id}/download` | The chosen tiles as GeoTIFFs: one tile is sent as its `.tif`, two or more as a ZIP holding only the `.tif` files (streamed). Body: `ids`, optional `token` (set as the `tile_download_token` cookie when the file starts). |
+| `POST /tile-explorer/sets/{id}/drone-imagery` | Send the chosen tiles to Drone Imagery: their GeoTIFFs are copied into a new drone layer (one batch, the tiles stay) and queued like a Drone Upload. Body: `ids` (at most `gdal.max_upload_files`), optional `name` (defaults to the GeoTIFF's name). Returns `202` with the layer (`id`, `name`, `status`, `source_type`, `file_count`, `drone_upload_url`), `409` if the set isn't ready. |
 | `GET /tile-explorer/sets/{id}/tiles/{tileId}/{variant}` | One tile image or thumbnail |
 | `DELETE /tile-explorer/sources/{id}` | Delete the GeoTIFF and its tiles. Returns `409` while tiles are still being made. |
 

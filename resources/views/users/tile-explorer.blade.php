@@ -1283,6 +1283,7 @@
                 display: inline;
             }
 
+            #txSendDrone,
             #txDownload {
                 order: 7;
                 flex: 1 1 0;
@@ -1349,7 +1350,7 @@
     <div class="tx-page">
         <h1>Tile Explorer</h1>
         <p class="tx-sub">Upload a GeoTIFF, cut it into equal tiles, pick the ones with mangroves and download them as GeoTIFFs (several at once come as one ZIP).
-            Files uploaded here are only for tiles: they are not added to the map or sent for review.</p>
+            Files uploaded here are only for tiles: nothing is added to the map or sent for review unless you send selected tiles to Drone Imagery.</p>
 
         <div class="tx-top">
             <section class="tx-card tx-upload" aria-labelledby="txUploadTitle">
@@ -1451,6 +1452,7 @@
                     <button type="button" class="tx-btn ghost" id="txSelectMangrove"><i class="bi bi-tree"></i> <span class="tx-long">Select mangrove tiles</span><span class="tx-short">Mangrove</span></button>
                     <button type="button" class="tx-btn ghost" id="txClear"><i class="bi bi-x-lg"></i> Clear</button>
                     <span class="tx-selbar-break" aria-hidden="true"></span>
+                    <button type="button" class="tx-btn" id="txSendDrone" title="Make a drone imagery layer from the selected tiles (they stay here too)"><i class="bi bi-send"></i> <span class="tx-long">Send to Drone Imagery</span><span class="tx-short">Drone Imagery</span></button>
                     <button type="button" class="tx-btn primary" id="txDownload"><i class="bi bi-download"></i> <span>Download selected</span></button>
                 </div>
             </div>

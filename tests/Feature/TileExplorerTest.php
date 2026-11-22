@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\TileExplorerController;
 use App\Jobs\GenerateTiles;
+use App\Jobs\ProcessDroneImagery;
+use App\Models\DroneImageryLayer;
 use App\Models\TileSet;
 use App\Models\TileSource;
 use App\Models\User;
@@ -243,6 +245,52 @@ class TileExplorerTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->postJson(route('tile-explorer.sets.download', $set->id), ['ids' => 'r000_c000'])
             ->assertNotFound();
+    }
+
+    public function test_selected_tiles_can_be_sent_to_drone_imagery_as_one_layer_and_stay_here(): void
+    {
+        $owner = User::factory()->create();
+        $set = $this->readySet($this->source($owner));
+
+        $response = $this->actingAs($owner)->postJson(route('tile-explorer.sets.drone-imagery', $set->id), [
+            'ids' => ['r000_c000', 'r000_c001'],
+        ]);
+
+        $response->assertAccepted()
+            ->assertJson(['name' => 'Brgy San Isidro March', 'status' => 'queued', 'source_type' => 'batch', 'file_count' => 2])
+            ->assertJsonPath('drone_upload_url', route('drone-imagery.page'));
+
+        $layer = DroneImageryLayer::with('files')->findOrFail($response->json('id'));
+        $this->assertSame($owner->id, $layer->user_id);
+        $this->assertSame(
+            ['brgy-san-isidro-march_r000_c000.tif', 'brgy-san-isidro-march_r000_c001.tif'],
+            $layer->files->sortBy('sort_order')->pluck('original_name')->all(),
+        );
+        $disk = Storage::disk('local');
+        foreach ($layer->files->sortBy('sort_order')->values() as $index => $file) {
+            $this->assertStringStartsWith("drone-imagery/uploads/{$layer->id}/", $file->stored_path);
+            $this->assertSame('tif-r000_c00'.$index, $disk->get($file->stored_path));
+        }
+        $this->assertTrue($disk->exists("{$set->directory()}/tif/r000_c000.tif"));
+        Queue::assertPushed(ProcessDroneImagery::class, fn (ProcessDroneImagery $job) => $job->layerId === $layer->id);
+    }
+
+    public function test_sending_to_drone_imagery_checks_the_selection_and_the_owner(): void
+    {
+        $owner = User::factory()->create();
+        $set = $this->readySet($this->source($owner));
+        config(['gdal.max_upload_files' => 1]);
+
+        $this->actingAs($owner)->postJson(route('tile-explorer.sets.drone-imagery', $set->id), ['ids' => ['r000_c000', 'r000_c001']])
+            ->assertUnprocessable();
+        $this->postJson(route('tile-explorer.sets.drone-imagery', $set->id), ['ids' => ['r009_c009']])
+            ->assertUnprocessable();
+        $this->actingAs(User::factory()->create())
+            ->postJson(route('tile-explorer.sets.drone-imagery', $set->id), ['ids' => ['r000_c000']])
+            ->assertNotFound();
+
+        $this->assertSame(0, DroneImageryLayer::count());
+        Queue::assertNotPushed(ProcessDroneImagery::class);
     }
 
     public function test_owner_can_delete_an_upload_with_its_tiles_unless_it_is_being_tiled(): void

@@ -219,6 +219,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('tileSetId')
         ->middleware('throttle:20,1')
         ->name('tile-explorer.sets.download');
+    Route::post('/tile-explorer/sets/{tileSetId}/drone-imagery', [TileExplorerController::class, 'sendToDroneImagery'])
+        ->whereNumber('tileSetId')
+        ->middleware('throttle:10,1,tile-explorer.sets.drone-imagery')
+        ->name('tile-explorer.sets.drone-imagery');
     Route::delete('/drone-imagery/{layerId}', [DroneImageryController::class, 'destroy'])
         ->whereNumber('layerId')
         ->name('drone-imagery.destroy');
