@@ -456,4 +456,93 @@
             min-height: 42px;
         }
     }
+
+    .page-sub {
+        margin: -8px 0 22px;
+        max-width: 760px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+
+    /* Search + status on the left, exports on the right. */
+    .layer-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .layer-toolbar .filter-bar {
+        flex: 1 1 420px;
+        margin-bottom: 0;
+    }
+
+    .export-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .export-actions .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+
+    /* Links between a delineation and its drone imagery (each opens the other tab on that record). */
+    .cross-link {
+        color: var(--fg-1e9e62, #1e9e62);
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .cross-link:hover {
+        text-decoration: underline;
+    }
+
+    .linked-record {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 6px;
+        margin-top: 4px;
+    }
+
+    @media (max-width: 768px) {
+        .page-sub {
+            margin-top: -4px;
+            font-size: 12.5px;
+        }
+
+        .export-actions {
+            width: 100%;
+        }
+
+        .export-actions .btn-secondary {
+            flex: 1 1 0;
+            justify-content: center;
+        }
+
+
+        /* All three tabs fit without sideways scrolling. */
+        .tabs .tab {
+            padding: 10px 6px;
+            font-size: 12.5px;
+        }
+
+        .tabs .tab i {
+            display: none;
+        }
+
+        .tabs .tab-long {
+            display: none;
+        }
+    }
 </style>

@@ -24,12 +24,23 @@
                 'queued', 'processing' => 'pending',
                 default => 'secondary',
             };
-            $isReady = $layer->status === 'ready' && $layer->bounds;
+            // Map tiles once ready, the review image while it awaits its owner's review, else nothing to preview.
+            $imagery = \App\Http\Controllers\MapLayerController::imageryPreviewAttributes($layer);
             @endphp
             <tr class="layer-row" data-layer-id="i{{ $layer->id }}">
                 <td class="cell-title">
                     <div class="user-name">{{ $layer->name }}</div>
-                    <div class="muted">{{ $layer->files_count }} {{ \Illuminate\Support\Str::plural('file', $layer->files_count) }} · {{ $layer->source_type === 'batch' ? 'Survey batch' : 'Single GeoTIFF' }}</div>
+                    <div class="muted">{{ $layer->files_count }} {{ \Illuminate\Support\Str::plural('file', $layer->files_count) }} · {{ \App\Http\Controllers\MapLayerController::formatBytes((int) $layer->files_sum_file_size) }} · {{ $layer->source_type === 'batch' ? 'Survey batch' : 'Single GeoTIFF' }}</div>
+                    <div class="muted linked-record">
+                        @if($layer->delineation)
+                        @php [$linkedLabel, $linkedClass] = \App\Http\Controllers\MapLayerController::delineationStatus($layer->delineation); @endphp
+                        <a class="cross-link" href="{{ route('admin.map-layers.index', ['delineation' => $layer->delineation->id]) }}"
+                            title="Open the delineation submitted from this imagery"><i class="bi bi-bounding-box"></i> Delineation</a>
+                        <span class="badge {{ $linkedClass }}">{{ $linkedLabel }}</span>
+                        @else
+                        <i class="bi bi-bounding-box"></i> No delineation yet
+                        @endif
+                    </div>
                 </td>
                 <td data-label="Uploaded by">
                     <div class="cell-value">
@@ -51,6 +62,17 @@
                         @if($layer->segmentation_status === 'failed' && $layer->segmentation_error)
                         <div class="muted clamp status-note" title="{{ $layer->segmentation_error }}">{{ $layer->segmentation_error }}</div>
                         @endif
+                        @php
+                        $topGenus = \App\Http\Controllers\MapLayerController::topGenus($layer);
+                        $canopies = $layer->classification_stats['canopy_count'] ?? null;
+                        @endphp
+                        @if($topGenus || $canopies !== null)
+                        <div class="muted">
+                            {{ $topGenus ? 'Genus: '.$topGenus : '' }}{{ $topGenus && $canopies !== null ? ' · ' : '' }}{{ $canopies !== null ? number_format($canopies).' '.\Illuminate\Support\Str::plural('canopy', $canopies) : '' }}
+                        </div>
+                        @elseif($layer->classification_status === 'failed')
+                        <div class="muted status-note">Genus detection failed</div>
+                        @endif
                     </div>
                 </td>
                 <td data-label="Uploaded" class="nowrap">{{ $layer->created_at?->format('M j, Y') ?? '—' }}</td>
@@ -60,16 +82,16 @@
                         <button type="button" class="action-btn" title="Preview on map" data-preview
                             data-kind="imagery"
                             data-name="{{ $layer->name }}"
-                            @if($isReady)
-                            data-tile-url="{{ parse_url(url("/drone-imagery/{$layer->id}/tiles"), PHP_URL_PATH) }}/{z}/{x}/{y}"
-                            data-bounds='@json($layer->bounds)'
-                            data-zoom-min="{{ $layer->zoom_min }}"
-                            data-zoom-max="{{ $layer->zoom_max }}"
-                            @endif
-                            @if($layer->segmentation_status === 'ready')
+                            @foreach($imagery as $attribute => $value) data-{{ $attribute }}="{{ $value }}" @endforeach
+                            @if($layerDelineation = $layer->delineation)
+                            {{-- The delineation submitted from this imagery, drawn on it (its status colour). --}}
+                            data-features='@json(\App\Http\Controllers\EndUserController::sanitizeFeaturesForMap($layerDelineation->features))'
+                            data-delineation-status="{{ \App\Http\Controllers\MapLayerController::delineationStatus($layerDelineation)[0] }}"
+                            @if($layerDelineation->is_rejected && ! $layerDelineation->is_approved) data-rejected @endif
+                            @elseif($layer->segmentation_status === 'ready')
                             data-segmentation-url="{{ route('drone-imagery.segmentation.show', $layer->id, false) }}"
                             @endif
-                            @disabled(! $isReady)><i class="bi bi-eye"></i></button>
+                            @disabled($imagery === [])><i class="bi bi-eye"></i></button>
                         <button type="button" class="action-btn" title="Rename" data-rename-imagery
                             data-url="{{ route('admin.map-layers.imagery.update', $layer) }}"
                             data-name="{{ $layer->name }}"><i class="bi bi-pencil"></i></button>
@@ -91,7 +113,7 @@
                         @endif
                         @unless($layer->isProcessing() || $layer->isSegmenting())
                         <form method="POST" action="{{ route('admin.map-layers.imagery.destroy', $layer) }}"
-                            data-confirm="Delete this record?" data-confirm-message="&quot;{{ $layer->name }}&quot; and all of its uploaded TIFFs and tiles are deleted. This cannot be undone."
+                            data-confirm="Delete this record?" data-confirm-message="&quot;{{ $layer->name }}&quot; and all of its uploaded TIFFs and tiles are deleted. This cannot be undone.{{ $layer->delineation ? ' Its delineation "'.$layer->delineation->name.'" ('.\App\Http\Controllers\MapLayerController::delineationStatus($layer->delineation)[0].') stays, but will have no drone imagery. Delete it on the Delineations tab if it should go too.' : '' }}"
                             data-confirm-label="Delete" data-confirm-tone="danger" data-busy-label="Deleting...">
                             @csrf
                             @method('DELETE')

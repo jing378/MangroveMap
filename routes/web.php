@@ -361,7 +361,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Admin routes - RESTRICTED TO ADMIN ROLE ONLY
     Route::middleware('admin')->prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-        Route::get('/datasets', [AdminController::class, 'datasets'])->name('admin.datasets');
+        // Datasets were merged into Map Layers (details and exports).
+        Route::redirect('/datasets', '/admin/map-layers');
         Route::get('/models', [AdminController::class, 'models'])->name('admin.models');
         Route::post('/models', [AdminController::class, 'uploadModel'])->name('admin.models.upload');
         Route::post('/models/{model}/activate', [AdminController::class, 'activateModel'])
@@ -379,6 +380,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/users/{user}', [AdminController::class, 'update'])->name('admin.users.update');
         Route::delete('/users/{user}', [AdminController::class, 'destroy'])->name('admin.users.destroy');
         Route::get('/map-layers', [MapLayerController::class, 'index'])->name('admin.map-layers.index');
+        Route::get('/map-layers/export', [MapLayerController::class, 'export'])
+            ->middleware('throttle:20,1,admin.map-layers.export')
+            ->name('admin.map-layers.export');
         Route::put('/map-layers/delineations/{delineation}', [MapLayerController::class, 'updateDelineation'])
             ->name('admin.map-layers.delineations.update');
         Route::post('/map-layers/delineations/{delineation}/hide', [MapLayerController::class, 'hideDelineation'])

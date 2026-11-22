@@ -309,9 +309,10 @@
                         $accuracy = $model->accuracy !== null ? round($model->accuracy * 100, 1) : null;
                         $accClass = $accuracy === null ? 'pending' : ($accuracy >= 90 ? 'excellent' : 'good');
                     @endphp
-                    <tr>
-                        <td>{{ $model->name }}</td>
-                        <td>v{{ $model->version }}</td>
+                    <tr class="registry-row">
+                        <td class="cell-title"><div class="user-name">{{ $model->name }}</div></td>
+                        {{-- "configured" models (found on disk) have no real version number. --}}
+                        <td data-label="Version">{{ preg_match('/^v?\d/i', (string) $model->version) ? 'v'.ltrim($model->version, 'vV') : '—' }}</td>
                         <td data-label="Accuracy">
                             <div class="cell-value">
                             @if($accuracy !== null)
@@ -320,9 +321,10 @@
                             @else
                             <span class="accuracy-badge pending">Not entered</span>
                             @endif
+                            </div>
                         </td>
-                        <td>{{ $model->dataset_size !== null ? number_format($model->dataset_size).' samples' : '—' }}</td>
-                        <td>{{ $model->created_at?->format('M j, Y') ?? '—' }}</td>
+                        <td data-label="Dataset size">{{ $model->dataset_size !== null ? number_format($model->dataset_size).' samples' : '—' }}</td>
+                        <td data-label="Date added">{{ $model->created_at?->format('M j, Y') ?? '—' }}</td>
                     </tr>
                     @empty
                     <tr>

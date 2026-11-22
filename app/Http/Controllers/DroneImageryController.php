@@ -688,8 +688,10 @@ class DroneImageryController extends Controller
 
     public function preview(Request $request, int $layerId): BinaryFileResponse
     {
+        // The owner (review editor), and admins: Map Layers shows it for layers still awaiting the owner's review,
+        // which have no map tiles until they are confirmed.
         $layer = DroneImageryLayer::query()
-            ->where('user_id', $request->user()->id)
+            ->when(! $request->user()->isAdmin(), fn (Builder $query) => $query->where('user_id', $request->user()->id))
             ->findOrFail($layerId);
 
         $disk = Storage::disk('local');

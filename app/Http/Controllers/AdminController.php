@@ -4,15 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Models\AIModel;
-use App\Models\Analysis;
 use App\Models\Delineation;
-use App\Models\MangroveData;
+use App\Models\DroneImageryFile;
+use App\Models\DroneImageryLayer;
+use App\Models\Feedback;
+use App\Models\TileSource;
 use App\Models\User;
 use App\Models\UserActivity;
 use App\Notifications\ExpertApplicationReviewed;
+use App\Services\ApprovedCoverageStats;
 use App\Services\MangroveSegmentationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -28,22 +32,46 @@ class AdminController extends Controller
     /** The dashboard's "Today" counts follow the local day, not UTC. */
     private const LOCAL_TIMEZONE = 'Asia/Manila';
 
+    /** A pending delineation older than this many days is flagged on the dashboard. */
+    private const STALE_REVIEW_DAYS = 3;
+
+    /** aiModelStatus() for this request. */
+    private ?array $aiModelStatus = null;
+
     private const TODAY_USERS_LIMIT = 25;
 
-    public function dashboard()
+    public function dashboard(ApprovedCoverageStats $coverage)
     {
         abort_if(Auth::user()->role !== 'admin', 403);
 
         $totalUsers = User::count();
-        $mappedZones = MangroveData::count();
-        $totalAnalyses = Analysis::count();
-        $completedAnalyses = Analysis::where('status', 'completed')->count();
-        $generaClassified = $completedAnalyses;
-        $systemHealth = $totalAnalyses > 0
-            ? round(($completedAnalyses / $totalAnalyses) * 100, 1)
-            : 100;
         $newUsersThisMonth = User::where('created_at', '>=', now()->subMonth())->count();
-        $newZonesThisMonth = MangroveData::where('created_at', '>=', now()->subMonth())->count();
+        $expertCount = User::where('role', 'expert')->count();
+
+        // Area mapped: expert-approved delineations, measured like the public pages.
+        $coverageSummary = $coverage->summary();
+
+        // Expert review queue.
+        $pendingDelineations = Delineation::pending()->count();
+        $oldestPending = Delineation::pending()->min('created_at');
+        $oldestPendingAt = $oldestPending ? Carbon::parse($oldestPending) : null;
+
+        // Drone imagery pipeline.
+        $droneTotal = DroneImageryLayer::count();
+        $droneProcessing = DroneImageryLayer::whereIn('status', ['queued', 'processing', 'finalizing'])->count();
+        $droneFailed = DroneImageryLayer::where(fn ($query) => $query
+            ->where('status', 'failed')
+            ->orWhere('segmentation_status', 'failed')
+            ->orWhere('classification_status', 'failed'))->count();
+        $droneAwaitingOwner = DroneImageryLayer::where('status', 'awaiting_review')->count();
+
+        // Disk used by uploads (as uploaded; generated tiles and mosaics come on top).
+        $storage = [
+            'droneBytes' => (int) DroneImageryFile::sum('file_size'),
+            'tileSources' => TileSource::count(),
+            'tileBytes' => (int) TileSource::sum('file_size'),
+        ];
+
         $recentActivities = UserActivity::with('user')
             ->latest()
             ->take(5)
@@ -86,16 +114,21 @@ class AdminController extends Controller
 
         return view('admin.dashboard', [
             'totalUsers' => $totalUsers,
-            'mappedZones' => $mappedZones,
-            'generaClassified' => $generaClassified,
-            'totalAnalyses' => $totalAnalyses,
-            'systemHealth' => $systemHealth,
             'newUsersThisMonth' => $newUsersThisMonth,
-            'newZonesThisMonth' => $newZonesThisMonth,
+            'expertCount' => $expertCount,
+            'approvedHectares' => $coverageSummary['area_ha'],
+            'approvedAreas' => $coverageSummary['area_count'],
+            'pendingDelineations' => $pendingDelineations,
+            'oldestPendingAt' => $oldestPendingAt,
+            'droneTotal' => $droneTotal,
+            'droneProcessing' => $droneProcessing,
+            'droneFailed' => $droneFailed,
+            'droneAwaitingOwner' => $droneAwaitingOwner,
+            'attention' => $this->attentionItems($pendingDelineations, $oldestPendingAt, $droneFailed),
+            'aiModels' => $this->aiModelStatus(),
+            'storage' => $storage,
             'recentActivities' => $recentActivities,
-            'growthChartLabels' => $growthChart['labels'],
-            'growthChartZones' => $growthChart['zones'],
-            'growthChartAnalyses' => $growthChart['analyses'],
+            'growthChart' => $growthChart,
             'newUsersToday' => $newUsersToday,
             'loggedInToday' => $loggedInToday,
             'todayUsers' => $todayUsers,
@@ -104,39 +137,6 @@ class AdminController extends Controller
             'approvedContributors' => $approvedContributors,
             'activeContributorsThisMonth' => $activeContributorsThisMonth,
             'topContributors' => $topContributors,
-        ]);
-    }
-
-    public function datasets()
-    {
-        abort_if(Auth::user()->role !== 'admin', 403);
-
-        $datasets = MangroveData::with('genus')
-            ->latest('observation_date')
-            ->paginate(20);
-
-        $totalDatasets = MangroveData::count();
-        $totalCoverage = MangroveData::sum('coverage_area_km2') ?? 0;
-        $avgConfidence = MangroveData::avg('confidence_score');
-        $healthyCount = MangroveData::where('health_status', 'healthy')->count();
-        $healthRate = $totalDatasets > 0
-            ? round(($healthyCount / $totalDatasets) * 100, 1)
-            : 0;
-        $newThisMonth = MangroveData::where('created_at', '>=', now()->subMonth())->count();
-
-        $importHistory = Analysis::with('user')
-            ->latest()
-            ->take(5)
-            ->get();
-
-        return view('admin.dataset-management', [
-            'datasets' => $datasets,
-            'totalDatasets' => $totalDatasets,
-            'totalCoverage' => $totalCoverage,
-            'avgConfidence' => $avgConfidence,
-            'healthRate' => $healthRate,
-            'newThisMonth' => $newThisMonth,
-            'importHistory' => $importHistory,
         ]);
     }
 
@@ -372,11 +372,11 @@ class AdminController extends Controller
             .($model->model_type === 'classification' ? 'genus suggestion' : 'segmentation').' model.');
     }
 
+    /** New users, submitted delineations and drone uploads in each of the last 4 weeks (local time). */
     private function weeklyGrowthChartData(): array
     {
         $labels = [];
-        $zones = [];
-        $analyses = [];
+        $series = ['users' => [], 'delineations' => [], 'drone' => []];
 
         // The last 4 weeks as back-to-back 7-day windows ending today (local time), so no day is counted twice.
         $today = now(self::LOCAL_TIMEZONE)->startOfDay();
@@ -385,13 +385,110 @@ class AdminController extends Controller
             $start = $today->copy()->subDays(7 * $i + 6);
             $end = $today->copy()->subDays(7 * $i)->addDay();
             $labels[] = $start->format('M j').' – '.$end->copy()->subDay()->format('M j');
-            $zones[] = MangroveData::where('created_at', '>=', $start->copy()->utc())
-                ->where('created_at', '<', $end->copy()->utc())->count();
-            $analyses[] = Analysis::where('created_at', '>=', $start->copy()->utc())
-                ->where('created_at', '<', $end->copy()->utc())->count();
+            $from = $start->copy()->utc();
+            $to = $end->copy()->utc();
+            $series['users'][] = User::where('created_at', '>=', $from)->where('created_at', '<', $to)->count();
+            $series['delineations'][] = Delineation::where('created_at', '>=', $from)->where('created_at', '<', $to)->count();
+            $series['drone'][] = DroneImageryLayer::where('created_at', '>=', $from)->where('created_at', '<', $to)->count();
         }
 
-        return compact('labels', 'zones', 'analyses');
+        return ['labels' => $labels] + $series;
+    }
+
+    /**
+     * What an admin should look at now, most urgent first.
+     *
+     * @return array<int, array{tone: string, icon: string, title: string, text: string, url: string, action: string}>
+     */
+    private function attentionItems(int $pendingDelineations, ?Carbon $oldestPendingAt, int $droneFailed): array
+    {
+        $items = [];
+        $plural = fn (int $count, string $word) => $count.' '.Str::plural($word, $count);
+
+        foreach ($this->aiModelStatus() as $model) {
+            if (! $model['ready']) {
+                $items[] = ['tone' => 'danger', 'icon' => 'bi-cpu', 'title' => "No {$model['label']} model",
+                    'text' => $model['missing_text'], 'url' => route('admin.models'), 'action' => 'AI Models'];
+            }
+        }
+
+        if ($droneFailed > 0) {
+            $items[] = ['tone' => 'danger', 'icon' => 'bi-exclamation-octagon', 'title' => $plural($droneFailed, 'drone layer').' failed',
+                'text' => 'Processing or an AI step failed. Reprocess or remove them.',
+                'url' => route('admin.map-layers.index', ['tab' => 'imagery', 'status' => 'failed']), 'action' => 'Drone imagery'];
+        }
+
+        $applications = User::pendingExpertApplications()->count();
+        if ($applications > 0) {
+            $items[] = ['tone' => 'warning', 'icon' => 'bi-person-badge', 'title' => $plural($applications, 'expert application').' waiting',
+                'text' => 'Residents asked to become experts. Approve or reject them.',
+                'url' => route('admin.users').'#expert-applications', 'action' => 'Review'];
+        }
+
+        if ($pendingDelineations > 0 && $oldestPendingAt !== null && $oldestPendingAt->lt(now()->subDays(self::STALE_REVIEW_DAYS))) {
+            $items[] = ['tone' => 'warning', 'icon' => 'bi-hourglass-split', 'title' => $plural($pendingDelineations, 'delineation').' waiting for experts',
+                'text' => 'The oldest was submitted '.$oldestPendingAt->diffForHumans().'. Remind the experts to review them.',
+                'url' => route('admin.map-layers.index', ['status' => 'pending']), 'action' => 'Pending'];
+        }
+
+        $newFeedback = Feedback::where('status', 'new')->count();
+        if ($newFeedback > 0) {
+            $items[] = ['tone' => 'info', 'icon' => 'bi-chat-left-text', 'title' => $plural($newFeedback, 'new feedback message'),
+                'text' => 'Users sent feedback that nobody has looked at yet.',
+                'url' => route('admin.feedback.index', ['status' => 'new']), 'action' => 'Feedback'];
+        }
+
+        return $items;
+    }
+
+    /**
+     * The AI models the pipeline would use right now: the newest active uploaded one, else the default file in ml/models.
+     *
+     * @return array<string, array{label: string, ready: bool, name: ?string, detail: string, missing_text: string}>
+     */
+    private function aiModelStatus(): array
+    {
+        if ($this->aiModelStatus !== null) {
+            return $this->aiModelStatus;
+        }
+
+        $kinds = [
+            'segmentation' => ['label' => 'mangrove area', 'extension' => 'pth', 'default' => (string) config('ml.model_path'), 'enabled' => true],
+            'classification' => ['label' => 'genus', 'extension' => 'pt', 'default' => (string) config('ml.genus.model_path'), 'enabled' => (bool) config('ml.genus.enabled', true)],
+        ];
+
+        $status = [];
+        foreach ($kinds as $type => $kind) {
+            $model = AIModel::query()
+                ->where('model_type', $type)
+                ->where('is_active', true)
+                ->whereNotNull('model_path')
+                ->orderByDesc('id')
+                ->get()
+                ->first(fn (AIModel $model) => strtolower(pathinfo($model->model_path, PATHINFO_EXTENSION)) === $kind['extension']
+                    && is_file($model->model_path));
+            $hasDefault = $kind['default'] !== '' && is_file($kind['default']);
+
+            $status[$type] = [
+                'label' => $kind['label'],
+                'ready' => ! $kind['enabled'] || $model !== null || $hasDefault,
+                'name' => $model?->name ?? ($hasDefault ? basename($kind['default']) : null),
+                'detail' => match (true) {
+                    ! $kind['enabled'] => 'Turned off in settings',
+                    // Show the version only when it is a real one that the name does not already contain.
+                    $model !== null => preg_match('/^v?\d/i', (string) $model->version) && ! str_contains(strtolower($model->name), strtolower(ltrim((string) $model->version, 'vV')))
+                        ? 'Uploaded model · version '.ltrim($model->version, 'vV')
+                        : 'Uploaded model',
+                    $hasDefault => 'Default file in ml/models',
+                    default => 'No weights found',
+                },
+                'missing_text' => $type === 'segmentation'
+                    ? 'The AI cannot draw mangrove areas on drone imagery or Tile Explorer uploads. Upload a .pth model.'
+                    : 'Drone imagery gets no genus suggestion or canopies. Upload a .pt model.',
+            ];
+        }
+
+        return $this->aiModelStatus = $status;
     }
 
     public function users()

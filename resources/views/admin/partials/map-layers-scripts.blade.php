@@ -46,27 +46,24 @@
         }
 
         function previewDelineation(button) {
+            // Drawn from drone imagery: that imagery first, so the outline sits on top of it.
+            drawImagery(button);
             const features = JSON.parse(button.dataset.features || '[]');
             const style = 'rejected' in button.dataset ? rejectedDelineationStyle : delineationStyle;
             fitTo(drawFeatures(features, style).getBounds());
         }
 
         function previewImagery(button) {
-            const b = JSON.parse(button.dataset.bounds || 'null');
-            if (!b) return;
-
-            const bounds = L.latLngBounds([b.south, b.west], [b.north, b.east]);
-            L.tileLayer(button.dataset.tileUrl, {
-                bounds,
-                minNativeZoom: Number(button.dataset.zoomMin) || 0,
-                maxNativeZoom: Number(button.dataset.zoomMax) || MAP_MAX_ZOOM,
-                maxZoom: MAP_MAX_ZOOM,
-                updateWhenZooming: false,
-                updateWhenIdle: true,
-            }).addTo(previewGroup);
+            const bounds = drawImagery(button);
+            if (!bounds) return;
             fitTo(bounds);
 
-            if (button.dataset.segmentationUrl) {
+            // Its submitted delineation on top of the imagery; before the owner confirms there is none yet,
+            // so the AI-detected extent is shown instead.
+            if (button.dataset.features) {
+                const style = 'rejected' in button.dataset ? rejectedDelineationStyle : delineationStyle;
+                drawFeatures(JSON.parse(button.dataset.features), style);
+            } else if (button.dataset.segmentationUrl) {
                 fetch(button.dataset.segmentationUrl, { headers: { Accept: 'application/json' } })
                     .then(response => response.ok ? response.json() : null)
                     .then(result => {
@@ -76,6 +73,29 @@
                     })
                     .catch(error => console.warn('AI extent load failed:', error));
             }
+        }
+
+        // A drone layer's map tiles, or its review image while it awaits the owner's review. Returns its bounds.
+        function drawImagery(button) {
+            const b = JSON.parse(button.dataset.bounds || 'null');
+            if (!b || !(button.dataset.tileUrl || button.dataset.previewUrl)) return null;
+
+            const bounds = L.latLngBounds([b.south, b.west], [b.north, b.east]);
+            if (button.dataset.tileUrl) {
+                L.tileLayer(button.dataset.tileUrl, {
+                    bounds,
+                    minNativeZoom: Number(button.dataset.zoomMin) || 0,
+                    maxNativeZoom: Number(button.dataset.zoomMax) || MAP_MAX_ZOOM,
+                    maxZoom: MAP_MAX_ZOOM,
+                    updateWhenZooming: false,
+                    updateWhenIdle: true,
+                }).addTo(previewGroup);
+            } else if (button.dataset.previewUrl) {
+                // Awaiting the owner's review: no map tiles yet, only the review image.
+                L.imageOverlay(button.dataset.previewUrl, bounds).addTo(previewGroup);
+            }
+
+            return bounds;
         }
 
         const previewMapEl = document.getElementById('layerPreviewMap');
@@ -99,10 +119,17 @@
                 button.closest('.layer-row')?.classList.add('previewing');
 
                 if (button.dataset.kind === 'imagery') {
-                    previewLabel.textContent = button.dataset.name + (button.dataset.segmentationUrl ? ' · AI-detected extent in yellow' : '');
+                    previewLabel.textContent = button.dataset.name
+                        + (button.dataset.previewUrl ? ' · awaiting owner review (preview image)' : '')
+                        + (button.dataset.features
+                            ? ' · with its delineation (' + button.dataset.delineationStatus + ('rejected' in button.dataset ? ', in red)' : ')')
+                            : (button.dataset.segmentationUrl ? ' · AI-detected extent in yellow' : ''));
                     previewImagery(button);
                 } else {
-                    previewLabel.textContent = button.dataset.name + ('rejected' in button.dataset ? ' · Rejected, shown in red' : '');
+                    previewLabel.textContent = button.dataset.name
+                        + ('rejected' in button.dataset ? ' · Rejected, shown in red' : '')
+                        + (button.dataset.tileUrl ? ' · on its drone imagery' : '')
+                        + (button.dataset.previewUrl ? ' · on its drone imagery (awaiting owner review)' : '');
                     previewDelineation(button);
                 }
 

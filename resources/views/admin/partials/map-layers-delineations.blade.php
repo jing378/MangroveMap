@@ -5,8 +5,8 @@
                 <th>Delineation</th>
                 <th>Owner</th>
                 <th>Status</th>
-                <th>Areas</th>
-                <th>Updated</th>
+                <th>Location</th>
+                <th>Area</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -14,12 +14,11 @@
             @forelse($delineations as $delineation)
             @php
             $mapFeatures = \App\Http\Controllers\EndUserController::sanitizeFeaturesForMap($delineation->features);
-            [$statusLabel, $statusClass] = match (true) {
-                $delineation->isHiddenFromMap() => ['Hidden from map', 'secondary'],
-                $delineation->is_approved => ['Published', 'success'],
-                $delineation->is_rejected => ['Rejected', 'rejected'],
-                default => ['Pending review', 'pending'],
-            };
+            [$statusLabel, $statusClass] = \App\Http\Controllers\MapLayerController::delineationStatus($delineation);
+            $facts = \App\Http\Controllers\MapLayerController::delineationFacts($delineation);
+            $areaCount = count(array_filter($mapFeatures, fn ($feature) => $feature['type'] === 'area'));
+            // Drawn from drone imagery: the preview shows that imagery under the outline (tiles, or the review image).
+            $imagery = \App\Http\Controllers\MapLayerController::imageryPreviewAttributes($delineation->droneImageryLayer);
             @endphp
             <tr class="layer-row" data-layer-id="d{{ $delineation->id }}">
                 <td class="cell-title">
@@ -27,6 +26,13 @@
                     @if($delineation->notes)
                     <div class="muted clamp" title="{{ $delineation->notes }}">{{ $delineation->notes }}</div>
                     @endif
+                    <div class="muted">
+                        Updated {{ $delineation->updated_at?->format('M j, Y') ?? '—' }}
+                        @if($delineation->droneImageryLayer)
+                        · <a class="cross-link" href="{{ route('admin.map-layers.index', ['tab' => 'imagery', 'layer' => $delineation->drone_imagery_layer_id]) }}"
+                            title="Open the drone imagery this was drawn from"><i class="bi bi-camera"></i> Drone imagery</a>
+                        @endif
+                    </div>
                 </td>
                 <td data-label="Owner">
                     <div class="cell-value">
@@ -59,14 +65,29 @@
                         @endif
                     </div>
                 </td>
-                <td data-label="Areas">{{ count($mapFeatures) }}</td>
-                <td data-label="Updated" class="nowrap">{{ $delineation->updated_at?->format('M j, Y') ?? '—' }}</td>
+                <td data-label="Location">
+                    <div class="cell-value">
+                        <div>{{ $facts['municipality'] ?? 'Not matched yet' }}</div>
+                        @if($facts['barangays'])
+                        <div class="muted clamp" title="{{ implode(', ', $facts['barangays']) }}">{{ implode(', ', $facts['barangays']) }}</div>
+                        @endif
+                    </div>
+                </td>
+                <td data-label="Area">
+                    <div class="cell-value">
+                        <div class="nowrap">{{ number_format($facts['hectares'], 2) }} ha <span class="muted">· {{ $areaCount }} {{ \Illuminate\Support\Str::plural('area', $areaCount) }}</span></div>
+                        @if($facts['genera'])
+                        <div class="muted">{{ implode(', ', $facts['genera']) }}</div>
+                        @endif
+                    </div>
+                </td>
                 <td class="cell-actions">
                     <div class="row-actions">
                         <button type="button" class="action-btn" title="Preview on map" data-preview
                             data-kind="delineation"
                             data-name="{{ $delineation->name }}"
                             @if($delineation->is_rejected && ! $delineation->is_approved) data-rejected @endif
+                            @foreach($imagery as $attribute => $value) data-{{ $attribute }}="{{ $value }}" @endforeach
                             data-features='@json($mapFeatures)'
                             @disabled($mapFeatures === [])><i class="bi bi-eye"></i></button>
                         <button type="button" class="action-btn" title="Edit name and notes" data-edit-delineation

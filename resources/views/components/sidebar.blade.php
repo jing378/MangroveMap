@@ -7,12 +7,12 @@
             <span>Dashboard</span>
         </a>
 
-        <a href="{{ route('admin.models') }}" class="sidebar-item {{ request()->routeIs('admin.models') ? 'active' : '' }}">
+        <a href="{{ route('admin.models') }}" class="sidebar-item {{ request()->routeIs('admin.models', 'admin.models.*') ? 'active' : '' }}">
             <i class="bi bi-robot"></i>
             <span>AI Models</span>
         </a>
 
-        <a href="{{ route('admin.users') }}" class="sidebar-item {{ request()->routeIs('admin.users') ? 'active' : '' }}">
+        <a href="{{ route('admin.users') }}" class="sidebar-item {{ request()->routeIs('admin.users', 'admin.users.*') ? 'active' : '' }}">
             <i class="bi bi-people"></i>
             <span>Users</span>
         </a>

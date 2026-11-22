@@ -133,6 +133,77 @@ class AdminMapLayersTest extends TestCase
             ->assertDontSee('Review Survey');
     }
 
+    public function test_pending_delineations_preview_their_outline_on_their_drone_imagery(): void
+    {
+        $admin = $this->admin();
+        $ready = $this->imageryLayer(['name' => 'Confirmed survey']);
+        $awaiting = $this->imageryLayer([
+            'name' => 'Unconfirmed survey',
+            'status' => 'awaiting_review',
+            'bounds' => null,
+            'preview_path' => 'drone-imagery/processed/x/preview.png',
+            'preview_bounds' => ['south' => 10.3, 'west' => 125.3, 'north' => 10.4, 'east' => 125.4],
+        ]);
+        $pending = ['is_approved' => false, 'approved_at' => null];
+        $this->delineation($pending + ['name' => 'Hand-drawn stand']);
+        $this->delineation($pending + ['name' => 'Drone stand', 'drone_imagery_layer_id' => $ready->id]);
+        $this->delineation($pending + ['name' => 'Unconfirmed stand', 'drone_imagery_layer_id' => $awaiting->id]);
+
+        $html = $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['status' => 'pending']))
+            ->assertOk()
+            ->getContent();
+
+        // Every pending delineation can be previewed (its outline), and the drone ones also on their imagery.
+        $this->assertSame(3, substr_count($html, 'data-kind="delineation"'));
+        $this->assertSame(3, substr_count($html, "data-features='[{\"type\":\"area\""));
+        $this->assertStringContainsString('data-tile-url="/drone-imagery/'.$ready->id.'/tiles/{z}/{x}/{y}"', $html);
+        $this->assertStringContainsString('data-preview-url="/drone-imagery/'.$awaiting->id.'/preview"', $html);
+    }
+
+    public function test_drone_layers_preview_with_their_submitted_delineation(): void
+    {
+        $admin = $this->admin();
+        $withDelineation = $this->imageryLayer(['name' => 'Submitted survey', 'segmentation_status' => 'ready']);
+        $this->delineation(['name' => 'Survey stand', 'is_approved' => false, 'approved_at' => null, 'drone_imagery_layer_id' => $withDelineation->id]);
+        $aiOnly = $this->imageryLayer(['name' => 'Unsubmitted survey', 'segmentation_status' => 'ready']);
+
+        $html = $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['tab' => 'imagery']))
+            ->assertOk()
+            ->getContent();
+
+        // The submitted one carries its delineation (pending) instead of the AI extent; the other keeps the AI extent.
+        $this->assertSame(1, substr_count($html, "data-features='[{\"type\":\"area\""));
+        $this->assertStringContainsString('data-delineation-status="Pending review"', $html);
+        $this->assertStringNotContainsString('data-segmentation-url="/drone-imagery/'.$withDelineation->id.'/segmentation"', $html);
+        $this->assertStringContainsString('data-segmentation-url="/drone-imagery/'.$aiOnly->id.'/segmentation"', $html);
+    }
+
+    public function test_layers_awaiting_owner_review_preview_their_review_image_for_admins_only(): void
+    {
+        Storage::fake('local');
+        $admin = $this->admin();
+        $layer = $this->imageryLayer([
+            'name' => 'Waiting Survey',
+            'status' => 'awaiting_review',
+            'bounds' => null,
+            'preview_bounds' => ['south' => 10.1, 'west' => 125.1, 'north' => 10.2, 'east' => 125.2],
+        ]);
+        $layer->update(['preview_path' => "drone-imagery/processed/{$layer->id}/preview.png"]);
+        Storage::disk('local')->put($layer->preview_path, 'png');
+
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['tab' => 'imagery']))
+            ->assertSee('data-preview-url="/drone-imagery/'.$layer->id.'/preview"', false)
+            ->assertDontSee('data-tile-url', false);
+
+        $this->get(route('drone-imagery.preview', $layer->id))->assertOk();
+        $this->actingAs(User::factory()->create(['role' => 'end_user']))
+            ->get(route('drone-imagery.preview', $layer->id))
+            ->assertNotFound();
+    }
+
     public function test_imagery_preview_urls_are_relative_and_hide_reason_is_shown(): void
     {
         $admin = $this->admin();
@@ -141,8 +212,8 @@ class AdminMapLayersTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('admin.map-layers.index', ['tab' => 'imagery']))
-            ->assertSee('data-tile-url="/drone-imagery/' . $layer->id . '/tiles/{z}/{x}/{y}"', false)
-            ->assertSee('data-segmentation-url="/drone-imagery/' . $layer->id . '/segmentation"', false);
+            ->assertSee('data-tile-url="/drone-imagery/'.$layer->id.'/tiles/{z}/{x}/{y}"', false)
+            ->assertSee('data-segmentation-url="/drone-imagery/'.$layer->id.'/segmentation"', false);
 
         $this->actingAs($admin)
             ->get(route('admin.map-layers.index', ['status' => 'hidden']))
@@ -216,7 +287,7 @@ class AdminMapLayersTest extends TestCase
         Notification::assertSentTo(
             $delineation->user,
             DelineationModerated::class,
-            fn($n) => $n->action === 'hidden' && $n->reason === 'Overlaps a fishpond.',
+            fn ($n) => $n->action === 'hidden' && $n->reason === 'Overlaps a fishpond.',
         );
 
         $this->actingAs($admin)
@@ -225,7 +296,7 @@ class AdminMapLayersTest extends TestCase
 
         $this->assertFalse($delineation->fresh()->isHiddenFromMap());
         $this->assertSame(1, Delineation::approved()->count());
-        Notification::assertSentTo($delineation->user, DelineationModerated::class, fn($n) => $n->action === 'restored');
+        Notification::assertSentTo($delineation->user, DelineationModerated::class, fn ($n) => $n->action === 'restored');
     }
 
     public function test_only_published_delineations_can_be_hidden(): void
@@ -252,7 +323,7 @@ class AdminMapLayersTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertModelMissing($delineation);
-        Notification::assertSentTo($owner, DelineationModerated::class, fn($n) => $n->action === 'deleted');
+        Notification::assertSentTo($owner, DelineationModerated::class, fn ($n) => $n->action === 'deleted');
         $this->assertDatabaseHas('user_activities', ['activity' => 'Deleted delineation: Sogod Bay Stand']);
     }
 
@@ -278,6 +349,47 @@ class AdminMapLayersTest extends TestCase
         Storage::disk('local')->assertMissing("drone-imagery/uploads/{$layer->id}/a.tif");
     }
 
+    public function test_deleting_imagery_warns_that_its_delineation_stays_without_imagery(): void
+    {
+        Storage::fake('local');
+        $admin = $this->admin();
+        $layer = $this->imageryLayer(['name' => 'Linked survey']);
+        $delineation = $this->delineation(['name' => 'Linked stand', 'is_approved' => false, 'approved_at' => null, 'drone_imagery_layer_id' => $layer->id]);
+        $this->imageryLayer(['name' => 'Lone survey']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.map-layers.index', ['tab' => 'imagery']))
+            ->assertSee('Its delineation &quot;Linked stand&quot; (Pending review) stays, but will have no drone imagery.', false)
+            ->assertSee('Delete it on the Delineations tab if it should go too.', false);
+
+        $this->delete(route('admin.map-layers.imagery.destroy', $layer))
+            ->assertSessionHas('success', 'Imagery layer "Linked survey" and its files were deleted. Its delineation "Linked stand" was kept, without imagery.');
+
+        $this->assertModelMissing($layer);
+        $this->assertNull($delineation->fresh()->drone_imagery_layer_id);
+    }
+
+    public function test_delineations_and_their_drone_imagery_link_to_each_other(): void
+    {
+        $admin = $this->admin();
+        $layer = $this->imageryLayer(['name' => 'Linked survey']);
+        $delineation = $this->delineation(['name' => 'Linked stand', 'is_approved' => false, 'approved_at' => null, 'drone_imagery_layer_id' => $layer->id]);
+        $this->delineation(['name' => 'Hand-drawn stand']);
+        $this->imageryLayer(['name' => 'Lone survey']);
+
+        // Each row links to the other tab, filtered to the linked record.
+        $this->actingAs($admin)->get(route('admin.map-layers.index'))
+            ->assertSee(route('admin.map-layers.index', ['tab' => 'imagery', 'layer' => $layer->id]));
+        $this->get(route('admin.map-layers.index', ['tab' => 'imagery']))
+            ->assertSee(route('admin.map-layers.index', ['delineation' => $delineation->id]), false)
+            ->assertSee('No delineation yet');
+
+        $this->get(route('admin.map-layers.index', ['delineation' => $delineation->id]))
+            ->assertSee('Linked stand')->assertDontSee('Hand-drawn stand');
+        $this->get(route('admin.map-layers.index', ['tab' => 'imagery', 'layer' => $layer->id]))
+            ->assertSee('Linked survey')->assertDontSee('Lone survey');
+    }
+
     public function test_imagery_still_processing_cannot_be_deleted(): void
     {
         $admin = $this->admin();
@@ -300,11 +412,11 @@ class AdminMapLayersTest extends TestCase
         $this->actingAs($admin)->post(route('admin.map-layers.imagery.reprocess', $failed))->assertSessionHas('success');
         $this->assertSame('queued', $failed->fresh()->status);
         $this->assertNull($failed->fresh()->error_message);
-        Queue::assertPushed(ProcessDroneImagery::class, fn($job) => $job->layerId === $failed->id);
+        Queue::assertPushed(ProcessDroneImagery::class, fn ($job) => $job->layerId === $failed->id);
 
         $this->actingAs($admin)->post(route('admin.map-layers.imagery.segment', $ready))->assertSessionHas('success');
         $this->assertSame('queued', $ready->fresh()->segmentation_status);
-        Queue::assertPushed(SegmentDroneImagery::class, fn($job) => $job->layerId === $ready->id);
+        Queue::assertPushed(SegmentDroneImagery::class, fn ($job) => $job->layerId === $ready->id);
 
         // A ready layer cannot be "reprocessed", and segmentation can't be queued twice.
         $this->actingAs($admin)->post(route('admin.map-layers.imagery.reprocess', $ready))->assertSessionHas('error');

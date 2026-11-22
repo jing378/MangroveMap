@@ -5,6 +5,7 @@
 @section('content')
 <div id="map-layers-section">
     <div class="page-title">Map Layers</div>
+    <p class="page-sub">Every delineation and drone imagery layer on the map. Export either list as CSV, or the delineations as GeoJSON for QGIS.</p>
 
     <div class="grid cols-4">
         <div class="stat-card">
@@ -20,7 +21,7 @@
         <div class="stat-card">
             <div class="stat-label">Drone Imagery Layers</div>
             <div class="stat-value">{{ $counts['imagery'] }}</div>
-            <div class="stat-change">{{ $counts['imageryReady'] }} ready to view</div>
+            <div class="stat-change">{{ $counts['imageryReady'] }} ready to view · {{ \App\Http\Controllers\MapLayerController::formatBytes($counts['imageryBytes']) }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Imagery Issues</div>
@@ -37,18 +38,20 @@
     <div class="section">
         <nav class="tabs" aria-label="Layer types">
             <a href="{{ route('admin.map-layers.index') }}" class="tab {{ $tab === 'delineations' ? 'active' : '' }}" @if($tab === 'delineations') aria-current="page" @endif>
-                <i class="bi bi-bounding-box"></i> Mangrove Delineations
+                <i class="bi bi-bounding-box"></i> {{-- one flex item, so the tab's gap does not split the words --}}<span><span class="tab-long">Mangrove </span>Delineations</span>
             </a>
             <a href="{{ route('admin.map-layers.index', ['tab' => 'imagery']) }}" class="tab {{ $tab === 'imagery' ? 'active' : '' }}" @if($tab === 'imagery') aria-current="page" @endif>
                 <i class="bi bi-camera"></i> Drone Imagery
             </a>
         </nav>
 
+        <div class="layer-toolbar">
         <form method="GET" action="{{ route('admin.map-layers.index') }}" class="filter-bar">
             @if($tab === 'imagery')
             <input type="hidden" name="tab" value="imagery">
             @endif
-            <input type="search" name="search" class="search-input" placeholder="Search by layer or user name..." value="{{ $filters['search'] ?? '' }}">
+            <input type="search" name="search" class="search-input" aria-label="Search"
+                placeholder="{{ $tab === 'delineations' ? 'Search by name, place or user...' : 'Search by layer or user name...' }}" value="{{ $filters['search'] ?? '' }}">
             <select name="status" class="filter-select" aria-label="Status">
                 <option value="">All Status</option>
                 @foreach($statusOptions as $value => $label)
@@ -61,10 +64,25 @@
             @endif
         </form>
 
-        @if($tab === 'delineations')
-        @include('admin.partials.map-layers-delineations')
-        @else
+        {{-- Exports take every row matching the search and status, not only this page. --}}
+        <div class="export-actions">
+            <a class="btn-secondary" href="{{ route('admin.map-layers.export', array_filter(['tab' => $tab === 'imagery' ? 'imagery' : null] + $filters)) }}"
+                download data-no-progress title="Every row that matches the search and status, not only this page">
+                <i class="bi bi-filetype-csv"></i> Export CSV
+            </a>
+            @if($tab === 'delineations')
+            <a class="btn-secondary" href="{{ route('admin.map-layers.export', ['format' => 'geojson'] + array_filter($filters)) }}"
+                download data-no-progress title="Polygons in WGS 84 (EPSG:4326), one feature per drawn area. Without a status filter: published ones only.">
+                <i class="bi bi-globe2"></i> GeoJSON{{ empty($filters['status']) ? ' (published)' : '' }}
+            </a>
+            @endif
+        </div>
+        </div>
+
+        @if($tab === 'imagery')
         @include('admin.partials.map-layers-imagery')
+        @else
+        @include('admin.partials.map-layers-delineations')
         @endif
     </div>
 

@@ -12,30 +12,95 @@
                 <span>Administrator</span>
             </div>
             <h1>Welcome back, {{ Auth::user()->name }}</h1>
-            <p>Manage user accounts, oversee mangrove delineation records, and keep the AI models and analysis pipeline running smoothly.</p>
+            <p>Manage user accounts, oversee mangrove delineations and drone imagery, and keep the AI models running.</p>
         </div>
     </div>
 
     <div class="grid cols-4">
-        <div class="stat-card">
-            <div class="stat-label">Total Users</div>
+        <a class="stat-card" href="{{ route('admin.users') }}">
+            <div class="stat-label"><i class="bi bi-people"></i> Users</div>
             <div class="stat-value green">{{ number_format($totalUsers) }}</div>
-            <div class="stat-change positive">{{ $newUsersThisMonth }} new this month</div>
+            <div class="stat-change positive">{{ number_format($newUsersThisMonth) }} new this month · {{ number_format($expertCount) }} {{ Str::plural('expert', $expertCount) }}</div>
+        </a>
+        <a class="stat-card" href="{{ route('admin.map-layers.index', ['status' => 'published']) }}">
+            <div class="stat-label"><i class="bi bi-tree"></i> Mangroves mapped</div>
+            <div class="stat-value">{{ number_format($approvedHectares, $approvedHectares < 100 ? 2 : 1) }} <span class="stat-unit">ha</span></div>
+            <div class="stat-change">{{ number_format($approvedAreas) }} approved {{ Str::plural('area', $approvedAreas) }}</div>
+        </a>
+        <a class="stat-card" href="{{ route('admin.map-layers.index', ['status' => 'pending']) }}">
+            <div class="stat-label"><i class="bi bi-hourglass-split"></i> Waiting for experts</div>
+            <div class="stat-value {{ $pendingDelineations > 0 ? 'amber' : '' }}">{{ number_format($pendingDelineations) }}</div>
+            <div class="stat-change">
+                @if($oldestPendingAt)
+                    Oldest submitted {{ $oldestPendingAt->diffForHumans() }}
+                @else
+                    Nothing to review
+                @endif
+            </div>
+        </a>
+        <a class="stat-card" href="{{ route('admin.map-layers.index', ['tab' => 'imagery']) }}">
+            <div class="stat-label"><i class="bi bi-camera"></i> Drone imagery</div>
+            <div class="stat-value">{{ number_format($droneTotal) }}</div>
+            <div class="stat-change {{ $droneFailed > 0 ? 'negative' : '' }}">
+                @php
+                    $droneParts = array_filter([
+                        $droneProcessing ? number_format($droneProcessing).' processing' : null,
+                        $droneAwaitingOwner ? number_format($droneAwaitingOwner).' awaiting owner' : null,
+                        $droneFailed ? number_format($droneFailed).' failed' : null,
+                    ]);
+                @endphp
+                {{ $droneParts ? implode(' · ', $droneParts) : 'All layers processed' }}
+            </div>
+        </a>
+    </div>
+
+    <div class="grid attention-grid">
+        <div class="section attention">
+            <div class="section-title"><i class="bi bi-bell"></i> Needs attention
+                @if($attention)
+                    <span class="badge pending">{{ count($attention) }}</span>
+                @endif
+            </div>
+            @forelse($attention as $item)
+                <a class="attention-item tone-{{ $item['tone'] }}" href="{{ $item['url'] }}">
+                    <i class="bi {{ $item['icon'] }} attention-icon" aria-hidden="true"></i>
+                    <span class="attention-text">
+                        <strong>{{ $item['title'] }}</strong>
+                        <span>{{ $item['text'] }}</span>
+                    </span>
+                    <span class="attention-action">{{ $item['action'] }} <i class="bi bi-arrow-right"></i></span>
+                </a>
+            @empty
+                <div class="attention-empty">
+                    <i class="bi bi-check-circle" aria-hidden="true"></i>
+                    <span>All clear. No failed jobs, waiting applications, overdue reviews or new feedback.</span>
+                </div>
+            @endforelse
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Observation Records</div>
-            <div class="stat-value">{{ number_format($mappedZones) }}</div>
-            <div class="stat-change positive">{{ $newZonesThisMonth }} new this month</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Completed Analyses</div>
-            <div class="stat-value">{{ number_format($generaClassified) }}</div>
-            <div class="stat-change">Out of {{ number_format($totalAnalyses) }} total runs</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Analysis Success Rate</div>
-            <div class="stat-value green">{{ $systemHealth }}%</div>
-            <div class="stat-change">Completed vs. total runs</div>
+
+        <div class="section">
+            <div class="section-title"><i class="bi bi-cpu"></i> AI models &amp; storage
+                <a href="{{ route('admin.models') }}" class="section-link">Manage <i class="bi bi-arrow-right"></i></a>
+            </div>
+            @foreach($aiModels as $model)
+                <div class="model-row">
+                    <span class="model-dot {{ $model['ready'] ? 'ok' : 'missing' }}" aria-hidden="true"></span>
+                    <span class="model-text">
+                        <span class="model-kind">{{ ucfirst($model['label']) }}</span>
+                        <strong>{{ $model['name'] ?? 'Not installed' }}</strong>
+                        <span class="cell-sub">{{ $model['detail'] }}</span>
+                    </span>
+                </div>
+            @endforeach
+            <div class="model-row">
+                <i class="bi bi-hdd storage-icon" aria-hidden="true"></i>
+                <span class="model-text">
+                    <span class="model-kind">Uploaded files</span>
+                    <span>Drone imagery: <strong>{{ \App\Http\Controllers\MapLayerController::formatBytes($storage['droneBytes']) }}</strong></span>
+                    <span>Tile Explorer: <strong>{{ \App\Http\Controllers\MapLayerController::formatBytes($storage['tileBytes']) }}</strong>
+                        <span class="cell-sub">({{ number_format($storage['tileSources']) }} {{ Str::plural('upload', $storage['tileSources']) }})</span></span>
+                </span>
+            </div>
         </div>
     </div>
 
@@ -178,7 +243,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5">No activity recorded yet. Run <code>php artisan db:seed</code> to load demo data.</td>
+                        <td colspan="5">No activity recorded yet.</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -473,6 +538,199 @@
         border: 1px solid var(--bd-d4e0d4, #d4e0d4);
     }
 
+    a.stat-card {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .stat-label i {
+        margin-right: 4px;
+    }
+
+    .stat-unit {
+        font-size: 16px;
+        font-weight: 700;
+        color: #7a9a7a;
+    }
+
+    .stat-value.amber {
+        color: var(--fg-c07818, #c07818);
+    }
+
+    .stat-change.negative {
+        color: var(--fg-d04030, #d04030);
+    }
+
+    .grid.attention-grid {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        gap: 20px;
+        margin-bottom: 0;
+        align-items: start;
+    }
+
+    .attention-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 14px;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+        border-left-width: 4px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        color: inherit;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+
+    .attention-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .attention-item:hover {
+        background: var(--bg-f5f7f6, #f5f7f6);
+    }
+
+    .attention-item.tone-danger {
+        border-left-color: #d04030;
+    }
+
+    .attention-item.tone-warning {
+        border-left-color: #c07818;
+    }
+
+    .attention-item.tone-info {
+        border-left-color: #1e9e62;
+    }
+
+    .attention-icon {
+        font-size: 18px;
+        flex: 0 0 auto;
+    }
+
+    .tone-danger .attention-icon {
+        color: var(--fg-d04030, #d04030);
+    }
+
+    .tone-warning .attention-icon {
+        color: var(--fg-c07818, #c07818);
+    }
+
+    .tone-info .attention-icon {
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .attention-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        flex: 1 1 auto;
+        font-size: 12px;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    .attention-text strong {
+        font-size: 13px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    .attention-action {
+        flex: 0 0 auto;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--fg-1e9e62, #1e9e62);
+        white-space: nowrap;
+    }
+
+    .attention-empty {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px;
+        border-radius: 10px;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-2f5a46, #2f5a46);
+        font-size: 13px;
+    }
+
+    .attention-empty i {
+        color: var(--fg-1e9e62, #1e9e62);
+        font-size: 18px;
+    }
+
+    .model-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+    }
+
+    .model-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .model-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-top: 5px;
+        flex: 0 0 auto;
+    }
+
+    .storage-icon {
+        font-size: 13px;
+        color: #9ab0a0;
+        margin-top: 1px;
+        flex: 0 0 10px;
+    }
+
+    .model-dot.ok {
+        background: #16a34a;
+    }
+
+    .model-dot.missing {
+        background: #d04030;
+    }
+
+    .model-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        font-size: 13px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        overflow-wrap: anywhere;
+    }
+
+    .model-kind {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #9ab0a0;
+    }
+
+    @media (max-width: 1024px) {
+        .grid.attention-grid {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .attention-item {
+            flex-wrap: wrap;
+            gap: 8px 12px;
+        }
+
+        .attention-action {
+            margin-left: 32px;
+        }
+    }
+
     .chart-container {
         position: relative;
         height: 300px;
@@ -498,9 +756,25 @@
             gap: 12px;
         }
 
-        .contributor-summary {
-            grid-template-columns: 1fr;
-            gap: 10px;
+        /* The counts stay side by side on phones: short numbers, so they fit and the tables come sooner. */
+        .contributor-summary,
+        .today-summary {
+            gap: 8px;
+        }
+
+        .contributor-metric {
+            padding: 10px 10px;
+            min-width: 0;
+        }
+
+        .contributor-metric .stat-value {
+            font-size: 20px;
+        }
+
+        .contributor-metric .stat-label {
+            font-size: 9.5px;
+            letter-spacing: 0.3px;
+            overflow-wrap: anywhere;
         }
 
         .section {
@@ -560,10 +834,10 @@
     new Chart(document.getElementById('growthChart'), {
         type: 'line',
         data: {
-            labels: @json($growthChartLabels),
+            labels: @json($growthChart['labels']),
             datasets: [{
-                    label: 'New observation records',
-                    data: @json($growthChartZones),
+                    label: 'New users',
+                    data: @json($growthChart['users']),
                     borderColor: '#1e9e62',
                     backgroundColor: 'rgba(30,158,98,.1)',
                     fill: true,
@@ -571,10 +845,19 @@
                     borderWidth: 2
                 },
                 {
-                    label: 'Analyses run',
-                    data: @json($growthChartAnalyses),
+                    label: 'Delineations submitted',
+                    data: @json($growthChart['delineations']),
                     borderColor: '#5ab8de',
                     backgroundColor: 'rgba(90,184,222,.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2
+                },
+                {
+                    label: 'Drone uploads',
+                    data: @json($growthChart['drone']),
+                    borderColor: '#d9a23a',
+                    backgroundColor: 'rgba(217,162,58,.08)',
                     fill: true,
                     tension: 0.4,
                     borderWidth: 2
@@ -587,7 +870,8 @@
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        color: '#9ab0a0'
+                        color: '#9ab0a0',
+                        precision: 0
                     }
                 },
                 x: {

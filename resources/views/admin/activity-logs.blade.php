@@ -412,7 +412,8 @@
         .log-table .cell-time {
             grid-area: time;
             display: flex;
-            gap: 6px;
+            flex-wrap: wrap; /* the time drops below the date instead of running under the module badge */
+            gap: 0 6px;
             font-size: 11px;
             color: #9ab0a0;
         }
