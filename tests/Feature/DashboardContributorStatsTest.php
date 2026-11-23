@@ -72,6 +72,22 @@ class DashboardContributorStatsTest extends TestCase
         );
     }
 
+    #[DataProvider('dashboards')]
+    public function test_the_delineations_table_opens_each_record_on_the_delineate_page(string $role, string $route): void
+    {
+        $viewer = User::factory()->create(['role' => $role]);
+        // Residents see their own records; experts see residents' records to review.
+        $owner = $role === 'expert' ? User::factory()->create(['role' => 'end_user']) : $viewer;
+        $delineation = $this->delineation($owner, ['name' => 'My stand']);
+        $delineate = $role === 'expert' ? 'expert.delineate' : 'delineate';
+
+        $this->actingAs($viewer)
+            ->get(route($route))
+            ->assertOk()
+            ->assertSee('href="'.route($delineate, ['delineation' => $delineation->id], false).'"', false)
+            ->assertDontSee('map?delineation='.$delineation->id.'" class="btn-table-action"', false);
+    }
+
     public function test_user_without_approved_work_has_no_rank(): void
     {
         $resident = User::factory()->create(['role' => 'end_user']);

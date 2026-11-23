@@ -1581,8 +1581,9 @@
                                 </td>
                                 <td style="color: #7a9a7a; font-size: 12px;">{{ $dateStr }}</td>
                                 <td style="text-align: right;">
-                                    <a href="{{ (auth()->user()->isExpert() ? route('expert.map') : route('map')) }}?delineation={{ $d['id'] }}" class="btn-table-action" title="View on map" aria-label="View on map">
-                                        <i class="bi bi-eye"></i> View<span class="action-label-extra"> on Map</span>
+                                    {{-- Opens the record on the Delineate page (review, revise or edit it there). --}}
+                                    <a href="{{ \App\Models\Delineation::delineateUrlForId($d['id'], auth()->user(), false) }}" class="btn-table-action" title="Open delineation" aria-label="Open delineation">
+                                        <i class="bi bi-eye"></i> View<span class="action-label-extra"> Delineation</span>
                                     </a>
                                 </td>
                             </tr>
