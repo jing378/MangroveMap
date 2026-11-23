@@ -109,6 +109,24 @@ class DroneReassessmentTest extends TestCase
             });
     }
 
+    public function test_the_same_area_surveyed_again_by_the_same_user_is_offered_as_a_resurvey(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        // Their first survey, approved; the second has exactly the same outline (shares every edge).
+        $first = $this->area($resident, self::ORIGINAL, ['approved_by' => $expert->id]);
+        $layer = $this->layer($resident, 'awaiting_review', self::ORIGINAL);
+
+        $this->actingAs($resident)
+            ->get(route('drone-imagery.edit', $layer->id))
+            ->assertOk()
+            ->assertViewHas('editor', fn (array $editor) => count($editor['reassessment_candidates']) === 1
+                && $editor['reassessment_candidates'][0]['id'] === $first->id
+                && $editor['reassessment_candidates'][0]['overlap_percent'] > 99);
+    }
+
     public function test_confirm_keeps_the_chosen_area_and_refuses_one_the_survey_does_not_overlap(): void
     {
         Storage::fake('local');

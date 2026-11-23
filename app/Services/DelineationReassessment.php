@@ -46,7 +46,14 @@ class DelineationReassessment
             ->get(['id', 'user_id', 'name', 'features', 'approved_at', 'created_at'])
             ->map(function (Delineation $delineation) use ($surveyRings, $surveyBox) {
                 $rings = self::rings($delineation->features ?? []);
-                if ($rings === [] || ! self::boxesOverlap($surveyBox, self::boundingBox($rings)) || ! self::ringsIntersect($surveyRings, $rings)) {
+                if ($rings === [] || ! self::boxesOverlap($surveyBox, self::boundingBox($rings))) {
+                    return null;
+                }
+                // Shared inside (the grid), or touching where the grid is too coarse to see it. The grid is what
+                // catches the same area surveyed again: identical outlines share every edge, so no corner lies
+                // strictly inside the other and no edge properly crosses one.
+                $share = self::shareInside($surveyRings, $rings);
+                if ($share <= 0 && ! self::ringsIntersect($surveyRings, $rings)) {
                     return null;
                 }
 
@@ -57,7 +64,7 @@ class DelineationReassessment
                     'name' => $delineation->name ?: "Delineation {$delineation->id}",
                     'location' => implode('; ', ApprovedCoverageStats::barangayNames($features)) ?: null,
                     'area_ha' => round(ApprovedCoverageStats::areaHectares($features), 2),
-                    'overlap_percent' => round(self::shareInside($surveyRings, $rings) * 100, 1),
+                    'overlap_percent' => round($share * 100, 1),
                     'mapped_by' => $delineation->user?->name,
                     'approved_year' => ($delineation->approved_at ?? $delineation->created_at)?->year,
                 ];
