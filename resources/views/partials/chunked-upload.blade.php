@@ -34,7 +34,11 @@
             if (event.lengthComputable) onProgress(event.loaded);
           });
         }
-        const fail = (text, status = 0) => reject(Object.assign(new Error(text), { status }));
+        const fail = (text, status = 0) => reject(Object.assign(new Error(text), {
+          status,
+          // Seconds the rate limiter asks us to wait (HTTP 429), when it says.
+          retryAfter: status === 429 ? Number.parseInt(request.getResponseHeader('Retry-After') || '', 10) || null : null,
+        }));
         request.addEventListener('load', () => {
           let payload;
           try {
@@ -59,6 +63,21 @@
       });
     }
 
+    // How long to wait after a 429: the server's Retry-After (plus a second), else 5 s, at most a minute.
+    const rateLimitDelay = error => Math.min(60000, ((error.retryAfter ?? 4) + 1) * 1000);
+
+    // start / complete: a 429 means the request never reached the controller, so it is safe to send again.
+    async function sendRetryingRateLimit(method, url, body = null, options = {}) {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await send(method, url, body, options);
+        } catch (error) {
+          if (error.status !== 429 || attempt >= MAX_ATTEMPTS) throw error;
+          await wait(rateLimitDelay(error));
+        }
+      }
+    }
+
     function readResume(key) {
       try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
     }
@@ -76,7 +95,7 @@
           writeResume(resumeKey, null); // expired or removed: start over
         }
       }
-      const created = await send('POST', url, JSON.stringify({
+      const created = await sendRetryingRateLimit('POST', url, JSON.stringify({
         ...fields,
         files: files.map(file => ({ name: file.name, size: file.size })),
       }), { contentType: 'application/json' });
@@ -133,7 +152,8 @@
             inFlight.delete(task);
             report();
             if (failure || FATAL_STATUSES.includes(error.status) || attempt >= MAX_ATTEMPTS) throw error;
-            await wait(Math.min(30000, 1000 * 2 ** attempt)); // 2 s, 4 s, 8 s … rides out short drop-outs
+            // Rate limited: wait as long as the server says. Otherwise 2 s, 4 s, 8 s … rides out short drop-outs.
+            await wait(error.status === 429 ? rateLimitDelay(error) : Math.min(30000, 1000 * 2 ** attempt));
           }
         }
       }
@@ -154,7 +174,7 @@
         throw failure;
       }
 
-      const result = await send('POST', `${sessionUrl}/complete`);
+      const result = await sendRetryingRateLimit('POST', `${sessionUrl}/complete`);
       writeResume(resumeKey, null);
       return result;
     }

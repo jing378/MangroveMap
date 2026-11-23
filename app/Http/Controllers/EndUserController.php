@@ -780,22 +780,7 @@ class EndUserController extends Controller
 
         $delineation->delete();
 
-        // Experts learn it is gone: a pending one was waiting for all of them; a rejected one concerns the
-        // expert who rejected it (all experts when that is not recorded).
-        $experts = User::where('role', 'expert')
-            ->when($status === 'rejected' && $rejectedBy, fn ($query) => $query->whereKey($rejectedBy))
-            ->get();
-        if ($experts->isEmpty() && $status === 'rejected') {
-            $experts = User::where('role', 'expert')->get();
-        }
-        $notification = new DelineationWithdrawn($name, $status, $request->user()->name);
-        $experts->each(function (User $expert) use ($notification) {
-            try {
-                $expert->notify($notification);
-            } catch (\Throwable $e) {
-                report($e); // never fails the deletion
-            }
-        });
+        DelineationWithdrawn::notifyExperts($name, $status, $rejectedBy, $request->user()->name);
 
         return response()->json([
             'message' => 'Delineation deleted.',

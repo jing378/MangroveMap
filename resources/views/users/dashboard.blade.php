@@ -765,39 +765,79 @@
         flex-wrap: wrap;
     }
 
-    .rep-places {
-        list-style: none;
-        margin: 0;
-        padding: 0;
+    /* Mangrove report: a histogram (one column per municipality) over a table of the figures */
+    .rep-histogram {
+        position: relative;
+        height: 240px;
+        margin-bottom: 6px;
+    }
+
+    .rep-hint {
         display: flex;
-        flex-direction: column;
+        align-items: center;
         gap: 6px;
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: #7a9a7a;
+    }
+
+    .rep-table {
+        table-layout: fixed;
+    }
+
+    .rep-col-name { width: auto; }
+    .rep-col-ha { width: 92px; }
+    .rep-col-share { width: 72px; }
+    .rep-col-count { width: 64px; }
+
+    .rep-table th,
+    .rep-table td {
+        padding: 9px 12px;
+        vertical-align: middle;
+    }
+
+    .rep-table thead th {
+        padding-top: 0;
+    }
+
+    .rep-table tbody th {
+        text-align: left;
+        font-weight: inherit;
+        border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+    }
+
+    .rep-num {
+        text-align: right !important;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .rep-ha {
+        font-weight: 800;
+    }
+
+    .rep-row {
+        cursor: pointer;
+    }
+
+    .rep-group.is-open .rep-row td,
+    .rep-group.is-open .rep-row th {
+        background: var(--bg-f5f7f6, #f5f7f6);
     }
 
     .rep-place-btn {
-        display: grid;
-        grid-template-columns: minmax(110px, 180px) minmax(0, 1fr) auto auto 16px;
+        display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
         width: 100%;
-        padding: 10px 12px;
-        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
-        border-radius: 10px;
-        background: var(--bg-ffffff, #ffffff);
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        background: none;
         color: var(--fg-1a2e1a, #1a2e1a);
         font-family: inherit;
         text-align: left;
         cursor: pointer;
-    }
-
-    .rep-place-btn:hover {
-        border-color: var(--bd-b8d9c6, #b8d9c6);
-        background: var(--bg-fbfdfb, #fbfdfb);
-    }
-
-    .rep-place-btn[aria-expanded="true"] {
-        border-color: #1e9e62;
-        background: var(--bg-f5f7f6, #f5f7f6);
     }
 
     .rep-place-name {
@@ -815,6 +855,7 @@
     }
 
     .rep-bar {
+        display: block;
         height: 12px;
         border-radius: 6px;
         background: var(--bg-edf7f2, #edf7f2);
@@ -829,33 +870,23 @@
         background: #1e9e62;
     }
 
-    .rep-place-ha {
-        font-size: 13px;
-        font-weight: 800;
-        white-space: nowrap;
-    }
-
-    .rep-count {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 2px 8px;
-        border-radius: 12px;
-        background: var(--bg-edf7f2, #edf7f2);
-        color: var(--fg-1e9e62, #1e9e62);
-        font-size: 11px;
-        font-weight: 700;
-        white-space: nowrap;
-    }
-
     .rep-chevron {
-        font-size: 12px;
+        flex: 0 0 auto;
+        font-size: 11px;
         color: #7a9a7a;
         transition: transform 0.15s ease;
     }
 
     .rep-place-btn[aria-expanded="true"] .rep-chevron {
-        transform: rotate(180deg);
+        transform: rotate(90deg);
+    }
+
+    .rep-table tfoot th,
+    .rep-table tfoot td {
+        border-top: 2px solid var(--bd-e0e8e0, #e0e8e0);
+        border-bottom: 0;
+        font-weight: 800;
+        text-align: left;
     }
 
     .type-dot {
@@ -866,36 +897,38 @@
         border-radius: 50%;
     }
 
-    .rep-areas {
-        list-style: none;
-        margin: 6px 0 4px 14px;
-        padding: 0 0 0 14px;
-        border-left: 2px solid var(--bd-e0e8e0, #e0e8e0);
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
     .rep-areas[hidden] {
         display: none;
     }
 
-    .rep-area {
-        display: grid;
-        grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) auto 28px;
-        align-items: center;
-        gap: 10px;
-        padding: 6px 4px;
+    .rep-area th,
+    .rep-area td {
+        padding-top: 7px;
+        padding-bottom: 7px;
         font-size: 12px;
     }
 
+    .rep-area th {
+        padding-left: 31px;
+    }
+
     .rep-area-name {
+        display: block;
         min-width: 0;
         font-weight: 700;
-        color: var(--fg-1a2e1a, #1a2e1a);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .rep-area-name a {
+        color: var(--fg-1a2e1a, #1a2e1a);
+        text-decoration: none;
+    }
+
+    .rep-area-name a:hover {
+        color: var(--fg-1e9e62, #1e9e62);
+        text-decoration: underline;
     }
 
     .rep-area-brgy {
@@ -906,21 +939,8 @@
         text-overflow: ellipsis;
     }
 
-    .rep-area .rep-bar {
-        height: 8px;
-    }
-
-    .rep-area .rep-bar span {
-        background: #5ab88a;
-    }
-
-    .rep-area-ha {
-        font-weight: 800;
-        white-space: nowrap;
-    }
-
     .rep-area-map {
-        display: grid;
+        display: inline-grid;
         place-items: center;
         width: 28px;
         height: 28px;
@@ -935,8 +955,8 @@
         color: #ffffff;
     }
 
-    .rep-area-all {
-        padding: 6px 4px 4px;
+    .rep-area-all td {
+        padding: 8px 12px 12px 31px;
     }
 
     /* Mangrove types: one bar per type */
@@ -1029,30 +1049,27 @@
 
     @media (max-width: 768px) {
 
-        /* Name, hectares and count on top; the bar underneath. */
-        .rep-place-btn {
-            grid-template-columns: minmax(0, 1fr) auto auto 16px;
-            gap: 8px 10px;
+        /* Phones: a shorter histogram, and the table drops the Share column. */
+        .rep-histogram {
+            height: 200px;
         }
 
-        .rep-place-btn .rep-bar {
-            grid-column: 1 / -1;
-            grid-row: 2;
+        .rep-col-ha { width: 76px; }
+        .rep-col-count { width: 52px; }
+
+        .rep-cell-share {
+            display: none;
         }
 
-        .rep-areas {
-            margin-left: 6px;
-            padding-left: 10px;
+        .rep-table th,
+        .rep-table td {
+            padding-left: 6px;
+            padding-right: 6px;
         }
 
-        .rep-area {
-            grid-template-columns: minmax(0, 1fr) auto 28px;
-            gap: 6px 10px;
-        }
-
-        .rep-area .rep-bar {
-            grid-column: 1 / -1;
-            grid-row: 2;
+        .rep-area th,
+        .rep-area-all td {
+            padding-left: 25px;
         }
     }
 
@@ -1291,7 +1308,6 @@
         $report = collect($municipalityReport ?? []);
         $reportPlaces = $report->whereNotNull('name');
         $provinceTotal = (float) ($totalCoverage ?? 0);
-        $largestPlaceHa = max(0.0001, (float) $report->max('area_ha'));
         $formatHa = fn ($ha) => number_format((float) $ha, $ha < 100 ? 2 : 0);
         $municipalityTotal = $reportPlaces->count() + count($municipalitiesWithoutAreas ?? []);
     @endphp
@@ -1319,44 +1335,85 @@
         @if($report->isEmpty())
             <div class="chart-empty" style="padding: 24px 0;">No approved mangrove areas yet.</div>
         @else
-            {{-- One bar per municipality (longest = most hectares); tap it for its areas, one by one. --}}
-            <ul class="rep-places">
-                @foreach($report as $rowIndex => $row)
-                    @php
-                        $placeKey = $row['name'] ?? '__unknown';
-                        $share = $provinceTotal > 0 ? $row['area_ha'] / $provinceTotal * 100 : 0;
-                        $largestAreaHa = max(0.0001, (float) collect($row['areas'] ?? [])->max('area_ha'));
-                    @endphp
-                    <li data-place="{{ $placeKey }}">
-                        <button type="button" class="rep-place-btn" aria-expanded="false" aria-controls="reportAreas{{ $rowIndex }}" data-place="{{ $placeKey }}"
-                            title="{{ $row['name'] ?? 'Location not identified' }}: {{ $formatHa($row['area_ha']) }} ha, {{ number_format($share, $share < 10 ? 1 : 0) }}% of all mapped">
-                            <span class="rep-place-name {{ $row['name'] ? '' : 'is-unknown' }}">{{ $row['name'] ?? 'Location not identified' }}</span>
-                            <span class="rep-bar" aria-hidden="true"><span style="width: {{ round($row['area_ha'] / $largestPlaceHa * 100, 1) }}%"></span></span>
-                            <span class="rep-place-ha">{{ $formatHa($row['area_ha']) }} ha</span>
-                            <span class="rep-count">{{ number_format($row['area_count']) }} {{ Str::plural('area', $row['area_count']) }}</span>
-                            <i class="bi bi-chevron-down rep-chevron" aria-hidden="true"></i>
-                        </button>
-                        <ul class="rep-areas" id="reportAreas{{ $rowIndex }}" hidden>
+            {{-- A histogram (one column per municipality, hectares) over a table with the figures.
+                 Tap a column or a row for that municipality's areas, one by one. --}}
+            @php
+                $reportHa = max(0.0001, (float) $report->sum('area_ha'));
+                $formatShare = fn ($pct) => number_format($pct, $pct < 10 ? 1 : 0).'%';
+            @endphp
+            <div class="rep-histogram">
+                <canvas id="reportHistogram" role="img" aria-label="Histogram of approved mangrove hectares per municipality"></canvas>
+            </div>
+            <p class="rep-hint"><i class="bi bi-hand-index"></i> Tap a column or a row to see that municipality's areas.</p>
+            <div class="rep-table-wrap">
+                <table class="custom-table rep-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="rep-col-name">Municipality</th>
+                            <th scope="col" class="rep-num rep-col-ha">Hectares</th>
+                            <th scope="col" class="rep-num rep-cell-share rep-col-share">Share</th>
+                            <th scope="col" class="rep-num rep-col-count">Areas</th>
+                        </tr>
+                    </thead>
+                    @foreach($report as $rowIndex => $row)
+                        @php
+                            $placeKey = $row['name'] ?? '__unknown';
+                            $placeName = $row['name'] ?? 'Location not identified';
+                            $share = $row['area_ha'] / $reportHa * 100;
+                            $placeHa = max(0.0001, (float) $row['area_ha']);
+                        @endphp
+                        <tbody class="rep-group" data-place="{{ $placeKey }}">
+                            <tr class="rep-row">
+                                <th scope="row">
+                                    <button type="button" class="rep-place-btn" aria-expanded="false" aria-controls="reportAreas{{ $rowIndex }}" data-place="{{ $placeKey }}"
+                                        title="{{ $placeName }}: {{ $formatHa($row['area_ha']) }} ha, {{ $formatShare($share) }} of all mapped">
+                                        <i class="bi bi-chevron-right rep-chevron" aria-hidden="true"></i>
+                                        <span class="rep-place-name {{ $row['name'] ? '' : 'is-unknown' }}">{{ $placeName }}</span>
+                                    </button>
+                                </th>
+                                <td class="rep-num rep-ha">{{ $formatHa($row['area_ha']) }}</td>
+                                <td class="rep-num rep-cell-share">{{ $formatShare($share) }}</td>
+                                <td class="rep-num">{{ number_format($row['area_count']) }}</td>
+                            </tr>
+                        </tbody>
+                        <tbody class="rep-areas" id="reportAreas{{ $rowIndex }}" hidden>
                             @foreach($row['areas'] ?? [] as $area)
-                                <li class="rep-area">
-                                    <span class="rep-area-name" title="{{ $area['name'] ?: 'Unnamed area' }}">
-                                        {{ $area['name'] ?: 'Unnamed area' }}
-                                        <span class="rep-area-brgy"><i class="bi bi-geo-alt"></i> {{ !empty($area['barangays']) ? implode(', ', $area['barangays']) : '—' }}</span>
-                                    </span>
-                                    <span class="rep-bar" aria-hidden="true"><span style="width: {{ round($area['area_ha'] / $largestAreaHa * 100, 1) }}%"></span></span>
-                                    <span class="rep-area-ha">{{ $formatHa($area['area_ha']) }} ha</span>
-                                    <a href="{{ $mapRoute }}?delineation={{ $area['id'] }}" class="rep-area-map" title="View on map" aria-label="View {{ $area['name'] ?: 'this area' }} on the map"><i class="bi bi-map"></i></a>
-                                </li>
+                                @php
+                                    $areaShare = $area['area_ha'] / $placeHa * 100;
+                                @endphp
+                                <tr class="rep-area">
+                                    <th scope="row">
+                                        <span class="rep-area-name">
+                                            <a href="{{ $mapRoute }}?delineation={{ $area['id'] }}" title="View {{ $area['name'] ?: 'this area' }} on the map">{{ $area['name'] ?: 'Unnamed area' }}</a>
+                                            <span class="rep-area-brgy"><i class="bi bi-geo-alt"></i> {{ !empty($area['barangays']) ? implode(', ', $area['barangays']) : '—' }}</span>
+                                        </span>
+                                    </th>
+                                    <td class="rep-num rep-ha">{{ $formatHa($area['area_ha']) }}</td>
+                                    <td class="rep-num rep-cell-share" title="Share of {{ $placeName }}">{{ $formatShare($areaShare) }}</td>
+                                    <td class="rep-num">
+                                        <a href="{{ $mapRoute }}?delineation={{ $area['id'] }}" class="rep-area-map" title="View on map" aria-label="View {{ $area['name'] ?: 'this area' }} on the map"><i class="bi bi-map"></i></a>
+                                    </td>
+                                </tr>
                             @endforeach
                             @if($row['name'])
-                                <li class="rep-area-all">
-                                    <a href="{{ $mapRoute }}?municipality={{ urlencode($row['name']) }}" class="btn-table-action"><i class="bi bi-map"></i> All of {{ $row['name'] }} on the map</a>
-                                </li>
+                                <tr class="rep-area-all">
+                                    <td colspan="4">
+                                        <a href="{{ $mapRoute }}?municipality={{ urlencode($row['name']) }}" class="btn-table-action"><i class="bi bi-map"></i> All of {{ $row['name'] }} on the map</a>
+                                    </td>
+                                </tr>
                             @endif
-                        </ul>
-                    </li>
-                @endforeach
-            </ul>
+                        </tbody>
+                    @endforeach
+                    <tfoot>
+                        <tr>
+                            <th scope="row">Total</th>
+                            <td class="rep-num rep-ha">{{ $formatHa($report->sum('area_ha')) }}</td>
+                            <td class="rep-num rep-cell-share">100%</td>
+                            <td class="rep-num">{{ number_format($report->sum('area_count')) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
 
         @endif
     </section>
@@ -1380,7 +1437,7 @@
             @if(empty($generaCounts))
                 <div class="chart-empty" style="padding: 24px 0;">No mangrove types recorded yet.</div>
             @else
-                <p class="gen-caption gen-hint" id="genusHint" aria-live="polite"><i class="bi bi-info-circle"></i> <span>Bar = share of approved areas where the type grows. Tap a type for how to recognise it.</span></p>
+                <p class="gen-caption gen-hint" id="genusHint" aria-live="polite"><i class="bi bi-info-circle"></i> <span>How many approved areas each type was found in. One area can have several types. Tap a type to learn how to recognise it.</span></p>
                 <ul class="gen-list" id="genusList"></ul>
             @endif
         </section>
@@ -1678,7 +1735,7 @@
                     row.type = 'button';
                     row.dataset.genus = genus;
                     row.setAttribute('aria-pressed', 'false');
-                    row.title = `${info.local ? `${info.local} (${genus})` : genus}: in ${count} of ${total} areas (${share}%), about ${formatHa(data.genera_ha?.[genus])} ha${info.about ? `. ${info.about}` : ''}`;
+                    row.title = `${info.local ? `${info.local} (${genus})` : genus}: found in ${count} of ${total} approved ${total === 1 ? 'area' : 'areas'} (${share}%), which cover about ${formatHa(data.genera_ha?.[genus])} ha${info.about ? `. ${info.about}` : ''}`;
 
                     const name = make('span', 'gen-name');
                     const dot = make('span', 'type-dot');
@@ -1687,7 +1744,8 @@
                     if (info.local) name.append(make('small', '', genus));
 
                     const figure = make('span', 'gen-count');
-                    figure.append(make('strong', '', String(count)), ` / ${total} · ${share}%`);
+                    // Spelled out ("found in 5 of 12 areas"), not "5 / 12 · 42%", so nobody has to guess what it counts.
+                    figure.append('in ', make('strong', '', String(count)), ` of ${total} ${total === 1 ? 'area' : 'areas'}`);
 
                     const bar = make('span', 'rep-bar');
                     const fill = make('span');
@@ -1750,11 +1808,105 @@
         const csvButton = document.getElementById('municipalityReportCsv');
         if (reportEl && csvButton) {
             const rows = @json($municipalityReport ?? []);
-            reportEl.querySelectorAll('.rep-place-btn').forEach(button => button.addEventListener('click', () => {
-                const open = button.getAttribute('aria-expanded') !== 'true';
+            const groups = [...reportEl.querySelectorAll('.rep-group')];
+            let histogram = null;
+            const setPlaceOpen = (group, open) => {
+                const button = group.querySelector('.rep-place-btn');
                 button.setAttribute('aria-expanded', open ? 'true' : 'false');
+                group.classList.toggle('is-open', open);
                 document.getElementById(button.getAttribute('aria-controls')).hidden = !open;
+                paintHistogram();
+            };
+
+            // The whole table row opens it, not only the name; the button keeps it keyboard-accessible.
+            groups.forEach(group => group.querySelector('.rep-row').addEventListener('click', () => {
+                setPlaceOpen(group, !group.classList.contains('is-open'));
             }));
+
+            // Histogram: one column per municipality (hectares). Open municipalities stay dark green,
+            // the rest turn lighter once any is open. Tapping a column opens its rows in the table.
+            const BAR = '#1e9e62';
+            const BAR_DIM = 'rgba(30, 158, 98, 0.35)';
+            function paintHistogram() {
+                if (!histogram) return;
+                const anyOpen = groups.some(group => group.classList.contains('is-open'));
+                histogram.data.datasets[0].backgroundColor = groups.map(group =>
+                    !anyOpen || group.classList.contains('is-open') ? BAR : BAR_DIM);
+                histogram.update('none');
+            }
+            const drawHistogram = () => {
+                const canvas = document.getElementById('reportHistogram');
+                if (histogram || !canvas || reportEl.hidden || typeof Chart === 'undefined') return;
+                const total = rows.reduce((sum, row) => sum + Number(row.area_ha || 0), 0) || 1;
+                const ha = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: value < 100 ? 2 : 0 });
+                const gridColor = () => (window.MangroveTheme?.get() === 'dark' ? 'rgba(255, 255, 255, 0.07)' : '#f0f4f0');
+                histogram = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: rows.map(row => row.name || 'Not identified'),
+                        datasets: [{
+                            label: 'Approved mangrove area (ha)',
+                            data: rows.map(row => Number(row.area_ha || 0)),
+                            backgroundColor: BAR,
+                            hoverBackgroundColor: '#16824f',
+                            borderRadius: 4,
+                            categoryPercentage: 0.96,
+                            barPercentage: 0.96,
+                            minBarLength: 2,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 400 },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => {
+                                        const row = rows[ctx.dataIndex];
+                                        const pct = row.area_ha / total * 100;
+                                        return [
+                                            `${ha(row.area_ha)} ha (${pct.toFixed(pct < 10 ? 1 : 0)}%)`,
+                                            `${row.area_count} approved ${row.area_count === 1 ? 'area' : 'areas'}`,
+                                        ];
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Hectares', font: { family: 'Manrope', size: 11, weight: '600' } },
+                                grid: { color: gridColor },
+                                ticks: { font: { family: 'Manrope', size: 11 } },
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { family: 'Manrope', size: 11 }, autoSkip: false, maxRotation: 60 },
+                            },
+                        },
+                        onHover: (event, elements) => {
+                            event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                        },
+                        onClick: (event, elements) => {
+                            if (!elements.length) return;
+                            const group = groups[elements[0].index];
+                            if (!group) return;
+                            const opening = !group.classList.contains('is-open');
+                            setPlaceOpen(group, opening);
+                            if (opening) {
+                                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                                group.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+                            }
+                        },
+                    },
+                });
+                paintHistogram();
+            };
+            // The report starts hidden; Chart.js needs a visible canvas, so draw it the first time it opens.
+            drawHistogram();
+            new MutationObserver(drawHistogram).observe(reportEl, { attributes: true, attributeFilter: ['hidden'] });
 
             // As a spreadsheet (opens in Excel or Google Sheets): municipality totals, then each area.
             csvButton.addEventListener('click', () => {

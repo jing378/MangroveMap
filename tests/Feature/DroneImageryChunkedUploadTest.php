@@ -66,6 +66,22 @@ class DroneImageryChunkedUploadTest extends TestCase
         Storage::disk('local')->assertMissing(DroneImageryUploadController::INCOMING_DIRECTORY."/{$id}");
     }
 
+    public function test_many_chunks_do_not_use_up_the_complete_or_other_rate_limits(): void
+    {
+        $user = User::factory()->create();
+        $data = random_bytes(500);
+        $id = $this->startUpload($user, ['survey.tif' => $data]);
+
+        // More chunk requests in a minute than complete (20) or the notification poll (30) allow:
+        // each route counts on its own, so neither is refused with 429.
+        foreach (range(1, 35) as $ignored) {
+            $this->putChunk($id, 0, 0, $data)->assertOk();
+        }
+
+        $this->getJson(route('notifications.poll'))->assertOk();
+        $this->postJson("/drone-imagery/uploads/{$id}/complete")->assertAccepted();
+    }
+
     public function test_status_lists_received_chunks_for_resuming(): void
     {
         $user = User::factory()->create();

@@ -35,7 +35,7 @@ Error bodies always include a human-readable `message`.
 
 ### Rate limits
 
-Limits are per user (or per IP for guests), per minute. Going over returns `429` with a `message` (JSON requests), or sends a form back with that message as an error.
+Limits are per user (or per IP for guests), per minute, and each endpoint counts on its own (the route name is the throttle prefix, e.g. `throttle:20,1,drone-imagery.uploads.complete`; a plain `throttle:N,1` would share one counter with every other route). Going over returns `429` with a `message` and a `Retry-After` header (JSON requests), or sends a form back with that message as an error. The chunked uploader waits for `Retry-After` and tries again.
 
 | Endpoint | Limit |
 |---|---|
@@ -188,7 +188,7 @@ Large GeoTIFFs are uploaded in pieces so that a dropped connection doesn't resta
 The AI runs in two separate jobs, each with its own status in the layer payloads: the delineation (`segmentation_status`, `segmentation_error`, `segmented_at`) and the genus classification (`classification_status`, `classification_error`, `classified_at`). Each status is `null` (not run), `queued`, `processing`, `ready` or `failed`. `segmentation_stats` also carries the classification's `genus_suggestion`, `canopy_count` and `canopies_by_genus`.
 | `PUT /drone-imagery/{id}/edits` | Save review edits |
 | `POST /drone-imagery/{id}/confirm` | Confirm the review. The first confirm also needs `delineation_details` (genus). Creates the delineation. |
-| `DELETE /drone-imagery/{id}` | Delete your own layer (`{"action": "deleted"}`) or hide someone else's (`{"action": "hidden"}`) |
+| `DELETE /drone-imagery/{id}` | Delete your own layer together with the delineation submitted from it, whatever its review state (`{"action": "deleted", "deleted_delineations": 0\|1}`; a resident's sends experts `DelineationWithdrawn`), or hide someone else's (`{"action": "hidden"}`) |
 | `GET /drone-imagery/{id}/tiles/{z}/{x}/{y}` | Map tile (PNG), only for users allowed to see the layer |
 | `GET /imagery/{id}/tiles/{z}/{x}/{y}` | Public map tile, for published layers only |
 

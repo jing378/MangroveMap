@@ -55,7 +55,7 @@ Route::middleware('guest')->group(function () {
 
     // Live "email already taken" check for the sign-up form (rate limited).
     Route::get('/register/check-email', [RegisteredUserController::class, 'checkEmail'])
-        ->middleware('throttle:30,1')
+        ->middleware('throttle:30,1,register.check-email')
         ->name('register.check-email');
 
     Route::get('/forgot-password', function () {
@@ -110,7 +110,7 @@ Route::middleware('auth')->group(function () {
         $user->sendEmailVerificationNotification();
 
         return back()->with('message', 'Verification link sent!');
-    })->middleware('throttle:6,1')->name('verification.send');
+    })->middleware('throttle:6,1,verification.send')->name('verification.send');
 });
 
 // The link in the verification email. It works without being logged in (it is often opened in another
@@ -143,7 +143,7 @@ Route::get('/email/verify/{id}/{hash}', function (Request $request, string $id, 
     return redirect()->route('login')->with('status', $alreadyVerified
         ? 'Your email is already verified. Please log in.'
         : 'Email verified successfully! Please log in to continue.');
-})->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
+})->middleware(['signed', 'throttle:6,1,verification.verify'])->name('verification.verify');
 
 // Public routes
 Route::get('/', function () {
@@ -163,12 +163,12 @@ Route::get('/imagery/{layerId}/tiles/{z}/{x}/{y}', [DroneImageryController::clas
 
 // OpenStreetMap place names drawn on the satellite basemap (every map, including the landing page).
 Route::get('/map/place-labels', MapPlaceLabelController::class)
-    ->middleware('throttle:60,1')
+    ->middleware('throttle:60,1,map.place-labels')
     ->name('map.place-labels');
 
 // Where mangroves stood in each year since 1985 (Global Mangrove Watch, public data) for the map's year slider.
 Route::get('/map/mangrove-history', MapMangroveHistoryController::class)
-    ->middleware('throttle:60,1')
+    ->middleware('throttle:60,1,map.mangrove-history')
     ->name('map.mangrove-history');
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -177,11 +177,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/drone-imagery', [DroneImageryController::class, 'index'])
         ->name('drone-imagery.index');
     Route::post('/drone-imagery', [DroneImageryController::class, 'store'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,drone-imagery.store')
         ->name('drone-imagery.store');
     // Chunked, resumable upload (what the Drone Upload page uses): start, send slices in parallel, complete.
     Route::post('/drone-imagery/uploads', [DroneImageryUploadController::class, 'start'])
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:20,1,drone-imagery.uploads.start')
         ->name('drone-imagery.uploads.start');
     Route::get('/drone-imagery/uploads/{uploadId}', [DroneImageryUploadController::class, 'status'])
         ->whereUuid('uploadId')
@@ -189,11 +189,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/drone-imagery/uploads/{uploadId}/files/{fileIndex}/chunks/{chunkIndex}', [DroneImageryUploadController::class, 'chunk'])
         ->whereUuid('uploadId')
         ->whereNumber(['fileIndex', 'chunkIndex'])
-        ->middleware('throttle:3000,1')
+        ->middleware('throttle:3000,1,drone-imagery.uploads.chunk')
         ->name('drone-imagery.uploads.chunk');
     Route::post('/drone-imagery/uploads/{uploadId}/complete', [DroneImageryUploadController::class, 'complete'])
         ->whereUuid('uploadId')
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:20,1,drone-imagery.uploads.complete')
         ->name('drone-imagery.uploads.complete');
     Route::delete('/drone-imagery/uploads/{uploadId}', [DroneImageryUploadController::class, 'cancel'])
         ->whereUuid('uploadId')
@@ -203,7 +203,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/tile-explorer', [TileExplorerController::class, 'page'])->name('tile-explorer.page');
     Route::post('/tile-explorer/sources/{sourceId}/sets', [TileExplorerController::class, 'storeSet'])
         ->whereNumber('sourceId')
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:20,1,tile-explorer.sets.store')
         ->name('tile-explorer.sets.store');
     Route::delete('/tile-explorer/sources/{sourceId}', [TileExplorerController::class, 'destroySource'])
         ->whereNumber('sourceId')
@@ -217,7 +217,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('tile-explorer.tiles.image');
     Route::post('/tile-explorer/sets/{tileSetId}/download', [TileExplorerController::class, 'download'])
         ->whereNumber('tileSetId')
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:20,1,tile-explorer.sets.download')
         ->name('tile-explorer.sets.download');
     Route::post('/tile-explorer/sets/{tileSetId}/drone-imagery', [TileExplorerController::class, 'sendToDroneImagery'])
         ->whereNumber('tileSetId')
@@ -235,19 +235,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Review editor: Save draft / Confirm sends the canopies the owner removed.
     Route::put('/drone-imagery/{layerId}/canopies', [DroneImageryController::class, 'updateCanopies'])
         ->whereNumber('layerId')
-        ->middleware('throttle:60,1')
+        ->middleware('throttle:60,1,drone-imagery.canopies.update')
         ->name('drone-imagery.canopies.update');
     Route::get('/drone-imagery/{layerId}/segmentation', [DroneImageryController::class, 'segmentation'])
         ->whereNumber('layerId')
         ->name('drone-imagery.segmentation.show');
     Route::post('/drone-imagery/{layerId}/segmentation', [DroneImageryController::class, 'segment'])
         ->whereNumber('layerId')
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,drone-imagery.segmentation.store')
         ->name('drone-imagery.segmentation.store');
     // Re-run only the genus classification (ClassifyDroneImagery); the mangrove areas stay.
     Route::post('/drone-imagery/{layerId}/classification', [DroneImageryController::class, 'classify'])
         ->whereNumber('layerId')
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,drone-imagery.classification.store')
         ->name('drone-imagery.classification.store');
     // Review editor: preview the prepared mosaic, mask non-mangrove areas, adjust, then confirm onto the map
     Route::get('/drone-imagery/{layerId}/edit', [DroneImageryController::class, 'edit'])
@@ -258,20 +258,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('drone-imagery.preview');
     Route::put('/drone-imagery/{layerId}/edits', [DroneImageryController::class, 'updateEdits'])
         ->whereNumber('layerId')
-        ->middleware('throttle:60,1')
+        ->middleware('throttle:60,1,drone-imagery.edits.update')
         ->name('drone-imagery.edits.update');
     Route::put('/drone-imagery/{layerId}/segmentation', [DroneImageryController::class, 'updateSegmentation'])
         ->whereNumber('layerId')
-        ->middleware('throttle:60,1')
+        ->middleware('throttle:60,1,drone-imagery.segmentation.update')
         ->name('drone-imagery.segmentation.update');
     // Live genus suggestion for unsaved area edits (recount only, nothing is saved).
     Route::post('/drone-imagery/{layerId}/segmentation/genus-preview', [DroneImageryController::class, 'previewGenusSuggestion'])
         ->whereNumber('layerId')
-        ->middleware('throttle:120,1')
+        ->middleware('throttle:120,1,drone-imagery.segmentation.genus-preview')
         ->name('drone-imagery.segmentation.genus-preview');
     Route::post('/drone-imagery/{layerId}/confirm', [DroneImageryController::class, 'confirm'])
         ->whereNumber('layerId')
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,drone-imagery.confirm')
         ->name('drone-imagery.confirm');
     Route::get('/drone-imagery/{layerId}', [DroneImageryController::class, 'show'])
         ->whereNumber('layerId')
@@ -283,14 +283,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.updatePassword');
     // Residents whose expert application was rejected can send a new one.
     Route::post('/profile/expert-application', [ProfileController::class, 'reapplyExpert'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:5,1,profile.expert-application')
         ->name('profile.expert-application');
     // Device (Web Push) notifications for the current browser, turned on/off on My Profile.
     Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store'])
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:20,1,push-subscriptions.store')
         ->name('push-subscriptions.store');
     Route::delete('/push-subscriptions', [PushSubscriptionController::class, 'destroy'])
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:20,1,push-subscriptions.destroy')
         ->name('push-subscriptions.destroy');
 
     // Help & user guide (sections shown depend on the user's role)
@@ -298,7 +298,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // "Send Feedback" pop-up in the sidebar; admins review it under /admin/feedback.
     Route::post('/feedback', [FeedbackController::class, 'store'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,feedback.store')
         ->name('feedback.store');
 
     // Map viewer & Delineate studio (accessible to authenticated users)
@@ -306,12 +306,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/delineate', [EndUserController::class, 'delineate'])->name('delineate');
     // The map's delineations as JSON: the map redraws from it right after a save, edit, review or removal.
     Route::get('/map/delineations', [EndUserController::class, 'mapDelineations'])
-        ->middleware('throttle:120,1')
+        ->middleware('throttle:120,1,map.delineations')
         ->name('map.delineations');
     Route::get('/delineations/{delineation}/annual-observations', [DelineationAnnualObservationController::class, 'index'])
         ->name('delineations.annual-observations.index');
     Route::post('/delineations/location-preview', [EndUserController::class, 'previewDelineationLocation'])
-        ->middleware('throttle:60,1')
+        ->middleware('throttle:60,1,delineations.location-preview')
         ->name('delineations.location-preview');
     // Edit the boundary of an existing saved delineation (experts: resident/own records; residents: own pending records)
     Route::put('/delineations/{delineation}/boundary', [EndUserController::class, 'updateDelineationBoundary'])
@@ -321,7 +321,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     // Live updates for the bell badge and pop-ups (partials/live-notifications), asked every ~20 s.
     Route::get('/notifications/poll', [NotificationController::class, 'poll'])
-        ->middleware('throttle:30,1')
+        ->middleware('throttle:30,1,notifications.poll')
         ->name('notifications.poll');
     Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
@@ -330,7 +330,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Dashboard "Field conditions" card (residents and experts): weather forecast from Open-Meteo, cached.
     Route::get('/dashboard/field-conditions', [EndUserController::class, 'fieldConditions'])
-        ->middleware('throttle:30,1')
+        ->middleware('throttle:30,1,dashboard.field-conditions')
         ->name('dashboard.field-conditions');
 
     // Resident dashboard - RESTRICTED TO END_USER ROLE ONLY

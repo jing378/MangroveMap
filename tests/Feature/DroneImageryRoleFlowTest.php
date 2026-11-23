@@ -7,6 +7,7 @@ use App\Models\Delineation;
 use App\Models\DroneImageryLayer;
 use App\Models\User;
 use App\Notifications\DelineationSubmittedForReview;
+use App\Notifications\DelineationWithdrawn;
 use App\Services\DroneImageryDelineationPublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -530,5 +531,44 @@ class DroneImageryRoleFlowTest extends TestCase
         $this->actingAs($expert)->get(route('drone-imagery.edit', $this->layer($expert, 'awaiting_review')->id))
             ->assertOk()
             ->assertSee('Confirm &amp; publish', false);
+    }
+
+    public function test_deleting_imagery_also_deletes_its_delineation_and_tells_the_experts(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        $layer = $this->layer($resident);
+        $delineation = $this->submittedDelineation($layer, ['is_approved' => true, 'approved_by' => $expert->id]);
+        $other = $this->submittedDelineation($this->layer($resident));
+
+        $this->actingAs($resident)->deleteJson(route('drone-imagery.destroy', $layer->id))
+            ->assertOk()
+            ->assertJsonPath('action', 'deleted')
+            ->assertJsonPath('deleted_delineations', 1);
+
+        $this->assertModelMissing($layer);
+        $this->assertModelMissing($delineation);
+        $this->assertModelExists($other);
+        Notification::assertSentTo($expert, DelineationWithdrawn::class,
+            fn (DelineationWithdrawn $notification) => $notification->status === 'approved');
+    }
+
+    public function test_an_expert_deleting_their_own_imagery_deletes_its_delineation_without_notices(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+        $expert = User::factory()->create(['role' => 'expert']);
+        User::factory()->create(['role' => 'expert']);
+        $layer = $this->layer($expert);
+        $delineation = $this->submittedDelineation($layer, ['is_approved' => true, 'approved_by' => $expert->id]);
+
+        $this->actingAs($expert)->deleteJson(route('drone-imagery.destroy', $layer->id))
+            ->assertOk()
+            ->assertJsonPath('deleted_delineations', 1);
+
+        $this->assertModelMissing($delineation);
+        Notification::assertNothingSent();
     }
 }

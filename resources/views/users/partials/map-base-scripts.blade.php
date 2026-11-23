@@ -161,14 +161,6 @@
       return tileLayer;
     }
 
-    // AI mangrove extent (SegmentDroneImagery output) per drone layer.
-    const droneSegmentationOverlays = new Map(); // layer id -> { key, group }
-    const droneSegmentationCache = new Map(); // `${id}:${segmented_at}` -> payload
-    // Canopies the canopy model pinpointed (layer.canopies_url): pins coloured by genus, crown outlines when zoomed in.
-    const droneCanopyOverlays = new Map(); // layer id -> { key, pins, outlines }
-    const droneCanopyCache = new Map(); // `${id}:${segmented_at}` -> payload
-    const DRONE_CANOPY_OUTLINE_MIN_ZOOM = 19;
-    const DRONE_GENUS_COLORS = { rhizophora: '#e4572e', avicennia: '#2e86de', sonneratia: '#f5b700', nypa: '#8e44ad', bruguiera: '#16a085', ceriops: '#d35400' };
     let droneSegmentationPollTimer = null;
 
     // layer.auto_show: published imagery (an expert's, or a resident's whose delineation an expert approved;
@@ -192,6 +184,12 @@
     let droneOwnedLayers = [];
     let pendingDroneActivationId = null; // freshly uploaded or confirmed layer to show once it is ready
 
+    // Deleting imagery also deletes the delineation submitted from it; the confirmation says so.
+    function droneDelineationNote(layer) {
+      const state = { approved: 'approved', pending: 'pending', rejected: 'rejected' }[layer.review_state];
+      return state ? `, plus its ${state} delineation on the map,` : '';
+    }
+
     // Server-side work in progress (polled). awaiting_review is not here: it waits for the owner.
     function dronePipelineStage(layer) {
       if (layer.status === 'queued') return { step: 1, label: 'Waiting to prepare the preview…' };
@@ -205,32 +203,23 @@
       return null;
     }
 
-    function buildDroneReviewLink(layer) {
-      if (!layer.review_url) return null;
-      if (layer.review_state === 'approved') { // approved by an expert: show it here on the map
-        const view = document.createElement('button');
-        view.type = 'button';
-        view.className = 'drone-imagery-ai-button';
-        view.textContent = 'View';
-        view.title = 'Show this imagery on the map and zoom to it';
-        view.addEventListener('click', () => {
-          const tileLayer = droneImageryTileLayers.get(layer.id);
-          if (!tileLayer) return;
-          if (!mainMap.hasLayer(tileLayer)) tileLayer.addTo(mainMap);
-          const checkbox = view.closest('.drone-imagery-layer')?.querySelector('input[type="checkbox"]');
-          if (checkbox) checkbox.checked = true;
-          zoomToDroneImagery(layer, tileLayer);
-          document.getElementById('droneImageryMenu')?.classList.remove('show');
-        });
-        return view;
-      }
-      const link = document.createElement('a');
-      link.href = layer.review_url;
-      link.className = `drone-imagery-ai-button${layer.status === 'ready' ? '' : ' primary'}`;
-      link.textContent = layer.status === 'awaiting_review' ? 'Review & add to map'
-        : (layer.status === 'failed' ? 'Edit & retry' : 'Edit imagery');
-      link.title = 'Remove non-mangrove areas, adjust opacity and position';
-      return link;
+    // The panel offers only View and Delete; reviewing and editing happen on the Drone Upload page.
+    function buildDroneViewButton(layer) {
+      const view = document.createElement('button');
+      view.type = 'button';
+      view.className = 'drone-imagery-ai-button';
+      view.textContent = 'View';
+      view.title = 'Show this imagery on the map and zoom to it';
+      view.addEventListener('click', () => {
+        const tileLayer = droneImageryTileLayers.get(layer.id);
+        if (!tileLayer) return;
+        if (!mainMap.hasLayer(tileLayer)) tileLayer.addTo(mainMap);
+        const checkbox = view.closest('.drone-imagery-layer')?.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = true;
+        zoomToDroneImagery(layer, tileLayer);
+        document.getElementById('droneImageryMenu')?.classList.remove('show');
+      });
+      return view;
     }
 
     function buildDronePipelineTracker(stage) {
@@ -311,287 +300,14 @@
       }
     }
 
-    async function fetchDroneSegmentation(layer) {
-      const key = `${layer.id}:${layer.segmented_at}`;
-      if (droneSegmentationCache.has(key)) return droneSegmentationCache.get(key);
-      const response = await fetch(layer.segmentation_url, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.message || 'Unable to load the AI mangrove extent.');
-      droneSegmentationCache.set(key, payload);
-      return payload;
-    }
-
-    function removeDroneSegmentationOverlay(layerId) {
-      const overlay = droneSegmentationOverlays.get(layerId);
-      if (overlay && mainMap.hasLayer(overlay.group)) mainMap.removeLayer(overlay.group);
-      droneSegmentationOverlays.delete(layerId);
-      removeDroneCanopyOverlay(layerId);
-    }
-
-    function droneGenusColor(genus) {
-      return DRONE_GENUS_COLORS[String(genus || '').trim().toLowerCase()] || '#1e9e62';
-    }
-
-    const droneEscape = text => String(text ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-
-    async function fetchDroneCanopies(layer) {
-      const key = `${layer.id}:${layer.classified_at}`; // the genus classification has its own runs
-      if (droneCanopyCache.has(key)) return droneCanopyCache.get(key);
-      const response = await fetch(layer.canopies_url, {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.message || 'Unable to load the pinpointed canopies.');
-      droneCanopyCache.set(key, payload);
-      return payload;
-    }
-
-    function removeDroneCanopyOverlay(layerId) {
-      const overlay = droneCanopyOverlays.get(layerId);
-      if (overlay) {
-        if (mainMap.hasLayer(overlay.pins)) mainMap.removeLayer(overlay.pins);
-        if (mainMap.hasLayer(overlay.outlines)) mainMap.removeLayer(overlay.outlines);
-      }
-      droneCanopyOverlays.delete(layerId);
-    }
-
-    // Crown outlines only when zoomed in enough to tell crowns apart; the pins always.
-    function syncDroneCanopyOutlines() {
-      const zoomedIn = mainMap.getZoom() >= DRONE_CANOPY_OUTLINE_MIN_ZOOM;
-      droneCanopyOverlays.forEach(overlay => {
-        const shown = mainMap.hasLayer(overlay.pins) && zoomedIn;
-        if (shown && !mainMap.hasLayer(overlay.outlines)) overlay.outlines.addTo(mainMap);
-        if (!shown && mainMap.hasLayer(overlay.outlines)) mainMap.removeLayer(overlay.outlines);
-      });
-    }
-    mainMap.on('zoomend', syncDroneCanopyOutlines);
-
-    async function showDroneCanopyOverlay(layer) {
-      const key = `${layer.id}:${layer.classified_at}`;
-      let overlay = droneCanopyOverlays.get(layer.id);
-      if (!overlay || overlay.key !== key) {
-        removeDroneCanopyOverlay(layer.id);
-        const payload = await fetchDroneCanopies(layer);
-        const pins = L.layerGroup();
-        const outlines = L.layerGroup();
-        (payload.canopies || []).forEach(canopy => {
-          if (!Array.isArray(canopy.center) || canopy.center.length < 2) return;
-          const color = droneGenusColor(canopy.genus);
-          const percent = Math.round((Number(canopy.confidence) || 0) * 100);
-          const genus = droneEscape(canopy.genus || 'Mangrove');
-          const pin = L.circleMarker(canopy.center, { radius: 5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95 });
-          pin.bindTooltip(`${genus} · ${percent}%`, { direction: 'top', offset: [0, -6] });
-          pin.bindPopup(`<strong>${genus}</strong><br>Confidence ${percent}%`
-            + (canopy.area_m2 != null ? `<br>Canopy about ${Number(canopy.area_m2).toFixed(1)} m²` : '')
-            + `<br><small>${droneEscape(layer.name || '')}</small>`);
-          pins.addLayer(pin);
-          // One ring per separate patch of the canopy (older results only have "coords", a single ring).
-          const rings = (Array.isArray(canopy.rings) ? canopy.rings : [canopy.coords])
-            .filter(ring => Array.isArray(ring) && ring.length >= 3);
-          if (rings.length) {
-            // Nested as a multipolygon: each ring is its own shape, not a hole in the first.
-            outlines.addLayer(L.polygon(rings.map(ring => [ring]), { color, weight: 1.5, fillColor: color, fillOpacity: 0.12, interactive: false }));
-          }
-        });
-        overlay = { key, pins, outlines };
-        droneCanopyOverlays.set(layer.id, overlay);
-      }
-      overlay.pins.addTo(mainMap);
-      syncDroneCanopyOutlines();
-      return overlay.pins;
-    }
-
-    function droneCanopySummary(layer) {
-      const count = Number(layer.segmentation_stats?.canopy_count ?? 0);
-      if (!count) return '';
-      const byGenus = Object.entries(layer.segmentation_stats?.canopies_by_genus || {})
-        .filter(([, n]) => Number(n) > 0)
-        .sort((a, b) => b[1] - a[1])
-        .map(([genus, n]) => `${genus} ${Number(n).toLocaleString()}`);
-      return `${count.toLocaleString()} canop${count === 1 ? 'y' : 'ies'} pinpointed${byGenus.length ? ` (${byGenus.join(', ')})` : ''}`;
-    }
-
-    async function showDroneSegmentationOverlay(layer) {
-      const key = `${layer.id}:${layer.segmented_at}`;
-      let overlay = droneSegmentationOverlays.get(layer.id);
-      if (!overlay || overlay.key !== key) {
-        removeDroneSegmentationOverlay(layer.id);
-        const payload = await fetchDroneSegmentation(layer);
-        const group = L.featureGroup((payload.features || []).map(feature => L.polygon(feature.coords, {
-          color: '#c6ff00',
-          weight: 2,
-          dashArray: '6 4',
-          fillColor: '#1e9e62',
-          fillOpacity: 0.2,
-          interactive: false,
-        })));
-        overlay = { key, group };
-        droneSegmentationOverlays.set(layer.id, overlay);
-      }
-      overlay.group.addTo(mainMap);
-      return overlay.group;
-    }
-
-    async function requestDroneSegmentation(layer) {
-      const response = await fetch(`${droneImageryStatusUrl}/${encodeURIComponent(layer.id)}/segmentation`, {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken },
-        credentials: 'same-origin',
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.message || 'Unable to start AI segmentation.');
-      return payload;
-    }
-
-    function buildDroneSegmentationControls(layer) {
-      const box = document.createElement('span');
-      box.className = 'drone-imagery-ai';
+    // Status line under a ready layer: the pipeline step while the AI runs, else the mangrove area found.
+    function buildDroneAiStatus(layer) {
       const stage = dronePipelineStage(layer);
-      if (stage) {
-        box.appendChild(buildDronePipelineTracker(stage));
-      } else {
-        const summary = document.createElement('span');
-        summary.className = 'drone-imagery-layer-state';
-        summary.textContent = droneSegmentationSummary(layer);
-        box.appendChild(summary);
-      }
-
-      const actions = document.createElement('span');
-      actions.className = 'drone-imagery-ai-actions';
-
-      if (layer.segmentation_status === 'ready') {
-        const toggleLabel = document.createElement('label');
-        toggleLabel.className = 'drone-imagery-ai-toggle';
-        const toggle = document.createElement('input');
-        toggle.type = 'checkbox';
-        const overlay = droneSegmentationOverlays.get(layer.id);
-        toggle.checked = Boolean(overlay && overlay.key === `${layer.id}:${layer.segmented_at}` && mainMap.hasLayer(overlay.group));
-        toggle.addEventListener('change', async () => {
-          if (!toggle.checked) {
-            const current = droneSegmentationOverlays.get(layer.id);
-            if (current) mainMap.removeLayer(current.group);
-            return;
-          }
-          try {
-            const group = await showDroneSegmentationOverlay(layer);
-            if (group.getLayers().length) mainMap.flyToBounds(group.getBounds(), { padding: [40, 40], duration: 0.8 });
-          } catch (error) {
-            toggle.checked = false;
-            showDroneImageryMessage(error.message, true);
-          }
-        });
-        toggleLabel.append(toggle, document.createTextNode(' Show AI extent'));
-        actions.appendChild(toggleLabel);
-
-        if (layer.canopies_url) {
-          const canopyLabel = document.createElement('label');
-          canopyLabel.className = 'drone-imagery-ai-toggle';
-          canopyLabel.title = droneCanopySummary(layer) || 'Every canopy the AI pinpointed, coloured by genus';
-          const canopyToggle = document.createElement('input');
-          canopyToggle.type = 'checkbox';
-          const canopyOverlay = droneCanopyOverlays.get(layer.id);
-          canopyToggle.checked = Boolean(canopyOverlay && canopyOverlay.key === `${layer.id}:${layer.classified_at}` && mainMap.hasLayer(canopyOverlay.pins));
-          canopyToggle.addEventListener('change', async () => {
-            if (!canopyToggle.checked) {
-              const current = droneCanopyOverlays.get(layer.id);
-              if (current) {
-                if (mainMap.hasLayer(current.pins)) mainMap.removeLayer(current.pins);
-                if (mainMap.hasLayer(current.outlines)) mainMap.removeLayer(current.outlines);
-              }
-              return;
-            }
-            try {
-              const pins = await showDroneCanopyOverlay(layer);
-              if (pins.getLayers().length) {
-                mainMap.flyToBounds(L.featureGroup(pins.getLayers()).getBounds(), { padding: [40, 40], duration: 0.8 });
-              } else {
-                showDroneImageryMessage('The AI did not pinpoint any canopies on this imagery.');
-              }
-            } catch (error) {
-              canopyToggle.checked = false;
-              showDroneImageryMessage(error.message, true);
-            }
-          });
-          const canopyCount = Number(layer.segmentation_stats?.canopy_count ?? 0);
-          canopyLabel.append(canopyToggle, document.createTextNode(` Show mangrove classification${canopyCount ? ` (${canopyCount.toLocaleString()})` : ''}`));
-          actions.appendChild(canopyLabel);
-        }
-        if (typeof window.useAiExtentAsDelineation === 'function') {
-          const useButton = document.createElement('button');
-          useButton.type = 'button';
-          useButton.className = 'drone-imagery-ai-button primary';
-          useButton.textContent = 'Use as delineation';
-          useButton.title = 'Open the AI-detected areas in the Delineate tab to edit and submit';
-          useButton.addEventListener('click', async () => {
-            // Drawing tools live on the Delineate page; go there and let it load the draft.
-            const delineateUrl = window.aiExtentDelineateUrl?.(layer.id);
-            if (delineateUrl) {
-              window.location.href = delineateUrl;
-              return;
-            }
-            useButton.disabled = true;
-            try {
-              const payload = await fetchDroneSegmentation(layer);
-              if (!payload.features?.length) {
-                showDroneImageryMessage('The AI did not detect any mangrove areas large enough to delineate.', true);
-                return;
-              }
-              const loaded = window.useAiExtentAsDelineation(payload, layer);
-              if (loaded) {
-                const tileLayer = droneImageryTileLayers.get(layer.id);
-                if (tileLayer && !mainMap.hasLayer(tileLayer)) tileLayer.addTo(mainMap);
-                const skipped = payload.features.length - loaded;
-                showDroneImageryMessage(
-                  `Loaded ${loaded} AI area${loaded === 1 ? '' : 's'} as a draft${skipped > 0 ? ` (${skipped} smaller skipped)` : ''}. Edit the shapes, select the genus present and save.`
-                );
-                document.getElementById('droneImageryMenu')?.classList.remove('show');
-              }
-            } catch (error) {
-              showDroneImageryMessage(error.message, true);
-            } finally {
-              useButton.disabled = false;
-            }
-          });
-          actions.appendChild(useButton);
-        }
-      }
-
-      if (layer.is_owner && !isDroneSegmenting(layer)) {
-        const runButton = document.createElement('button');
-        runButton.type = 'button';
-        runButton.className = 'drone-imagery-ai-button';
-        runButton.textContent = layer.segmentation_status === 'ready' ? 'Re-run AI'
-          : (layer.segmentation_status === 'failed' ? 'Retry AI' : 'Run AI segmentation');
-        runButton.addEventListener('click', async () => {
-          const rerun = layer.segmentation_status === 'ready';
-          const outcome = await window.AppActions.run({
-            confirm: {
-              title: rerun ? 'Run AI segmentation again?' : 'Run AI segmentation?',
-              message: rerun ? 'The current result is replaced when it finishes.' : `The AI detects the mangrove areas on "${layer.name}" in the background.`,
-              confirmLabel: 'Run',
-            },
-            button: runButton,
-            busyLabel: 'Starting AI...',
-            errorMessage: false,
-            task: () => requestDroneSegmentation(layer),
-          });
-          if (outcome.status === 'done') {
-            removeDroneSegmentationOverlay(layer.id);
-            showDroneImageryMessage(`AI segmentation queued for "${layer.name}".`);
-            await loadDroneImageryLayers();
-          } else if (outcome.status === 'failed') {
-            showDroneImageryMessage(outcome.error.message, true);
-          }
-        });
-        actions.appendChild(runButton);
-      }
-
-      if (actions.childElementCount) box.appendChild(actions);
-      return box;
+      if (stage) return buildDronePipelineTracker(stage);
+      const summary = document.createElement('span');
+      summary.className = 'drone-imagery-layer-state';
+      summary.textContent = droneSegmentationSummary(layer);
+      return summary;
     }
 
     // Move the map onto the imagery at a zoom the GeoTIFF actually has tiles for.
@@ -635,7 +351,7 @@
         } else if (layer.status === 'awaiting_review') {
           state.textContent = isDroneSegmenting(layer)
             ? `${kind} · the AI is detecting mangroves so you can review the result.`
-            : `${kind} · ready for review. Remove non-mangrove areas, then add it to the map.`;
+            : `${kind} · ready for review on the Drone Upload page.`;
         } else {
           state.textContent = `${kind} · processing on the server`;
         }
@@ -644,20 +360,14 @@
         uploader.textContent = `Uploaded by ${layer.uploaded_by || 'Unknown user'}`;
         info.append(name, state, uploader);
         if (layer.status === 'ready') {
-          info.appendChild(buildDroneSegmentationControls(layer));
+          info.appendChild(buildDroneAiStatus(layer));
+          const actions = document.createElement('span');
+          actions.className = 'drone-imagery-ai-actions';
+          actions.appendChild(buildDroneViewButton(layer));
+          info.appendChild(actions);
         } else {
           const stage = dronePipelineStage(layer);
           if (stage) info.appendChild(buildDronePipelineTracker(stage));
-        }
-        const reviewLink = buildDroneReviewLink(layer);
-        if (reviewLink) {
-          const reviewActions = document.createElement('span');
-          reviewActions.className = 'drone-imagery-ai-actions';
-          reviewActions.appendChild(reviewLink);
-          info.appendChild(reviewActions);
-        }
-        if (layer.segmentation_status !== 'ready') {
-          removeDroneSegmentationOverlay(layer.id);
         }
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
@@ -675,7 +385,7 @@
           // Confirmation → Processing → Success or Error (partials.action-feedback); messages use the panel's line.
           const outcome = await window.AppActions.run({
             confirm: layer.is_owner
-              ? { title: 'Delete this record?', message: `"${layer.name}" and its TIFF files are permanently deleted. This cannot be undone.`, confirmLabel: 'Delete', tone: 'danger' }
+              ? { title: 'Delete this record?', message: `"${layer.name}" and its TIFF files${droneDelineationNote(layer)} are permanently deleted. This cannot be undone.`, confirmLabel: 'Delete', tone: 'danger' }
               : { title: 'Remove this item?', message: `"${layer.name}" is hidden from your map. The owner keeps it.`, confirmLabel: 'Remove', tone: 'danger' },
             button: removeButton,
             busyLabel: layer.is_owner ? 'Deleting...' : 'Removing...',
@@ -697,12 +407,15 @@
               const activeTileLayer = droneImageryTileLayers.get(layer.id);
               if (activeTileLayer && mainMap.hasLayer(activeTileLayer)) mainMap.removeLayer(activeTileLayer);
               droneImageryTileLayers.delete(layer.id);
-              removeDroneSegmentationOverlay(layer.id);
               await loadDroneImageryLayers();
+              // Its delineation was deleted with it: redraw the map's delineations (workspace pages only).
+              if (payload.deleted_delineations && typeof refreshMapKeepingView === 'function') refreshMapKeepingView();
             },
           });
           if (outcome.status === 'done') {
-            showDroneImageryMessage(layer.is_owner ? 'TIFF layer deleted.' : 'Shared TIFF layer removed from your map.');
+            showDroneImageryMessage(layer.is_owner
+              ? (layer.review_state ? 'TIFF layer and its delineation deleted.' : 'TIFF layer deleted.')
+              : 'Shared TIFF layer removed from your map.');
           } else if (outcome.status === 'failed') {
             showDroneImageryMessage(outcome.error.message || 'Unable to remove this TIFF layer.', true);
           }
@@ -760,7 +473,7 @@
           showDroneImageryMessage(`"${target.name}" is ready and displayed on the map.${isDroneSegmenting(target) ? ' AI mangrove segmentation is running in the background.' : ''}`);
         } else if (target.status === 'awaiting_review' && !isDroneSegmenting(target)) {
           pendingDroneActivationId = null;
-          showDroneImageryMessage(`"${target.name}" is ready for review. Use "Review & add to map" to remove non-mangrove areas before it is placed on the map.`);
+          showDroneImageryMessage(`"${target.name}" is ready for review. Open it on the Drone Upload page to remove non-mangrove areas before it is placed on the map.`);
         } else if (target.status === 'failed') {
           pendingDroneActivationId = null;
           showDroneImageryMessage(target.error_message || 'Raster processing failed.', true);

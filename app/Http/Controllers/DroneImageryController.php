@@ -6,8 +6,10 @@ use App\Jobs\ClassifyDroneImagery;
 use App\Jobs\FinalizeDroneImagery;
 use App\Jobs\ProcessDroneImagery;
 use App\Jobs\SegmentDroneImagery;
+use App\Models\Delineation;
 use App\Models\DroneImageryLayer;
 use App\Models\User;
+use App\Notifications\DelineationWithdrawn;
 use App\Services\BoundaryResolver;
 use App\Services\DroneImageryDelineationPublisher;
 use App\Services\MangroveSegmentationService;
@@ -1316,9 +1318,23 @@ class DroneImageryController extends Controller
             ], 409);
         }
 
+        // The delineation drawn from this imagery goes with it (whatever its review state). Experts hear about a
+        // resident's, like when the resident deletes the delineation itself; an expert's own needs no notice.
+        $removed = Delineation::query()->where('drone_imagery_layer_id', $layer->id)->get();
+        foreach ($removed as $delineation) {
+            $name = $delineation->name ?: 'Delineation #'.$delineation->id;
+            $status = $delineation->is_approved ? 'approved' : ($delineation->is_rejected ? 'rejected' : 'pending');
+            $rejectedBy = $delineation->rejected_by;
+            $delineation->delete();
+
+            if (! $viewer->isExpert()) {
+                DelineationWithdrawn::notifyExperts($name, $status, $rejectedBy, $viewer->name);
+            }
+        }
+
         $layer->deleteWithStoredFiles();
 
-        return response()->json(['action' => 'deleted']);
+        return response()->json(['action' => 'deleted', 'deleted_delineations' => $removed->count()]);
     }
 
     public function tile(Request $request, int $layerId, int $z, int $x, int $y): Response|BinaryFileResponse

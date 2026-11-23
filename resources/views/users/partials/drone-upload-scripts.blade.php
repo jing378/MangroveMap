@@ -639,7 +639,8 @@
         const outcome = await window.AppActions.run({
           confirm: {
             title: 'Delete this record?',
-            message: `"${layer.name}" and its GeoTIFF files are permanently deleted. This cannot be undone.`,
+            // The delineation submitted from this imagery is deleted with it.
+            message: `"${layer.name}" and its GeoTIFF files${layer.review_state ? `, plus its ${layer.review_state} delineation on the map,` : ''} are permanently deleted. This cannot be undone.`,
             confirmLabel: 'Delete',
             tone: 'danger',
           },
@@ -654,7 +655,7 @@
             const body = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(body.message || 'Unable to delete this imagery.');
           },
-          successMessage: `"${layer.name}" was deleted.`,
+          successMessage: layer.review_state ? `"${layer.name}" and its delineation were deleted.` : `"${layer.name}" was deleted.`,
         });
         if (outcome.status === 'done') await loadLayers();
       });

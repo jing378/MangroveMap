@@ -1922,14 +1922,6 @@
     gap: 6px;
   }
 
-  .drone-imagery-ai-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--fg-4c6b5d, #4c6b5d);
-    cursor: pointer;
-  }
-
   .drone-imagery-ai-button {
     padding: 4px 7px;
     border: 1px solid var(--bd-cfe0d5, #cfe0d5);
@@ -1939,12 +1931,6 @@
     cursor: pointer;
     font: inherit;
     font-size: 10px;
-  }
-
-  .drone-imagery-ai-button.primary {
-    border-color: #1e9e62;
-    background: #1e9e62;
-    color: #fff;
   }
 
   .drone-imagery-ai-button:hover:not(:disabled) {
