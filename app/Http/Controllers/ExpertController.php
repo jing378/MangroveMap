@@ -10,6 +10,7 @@ use App\Notifications\DelineationRemoved;
 use App\Http\Controllers\EndUserController;
 use App\Models\User;
 use App\Services\BoundaryResolver;
+use App\Services\DelineationReassessment;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -116,6 +117,9 @@ class ExpertController extends Controller
         }
         $delineation->update($updates);
 
+        // A drone re-survey: its boundary now updates the area it reassesses (as that year's observation).
+        $reassessed = app(DelineationReassessment::class)->apply($delineation, Auth::user());
+
         $delineation->load('user');
         $this->notifyUserSafely($delineation->user, new DelineationApproved($delineation));
 
@@ -127,10 +131,18 @@ class ExpertController extends Controller
             ->each->markAsRead();
 
         $unreadCount = Auth::user()->unreadNotifications()->count();
-        $message = 'Delineation approved. The resident has been notified.';
+        $message = $reassessed
+            ? 'Re-survey approved. It updated the boundary of "'.($reassessed->name ?: "Delineation {$reassessed->id}")
+                .'", recorded in its Changes over time. The resident has been notified.'
+            : 'Delineation approved. The resident has been notified.';
 
         if (request()->expectsJson()) {
-            return response()->json(['message' => $message, 'unreadCount' => $unreadCount], 200);
+            return response()->json([
+                'message' => $message,
+                'unreadCount' => $unreadCount,
+                // The map selects this area afterwards: the approved re-survey itself is no longer drawn.
+                'reassessed_delineation_id' => $reassessed?->id,
+            ], 200);
         }
         return redirect()
             ->route('expert.dashboard')

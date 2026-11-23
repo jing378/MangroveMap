@@ -11,6 +11,7 @@ use App\Models\DroneImageryLayer;
 use App\Models\User;
 use App\Notifications\DelineationWithdrawn;
 use App\Services\BoundaryResolver;
+use App\Services\DelineationReassessment;
 use App\Services\DroneImageryDelineationPublisher;
 use App\Services\MangroveSegmentationService;
 use Illuminate\Contracts\View\View;
@@ -682,6 +683,8 @@ class DroneImageryController extends Controller
                 'delineation_draft' => $layer->delineation_details,
                 // Barangay of the current mangrove areas (before submitting), refreshed when they are saved.
                 'location' => self::needsDelineation($layer) ? $this->areasLocation($layer) : null,
+                // Approved areas the survey overlaps, offered as "Re-survey of …" (refreshed when the areas are saved).
+                'reassessment_candidates' => self::needsDelineation($layer) ? $this->reassessmentCandidates($layer) : [],
                 // After submitting: what was submitted, shown read-only in the panel.
                 'submitted_delineation' => $this->submittedDelineationSummary($layer, $viewer),
                 'needs_expert_review' => ! $viewer->isExpert(),
@@ -820,9 +823,16 @@ class DroneImageryController extends Controller
             'delineation.genera' => ['nullable', 'array', 'max:20'],
             'delineation.genera.*' => ['string', 'max:100'],
             'delineation.notes' => ['nullable', 'string', 'max:5000'],
+            'delineation.reassesses_delineation_id' => ['nullable', 'integer'],
         ]);
 
-        return ['delineation_details' => self::normalizedDelineationDetails($validated['delineation'] ?? [])];
+        // A draft keeps the choice only while the saved areas still overlap that area.
+        $details = self::normalizedDelineationDetails($validated['delineation'] ?? []);
+        if (isset($details['reassesses_delineation_id']) && ! $this->isReassessmentCandidate($layer, $details['reassesses_delineation_id'])) {
+            unset($details['reassesses_delineation_id']);
+        }
+
+        return ['delineation_details' => $details];
     }
 
     /**
@@ -837,9 +847,12 @@ class DroneImageryController extends Controller
         return $name === null ? [] : ['name' => $name];
     }
 
-    /** @return array{name: ?string, genera: array<int, string>, notes: ?string} */
+    /** @return array{name: ?string, genera: array<int, string>, notes: ?string, reassesses_delineation_id?: int} */
     private static function normalizedDelineationDetails(array $details): array
     {
+        // "Re-survey of" an approved area (DelineationReassessment); left out for a new area.
+        $reassessesId = (int) ($details['reassesses_delineation_id'] ?? 0);
+
         return [
             'name' => trim((string) ($details['name'] ?? '')) ?: null,
             'genera' => collect($details['genera'] ?? [])
@@ -849,6 +862,7 @@ class DroneImageryController extends Controller
                 ->values()
                 ->all(),
             'notes' => trim((string) ($details['notes'] ?? '')) ?: null,
+            ...($reassessesId > 0 ? ['reassesses_delineation_id' => $reassessesId] : []),
         ];
     }
 
@@ -864,6 +878,7 @@ class DroneImageryController extends Controller
             'delineation.genera' => ['required', 'array', 'min:1', 'max:20'],
             'delineation.genera.*' => ['required', 'string', 'max:100'],
             'delineation.notes' => ['nullable', 'string', 'max:5000'],
+            'delineation.reassesses_delineation_id' => ['nullable', 'integer'],
         ], [
             'delineation.required' => EndUserController::GENERA_REQUIRED_MESSAGE,
             'delineation.genera.required' => EndUserController::GENERA_REQUIRED_MESSAGE,
@@ -887,8 +902,30 @@ class DroneImageryController extends Controller
         if ($details['genera'] === []) {
             throw ValidationException::withMessages(['delineation.genera' => EndUserController::GENERA_REQUIRED_MESSAGE]);
         }
+        if (isset($details['reassesses_delineation_id']) && ! $this->isReassessmentCandidate($layer, $details['reassesses_delineation_id'])) {
+            throw ValidationException::withMessages([
+                'delineation.reassesses_delineation_id' => 'The mangrove areas no longer overlap the area chosen under "Survey of". Choose again.',
+            ]);
+        }
 
         return $details;
+    }
+
+    /**
+     * Approved areas the layer's saved mangrove areas overlap (see DelineationReassessment::candidatesFor).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function reassessmentCandidates(DroneImageryLayer $layer): array
+    {
+        $areas = array_slice(DroneImageryDelineationPublisher::areasOf($layer), 0, DroneImageryDelineationPublisher::MAX_AREAS);
+
+        return app(DelineationReassessment::class)->candidatesFor($areas);
+    }
+
+    private function isReassessmentCandidate(DroneImageryLayer $layer, int $delineationId): bool
+    {
+        return collect($this->reassessmentCandidates($layer))->contains('id', $delineationId);
     }
 
     /**
@@ -960,7 +997,13 @@ class DroneImageryController extends Controller
                 ->all(),
             'area_count' => count($features),
             'location' => self::summarizeLocations($features),
-            'url' => $delineation->mapDashboardUrlFor($viewer),
+            // An approved re-survey is drawn as the area it updated, so the link opens that area.
+            'url' => ($delineation->isAppliedReassessment() && $delineation->reassessedDelineation
+                ? $delineation->reassessedDelineation
+                : $delineation)->mapDashboardUrlFor($viewer),
+            'reassesses' => $delineation->reassessedDelineation
+                ? ['id' => $delineation->reassessedDelineation->id, 'name' => $delineation->reassessedDelineation->name ?: "Delineation {$delineation->reassesses_delineation_id}"]
+                : null,
         ];
     }
 
@@ -1179,6 +1222,7 @@ class DroneImageryController extends Controller
             ...$this->segmentationPayload($layer),
             // The corrected areas may sit in another barangay: refresh the panel's location.
             'location' => self::needsDelineation($layer) ? $this->areasLocation($layer) : null,
+            'reassessment_candidates' => self::needsDelineation($layer) ? $this->reassessmentCandidates($layer) : [],
         ]);
     }
 

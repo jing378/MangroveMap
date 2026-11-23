@@ -32,7 +32,7 @@ class PlantingRecommendationController extends Controller
 
         // Approved delineations an expert can select as the area to evaluate (polygons only).
         $referenceAreas = Delineation::fetchForMap(
-            Delineation::approved()->with('user:id,name'),
+            Delineation::approved()->withoutAppliedReassessments()->with('user:id,name'),
             Delineation::MAP_QUERY_LIMIT
         )
             ->map(fn (Delineation $delineation) => [

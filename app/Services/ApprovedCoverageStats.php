@@ -25,8 +25,10 @@ class ApprovedCoverageStats
     public function summary(): array
     {
         // Expert-approved areas only: never pending ones, and never one also marked rejected.
+        // An approved drone re-survey is counted once, on the area it re-surveyed (its boundary was copied there).
         $delineations = Delineation::approved()
             ->where('is_rejected', false)
+            ->withoutAppliedReassessments()
             ->with(['annualObservations:id,delineation_id,year,coverage_area_ha', 'user:id,name'])
             ->get(['id', 'user_id', 'name', 'features', 'created_at', 'approved_at']);
 

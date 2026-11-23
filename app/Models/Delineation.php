@@ -20,6 +20,10 @@ class Delineation extends Model
     {
         static::deleting(function (Delineation $delineation) {
             $delineation->deleteReviewNotifications();
+            // Re-surveys of a deleted area stand as areas of their own (the foreign key does the same on MySQL).
+            static::query()
+                ->where('reassesses_delineation_id', $delineation->id)
+                ->update(['reassesses_delineation_id' => null]);
         });
 
         // A delineation from drone imagery shares its name with the imagery (listed on Drone Upload).
@@ -53,6 +57,7 @@ class Delineation extends Model
         'user_id',
         'drone_imagery_layer_id',
         'source',
+        'reassesses_delineation_id',
         'name',
         'notes',
         'planting_recommendation',
@@ -133,6 +138,36 @@ class Delineation extends Model
     public function droneImageryLayer()
     {
         return $this->belongsTo(DroneImageryLayer::class);
+    }
+
+    /** The already mapped area this drone re-survey reassesses (null for a new area). */
+    public function reassessedDelineation()
+    {
+        return $this->belongsTo(Delineation::class, 'reassesses_delineation_id');
+    }
+
+    /** Drone re-surveys submitted for this area. */
+    public function reassessments(): HasMany
+    {
+        return $this->hasMany(Delineation::class, 'reassesses_delineation_id');
+    }
+
+    /**
+     * An approved re-survey: its boundary was copied onto the area it reassesses, so it is not an area of its own.
+     * Pending and rejected ones are still shown (to their owner and the experts reviewing them).
+     */
+    public function isAppliedReassessment(): bool
+    {
+        return $this->reassesses_delineation_id !== null && $this->is_approved && ! $this->is_rejected;
+    }
+
+    /** Without applied re-surveys (see isAppliedReassessment): for the map and the hectare totals. */
+    public function scopeWithoutAppliedReassessments($query)
+    {
+        return $query->where(fn ($q) => $q
+            ->whereNull('delineations.reassesses_delineation_id')
+            ->orWhere('delineations.is_approved', false)
+            ->orWhere('delineations.is_rejected', true));
     }
 
     public function approvedBy()
@@ -262,6 +297,7 @@ class Delineation extends Model
     {
         $ids = static::query()
             ->fromEndUsers()
+            ->withoutAppliedReassessments()
             ->select('delineations.id')
             ->orderByRaw('(delineations.is_approved = 0 AND delineations.is_rejected = 0) DESC')
             ->orderByDesc('delineations.created_at')

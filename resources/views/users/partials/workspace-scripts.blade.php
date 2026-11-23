@@ -836,6 +836,7 @@
               approved_by_name: record.approved_by_name || null,
               delineation_id: record.id,
               drone_imagery_layer_id: record.drone_imagery_layer_id || null,
+              reassesses: record.reassesses || null,
               is_approved: !!record.is_approved,
               is_rejected: !!record.is_rejected,
               is_own: true,
@@ -878,6 +879,7 @@
           created_year: mapRecordYear(record.created_at),
           municipality,
           drone_imagery_layer_id: record.drone_imagery_layer_id || null,
+          reassesses: record.reassesses || null,
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
           rejection_notes: record.rejection_notes || null,
@@ -1342,9 +1344,12 @@
       }
 
       // "Source": where the boundary came from. Delineations are only drawn as areas, so the shape says nothing.
-      document.getElementById('delineationFeatureType').textContent = feature.drone_imagery_layer_id
-        ? 'Drone imagery (AI-assisted)'
-        : (feature.source === 'ai' ? 'Drone imagery AI (draft)' : 'Drawn on the map');
+      // A drone re-survey of an area already on the map: approving it updates that area's boundary.
+      document.getElementById('delineationFeatureType').textContent = feature.reassesses
+        ? `Drone re-survey of "${feature.reassesses.name}" (approving it updates that area)`
+        : feature.drone_imagery_layer_id
+          ? 'Drone imagery (AI-assisted)'
+          : (feature.source === 'ai' ? 'Drone imagery AI (draft)' : 'Drawn on the map');
       document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
       const locationEl = document.getElementById('delineationFeatureLocation');
       if (locationEl) {
@@ -2893,7 +2898,8 @@
         if (approveBtn) approveBtn.disabled = true;
         if (rejectBtn) rejectBtn.disabled = true;
         await reviewModalClosed;
-        if (await refreshMapData({ selectDelineationId: delineationId })) {
+        // An approved re-survey is no longer drawn on its own: open the area it updated instead.
+        if (await refreshMapData({ selectDelineationId: payload.reassessed_delineation_id || delineationId })) {
           if (approveBtn) approveBtn.disabled = false;
           if (rejectBtn) rejectBtn.disabled = false;
         } else {

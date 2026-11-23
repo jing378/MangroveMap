@@ -1325,6 +1325,7 @@
         name: delineationNameInput?.value.trim() || '',
         genera: selectedGenera(),
         notes: delineationNotesInput?.value.trim() || '',
+        reassesses_delineation_id: surveyOf,
       };
     }
 
@@ -1351,10 +1352,69 @@
     });
     [delineationNameInput, delineationNotesInput].forEach(input => input?.addEventListener('input', () => renderActionButtons()));
 
+    // "Survey of": approved areas the saved mangrove areas overlap (DelineationReassessment on the server). Choosing
+    // one makes this a re-survey: once approved, its boundary updates that area instead of adding a new one.
+    const surveyOfField = document.getElementById('droneEditorSurveyOfField');
+    const surveyOfBox = document.getElementById('droneEditorSurveyOf');
+    let surveyOf = null; // delineation id, or null for a new area
+
+    function surveyCandidates() {
+      return Array.isArray(editor.reassessment_candidates) ? editor.reassessment_candidates : [];
+    }
+
+    function surveyOfName() {
+      return surveyCandidates().find(candidate => candidate.id === surveyOf)?.name || null;
+    }
+
+    function renderSurveyOf() {
+      if (!surveyOfField || !surveyOfBox) return;
+      const candidates = surveyCandidates();
+      // The areas changed and no longer overlap the chosen one: back to a new area.
+      if (surveyOf !== null && !candidates.some(candidate => candidate.id === surveyOf)) surveyOf = null;
+      surveyOfField.hidden = candidates.length === 0;
+      const option = (value, title, detail) => {
+        const label = document.createElement('label');
+        label.className = 'drone-editor-survey-option';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'droneEditorSurveyOf';
+        input.value = value === null ? '' : String(value);
+        input.checked = value === surveyOf;
+        const text = document.createElement('span');
+        const strong = document.createElement('strong');
+        strong.textContent = title;
+        const small = document.createElement('small');
+        small.textContent = detail;
+        text.append(strong, small);
+        label.append(input, text);
+        return label;
+      };
+      surveyOfBox.replaceChildren(
+        option(null, 'A new area', 'Added to the map as an area of its own.'),
+        ...candidates.map(candidate => {
+          const overlap = candidate.overlap_percent >= 1 ? `${Math.round(candidate.overlap_percent)}%` : 'under 1%';
+          const parts = [
+            candidate.location || 'Location not matched',
+            `${Number(candidate.area_ha).toFixed(2)} ha`,
+            `${overlap} of this survey inside it`,
+            candidate.approved_year ? `mapped ${candidate.approved_year}` : null,
+          ].filter(Boolean);
+          return option(candidate.id, `Re-survey of ${candidate.name}`, parts.join(' · '));
+        }),
+      );
+    }
+
+    surveyOfBox?.addEventListener('change', event => {
+      if (event.target?.name !== 'droneEditorSurveyOf') return;
+      surveyOf = Number(event.target.value) || null;
+      renderActionButtons();
+    });
+
     // Reopen with the details kept by "Save draft": listed genera as pressed pills, others as custom tags.
     (() => {
       const draft = editor.delineation_draft;
       if (!editor.needs_delineation || !draft) return;
+      surveyOf = Number(draft.reassesses_delineation_id) || null;
       if (delineationNameInput && draft.name) delineationNameInput.value = draft.name;
       if (delineationNotesInput && draft.notes) delineationNotesInput.value = draft.notes;
       const buttons = generaBox ? [...generaBox.querySelectorAll('.drone-editor-genus')] : [];
@@ -1365,6 +1425,7 @@
       });
       renderCustomGenera();
     })();
+    renderSurveyOf();
     saved.details = detailsSnapshot();
     addGenusButton?.addEventListener('click', addCustomGenera);
     otherGeneraInput?.addEventListener('keydown', event => {
@@ -1467,6 +1528,10 @@
       saved.areas = sent;
       if (body.location) editor.location = body.location;
       renderLocation();
+      if (Array.isArray(body.reassessment_candidates)) {
+        editor.reassessment_candidates = body.reassessment_candidates;
+        renderSurveyOf();
+      }
     }
 
     // Section 3: barangay of the mangrove areas, as the delineation will get it (resolved by the server
@@ -1546,9 +1611,21 @@
       if (!editor.needs_delineation) {
         dialog = { title: 'Confirm?', message: 'The imagery is rebuilt with your changes (hidden meanwhile).', confirmLabel: 'Confirm' };
       } else if (editor.needs_expert_review) {
-        dialog = { title: 'Submit for expert review?', message: 'An expert reviews your areas. Once approved, they appear on the map.', confirmLabel: 'Submit' };
+        dialog = {
+          title: 'Submit for expert review?',
+          message: surveyOfName()
+            ? `An expert reviews your areas. Once approved, they update the boundary of "${surveyOfName()}" for this year.`
+            : 'An expert reviews your areas. Once approved, they appear on the map.',
+          confirmLabel: 'Submit',
+        };
       } else {
-        dialog = { title: 'Publish?', message: 'It is processed, then published on the map.', confirmLabel: 'Publish' };
+        dialog = {
+          title: 'Publish?',
+          message: surveyOfName()
+            ? `It is processed, then updates the boundary of "${surveyOfName()}" for this year.`
+            : 'It is processed, then published on the map.',
+          confirmLabel: 'Publish',
+        };
       }
       const confirmed = await window.AppActions.confirm(dialog);
       if (!confirmed || state.busy || confirmButton.disabled) return;
@@ -1557,7 +1634,11 @@
       refresh();
       showMessage('Sending your edits…');
       try {
+        const chosenSurveyOf = surveyOf;
         await saveAiAreas();
+        if (chosenSurveyOf !== null && surveyOf !== chosenSurveyOf) {
+          throw new Error('Your saved areas no longer overlap the area chosen under "Survey of". Check it, then confirm again.');
+        }
         await saveCanopies();
         const body = await send(editor.confirm_url, 'POST', {
           ...editsPayload(),

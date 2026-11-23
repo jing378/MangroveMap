@@ -74,7 +74,7 @@ The delineations the map draws for the current user. The map calls it after ever
     "residentDelineationsForMap": [ /* experts only: residents' delineations, pending first, at most 150 */ ]
   }
   ```
-  Each delineation includes `id`, `name`, `notes`, `features`, `is_approved`, `is_rejected`, `rejection_notes`, `user_name`, `approved_by_name`, `municipality`, `planting_recommendations`, `last_revised_by_name`, `last_revised_at` and `removable_after`.
+  Each delineation includes `id`, `name`, `notes`, `features`, `is_approved`, `is_rejected`, `rejection_notes`, `user_name`, `approved_by_name`, `municipality`, `planting_recommendations`, `last_revised_by_name`, `last_revised_at`, `removable_after` and `reassesses` (`{id, name}` of the area a drone re-survey reassesses, else `null`). Approved re-surveys are left out: their boundary is on the area they updated.
 
 ### `GET /delineations/{delineation}/annual-observations`
 The "Changes over time" timeline for one delineation: one entry per observed year, with `year`, `coverageAreaHa`, `source` and the boundary `features`.
@@ -126,7 +126,7 @@ Looks up the barangay and municipality of a shape before it is saved.
 
 ### `POST /expert/delineations/{delineation}/approve`
 - **Who:** expert. **Body:** `planting_recommendation` (optional, up to 5000 characters).
-- **Returns `200`:** `{"message": "...", "unreadCount": 0}`. The owner is notified.
+- **Returns `200`:** `{"message": "...", "unreadCount": 0, "reassessed_delineation_id": null}`. The owner is notified. For a drone re-survey, its boundary is copied onto the area it reassesses (a revision plus that year's observation) and `reassessed_delineation_id` is that area's id.
 
 ### `POST /expert/delineations/{delineation}/reject`
 - **Who:** expert. **Body:** `rejection_notes` (required, 10–2000 characters).
@@ -181,13 +181,13 @@ Large GeoTIFFs are uploaded in pieces so that a dropped connection doesn't resta
 | `GET /drone-imagery/{id}/segmentation` | The AI-detected mangrove areas (GeoJSON) |
 | `POST /drone-imagery/{id}/segmentation` | Run the AI delineation again (owner). The genus classification follows automatically when it is done |
 | `POST /drone-imagery/{id}/classification` | Run only the genus classification again (owner); the areas stay. `202` with `{"classification_status": "queued"}`, `409` while either AI job runs, before the areas exist or without a genus model. Throttled 10/min |
-| `PUT /drone-imagery/{id}/segmentation` | Save edited areas. Body: `areas`, `offset` (`east_m`, `north_m`). Allowed while the genus is still being classified |
+| `PUT /drone-imagery/{id}/segmentation` | Save edited areas. Body: `areas`, `offset` (`east_m`, `north_m`). Allowed while the genus is still being classified. Returns the areas' `location` and `reassessment_candidates` (approved areas they overlap: `id`, `name`, `location`, `area_ha`, `overlap_percent`, `mapped_by`, `approved_year`) until the delineation is submitted |
 | `POST /drone-imagery/{id}/segmentation/genus-preview` | Recount the AI genus suggestion for unsaved areas, without saving. Returns `{"genus_suggestion": {...}}`; `409` until the genus classification is ready |
 | `GET /drone-imagery/{id}/canopies` · `PUT` | The tree canopies the genus classification found, and removing wrong ones |
 
 The AI runs in two separate jobs, each with its own status in the layer payloads: the delineation (`segmentation_status`, `segmentation_error`, `segmented_at`) and the genus classification (`classification_status`, `classification_error`, `classified_at`). Each status is `null` (not run), `queued`, `processing`, `ready` or `failed`. `segmentation_stats` also carries the classification's `genus_suggestion`, `canopy_count` and `canopies_by_genus`.
 | `PUT /drone-imagery/{id}/edits` | Save review edits |
-| `POST /drone-imagery/{id}/confirm` | Confirm the review. The first confirm also needs `delineation_details` (genus). Creates the delineation. |
+| `POST /drone-imagery/{id}/confirm` | Confirm the review. The first confirm also needs `delineation` (`name`, `genera`, `notes`, and optionally `reassesses_delineation_id`: one of the `reassessment_candidates`, to submit it as a re-survey of that area; `422` when the areas no longer overlap it). Creates the delineation. |
 | `DELETE /drone-imagery/{id}` | Delete your own layer together with the delineation submitted from it, whatever its review state (`{"action": "deleted", "deleted_delineations": 0\|1}`; a resident's sends experts `DelineationWithdrawn`), or hide someone else's (`{"action": "hidden"}`) |
 | `GET /drone-imagery/{id}/tiles/{z}/{x}/{y}` | Map tile (PNG), only for users allowed to see the layer |
 | `GET /imagery/{id}/tiles/{z}/{x}/{y}` | Public map tile, for published layers only |

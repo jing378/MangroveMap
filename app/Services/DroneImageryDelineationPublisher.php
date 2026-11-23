@@ -72,9 +72,11 @@ class DroneImageryDelineationPublisher
 
         $owner = $layer->user;
         $isExpert = (bool) $owner?->isExpert();
+        // "Re-survey of …" chosen in the review editor: kept only while that area is still a current approved one.
+        $reassessesId = self::reassessedAreaId($details);
         // Details are cleared with the insert, so a failure keeps them for another try. The layer row is
         // locked and re-checked: the job and a page load (DroneImageryController::index) may race to submit.
-        $delineation = DB::transaction(function () use ($layer, $details, $features, $isExpert, $owner) {
+        $delineation = DB::transaction(function () use ($layer, $details, $features, $isExpert, $owner, $reassessesId) {
             $locked = DroneImageryLayer::query()->lockForUpdate()->find($layer->id);
             if ($locked === null || $locked->delineation_details === null || $locked->delineation()->exists()) {
                 return null;
@@ -86,6 +88,7 @@ class DroneImageryDelineationPublisher
                 'user_id' => $layer->user_id,
                 'drone_imagery_layer_id' => $layer->id,
                 'source' => Delineation::SOURCE_DRONE,
+                'reassesses_delineation_id' => $reassessesId,
                 'name' => trim((string) ($details['name'] ?? '')) ?: $layer->name,
                 'notes' => trim((string) ($details['notes'] ?? '')) ?: "Mangrove areas from drone survey \"{$layer->name}\".",
                 'features' => $features,
@@ -98,6 +101,8 @@ class DroneImageryDelineationPublisher
 
         if ($isExpert) {
             UserActivity::recordDelineationPublished($delineation, $owner);
+            // An expert's re-survey is approved at once, so it updates the area straight away.
+            app(DelineationReassessment::class)->apply($delineation, $owner);
         } else {
             UserActivity::recordDelineationSubmitted($delineation);
             User::where('role', 'expert')
@@ -106,5 +111,20 @@ class DroneImageryDelineationPublisher
         }
 
         return $delineation;
+    }
+
+    /** The approved area the owner said this survey re-surveys, if it still is one (else a new area). */
+    private static function reassessedAreaId(array $details): ?int
+    {
+        $id = (int) ($details['reassesses_delineation_id'] ?? 0);
+        if ($id <= 0) {
+            return null;
+        }
+
+        return Delineation::approved()
+            ->where('is_rejected', false)
+            ->whereNull('reassesses_delineation_id')
+            ->whereKey($id)
+            ->exists() ? $id : null;
     }
 }

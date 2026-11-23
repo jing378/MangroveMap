@@ -809,6 +809,50 @@
             color: var(--fg-182918, #182918);
         }
 
+        .drone-editor-survey-hint {
+            margin: 0 0 6px;
+        }
+
+        .drone-editor-survey-options {
+            display: grid;
+            gap: 6px;
+        }
+
+        .drone-editor-survey-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+            border-radius: 8px;
+            background: var(--bg-ffffff, #ffffff);
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .drone-editor-survey-option:has(input:checked) {
+            border-color: #1e9e62;
+            background: var(--bg-edf7f2, #edf7f2);
+        }
+
+        .drone-editor-survey-option input {
+            margin: 2px 0 0;
+            accent-color: #1e9e62;
+            flex-shrink: 0;
+        }
+
+        .drone-editor-survey-option strong {
+            display: block;
+            color: var(--fg-1a2e1a, #1a2e1a);
+        }
+
+        .drone-editor-survey-option small {
+            display: block;
+            color: var(--fg-6b8a78, #6b8a78);
+            font-size: 12px;
+        }
+
         .drone-editor-location.is-muted {
             font-weight: 400;
             color: var(--fg-6b8a78, #6b8a78);
@@ -1368,6 +1412,12 @@
                         <span class="drone-editor-field-label"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> Location <em>automatic</em></span>
                         <div class="drone-editor-location" id="droneEditorLocation" aria-live="polite"></div>
                     </div>
+                    {{-- Shown when the areas overlap approved ones: a re-survey updates that area instead of adding a new one. --}}
+                    <div class="drone-editor-field" role="radiogroup" aria-labelledby="droneEditorSurveyOfLabel" id="droneEditorSurveyOfField" hidden>
+                        <span class="drone-editor-field-label" id="droneEditorSurveyOfLabel"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Survey of</span>
+                        <p class="drone-editor-hint drone-editor-survey-hint">These areas overlap an area already on the map. Is this a re-survey of it?</p>
+                        <div class="drone-editor-survey-options" id="droneEditorSurveyOf"></div>
+                    </div>
                     <label class="drone-editor-field">
                         <span class="drone-editor-field-label"><i class="bi bi-tag-fill" aria-hidden="true"></i> Name</span>
                         <input type="text" id="droneEditorDelineationName" maxlength="191" value="{{ $layer->name }}">
@@ -1413,6 +1463,19 @@
                             <dt>Name</dt>
                             <dd>{{ $submitted['name'] }}</dd>
                         </div>
+                        @if ($submitted['reassesses'])
+                            <div>
+                                <dt>Survey of</dt>
+                                <dd>
+                                    Re-survey of {{ $submitted['reassesses']['name'] }}
+                                    @if ($submitted['review_state'] === 'approved')
+                                        · its boundary was updated
+                                    @else
+                                        · updates its boundary once approved
+                                    @endif
+                                </dd>
+                            </div>
+                        @endif
                         <div>
                             <dt>Status</dt>
                             <dd>

@@ -20,11 +20,22 @@ class DelineationSubmittedForReview extends Notification
 
     public function toArray(object $notifiable): array
     {
+        // A drone re-survey of an area already on the map: approving it updates that area's boundary.
+        $reassessed = $this->delineation->reassesses_delineation_id
+            ? $this->delineation->reassessedDelineation
+            : null;
+        $reassessedName = $reassessed ? ($reassessed->name ?: "Delineation {$reassessed->id}") : null;
+
         return [
-            'title' => $this->isRevision ? 'Delineation resubmitted for review' : 'Delineation submitted for review',
-            'message' => $this->isRevision
-                ? 'A revised delineation has been resubmitted and is waiting for your review.'
-                : 'A new delineation has been submitted and is waiting for your review.',
+            'title' => $this->isRevision
+                ? 'Delineation resubmitted for review'
+                : ($reassessedName ? 'Drone re-survey submitted for review' : 'Delineation submitted for review'),
+            'message' => match (true) {
+                $reassessedName !== null => ($this->isRevision ? 'A revised drone re-survey' : 'A drone re-survey')
+                    ." of \"{$reassessedName}\" is waiting for your review. Approving it updates that area's boundary.",
+                $this->isRevision => 'A revised delineation has been resubmitted and is waiting for your review.',
+                default => 'A new delineation has been submitted and is waiting for your review.',
+            },
             'type' => 'delineation_submitted',
             'icon' => 'bi-hourglass-split',
             'delineation_id' => $this->delineation->id,

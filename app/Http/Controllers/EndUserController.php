@@ -236,7 +236,15 @@ class EndUserController extends Controller
             'last_revised_at' => $latestRevision?->created_at?->toIso8601String(),
             // Rejected delineations: experts may remove them from this moment on (the resident is told).
             'removable_after' => $delineation->rejectedRemovableAt()?->toIso8601String(),
+            // A drone re-survey of an area already on the map (the panel's Source says which).
+            'reassesses' => $delineation->reassesses_delineation_id && $delineation->reassessedDelineation
+                ? [
+                    'id' => $delineation->reassessedDelineation->id,
+                    'name' => $delineation->reassessedDelineation->name ?: "Delineation {$delineation->reassessedDelineation->id}",
+                ]
+                : null,
         ]);
+        unset($payload['reassessed_delineation']); // loaded above; the panel only needs id and name
 
         if ($delineation->relationLoaded('user') || $delineation->user !== null) {
             $payload['user'] = $delineation->user?->only(['id', 'name', 'role']);
@@ -286,6 +294,12 @@ class EndUserController extends Controller
         }
 
         $focus = Delineation::with(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name'])->find($focusId);
+        // An approved drone re-survey (e.g. from its approval notice) is shown as the area it updated.
+        if ($focus?->isAppliedReassessment()) {
+            $focus = Delineation::with(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name'])
+                ->find($focus->reassesses_delineation_id) ?? $focus;
+            $focusId = $focus->id;
+        }
         if (! $focus || ! $this->userCanViewDelineationOnMap($user, $focus)) {
             return [$delineations, $approvedDelineationsForMap, $residentDelineationsForMap, null, $focusId];
         }
@@ -319,8 +333,9 @@ class EndUserController extends Controller
      */
     private function mapDelineationData(User $user): array
     {
+        // Approved drone re-surveys are left out: their boundary is shown on the area they reassess.
         $delineationModels = Delineation::fetchForMap(
-            $user->delineations()->with(['user:id,name,role', 'approvedBy:id,name']),
+            $user->delineations()->withoutAppliedReassessments()->with(['user:id,name,role', 'approvedBy:id,name']),
             Delineation::MAP_QUERY_LIMIT_OWN,
             ['latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION]
         );
@@ -329,7 +344,7 @@ class EndUserController extends Controller
             ->values();
 
         $approvedForMapModels = Delineation::fetchForMap(
-            Delineation::approved()->where('user_id', '!=', $user->id)->with(['user:id,name,role', 'approvedBy:id,name']),
+            Delineation::approved()->withoutAppliedReassessments()->where('user_id', '!=', $user->id)->with(['user:id,name,role', 'approvedBy:id,name']),
             Delineation::MAP_QUERY_LIMIT,
             [self::PLANTING_RECOMMENDATIONS_RELATION]
         );

@@ -63,6 +63,11 @@
                         @else
                         <span class="source-tag"><i class="bi bi-pencil"></i> {{ $delineation->sourceLabel() }}</span>
                         @endif
+                        @if($delineation->reassessedDelineation)
+                        {{-- A drone re-survey of an area already mapped: once approved, its boundary updates that area. --}}
+                        · <a href="{{ route('admin.map-layers.index', ['delineation' => $delineation->reassesses_delineation_id]) }}"
+                            title="{{ $delineation->is_approved ? 'Its boundary updated this area' : 'Approving it updates this area' }}">Re-survey of {{ $delineation->reassessedDelineation->name ?: 'Delineation #'.$delineation->reassesses_delineation_id }}</a>
+                        @endif
                         · Updated {{ $delineation->updated_at?->format('M j, Y') ?? '—' }}
                     </div>
                 </td>

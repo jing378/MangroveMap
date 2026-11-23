@@ -89,7 +89,7 @@ class MapLayerController extends Controller
         } else {
             $data['delineations'] = $this->delineationQuery($filters)
                 ->with([
-                    'user:id,name,role', 'approvedBy:id,name',
+                    'user:id,name,role', 'approvedBy:id,name', 'reassessedDelineation:id,name',
                     'droneImageryLayer:id,user_id,status,segmentation_status,segmented_at,created_at,bounds,zoom_min,zoom_max,preview_path,preview_bounds',
                 ])
                 ->latest()
@@ -179,7 +179,7 @@ class MapLayerController extends Controller
             ->select([
                 'id', 'user_id', 'source', 'name', 'notes', 'features', 'is_approved', 'approved_at', 'approved_by',
                 'is_rejected', 'rejected_at', 'created_at', 'updated_at',
-                'drone_imagery_layer_id',
+                'drone_imagery_layer_id', 'reassesses_delineation_id',
             ])
             ->when($filters['delineation'] ?? null, fn (Builder $query, $id) => $query->whereKey((int) $id))
             ->when($filters['source'] ?? null, fn (Builder $query, string $source) => $query->where('source', $source))
@@ -359,7 +359,7 @@ class MapLayerController extends Controller
 
     private function writeDelineationsCsv($out, array $filters): void
     {
-        fputcsv($out, ['ID', 'Name', 'Status', 'Source', 'Owner', 'Owner role', 'Municipality', 'Barangays', 'Hectares', 'Genera', 'From drone layer', 'Submitted', 'Approved', 'Approved by']);
+        fputcsv($out, ['ID', 'Name', 'Status', 'Source', 'Owner', 'Owner role', 'Municipality', 'Barangays', 'Hectares', 'Genera', 'From drone layer', 'Submitted', 'Approved', 'Approved by', 'Re-survey of']);
         $this->delineationQuery($filters)
             ->with(['user:id,name,role', 'approvedBy:id,name'])
             ->latest()->orderByDesc('id')
@@ -381,6 +381,7 @@ class MapLayerController extends Controller
                         $delineation->created_at?->toDateTimeString(),
                         $delineation->approved_at?->toDateTimeString(),
                         $delineation->approvedBy?->name,
+                        $delineation->reassesses_delineation_id,
                     ]);
                 }
             });
@@ -421,7 +422,9 @@ class MapLayerController extends Controller
     {
         echo '{"type":"FeatureCollection","features":[';
         $first = true;
+        // Approved re-surveys are left out: their boundary is already on the area they re-surveyed.
         $this->delineationQuery($filters)
+            ->withoutAppliedReassessments()
             ->with('user:id,name')
             ->latest()->orderByDesc('id')
             ->chunk(200, function ($delineations) use (&$first) {

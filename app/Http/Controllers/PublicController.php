@@ -24,6 +24,7 @@ class PublicController extends Controller
             'annualObservations:id,delineation_id,year,coverage_area_ha',
         ])
             ->approved()
+            ->withoutAppliedReassessments() // shown on the area they re-surveyed
             ->latest('approved_at')
             ->get();
 
