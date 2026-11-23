@@ -201,15 +201,6 @@ class Delineation extends Model
         return $this->belongsTo(User::class, 'rejected_by');
     }
 
-    public function mapDashboardUrlFor(User $user): string
-    {
-        $params = ['delineation' => $this->id];
-
-        return $user->isExpert()
-            ? route('expert.map', $params)
-            : route('map', $params);
-    }
-
     /**
      * The Delineate page with this record opened: where "View delineation" in notifications goes
      * (bell, pop-ups, phone pushes and emails).

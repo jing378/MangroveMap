@@ -1528,8 +1528,8 @@
                             <dd class="drone-editor-summary-notes">{{ $submitted['notes'] ?: '—' }}</dd>
                         </div>
                     </dl>
-                    <p class="drone-editor-hint">Edit the genus or notes on the map.</p>
-                    <a href="{{ $submitted['url'] }}" class="drone-editor-btn drone-editor-link-btn"><i class="bi bi-geo-alt"></i> Open delineation on the map</a>
+                    <p class="drone-editor-hint">Edit the genus or notes on the Delineate page.</p>
+                    <a href="{{ $submitted['url'] }}" class="drone-editor-btn drone-editor-link-btn"><i class="bi bi-geo-alt"></i> Open delineation</a>
                 </section>
             @endif
 

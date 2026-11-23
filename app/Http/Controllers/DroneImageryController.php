@@ -122,9 +122,9 @@ class DroneImageryController extends Controller
             'review_state' => $reviewState,
             'is_published' => $isPublished,
             'rejection_notes' => ($isOwner || $viewer->isExpert()) && $reviewState === 'rejected' ? $layer->delineation?->rejection_notes : null,
-            // The owner revises it there; experts open it to review it.
+            // On the Delineate page: the owner revises it there; experts open it to review it.
             'delineation_url' => ($isOwner || $viewer->isExpert()) && $layer->delineation
-                ? $layer->delineation->mapDashboardUrlFor($viewer)
+                ? $layer->delineation->delineateUrlFor($viewer, false)
                 : null,
             // Shown on the map without ticking it: published imagery (next to its approved delineation), and
             // for experts, resident imagery whose delineation waits for their review.
@@ -1000,7 +1000,7 @@ class DroneImageryController extends Controller
             // An approved re-survey is drawn as the area it updated, so the link opens that area.
             'url' => ($delineation->isAppliedReassessment() && $delineation->reassessedDelineation
                 ? $delineation->reassessedDelineation
-                : $delineation)->mapDashboardUrlFor($viewer),
+                : $delineation)->delineateUrlFor($viewer, false),
             'reassesses' => $delineation->reassessedDelineation
                 ? ['id' => $delineation->reassessedDelineation->id, 'name' => $delineation->reassessedDelineation->name ?: "Delineation {$delineation->reassesses_delineation_id}"]
                 : null,

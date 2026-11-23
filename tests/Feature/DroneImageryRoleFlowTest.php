@@ -463,7 +463,9 @@ class DroneImageryRoleFlowTest extends TestCase
         $own = $this->layersFor($resident)[$layer->id];
         $this->assertSame('rejected', $own['review_state']);
         $this->assertSame('Includes the fishpond.', $own['rejection_notes']);
-        $this->assertNotNull($own['delineation_url']);
+        // Opens the Delineate page (where the resident revises it), not the map.
+        $delineation = $layer->fresh()->delineation;
+        $this->assertSame(route('delineate', ['delineation' => $delineation->id], false), $own['delineation_url']);
         $this->assertFalse($own['auto_show']);
         $this->assertArrayNotHasKey($layer->id, $this->layersFor($otherResident)->all());
 
@@ -493,7 +495,10 @@ class DroneImageryRoleFlowTest extends TestCase
         $this->assertSame('Expert Two', $layers[$otherExpertProcessing->id]['uploaded_by']);
         $this->assertSame('expert', $layers[$otherExpertProcessing->id]['uploader_role']);
         // A submitted delineation can be opened for review; only the pending one goes on the map.
-        $this->assertNotNull($layers[$residentPending->id]['delineation_url']);
+        $this->assertSame(
+            route('expert.delineate', ['delineation' => $residentPending->fresh()->delineation->id], false),
+            $layers[$residentPending->id]['delineation_url']
+        );
         $this->assertTrue($layers[$residentPending->id]['auto_show']);
         $this->assertFalse($layers[$residentDraft->id]['auto_show']);
 
