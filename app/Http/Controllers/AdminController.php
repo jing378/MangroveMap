@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Models\AdminReminder;
 use App\Models\AIModel;
 use App\Models\Delineation;
 use App\Models\DroneImageryFile;
@@ -137,7 +138,126 @@ class AdminController extends Controller
             'approvedContributors' => $approvedContributors,
             'activeContributorsThisMonth' => $activeContributorsThisMonth,
             'topContributors' => $topContributors,
+            'droneStages' => $this->droneStageCounts(),
+            'reviewStatus' => $this->reviewStatus(),
+            'hectaresByMunicipality' => $this->hectaresByMunicipality($coverageSummary['by_municipality']),
         ]);
+    }
+
+    /** How many municipalities the "Hectares by municipality" chart lists before folding the rest into "Other". */
+    private const CHART_MUNICIPALITIES = 8;
+
+    /** Reviews in this many recent days make up the "average time to review". */
+    private const REVIEW_TIME_DAYS = 90;
+
+    /**
+     * Drone surveys per stage, in pipeline order (DroneImageryLayer::STAGES), for the dashboard chart.
+     *
+     * @return array<int, array{key: string, label: string, count: int, url: string}>
+     */
+    private function droneStageCounts(): array
+    {
+        $counts = DroneImageryLayer::query()
+            ->with(['user:id,role', 'delineation:id,drone_imagery_layer_id,is_approved,is_rejected'])
+            ->get(['id', 'user_id', 'status', 'segmentation_status'])
+            ->countBy(fn (DroneImageryLayer $layer) => $layer->stage());
+
+        return collect(DroneImageryLayer::STAGES)
+            ->map(fn (string $label, string $key) => [
+                'key' => $key,
+                'label' => $label,
+                'count' => (int) ($counts[$key] ?? 0),
+                'url' => route('admin.map-layers.index', ['tab' => 'imagery', 'status' => $key]),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Delineations by review state, and how long recent reviews took. An expert's own delineation is approved
+     * as it is saved, so it is left out of the average (it would pull it toward zero).
+     *
+     * @return array{segments: array<int, array{key: string, label: string, count: int, url: string}>, total: int, average_hours: ?float, reviewed: int, sources: array<string, int>}
+     */
+    private function reviewStatus(): array
+    {
+        $approved = Delineation::approved()->count();
+        $pending = Delineation::pending()->count();
+        $rejected = Delineation::rejected()->where('is_approved', false)->count();
+
+        $since = now()->subDays(self::REVIEW_TIME_DAYS);
+        $hours = Delineation::query()
+            ->where(fn ($query) => $query->where('approved_at', '>=', $since)->orWhere('rejected_at', '>=', $since))
+            ->get(['id', 'user_id', 'created_at', 'approved_at', 'approved_by', 'rejected_at', 'is_approved'])
+            ->reject(fn (Delineation $d) => $d->is_approved && (int) $d->approved_by === (int) $d->user_id)
+            ->map(fn (Delineation $d) => ($d->is_approved ? $d->approved_at : $d->rejected_at)?->diffInMinutes($d->created_at, true))
+            ->filter(fn ($minutes) => $minutes !== null)
+            ->map(fn ($minutes) => $minutes / 60);
+
+        $segments = [
+            ['key' => 'published', 'label' => 'Approved', 'count' => $approved],
+            ['key' => 'pending', 'label' => 'Pending review', 'count' => $pending],
+            ['key' => 'rejected', 'label' => 'Rejected', 'count' => $rejected],
+        ];
+
+        return [
+            'segments' => array_map(fn (array $segment) => $segment + [
+                'url' => route('admin.map-layers.index', ['status' => $segment['key']]),
+            ], $segments),
+            'total' => $approved + $pending + $rejected,
+            'average_hours' => $hours->isEmpty() ? null : round($hours->avg(), 1),
+            'reviewed' => $hours->count(),
+            'review_days' => self::REVIEW_TIME_DAYS,
+            // Where every delineation came from (Delineation::SOURCES), for the line under the bar.
+            'sources' => collect(Delineation::SOURCES)
+                ->map(fn (string $label, string $key) => Delineation::where('source', $key)->count())
+                ->all(),
+        ];
+    }
+
+    /**
+     * Approved hectares per municipality, largest first; past CHART_MUNICIPALITIES the rest are one "Other"
+     * row, and areas not matched to a municipality yet come last.
+     *
+     * @param  array<int, array{name: ?string, area_count: int, area_ha: float}>  $byMunicipality  ApprovedCoverageStats summary
+     * @return array<int, array{name: string, area_ha: float, area_count: int, url: ?string, muted: bool}>
+     */
+    private function hectaresByMunicipality(array $byMunicipality): array
+    {
+        $named = collect($byMunicipality)->filter(fn (array $row) => $row['name'] !== null)->values();
+        $unmatched = collect($byMunicipality)->first(fn (array $row) => $row['name'] === null);
+
+        $rows = $named->take(self::CHART_MUNICIPALITIES)
+            ->map(fn (array $row) => [
+                'name' => $row['name'],
+                'area_ha' => (float) $row['area_ha'],
+                'area_count' => (int) $row['area_count'],
+                // Map Layers' search also matches the place names kept in the features.
+                'url' => route('admin.map-layers.index', ['status' => 'published', 'search' => $row['name']]),
+                'muted' => false,
+            ]);
+
+        $rest = $named->slice(self::CHART_MUNICIPALITIES);
+        if ($rest->isNotEmpty()) {
+            $rows->push([
+                'name' => 'Other ('.$rest->count().')',
+                'area_ha' => round((float) $rest->sum('area_ha'), 2),
+                'area_count' => (int) $rest->sum('area_count'),
+                'url' => null,
+                'muted' => true,
+            ]);
+        }
+        if ($unmatched) {
+            $rows->push([
+                'name' => 'Not matched yet',
+                'area_ha' => (float) $unmatched['area_ha'],
+                'area_count' => (int) $unmatched['area_count'],
+                'url' => null,
+                'muted' => true,
+            ]);
+        }
+
+        return $rows->values()->all();
     }
 
     public function models()
@@ -372,6 +492,60 @@ class AdminController extends Controller
             .($model->model_type === 'classification' ? 'genus suggestion' : 'segmentation').' model.');
     }
 
+    /**
+     * Stop using a model for new AI runs without deleting it. With no active model of its type, the pipeline
+     * uses the default file in ml/models (MangroveSegmentationService); it can be activated again any time.
+     */
+    public function deactivateModel(AIModel $model): RedirectResponse
+    {
+        abort_if(Auth::user()->role !== 'admin', 403);
+
+        if (! $model->is_active) {
+            return redirect()->route('admin.models')->with('success', $model->name.' is not active.');
+        }
+
+        $model->forceFill(['is_active' => false])->save();
+        UserActivity::record(Auth::user(), 'Deactivated AI model: '.$model->name, 'AI Models', 'success', $model);
+
+        $kind = $model->model_type === 'classification' ? 'genus' : 'segmentation';
+
+        return redirect()->route('admin.models')->with('success', $model->name.' is no longer active. New AI runs use the default '
+            .$kind.' model file until you activate a model.');
+    }
+
+    /**
+     * Remove a model from the registry and its uploaded checkpoint. Only files in the upload folder
+     * (storage models/) are deleted; a record pointing anywhere else (e.g. the default files in ml/models)
+     * loses only its registry entry. Deleting the active model leaves the pipeline on the default model
+     * file until another one is activated (see aiModelStatus / MangroveSegmentationService).
+     */
+    public function destroyModel(AIModel $model): RedirectResponse
+    {
+        abort_if(Auth::user()->role !== 'admin', 403);
+
+        $name = $model->name;
+        $wasActive = (bool) $model->is_active;
+        $file = $this->resolveModelArtifactPath($model->model_path);
+        $uploadsDir = realpath(Storage::disk('local')->path('models'));
+        $realFile = $file !== null ? realpath($file) : false;
+        $isUpload = $realFile !== false && $uploadsDir !== false
+            && str_starts_with(strtolower($realFile), strtolower($uploadsDir.DIRECTORY_SEPARATOR));
+
+        // A running AI job may hold the file open (Windows refuses to delete it then): keep the record and say so.
+        if ($isUpload && ! @unlink($realFile)) {
+            return redirect()->route('admin.models')->with('error',
+                'The file of '.$name.' could not be deleted, probably because an AI job is using it. Try again when it finishes.');
+        }
+
+        UserActivity::record(Auth::user(), 'Deleted AI model: '.$name, 'AI Models', 'success', $model);
+        $model->delete();
+
+        $kind = $model->model_type === 'classification' ? 'genus' : 'segmentation';
+
+        return redirect()->route('admin.models')->with('success', $name.' was deleted'
+            .($wasActive ? '. New AI runs use the default '.$kind.' model file until you activate another one.' : '.'));
+    }
+
     /** New users, submitted delineations and drone uploads in each of the last 4 weeks (local time). */
     private function weeklyGrowthChartData(): array
     {
@@ -428,13 +602,27 @@ class AdminController extends Controller
         if ($pendingDelineations > 0 && $oldestPendingAt !== null && $oldestPendingAt->lt(now()->subDays(self::STALE_REVIEW_DAYS))) {
             $items[] = ['tone' => 'warning', 'icon' => 'bi-hourglass-split', 'title' => $plural($pendingDelineations, 'delineation').' waiting for experts',
                 'text' => 'The oldest was submitted '.$oldestPendingAt->diffForHumans().'. Remind the experts to review them.',
-                'url' => route('admin.map-layers.index', ['status' => 'pending']), 'action' => 'Pending'];
+                'url' => route('admin.map-layers.index', ['status' => 'pending']), 'action' => 'Pending',
+                'reminder' => [
+                    'kind' => AdminReminder::PENDING_REVIEWS,
+                    'title' => 'Remind the experts',
+                    'who' => 'Every expert ('.User::where('role', User::ROLE_EXPERT)->count().') is reminded that '
+                        .$plural($pendingDelineations, 'delineation').' '.($pendingDelineations === 1 ? 'is' : 'are').' waiting for review.',
+                    'recent' => AdminReminder::recent(AdminReminder::PENDING_REVIEWS),
+                ]];
         }
 
         if ($staleDrafts > 0) {
             $items[] = ['tone' => 'warning', 'icon' => 'bi-camera', 'title' => $plural($staleDrafts, 'AI draft').' not confirmed',
                 'text' => 'Drone imagery has waited over '.DroneImageryLayer::STALE_DRAFT_DAYS.' days for its owner to confirm the mangrove areas. Remind them, or delete abandoned layers.',
-                'url' => route('admin.map-layers.index', ['tab' => 'imagery', 'status' => 'waiting_owner']), 'action' => 'Waiting'];
+                'url' => route('admin.map-layers.index', ['tab' => 'imagery', 'status' => 'waiting_owner']), 'action' => 'Waiting',
+                'reminder' => [
+                    'kind' => AdminReminder::STALE_DRAFTS,
+                    'title' => 'Remind the owners',
+                    'who' => 'Each owner of the '.$plural($staleDrafts, 'drone survey').' waiting over '.DroneImageryLayer::STALE_DRAFT_DAYS
+                        .' days is reminded to confirm the mangrove areas, naming their surveys.',
+                    'recent' => AdminReminder::recent(AdminReminder::STALE_DRAFTS),
+                ]];
         }
 
         $newFeedback = Feedback::where('status', 'new')->count();

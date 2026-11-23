@@ -232,39 +232,58 @@
                                 $canActivate = $model->artifact_available
                                     && in_array(strtolower(pathinfo((string) $model->artifact_path, PATHINFO_EXTENSION)), \App\Models\AIModel::runnableExtensions($model->model_type), true);
                             @endphp
+                            {{-- Icon buttons in one row (title and aria-label name each one): accuracy, read from file
+                                 (YOLO), activate or the active check, and delete. --}}
                             <div class="row-actions">
                             @if($model->artifact_available)
-                            <button type="button" class="btn-activate btn-metrics" data-edit-metrics
+                            @php $metricsLabel = $model->accuracy === null ? 'Add accuracy and dataset size' : 'Edit accuracy and dataset size'; @endphp
+                            <button type="button" class="action-btn" data-edit-metrics
                                 data-url="{{ route('admin.models.metrics', $model) }}"
                                 data-model-id="{{ $model->id }}"
                                 data-name="{{ $model->name }}"
                                 data-accuracy="{{ $model->accuracyPercent() }}"
                                 data-metric="{{ $model->accuracy_metric }}"
                                 data-dataset-size="{{ $model->dataset_size }}"
-                                title="Add or edit accuracy and dataset size"><i class="bi bi-graph-up"></i> {{ $model->accuracy === null ? 'Add accuracy' : 'Edit accuracy' }}</button>
+                                title="{{ $metricsLabel }}" aria-label="{{ $metricsLabel }}"><i class="bi bi-graph-up" aria-hidden="true"></i></button>
                             @if($model->model_type === 'classification' && strtolower(pathinfo((string) $model->artifact_path, PATHINFO_EXTENSION)) === 'pt')
                             <form method="POST" action="{{ route('admin.models.metrics.checkpoint', $model) }}"
                                 data-confirm="Read the results from the model file?"
                                 data-confirm-message="Fills in the validation mAP50, precision and recall saved in {{ $model->name }} at the end of training. Any accuracy entered by hand is replaced."
                                 data-confirm-label="Read" data-busy-label="Reading...">
                                 @csrf
-                                <button type="submit" class="btn-activate btn-metrics" title="Use the validation results stored in the YOLO file"><i class="bi bi-file-earmark-bar-graph"></i> Read from file</button>
+                                <button type="submit" class="action-btn" title="Read the results stored in the YOLO file" aria-label="Read the results stored in the YOLO file"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></button>
                             </form>
                             @endif
                             @endif
-                            @if($model->is_active && $canActivate)
-                            <span class="badge success"><i class="bi bi-check2"></i> Active</span>
+                            @if($model->is_active)
+                            {{-- The active model: a filled green check; clicking it deactivates the model. --}}
+                            <form method="POST" action="{{ route('admin.models.deactivate', $model) }}"
+                                data-confirm="Deactivate {{ $model->name }}?"
+                                data-confirm-message="New AI runs will use the default {{ $model->model_type === 'classification' ? 'genus' : 'segmentation' }} model file until you activate a model. It stays in the registry and can be activated again."
+                                data-confirm-label="Deactivate" data-busy-label="Deactivating...">
+                                @csrf
+                                <button type="submit" class="action-btn is-active" title="Active: used for new AI runs. Click to deactivate" aria-label="Active. Deactivate {{ $model->name }}"><i class="bi bi-check2-circle" aria-hidden="true"></i></button>
+                            </form>
                             @elseif($canActivate)
                             <form method="POST" action="{{ route('admin.models.activate', $model) }}"
                                 data-confirm="Activate {{ $model->name }}?"
                                 data-confirm-message="It replaces the active {{ $model->model_type === 'classification' ? 'genus suggestion' : 'segmentation' }} model for new AI runs."
                                 data-confirm-label="Activate" data-busy-label="Activating...">
                                 @csrf
-                                <button type="submit" class="btn-activate"><i class="bi bi-power"></i> Activate</button>
+                                <button type="submit" class="action-btn activate" title="Activate: use for new AI runs" aria-label="Activate: use for new AI runs"><i class="bi bi-power" aria-hidden="true"></i></button>
                             </form>
-                            @elseif(! $model->artifact_available)
-                            <span class="muted-note">—</span>
                             @endif
+                            {{-- Deletes the registry entry and its uploaded checkpoint (AdminController::destroyModel). --}}
+                            <form method="POST" action="{{ route('admin.models.destroy', $model) }}"
+                                data-confirm="Delete {{ $model->name }}?"
+                                data-confirm-message="{{ $model->is_active
+                                    ? 'This is the active '.($model->model_type === 'classification' ? 'genus' : 'segmentation').' model. New AI runs will use the default model file until you activate another one. '
+                                    : '' }}Its registry entry and uploaded file are deleted. This cannot be undone."
+                                data-confirm-label="Delete" data-confirm-tone="danger" data-busy-label="Deleting...">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="action-btn delete" title="Delete this model and its file" aria-label="Delete this model and its file"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                            </form>
                             </div>
                         </td>
                     </tr>
@@ -762,16 +781,38 @@
         background: var(--bg-eef3ee, #eef3ee);
     }
 
-    /* One column of equal-width buttons, so rows with 1, 2 or 3 actions line up. */
+    /* Icon buttons side by side (title / aria-label name each one). */
     .row-actions {
-        display: grid;
-        grid-template-columns: minmax(130px, max-content);
+        display: flex;
+        align-items: center;
         gap: 6px;
     }
 
-    .row-actions form,
-    .row-actions .btn-activate {
-        width: 100%;
+    .row-actions form {
+        margin: 0;
+    }
+
+    .action-btn {
+        color: var(--fg-3a5a3a, #3a5a3a);
+    }
+
+    .action-btn.activate {
+        color: var(--fg-1e9e62, #1e9e62);
+        border-color: var(--bd-b0e0c0, #b0e0c0);
+    }
+
+    /* The active model: a filled green check; clicking it deactivates the model (with a confirm). */
+    .action-btn.is-active {
+        color: #fff;
+        background: #1e9e62;
+        border-color: #1e9e62;
+    }
+
+    .action-btn.is-active:hover,
+    .action-btn.is-active:focus-visible {
+        background: #17834f;
+        border-color: #17834f;
+        box-shadow: 0 0 0 3px rgba(30, 158, 98, 0.18);
     }
 
     .row-actions .badge {
@@ -782,6 +823,7 @@
         color: var(--fg-3a5a3a, #3a5a3a);
         border-color: var(--bd-d4e0d4, #d4e0d4);
     }
+
 
     .metric-note {
         margin-left: 4px;
@@ -1227,15 +1269,11 @@
             gap: 8px;
         }
 
-        .registry-table .row-actions form,
-        .registry-table .row-actions > .btn-activate {
-            flex: 1 1 140px;
-            width: auto;
-        }
-
-        .registry-table .row-actions .btn-activate {
-            justify-content: center;
-            min-height: 38px;
+        /* Bigger touch targets on phones. */
+        .registry-table .row-actions .action-btn {
+            width: 40px;
+            height: 40px;
+            font-size: 16px;
         }
 
         .registry-table .row-actions > .badge {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\ProcessDroneImagery;
+use App\Models\AdminReminder;
 use App\Models\Delineation;
 use App\Models\DroneImageryLayer;
 use App\Models\UserActivity;
@@ -96,6 +97,11 @@ class MapLayerController extends Controller
                 ->paginate(20)
                 ->withQueryString();
         }
+
+        // Reminders sent in the last day for the rows on this page (their bell shows "Reminded … ago").
+        $data['reminders'] = $tab === 'imagery'
+            ? AdminReminder::recentFor(AdminReminder::DRONE_LAYER, $data['layers']->getCollection()->modelKeys())
+            : AdminReminder::recentFor(AdminReminder::DELINEATION, $data['delineations']->getCollection()->modelKeys());
 
         return view('admin.map-layers', $data);
     }

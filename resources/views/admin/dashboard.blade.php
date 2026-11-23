@@ -62,6 +62,33 @@
                 @endif
             </div>
             @forelse($attention as $item)
+                @if(isset($item['reminder']))
+                    {{-- With a reminder: the card is a link plus a "Send reminder" button (a button can't sit inside a link). --}}
+                    @php $reminder = $item['reminder']; @endphp
+                    <div class="attention-item has-reminder tone-{{ $item['tone'] }}">
+                        <a class="attention-link" href="{{ $item['url'] }}">
+                            <i class="bi {{ $item['icon'] }} attention-icon" aria-hidden="true"></i>
+                            <span class="attention-text">
+                                <strong>{{ $item['title'] }}</strong>
+                                <span>{{ $item['text'] }}</span>
+                            </span>
+                            <span class="attention-action">{{ $item['action'] }} <i class="bi bi-arrow-right"></i></span>
+                        </a>
+                        @if($reminder['recent'])
+                            <button type="button" class="reminder-btn" disabled
+                                title="Sent by {{ $reminder['recent']->sender?->name ?? 'an admin' }} to {{ $reminder['recent']->recipients }} {{ Str::plural('person', $reminder['recent']->recipients) }}. It can be sent again {{ $reminder['recent']->availableAgainAt()->diffForHumans() }}.">
+                                <i class="bi bi-check2" aria-hidden="true"></i> Reminded {{ $reminder['recent']->created_at->diffForHumans(null, true, true) }} ago
+                            </button>
+                        @else
+                            <button type="button" class="reminder-btn" data-reminder
+                                data-reminder-kind="{{ $reminder['kind'] }}"
+                                data-title="{{ $reminder['title'] }}"
+                                data-who="{{ $reminder['who'] }}">
+                                <i class="bi bi-alarm" aria-hidden="true"></i> Send reminder
+                            </button>
+                        @endif
+                    </div>
+                @else
                 <a class="attention-item tone-{{ $item['tone'] }}" href="{{ $item['url'] }}">
                     <i class="bi {{ $item['icon'] }} attention-icon" aria-hidden="true"></i>
                     <span class="attention-text">
@@ -70,6 +97,7 @@
                     </span>
                     <span class="attention-action">{{ $item['action'] }} <i class="bi bi-arrow-right"></i></span>
                 </a>
+                @endif
             @empty
                 <div class="attention-empty">
                     <i class="bi bi-check-circle" aria-hidden="true"></i>
@@ -101,6 +129,115 @@
                         <span class="cell-sub">({{ number_format($storage['tileSources']) }} {{ Str::plural('upload', $storage['tileSources']) }})</span></span>
                 </span>
             </div>
+        </div>
+    </div>
+
+    {{-- Overview charts: plain HTML bars (label, bar, value) so every bar is a link to that list in Map Layers,
+         the numbers stay readable text (the table view), and dark mode follows the theme like the rest. --}}
+    <div class="grid overview-grid">
+        {{-- 1. Where the drone surveys are on their way to the map; a stuck stage shows at a glance. --}}
+        @php
+            $stageMax = max(1, max(array_column($droneStages, 'count')));
+            $stageTotal = array_sum(array_column($droneStages, 'count'));
+        @endphp
+        <div class="section chart-card">
+            <div class="section-title"><i class="bi bi-camera"></i> Drone survey pipeline
+                <a href="{{ route('admin.map-layers.index', ['tab' => 'imagery']) }}" class="section-link" title="Open Drone Surveys in Map Layers">View <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <p class="chart-sub">{{ number_format($stageTotal) }} {{ Str::plural('survey', $stageTotal) }} by stage, in pipeline order.</p>
+            @if($stageTotal === 0)
+                <div class="chart-empty">No drone surveys uploaded yet.</div>
+            @else
+                <ul class="hbar-list" aria-label="Drone surveys per stage">
+                    @foreach($droneStages as $stage)
+                        <li>
+                            <a class="hbar-row {{ $stage['count'] === 0 ? 'is-zero' : '' }} {{ $stage['key'] === 'failed' ? 'is-critical' : '' }}"
+                                href="{{ $stage['url'] }}"
+                                title="{{ $stage['label'] }}: {{ number_format($stage['count']) }} {{ Str::plural('survey', $stage['count']) }}. Open in Drone Surveys.">
+                                <span class="hbar-label">
+                                    @if($stage['key'] === 'failed')<i class="bi bi-exclamation-octagon" aria-hidden="true"></i>@endif
+                                    {{ $stage['label'] }}
+                                </span>
+                                <span class="hbar-track"><span class="hbar-fill" style="width: {{ $stage['count'] ? max(2, round($stage['count'] / $stageMax * 100, 1)) : 0 }}%"></span></span>
+                                <span class="hbar-value">{{ number_format($stage['count']) }}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+
+        {{-- 2. Review status as one stacked bar, plus how long reviews take: are the experts keeping up? --}}
+        <div class="section chart-card">
+            <div class="section-title"><i class="bi bi-clipboard-check"></i> Delineation reviews
+                <a href="{{ route('admin.map-layers.index') }}" class="section-link" title="Open Delineations in Map Layers">View <i class="bi bi-arrow-right"></i></a>
+            </div>
+            @if($reviewStatus['total'] === 0)
+                <div class="chart-empty">No delineations submitted yet.</div>
+            @else
+                <div class="review-headline">
+                    @if($reviewStatus['average_hours'] !== null)
+                        @php
+                            $avg = $reviewStatus['average_hours'];
+                            $avgText = $avg < 1 ? 'under 1 hour' : ($avg < 48 ? number_format($avg, $avg < 10 ? 1 : 0).' hours' : number_format($avg / 24, 1).' days');
+                        @endphp
+                        <span class="review-avg">{{ $avgText }}</span>
+                        <span class="chart-sub">average time to review, from {{ number_format($reviewStatus['reviewed']) }} {{ Str::plural('review', $reviewStatus['reviewed']) }} in the last {{ $reviewStatus['review_days'] }} days (experts' own areas left out)</span>
+                    @else
+                        <span class="chart-sub">No resident delineations reviewed in the last {{ $reviewStatus['review_days'] }} days.</span>
+                    @endif
+                </div>
+                <div class="stack-bar" role="img"
+                    aria-label="{{ collect($reviewStatus['segments'])->map(fn ($s) => $s['label'].' '.$s['count'])->implode(', ') }}">
+                    @foreach($reviewStatus['segments'] as $segment)
+                        @if($segment['count'] > 0)
+                            <a class="stack-seg seg-{{ $segment['key'] }}" href="{{ $segment['url'] }}"
+                                style="flex-grow: {{ $segment['count'] }}"
+                                title="{{ $segment['label'] }}: {{ number_format($segment['count']) }} ({{ round($segment['count'] / $reviewStatus['total'] * 100) }}%)"></a>
+                        @endif
+                    @endforeach
+                </div>
+                <ul class="stack-legend">
+                    @foreach($reviewStatus['segments'] as $segment)
+                        <li>
+                            <a href="{{ $segment['url'] }}">
+                                <span class="legend-swatch seg-{{ $segment['key'] }}" aria-hidden="true"></span>
+                                {{ $segment['label'] }}
+                                <strong>{{ number_format($segment['count']) }}</strong>
+                                <span class="legend-share">{{ round($segment['count'] / $reviewStatus['total'] * 100) }}%</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+                <p class="chart-sub chart-foot">
+                    <i class="bi bi-pencil" aria-hidden="true"></i> {{ number_format($reviewStatus['sources']['manual'] ?? 0) }} hand-drawn
+                    · <i class="bi bi-camera" aria-hidden="true"></i> {{ number_format($reviewStatus['sources']['drone'] ?? 0) }} from drone surveys (AI-assisted)
+                </p>
+            @endif
+        </div>
+
+        {{-- 3. Where the mapped mangroves are: approved hectares per municipality. --}}
+        @php $haMax = max(0.01, max(array_column($hectaresByMunicipality, 'area_ha') ?: [0])); @endphp
+        <div class="section chart-card">
+            <div class="section-title"><i class="bi bi-geo-alt"></i> Hectares by municipality</div>
+            <p class="chart-sub">Expert-approved mangrove areas, largest first.</p>
+            @if($hectaresByMunicipality === [])
+                <div class="chart-empty">No approved areas yet.</div>
+            @else
+                <ul class="hbar-list" aria-label="Approved hectares per municipality">
+                    @foreach($hectaresByMunicipality as $row)
+                        <li>
+                            <{{ $row['url'] ? 'a' : 'div' }} class="hbar-row {{ $row['muted'] ? 'is-muted' : '' }}"
+                                @if($row['url']) href="{{ $row['url'] }}" @endif
+                                title="{{ $row['name'] }}: {{ number_format($row['area_ha'], 2) }} ha in {{ $row['area_count'] }} {{ Str::plural('area', $row['area_count']) }}">
+                                <span class="hbar-label">{{ $row['name'] }}</span>
+                                <span class="hbar-track"><span class="hbar-fill" style="width: {{ max(2, round($row['area_ha'] / $haMax * 100, 1)) }}%"></span></span>
+                                <span class="hbar-value">{{ number_format($row['area_ha'], 2) }} <small>ha</small></span>
+                            </{{ $row['url'] ? 'a' : 'div' }}>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
     </div>
 
@@ -258,6 +395,7 @@
         </div>
     </div>
 </div>
+@include('admin.partials.reminder-dialog')
 @endsection
 
 @section('styles')
@@ -587,6 +725,33 @@
         margin-bottom: 0;
     }
 
+    /* An item with a "Send reminder" button: the link part keeps the usual layout, the button sits at the end. */
+    .attention-link {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex: 1 1 auto;
+        min-width: 0;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .attention-item.has-reminder .reminder-btn {
+        flex: none;
+    }
+
+    @media (max-width: 600px) {
+        .attention-item.has-reminder {
+            flex-wrap: wrap;
+        }
+
+        .attention-item.has-reminder .reminder-btn {
+            flex: 1 1 100%;
+            justify-content: center;
+            min-height: 40px;
+        }
+    }
+
     .attention-item:hover {
         background: var(--bg-f5f7f6, #f5f7f6);
     }
@@ -812,10 +977,264 @@
             grid-template-columns: 1fr;
         }
     }
+
+    /* ---- Overview charts (drone pipeline, reviews, hectares by municipality) ---- */
+    .grid.overview-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 20px;
+        margin-bottom: 0;
+        align-items: stretch;
+    }
+
+    .chart-card {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chart-card .section-title {
+        margin-bottom: 4px;
+    }
+
+    .chart-sub {
+        margin: 0 0 12px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    .chart-foot {
+        margin: auto 0 0;
+        padding-top: 12px;
+        border-top: 1px solid var(--bd-edf2ed, #edf2ed);
+    }
+
+    .chart-empty {
+        padding: 18px 0;
+        font-size: 13px;
+        color: #7a9a7a;
+    }
+
+    /* Horizontal bars: label, thin track with the bar, value. Each row links to that list. */
+    .hbar-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 2px;
+    }
+
+    .hbar-row {
+        display: grid;
+        /* Wide enough for the longest stage ("Pending expert review") at the three-column width. */
+        grid-template-columns: minmax(0, 152px) minmax(36px, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px;
+        margin: 0 -8px;
+        border-radius: 8px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        text-decoration: none;
+        transition: background-color 0.15s ease;
+    }
+
+    a.hbar-row:hover,
+    a.hbar-row:focus-visible {
+        background: var(--bg-f3f8f4, #f3f8f4);
+    }
+
+    a.hbar-row:focus-visible {
+        outline: 2px solid #1e9e62;
+        outline-offset: -2px;
+    }
+
+    .hbar-label {
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .hbar-label .bi {
+        margin-right: 3px;
+    }
+
+    .hbar-track {
+        height: 10px;
+        border-radius: 999px;
+        background: var(--bg-edf2ed, #edf2ed);
+        overflow: hidden;
+    }
+
+    .hbar-fill {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: #1e9e62;
+    }
+
+    .hbar-value {
+        min-width: 34px;
+        text-align: right;
+        font-size: 12.5px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .hbar-value small {
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    /* A stage nobody is at: shown (the pipeline keeps its order) but quiet. */
+    .hbar-row.is-zero .hbar-label,
+    .hbar-row.is-zero .hbar-value {
+        color: #9ab0a0;
+        font-weight: 500;
+    }
+
+    /* Failed is the one stage in a status colour (with its icon), so it stands out from the rest. */
+    .hbar-row.is-critical:not(.is-zero) .hbar-label,
+    .hbar-row.is-critical:not(.is-zero) .hbar-value {
+        color: var(--fg-d04030, #d04030);
+    }
+
+    .hbar-row.is-critical .hbar-fill {
+        background: #d04030;
+    }
+
+    /* "Other" and "Not matched yet": the same scale, a lighter bar. */
+    .hbar-row.is-muted .hbar-fill {
+        background: var(--bg-9ccfb4, #9ccfb4);
+    }
+
+    .hbar-row.is-muted .hbar-label {
+        font-weight: 500;
+        color: var(--fg-6a8a6a, #6a8a6a);
+    }
+
+    /* Review status: one stacked bar (2px gaps between segments) and a legend with counts. */
+    .review-headline {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-bottom: 12px;
+    }
+
+    .review-headline .chart-sub {
+        margin: 0;
+    }
+
+    .review-avg {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        line-height: 1.15;
+    }
+
+    .stack-bar {
+        display: flex;
+        gap: 2px;
+        height: 16px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: var(--bg-edf2ed, #edf2ed);
+    }
+
+    .stack-seg {
+        display: block;
+        min-width: 6px;
+        height: 100%;
+        transition: filter 0.15s ease;
+    }
+
+    .stack-seg:hover,
+    .stack-seg:focus-visible {
+        filter: brightness(1.12);
+    }
+
+    /* Review colours, checked for colour-blind separation (deuteranopia included) against the light and the dark
+       card: a teal-leaning green so Approved and Rejected stay apart even when nothing is pending between
+       them, and a dark-mode amber of its own (the light one is too pale on the dark card). Every segment is also
+       named with its count in the legend, so colour is never the only cue. */
+    .seg-published {
+        background: #0f8f74;
+    }
+
+    .seg-pending {
+        background: #c98a20;
+    }
+
+    html[data-theme="dark"] .seg-pending {
+        background: #a8952a;
+    }
+
+    .seg-rejected {
+        background: #d04030;
+    }
+
+    .stack-legend {
+        list-style: none;
+        margin: 12px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 2px;
+    }
+
+    .stack-legend a {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        margin: 0 -8px;
+        border-radius: 8px;
+        font-size: 12.5px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        text-decoration: none;
+    }
+
+    .stack-legend a:hover,
+    .stack-legend a:focus-visible {
+        background: var(--bg-f3f8f4, #f3f8f4);
+    }
+
+    .stack-legend strong {
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .legend-swatch {
+        flex: none;
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+    }
+
+    .legend-share {
+        min-width: 38px;
+        text-align: right;
+        color: var(--fg-6a8a6a, #6a8a6a);
+        font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 1200px) {
+        .grid.overview-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 900px) {
+        .grid.overview-grid {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+    }
 </style>
 @endsection
 
 @section('scripts')
+@include('partials.flash-toast')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
     const chartOpts = {

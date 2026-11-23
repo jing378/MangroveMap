@@ -108,6 +108,16 @@
                 </td>
                 <td class="cell-actions">
                     <div class="row-actions">
+                        @if(! $delineation->is_approved && ! $delineation->is_rejected)
+                        {{-- Pending: remind the experts to review this one. --}}
+                        @include('admin.partials.reminder-bell', [
+                            'kind' => \App\Models\AdminReminder::DELINEATION,
+                            'target' => $delineation->id,
+                            'title' => 'Remind the experts to review this',
+                            'who' => 'Every expert is reminded to review "'.$delineation->name.'", waiting since '.$delineation->created_at?->diffForHumans().'.',
+                            'recent' => $reminders[$delineation->id] ?? null,
+                        ])
+                        @endif
                         <form method="POST" action="{{ route('admin.map-layers.delineations.destroy', $delineation) }}"
                             data-confirm="Delete this record?" data-confirm-message="&quot;{{ $delineation->name }}&quot; is permanently deleted with its yearly observations and revisions, and the owner is notified. This cannot be undone."
                             data-confirm-label="Delete" data-confirm-tone="danger" data-busy-label="Deleting...">

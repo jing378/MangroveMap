@@ -69,6 +69,7 @@
         --bd-ffffff-rgb: 38, 49, 43;
         --bg-6aa7ff: #233b5d;
         --bg-86efac: #215735;
+        --bg-9ccfb4: #29553e;
         --bg-b8c4bc: #353f38;
         --bg-b8d4b8: #284228;
         --bg-bfe3cf: #1c412d;
@@ -125,6 +126,7 @@
         --bg-f1f7f2: #132115;
         --bg-f2f4f3: #181d1a;
         --bg-f2f8fd: #0d1922;
+        --bg-f3f8f4: #121f15;
         --bg-f3faf6: #0e2217;
         --bg-f3fbf6: #0d2315;
         --bg-f4f8f4: #131e13;

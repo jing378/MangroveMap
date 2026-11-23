@@ -586,10 +586,31 @@
                 delete form.dataset.actionConfirmed;
                 return;
             }
-            event.preventDefault();
-            if (form.dataset.actionPending === 'true') return;
 
             const submitter = event.submitter || form.querySelector('[type="submit"]');
+
+            // Nothing to ask (only a busy label): let this submit go through as it is and show the busy state
+            // right after. It must not be stopped and re-sent with requestSubmit(): browsers ignore requestSubmit()
+            // while the form's own submit event is still being dispatched, so the form would never be sent and
+            // the button would spin forever.
+            if (!asks) {
+                if (form.dataset.actionSubmitting === 'true') {
+                    event.preventDefault(); // a second click while it is already on its way
+                    return;
+                }
+                form.dataset.actionSubmitting = 'true';
+                // After the browser has read the form (the submitter's name/value is only sent while it is enabled).
+                setTimeout(() => {
+                    setBusy(submitter, form.dataset.busyLabel || 'Processing...');
+                    if (form.hasAttribute('data-busy-overlay')) {
+                        showProgress({ title: form.dataset.busyLabel || 'Please wait...', message: form.dataset.busyOverlay || '' });
+                    }
+                }, 0);
+                return;
+            }
+
+            event.preventDefault();
+            if (form.dataset.actionPending === 'true') return;
             if (asks) {
                 form.dataset.actionPending = 'true';
                 const ok = await confirmAction({
@@ -624,6 +645,9 @@
             if (!event.persisted) return;
             hideProgress();
             document.querySelectorAll('[data-loading="true"]').forEach(clearBusy);
+            document.querySelectorAll('form[data-action-submitting="true"]').forEach(form => {
+                delete form.dataset.actionSubmitting;
+            });
             document.querySelectorAll('[data-action-locked="true"]').forEach(button => {
                 button.disabled = false;
                 delete button.dataset.actionLocked;

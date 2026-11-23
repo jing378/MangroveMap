@@ -64,8 +64,19 @@ class BoundaryResolver
 
         $positions = array_map(fn ($position) => $this->position($position), $coords);
         $minimumPositions = $type === 'line' ? 2 : 3;
-        if (count($positions) < $minimumPositions) {
-            throw ValidationException::withMessages(['features' => 'The boundary has too few coordinates.']);
+        // Distinct points, not raw positions: a "polygon" of A, B, A (closed but flat) has 3 positions and only
+        // 2 points, and MySQL cannot even read it (ST_GeomFromGeoJSON fails before ST_IsValid can say why).
+        // It happens while an area is still being drawn, when the map asks for its location early.
+        $distinct = [];
+        foreach ($positions as $position) {
+            if (! array_filter($distinct, fn (array $seen) => $this->samePosition($seen, $position))) {
+                $distinct[] = $position;
+            }
+        }
+        if (count($positions) < $minimumPositions || count($distinct) < $minimumPositions) {
+            throw ValidationException::withMessages(['features' => $type === 'area'
+                ? 'An area needs at least 3 different points.'
+                : 'The boundary has too few coordinates.']);
         }
 
         if ($type === 'line') {

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminReminderController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -374,6 +375,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/models/{model}/metrics/from-checkpoint', [AdminController::class, 'readModelMetricsFromCheckpoint'])
             ->whereNumber('model')
             ->name('admin.models.metrics.checkpoint');
+        Route::post('/reminders', [AdminReminderController::class, 'store'])
+            ->middleware('throttle:30,1,admin.reminders.store')
+            ->name('admin.reminders.store');
+        Route::post('/models/{model}/deactivate', [AdminController::class, 'deactivateModel'])
+            ->whereNumber('model')
+            ->name('admin.models.deactivate');
+        Route::delete('/models/{model}', [AdminController::class, 'destroyModel'])
+            ->whereNumber('model')
+            ->name('admin.models.destroy');
         Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
         Route::get('/users/{user}', [AdminController::class, 'show'])->name('admin.users.show');
         Route::get('/users/{user}/edit', [AdminController::class, 'edit'])->name('admin.users.edit');

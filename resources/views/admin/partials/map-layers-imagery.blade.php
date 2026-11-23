@@ -98,6 +98,16 @@
                 <td data-label="Uploaded" class="cell-area nowrap">{{ $layer->created_at?->format('M j, Y') ?? '—' }}</td>
                 <td class="cell-actions">
                     <div class="row-actions">
+                        @if($stage === 'waiting_owner' && $layer->user)
+                        {{-- Waiting for its owner: remind them to confirm the AI's mangrove areas. --}}
+                        @include('admin.partials.reminder-bell', [
+                            'kind' => \App\Models\AdminReminder::DRONE_LAYER,
+                            'target' => $layer->id,
+                            'title' => 'Remind the owner to confirm the areas',
+                            'who' => $layer->user->name.' is reminded to check and confirm the mangrove areas of "'.$layer->name.'".',
+                            'recent' => $reminders[$layer->id] ?? null,
+                        ])
+                        @endif
                         @if($layer->status === 'failed')
                         <form method="POST" action="{{ route('admin.map-layers.imagery.reprocess', $layer) }}"
                             data-confirm="Retry processing?" data-confirm-message="&quot;{{ $layer->name }}&quot; is processed again in the background."

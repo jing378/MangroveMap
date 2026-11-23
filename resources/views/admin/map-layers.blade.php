@@ -99,6 +99,8 @@
         @endif
     </div>
 
+    {{-- Opened by the bells in the rows (pending delineations, surveys waiting for their owner). --}}
+    @include('admin.partials.reminder-dialog')
 </div>
 @endsection
 
