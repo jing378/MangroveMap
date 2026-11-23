@@ -6,6 +6,7 @@ use App\Models\Delineation;
 use App\Models\DelineationAnnualObservation;
 use App\Models\User;
 use App\Models\UserActivity;
+use App\Notifications\DelineationReassessed;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -78,7 +79,8 @@ class DelineationReassessment
             return null;
         }
 
-        $target = DB::transaction(function () use ($survey, $approver) {
+        $previousHa = 0.0;
+        $target = DB::transaction(function () use ($survey, $approver, &$previousHa) {
             $target = Delineation::query()->lockForUpdate()->find($survey->reassesses_delineation_id);
             if ($target === null || ! $target->is_approved || $target->is_rejected || $target->reassesses_delineation_id !== null) {
                 $survey->update(['reassesses_delineation_id' => null]);
@@ -87,6 +89,7 @@ class DelineationReassessment
             }
 
             $previous = $target->features ?? [];
+            $previousHa = ApprovedCoverageStats::areaHectares($previous);
             $features = $survey->features ?? [];
             $target->recordRevision($approver, 'reassessment');
             $this->observations->record(
@@ -104,6 +107,7 @@ class DelineationReassessment
         });
 
         if ($target !== null) {
+            $this->notifyOwner($target, $survey, $approver, $previousHa);
             UserActivity::record(
                 $approver,
                 'Updated "'.($target->name ?: "Delineation {$target->id}").'" from drone re-survey: '.($survey->name ?: "Delineation {$survey->id}"),
@@ -114,6 +118,30 @@ class DelineationReassessment
         }
 
         return $target;
+    }
+
+    /**
+     * Tell the area's owner, unless they flew the re-survey or approved it themselves. A failed send never
+     * undoes the update.
+     */
+    private function notifyOwner(Delineation $area, Delineation $survey, User $approver, float $previousHa): void
+    {
+        $owner = $area->user;
+        if ($owner === null || $owner->id === $survey->user_id || $owner->id === $approver->id) {
+            return;
+        }
+
+        try {
+            $owner->notify(new DelineationReassessed(
+                $area,
+                $survey->user?->name,
+                ($survey->created_at ?? now())->copy()->timezone(DelineationAnnualObservation::LOCAL_TIMEZONE)->year,
+                $previousHa,
+                ApprovedCoverageStats::areaHectares($area->features ?? []),
+            ));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

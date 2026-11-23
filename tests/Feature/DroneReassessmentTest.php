@@ -6,6 +6,7 @@ use App\Models\Delineation;
 use App\Models\DelineationAnnualObservation;
 use App\Models\DroneImageryLayer;
 use App\Models\User;
+use App\Notifications\DelineationReassessed;
 use App\Notifications\DelineationSubmittedForReview;
 use App\Services\ApprovedCoverageStats;
 use App\Services\DroneImageryDelineationPublisher;
@@ -193,6 +194,36 @@ class DroneReassessmentTest extends TestCase
         $this->assertTrue($layer->fresh()->isPublished());
     }
 
+    public function test_the_area_owner_is_told_when_someone_elses_resurvey_updates_it(): void
+    {
+        Storage::fake('local');
+        $areaOwner = User::factory()->create(['role' => 'end_user', 'name' => 'Area Owner']);
+        $surveyor = User::factory()->create(['role' => 'end_user', 'name' => 'Drone Pilot']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        $original = $this->area($areaOwner, self::ORIGINAL, ['approved_by' => $expert->id]);
+        $layer = $this->layer($surveyor, 'ready', self::RESURVEY, [
+            'delineation_details' => [
+                'name' => 'Pilot survey', 'genera' => ['Rhizophora'], 'notes' => null,
+                'reassesses_delineation_id' => $original->id,
+            ],
+        ]);
+        Notification::fake();
+        $survey = app(DroneImageryDelineationPublisher::class)->publish($layer);
+        Notification::assertNothingSentTo($areaOwner); // not before an expert approves it
+
+        $this->actingAs($expert)->postJson(route('expert.delineations.approve', $survey))->assertOk();
+
+        Notification::assertSentTo($areaOwner, DelineationReassessed::class, function (DelineationReassessed $notification) use ($areaOwner, $original) {
+            $data = $notification->toArray($areaOwner);
+
+            return $data['delineation_id'] === $original->id
+                && $data['type'] === 'delineation_reassessed'
+                && str_contains($data['message'], 'by Drone Pilot updated the boundary of "Cabalian stand" for '.now()->year);
+        });
+        Notification::assertNotSentTo($surveyor, DelineationReassessed::class);
+        Notification::assertNotSentTo($expert, DelineationReassessed::class);
+    }
+
     public function test_an_experts_resurvey_updates_the_area_straight_away(): void
     {
         Storage::fake('local');
@@ -210,6 +241,7 @@ class DroneReassessmentTest extends TestCase
 
         $this->assertTrue($survey->isAppliedReassessment());
         $this->assertSame(self::RESURVEY, $original->fresh()->features[0]['coords']);
+        Notification::assertNotSentTo($expert, DelineationReassessed::class); // their own area
         $this->assertSame(1, Delineation::approved()->withoutAppliedReassessments()->count());
     }
 
