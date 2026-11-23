@@ -85,6 +85,7 @@ class DroneImageryDelineationPublisher
             return Delineation::create([
                 'user_id' => $layer->user_id,
                 'drone_imagery_layer_id' => $layer->id,
+                'source' => Delineation::SOURCE_DRONE,
                 'name' => trim((string) ($details['name'] ?? '')) ?: $layer->name,
                 'notes' => trim((string) ($details['notes'] ?? '')) ?: "Mangrove areas from drone survey \"{$layer->name}\".",
                 'features' => $features,

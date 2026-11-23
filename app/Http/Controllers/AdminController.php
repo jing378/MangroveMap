@@ -63,7 +63,7 @@ class AdminController extends Controller
             ->where('status', 'failed')
             ->orWhere('segmentation_status', 'failed')
             ->orWhere('classification_status', 'failed'))->count();
-        $droneAwaitingOwner = DroneImageryLayer::where('status', 'awaiting_review')->count();
+        $droneAwaitingOwner = DroneImageryLayer::inStage('waiting_owner')->count();
 
         // Disk used by uploads (as uploaded; generated tiles and mosaics come on top).
         $storage = [
@@ -124,7 +124,7 @@ class AdminController extends Controller
             'droneProcessing' => $droneProcessing,
             'droneFailed' => $droneFailed,
             'droneAwaitingOwner' => $droneAwaitingOwner,
-            'attention' => $this->attentionItems($pendingDelineations, $oldestPendingAt, $droneFailed),
+            'attention' => $this->attentionItems($pendingDelineations, $oldestPendingAt, $droneFailed, DroneImageryLayer::staleOwnerDraft()->count()),
             'aiModels' => $this->aiModelStatus(),
             'storage' => $storage,
             'recentActivities' => $recentActivities,
@@ -400,7 +400,7 @@ class AdminController extends Controller
      *
      * @return array<int, array{tone: string, icon: string, title: string, text: string, url: string, action: string}>
      */
-    private function attentionItems(int $pendingDelineations, ?Carbon $oldestPendingAt, int $droneFailed): array
+    private function attentionItems(int $pendingDelineations, ?Carbon $oldestPendingAt, int $droneFailed, int $staleDrafts): array
     {
         $items = [];
         $plural = fn (int $count, string $word) => $count.' '.Str::plural($word, $count);
@@ -429,6 +429,12 @@ class AdminController extends Controller
             $items[] = ['tone' => 'warning', 'icon' => 'bi-hourglass-split', 'title' => $plural($pendingDelineations, 'delineation').' waiting for experts',
                 'text' => 'The oldest was submitted '.$oldestPendingAt->diffForHumans().'. Remind the experts to review them.',
                 'url' => route('admin.map-layers.index', ['status' => 'pending']), 'action' => 'Pending'];
+        }
+
+        if ($staleDrafts > 0) {
+            $items[] = ['tone' => 'warning', 'icon' => 'bi-camera', 'title' => $plural($staleDrafts, 'AI draft').' not confirmed',
+                'text' => 'Drone imagery has waited over '.DroneImageryLayer::STALE_DRAFT_DAYS.' days for its owner to confirm the mangrove areas. Remind them, or delete abandoned layers.',
+                'url' => route('admin.map-layers.index', ['tab' => 'imagery', 'status' => 'waiting_owner']), 'action' => 'Waiting'];
         }
 
         $newFeedback = Feedback::where('status', 'new')->count();

@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\ProcessDroneImagery;
-use App\Jobs\SegmentDroneImagery;
 use App\Models\Delineation;
-use App\Models\DroneImageryFile;
 use App\Models\DroneImageryLayer;
 use App\Models\UserActivity;
 use App\Notifications\DelineationModerated;
@@ -15,7 +13,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -32,18 +29,28 @@ class MapLayerController extends Controller
     /** Status filter options per tab: value => label. */
     public const DELINEATION_STATUSES = [
         'published' => 'Published',
-        'hidden' => 'Hidden from map',
         'pending' => 'Pending review',
         'rejected' => 'Rejected',
     ];
 
+    /** The imagery tab filters by stage (DroneImageryLayer::STAGES); "Failed" also covers failed AI steps. */
     public const IMAGERY_STATUSES = [
-        'ready' => 'Ready',
-        'awaiting_review' => 'Awaiting owner review',
-        'finalizing' => 'Finalizing',
-        'processing' => 'Processing',
-        'queued' => 'Queued',
-        'failed' => 'Failed',
+        ...DroneImageryLayer::STAGES,
+        'waiting_owner' => 'Waiting for owner (AI draft)',
+        'failed' => 'Failed (processing or AI)',
+    ];
+
+    /** Badge class per stage. */
+    public const STAGE_BADGES = [
+        'processing' => 'pending',
+        'detecting' => 'pending',
+        'waiting_owner' => 'pending',
+        'finalizing' => 'pending',
+        'pending_expert' => 'pending',
+        'rejected' => 'rejected',
+        'published' => 'success',
+        'not_submitted' => 'secondary',
+        'failed' => 'rejected',
     ];
 
     public const TABS = ['delineations', 'imagery'];
@@ -61,21 +68,17 @@ class MapLayerController extends Controller
             'statusOptions' => $statuses,
             'counts' => [
                 'published' => Delineation::approved()->count(),
-                'hidden' => Delineation::whereNotNull('hidden_at')->count(),
                 'pending' => Delineation::pending()->count(),
-                'imagery' => DroneImageryLayer::count(),
-                'imageryReady' => DroneImageryLayer::where('status', 'ready')->count(),
-                'imageryFailed' => DroneImageryLayer::where('status', 'failed')
-                    ->orWhere('segmentation_status', 'failed')
-                    ->count(),
-                'imageryBytes' => (int) DroneImageryFile::sum('file_size'),
+                'waitingOwner' => DroneImageryLayer::inStage('waiting_owner')->count(),
+                'staleDrafts' => DroneImageryLayer::staleOwnerDraft()->count(),
+                'imageryFailed' => $this->failedImagery(DroneImageryLayer::query())->count(),
             ],
         ];
 
         if ($tab === 'imagery') {
             $data['layers'] = $this->imageryQuery($filters)
                 // The delineation submitted from each layer, drawn on the imagery in the preview.
-                ->with(['user:id,name,role', 'delineation:id,drone_imagery_layer_id,name,features,is_approved,is_rejected,hidden_at'])
+                ->with(['user:id,name,role', 'delineation:id,drone_imagery_layer_id,name,features,is_approved,is_rejected'])
                 ->withCount('files')
                 ->withSum('files', 'file_size')
                 ->latest()
@@ -85,8 +88,8 @@ class MapLayerController extends Controller
         } else {
             $data['delineations'] = $this->delineationQuery($filters)
                 ->with([
-                    'user:id,name,role', 'approvedBy:id,name', 'hiddenBy:id,name',
-                    'droneImageryLayer:id,status,bounds,zoom_min,zoom_max,preview_path,preview_bounds',
+                    'user:id,name,role', 'approvedBy:id,name',
+                    'droneImageryLayer:id,user_id,status,segmentation_status,segmented_at,created_at,bounds,zoom_min,zoom_max,preview_path,preview_bounds',
                 ])
                 ->latest()
                 ->orderByDesc('id')
@@ -95,73 +98,6 @@ class MapLayerController extends Controller
         }
 
         return view('admin.map-layers', $data);
-    }
-
-    public function updateDelineation(Request $request, Delineation $delineation): RedirectResponse
-    {
-        abort_if(Auth::user()->role !== 'admin', 403);
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'notes' => ['nullable', 'string', 'max:5000'],
-        ]);
-        $validated['name'] = trim($validated['name']);
-        $validated['notes'] = isset($validated['notes']) ? trim($validated['notes']) : null;
-
-        if ($validated['name'] === $delineation->name && ($validated['notes'] ?: null) === ($delineation->notes ?: null)) {
-            return $this->backToDelineations('No changes to save.');
-        }
-
-        DB::transaction(function () use ($delineation, $validated) {
-            $delineation->recordRevision(Auth::user(), 'admin_details_edit');
-            $delineation->update([
-                'name' => $validated['name'],
-                'notes' => $validated['notes'] ?: null,
-            ]);
-        });
-
-        UserActivity::record(Auth::user(), 'Updated delineation details: '.$delineation->name, self::MODULE, 'success', $delineation);
-
-        return $this->backToDelineations('Delineation "'.$delineation->name.'" updated.');
-    }
-
-    public function hideDelineation(Request $request, Delineation $delineation): RedirectResponse
-    {
-        abort_if(Auth::user()->role !== 'admin', 403);
-
-        $validated = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
-
-        if (! $delineation->is_approved || $delineation->isHiddenFromMap()) {
-            return $this->backToDelineations('Only published delineations can be hidden.', 'error');
-        }
-
-        $reason = trim((string) ($validated['reason'] ?? '')) ?: null;
-        $delineation->forceFill([
-            'hidden_at' => now(),
-            'hidden_by' => Auth::id(),
-            'hidden_reason' => $reason,
-        ])->save();
-
-        UserActivity::record(Auth::user(), 'Hid delineation from map: '.$delineation->name, self::MODULE, 'pending', $delineation);
-        $this->notifyOwner($delineation, 'hidden', $reason);
-
-        return $this->backToDelineations('"'.$delineation->name.'" is now hidden from the map.');
-    }
-
-    public function restoreDelineation(Delineation $delineation): RedirectResponse
-    {
-        abort_if(Auth::user()->role !== 'admin', 403);
-
-        if (! $delineation->isHiddenFromMap()) {
-            return $this->backToDelineations('This delineation is not hidden.', 'error');
-        }
-
-        $delineation->forceFill(['hidden_at' => null, 'hidden_by' => null, 'hidden_reason' => null])->save();
-
-        UserActivity::record(Auth::user(), 'Restored delineation to map: '.$delineation->name, self::MODULE, 'success', $delineation);
-        $this->notifyOwner($delineation, 'restored');
-
-        return $this->backToDelineations('"'.$delineation->name.'" is back on the map.');
     }
 
     public function destroyDelineation(Delineation $delineation): RedirectResponse
@@ -180,22 +116,6 @@ class MapLayerController extends Controller
         }
 
         return $this->backToDelineations('Delineation "'.$name.'" deleted.');
-    }
-
-    public function updateImagery(Request $request, DroneImageryLayer $layer): RedirectResponse
-    {
-        abort_if(Auth::user()->role !== 'admin', 403);
-
-        $validated = $request->validate(['name' => ['required', 'string', 'max:120']]);
-        $name = trim($validated['name']);
-
-        if ($name !== $layer->name) {
-            $previous = $layer->name;
-            $layer->update(['name' => $name]);
-            UserActivity::record(Auth::user(), "Renamed drone imagery \"{$previous}\" to \"{$name}\"", self::MODULE, 'success', $layer);
-        }
-
-        return $this->backToImagery('Imagery layer renamed.');
     }
 
     public function reprocessImagery(DroneImageryLayer $layer): RedirectResponse
@@ -220,28 +140,6 @@ class MapLayerController extends Controller
         return $this->backToImagery('"'.$layer->name.'" was queued for processing again.');
     }
 
-    public function resegmentImagery(DroneImageryLayer $layer): RedirectResponse
-    {
-        abort_if(Auth::user()->role !== 'admin', 403);
-
-        if ($layer->status !== 'ready' || $layer->isSegmenting()) {
-            return $this->backToImagery('AI segmentation can only be run on a ready layer that is not already being segmented.', 'error');
-        }
-
-        $layer->update(['segmentation_status' => 'queued', 'segmentation_error' => null]);
-
-        if (! $this->dispatchSafely(fn () => SegmentDroneImagery::dispatch($layer->id), $layer, [
-            'segmentation_status' => 'failed',
-            'segmentation_error' => 'Unable to queue AI segmentation. Please try again later.',
-        ])) {
-            return $this->backToImagery('AI segmentation could not be queued. Check the queue connection.', 'error');
-        }
-
-        UserActivity::record(Auth::user(), 'Queued AI segmentation: '.$layer->name, self::MODULE, 'pending', $layer);
-
-        return $this->backToImagery('AI segmentation queued for "'.$layer->name.'".');
-    }
-
     public function destroyImagery(DroneImageryLayer $layer): RedirectResponse
     {
         abort_if(Auth::user()->role !== 'admin', 403);
@@ -251,24 +149,34 @@ class MapLayerController extends Controller
         }
 
         $name = $layer->name;
-        // Its delineation is kept (unlike when the owner deletes the layer); the confirm dialog warns about it.
-        $keptDelineation = $layer->delineation()->value('name');
+        // A drone survey's delineation goes with its imagery (as when the owner deletes the layer), so no
+        // delineation is left claiming a drone survey with nothing to show. The confirm dialog says so.
+        $delineation = $layer->delineation;
         UserActivity::record(Auth::user(), 'Deleted drone imagery: '.$name, self::MODULE, 'success', $layer);
+        if ($delineation !== null) {
+            $owner = $delineation->user;
+            UserActivity::record(Auth::user(), 'Deleted delineation: '.$delineation->name, self::MODULE, 'success', $delineation);
+            $delineation->delete();
+            if ($owner && (int) $owner->id !== (int) Auth::id()) {
+                $owner->notify(new DelineationModerated('deleted', $delineation->name));
+            }
+        }
         $layer->deleteWithStoredFiles();
 
-        return $this->backToImagery('Imagery layer "'.$name.'" and its files were deleted.'
-            .($keptDelineation !== null ? ' Its delineation "'.$keptDelineation.'" was kept, without imagery.' : ''));
+        return $this->backToImagery('Drone survey "'.$name.'" and its files were deleted'
+            .($delineation !== null ? ', with its delineation "'.$delineation->name.'".' : '.'));
     }
 
     private function delineationQuery(array $filters): Builder
     {
         return Delineation::query()
             ->select([
-                'id', 'user_id', 'name', 'notes', 'features', 'is_approved', 'approved_at', 'approved_by',
-                'is_rejected', 'rejected_at', 'hidden_at', 'hidden_by', 'hidden_reason', 'created_at', 'updated_at',
+                'id', 'user_id', 'source', 'name', 'notes', 'features', 'is_approved', 'approved_at', 'approved_by',
+                'is_rejected', 'rejected_at', 'created_at', 'updated_at',
                 'drone_imagery_layer_id',
             ])
             ->when($filters['delineation'] ?? null, fn (Builder $query, $id) => $query->whereKey((int) $id))
+            ->when($filters['source'] ?? null, fn (Builder $query, string $source) => $query->where('source', $source))
             ->when($filters['search'] ?? null, function (Builder $query, string $search) {
                 $like = '%'.addcslashes($search, '%_\\').'%';
                 $query->where(fn (Builder $query) => $query
@@ -278,7 +186,6 @@ class MapLayerController extends Controller
             })
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => match ($status) {
                 'published' => $query->approved(),
-                'hidden' => $query->whereNotNull('hidden_at'),
                 'pending' => $query->pending(),
                 'rejected' => $query->rejected(),
                 default => $query,
@@ -295,23 +202,36 @@ class MapLayerController extends Controller
                     ->where('name', 'like', $like)
                     ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', $like)));
             })
-            ->when(
-                array_key_exists($filters['status'] ?? '', self::IMAGERY_STATUSES),
-                fn (Builder $query) => $query->where('status', $filters['status'])
-            );
+            ->when($filters['status'] ?? null, fn (Builder $query, string $stage) => $stage === 'failed'
+                ? $this->failedImagery($query)
+                : $query->inStage($stage));
+    }
+
+    /** Processing failed, or the AI delineation or genus detection did. */
+    private function failedImagery(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $failed) => $failed
+            ->where('status', 'failed')
+            ->orWhere('segmentation_status', 'failed')
+            ->orWhere('classification_status', 'failed'));
     }
 
     /** @return array{0: string, 1: array} the tab and its valid filters (bad values are dropped). */
     private function tabAndFilters(Request $request): array
     {
         $tab = in_array($request->query('tab'), self::TABS, true) ? (string) $request->query('tab') : 'delineations';
-        $filters = Validator::make($request->query(), [
+        $rules = [
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'in:'.implode(',', array_keys($this->statusOptions($tab)))],
+            // Hand-drawn or from a drone survey (delineations only).
+            'source' => $tab === 'delineations' ? ['nullable', 'in:'.implode(',', array_keys(Delineation::SOURCES))] : ['prohibited'],
             // One record, from the other tab's link (a delineation's drone layer, a layer's delineation).
             'delineation' => ['nullable', 'integer', 'min:1'],
             'layer' => ['nullable', 'integer', 'min:1'],
-        ])->valid();
+        ];
+        // valid() also returns query keys without a rule (tab, page): keep only the filters, so "Clear"
+        // and the exports see just what the admin chose.
+        $filters = array_intersect_key(Validator::make($request->query(), $rules)->valid(), $rules);
 
         return [$tab, $filters];
     }
@@ -355,7 +275,6 @@ class MapLayerController extends Controller
     public static function delineationStatus(Delineation $delineation): array
     {
         return match (true) {
-            $delineation->isHiddenFromMap() => ['Hidden from map', 'secondary'],
             $delineation->is_approved => ['Published', 'success'],
             $delineation->is_rejected => ['Rejected', 'rejected'],
             default => ['Pending review', 'pending'],
@@ -434,7 +353,7 @@ class MapLayerController extends Controller
 
     private function writeDelineationsCsv($out, array $filters): void
     {
-        fputcsv($out, ['ID', 'Name', 'Status', 'Owner', 'Owner role', 'Municipality', 'Barangays', 'Hectares', 'Genera', 'From drone layer', 'Submitted', 'Approved', 'Approved by']);
+        fputcsv($out, ['ID', 'Name', 'Status', 'Source', 'Owner', 'Owner role', 'Municipality', 'Barangays', 'Hectares', 'Genera', 'From drone layer', 'Submitted', 'Approved', 'Approved by']);
         $this->delineationQuery($filters)
             ->with(['user:id,name,role', 'approvedBy:id,name'])
             ->latest()->orderByDesc('id')
@@ -445,6 +364,7 @@ class MapLayerController extends Controller
                         $delineation->id,
                         $delineation->name,
                         self::delineationStatus($delineation)[0],
+                        $delineation->sourceLabel(),
                         $delineation->user?->name,
                         $delineation->user?->roleLabel(),
                         $facts['municipality'],
@@ -462,9 +382,9 @@ class MapLayerController extends Controller
 
     private function writeImageryCsv($out, array $filters): void
     {
-        fputcsv($out, ['ID', 'Name', 'Status', 'Owner', 'Owner role', 'Files', 'Size (bytes)', 'Source CRS', 'AI areas', 'AI genus', 'Top genus', 'Canopies', 'Uploaded', 'Processed']);
+        fputcsv($out, ['ID', 'Name', 'Stage', 'Owner', 'Owner role', 'Files', 'Size (bytes)', 'Source CRS', 'AI areas', 'AI genus', 'Top genus', 'Canopies', 'Uploaded', 'Processed']);
         $this->imageryQuery($filters)
-            ->with('user:id,name,role')
+            ->with(['user:id,name,role', 'delineation:id,drone_imagery_layer_id,is_approved,is_rejected'])
             ->withCount('files')
             ->withSum('files', 'file_size')
             ->latest()->orderByDesc('id')
@@ -473,7 +393,7 @@ class MapLayerController extends Controller
                     fputcsv($out, [
                         $layer->id,
                         $layer->name,
-                        self::IMAGERY_STATUSES[$layer->status] ?? ucfirst((string) $layer->status),
+                        DroneImageryLayer::STAGES[$layer->stage()],
                         $layer->user?->name,
                         $layer->user?->roleLabel(),
                         $layer->files_count,
@@ -516,6 +436,7 @@ class MapLayerController extends Controller
                                 'delineation_id' => $delineation->id,
                                 'name' => $delineation->name,
                                 'status' => self::delineationStatus($delineation)[0],
+                                'source' => $delineation->source,
                                 'owner' => $delineation->user?->name,
                                 'municipality' => $facts['municipality'],
                                 'barangays' => $facts['barangays'],
@@ -530,14 +451,6 @@ class MapLayerController extends Controller
                 }
             });
         echo ']}';
-    }
-
-    private function notifyOwner(Delineation $delineation, string $action, ?string $reason = null): void
-    {
-        $owner = $delineation->user;
-        if ($owner && (int) $owner->id !== (int) Auth::id()) {
-            $owner->notify(new DelineationModerated($action, $delineation->name, $delineation->id, $reason));
-        }
     }
 
     private function dispatchSafely(callable $dispatch, DroneImageryLayer $layer, array $failureState): bool

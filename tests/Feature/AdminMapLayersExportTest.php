@@ -86,8 +86,8 @@ class AdminMapLayersExportTest extends TestCase
 
         $response->assertOk()->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
         $csv = $response->streamedContent();
-        $this->assertStringContainsString('ID,Name,Status,Owner', $csv);
-        $this->assertStringContainsString('"Approved stand",Published,Alice', $csv);
+        $this->assertStringContainsString('ID,Name,Status,Source,Owner', $csv);
+        $this->assertStringContainsString('"Approved stand",Published,Hand-drawn,Alice', $csv);
         $this->assertStringContainsString('"Maasin City",Tunga-tunga,1.2', $csv);
         $this->assertStringNotContainsString('Waiting stand', $csv);
     }
@@ -99,7 +99,8 @@ class AdminMapLayersExportTest extends TestCase
         DroneImageryLayer::create(['user_id' => $owner->id, 'name' => 'Macrohon survey', 'status' => 'ready', 'source_type' => 'single']);
 
         $csv = $this->actingAs($admin)->get(route('admin.map-layers.export', ['tab' => 'imagery']))->streamedContent();
-        $this->assertStringContainsString('"Macrohon survey",Ready', $csv);
+        $this->assertStringContainsString('ID,Name,Stage,Owner', $csv);
+        $this->assertStringContainsString('"Macrohon survey","Ready, not submitted"', $csv);
     }
 
     public function test_geojson_export_writes_lng_lat_polygons_of_published_areas(): void
@@ -131,6 +132,9 @@ class AdminMapLayersExportTest extends TestCase
         $old = $this->delineation($owner);
         $old->forceFill(['created_at' => now()->subDays(5)])->save();
         DroneImageryLayer::create(['user_id' => $owner->id, 'name' => 'Broken', 'status' => 'failed', 'source_type' => 'single']);
+        // AI draft the owner left for 10 days, and a fresh one (not yet worth a warning).
+        DroneImageryLayer::create(['user_id' => $owner->id, 'name' => 'Old draft', 'status' => 'awaiting_review', 'source_type' => 'single', 'segmentation_status' => 'ready', 'segmented_at' => now()->subDays(10)]);
+        DroneImageryLayer::create(['user_id' => $owner->id, 'name' => 'New draft', 'status' => 'awaiting_review', 'source_type' => 'single', 'segmentation_status' => 'ready', 'segmented_at' => now()->subDay()]);
         Feedback::create(['user_id' => $owner->id, 'type' => 'bug', 'message' => 'Map is slow', 'status' => 'new']);
         TileSource::create(['user_id' => $owner->id, 'name' => 'Bontoc tiles', 'original_name' => 'bontoc.tif', 'stored_path' => 'x.tif', 'file_size' => 3 * 1024 * 1024]);
 
@@ -145,6 +149,8 @@ class AdminMapLayersExportTest extends TestCase
             ->assertSee('1 drone layer failed')
             ->assertSee('1 delineation waiting for experts')
             ->assertSee('1 new feedback message')
+            ->assertSee('1 AI draft not confirmed')
+            ->assertSee('2 awaiting owner')
             ->assertSee('3 MB')        // Tile Explorer storage
             ->assertSee('(1 upload)')
             ->assertDontSee('Analysis Success Rate');

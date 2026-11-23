@@ -339,6 +339,7 @@ class DroneImageryRoleFlowTest extends TestCase
 
         $this->assertNotNull($delineation);
         $this->assertSame($layer->id, $delineation->drone_imagery_layer_id);
+        $this->assertSame('drone', $delineation->fresh()->source);
         $this->assertSame('Cabalian mangroves', $delineation->name);
         $this->assertSame(['Rhizophora'], $delineation->features[0]['genera']);
         $this->assertFalse((bool) $delineation->is_approved);

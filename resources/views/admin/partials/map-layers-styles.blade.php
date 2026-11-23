@@ -127,6 +127,36 @@
         box-shadow: 0 0 0 3px rgba(30, 158, 98, 0.1);
     }
 
+    a.stat-card {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+        transition: border-color 0.15s ease;
+    }
+
+    a.stat-card:hover {
+        border-color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .stat-value.amber {
+        color: var(--fg-c07818, #c07818);
+    }
+
+    /* An AI draft its owner has left for over STALE_DRAFT_DAYS. */
+    .status-stale {
+        color: var(--fg-c07818, #c07818) !important;
+        font-weight: 600;
+    }
+
+    tr.layer-row[data-preview] {
+        cursor: pointer;
+    }
+
+    tr.layer-row[data-preview]:focus-visible {
+        outline: 2px solid var(--fg-1e9e62, #1e9e62);
+        outline-offset: -2px;
+    }
+
     .layer-row.previewing {
         background: var(--bg-edf7f2, #edf7f2) !important;
     }
@@ -218,149 +248,164 @@
         margin-top: 14px;
     }
 
-    .btn-danger {
-        padding: 10px 18px;
-        background: #d04030;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        font-family: 'Manrope', sans-serif;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .layer-dialog {
-        width: min(480px, calc(100vw - 32px));
-        max-height: calc(100dvh - 32px);
-        overflow-y: auto;
-        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
-        border-radius: 14px;
-        padding: 0;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-        /* Without these the browser's own dialog colors show (white even in dark mode). */
-        background: var(--bg-ffffff, #fff);
-        color: var(--fg-3a5a3a, #3a5a3a);
-    }
-
-    .layer-dialog::backdrop {
-        background: rgba(26, 46, 26, 0.5);
-    }
-
-    .layer-dialog form {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 24px;
-    }
-
-    .layer-dialog h3 {
-        margin: 0 0 4px;
-        font-size: 18px;
-        color: var(--fg-1a2e1a, #1a2e1a);
-    }
-
-    .layer-dialog label {
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--fg-3a5a3a, #3a5a3a);
-        margin-top: 6px;
-    }
-
-    .layer-dialog input,
-    .layer-dialog textarea {
-        padding: 10px 12px;
-        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
-        border-radius: 8px;
-        font-family: 'Manrope', sans-serif;
-        font-size: 13px;
-        color: var(--fg-1a2e1a, #1a2e1a);
-        background: var(--bg-ffffff, #fff);
-        resize: vertical;
-    }
-
-    .status-note {
-        margin-top: 3px;
-        max-width: 260px;
-        overflow-wrap: anywhere;
-    }
-
-    .status-removable {
-        color: var(--fg-b73318, #b73318);
-        font-weight: 600;
-    }
-
-    .layer-dialog input:focus,
-    .layer-dialog textarea:focus {
-        outline: none;
-        border-color: #1e9e62;
-        box-shadow: 0 0 0 3px rgba(30, 158, 98, 0.1);
-    }
-
-    .dialog-note {
-        margin: 0;
-        font-size: 12px;
-        line-height: 1.5;
-        color: var(--fg-6a8a6a, #6a8a6a);
-    }
-
-    .dialog-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 14px;
-    }
-
+    /* ---- Phones: a compact page built around a sticky preview map ----
+       The list scrolls under a short map that stays at the top, so tapping a card shows it straight away. */
     @media (max-width: 768px) {
-        .preview-map {
-            height: 260px;
+        .page-sub {
+            display: none;
         }
 
-        /* The label names the previewed layer; keep it, on its own line under the title. */
+        /* Stat cards: a tight 2x2 grid. */
+        .grid.cols-4 {
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .stat-card {
+            padding: 10px 12px;
+            border-radius: 12px;
+        }
+
+        .stat-label {
+            font-size: 9.5px;
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            margin-bottom: 2px;
+        }
+
+        .stat-change {
+            font-size: 10.5px;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Preview: sticks to the top of the scrolling content box, the layer's name on one line. */
+        .preview-section:not(.is-expanded) {
+            position: sticky;
+            /* Sticky offsets count from inside the scroll box's padding (the layout's .content, 20px on phones),
+               so pull it up by that padding to sit flush under the header with nothing showing above it. */
+            top: -20px;
+            z-index: 20;
+            padding: 8px;
+            margin: 0 -16px 12px;
+            border-radius: 0 0 14px 14px;
+            border-left: none;
+            border-right: none;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+        }
+
         .preview-section .section-title {
-            flex-wrap: wrap;
-            row-gap: 4px;
+            font-size: 12px;
+            margin-bottom: 6px;
+            gap: 6px;
+            min-width: 0;
+            flex-wrap: nowrap;
         }
 
         .preview-label {
-            flex-basis: 100%;
-            margin-left: 0;
-            overflow-wrap: anywhere;
-        }
-
-        .tabs {
-            overflow-x: auto;
-            scrollbar-width: none;
-        }
-
-        .tab {
-            flex: 1 0 auto;
-            justify-content: center;
+            flex: 1 1 auto;
+            min-width: 0;
+            margin-left: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
-            padding: 10px 12px;
+            text-align: right;
+            font-size: 11.5px;
         }
 
-        /* Same as the Users page filter bar: fields stacked full width, same 12px text. */
+        .preview-map {
+            height: 200px;
+            border-radius: 10px;
+        }
+
+        .layer-list {
+            padding: 12px;
+        }
+
+        /* Tabs: a two-way switch. */
+        .tabs {
+            gap: 4px;
+            padding: 4px;
+            margin-bottom: 12px;
+            border-bottom: none;
+            border-radius: 10px;
+            background: var(--bg-f0f4f0, #f0f4f0);
+        }
+
+        .tabs .tab {
+            flex: 1 1 0;
+            justify-content: center;
+            gap: 6px;
+            margin: 0;
+            padding: 9px 8px;
+            border: none;
+            border-radius: 8px;
+            font-size: 12.5px;
+            white-space: nowrap;
+        }
+
+        .tabs .tab.active {
+            background: var(--bg-ffffff, #fff);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Filters: search on its own row, then two per row; a lone dropdown or an odd last button takes the row. */
+        .layer-toolbar {
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .layer-toolbar .filter-bar {
+            flex-basis: 100%;
+        }
+
         .filter-bar {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
         }
 
         .filter-bar .search-input,
         .filter-bar .filter-select {
-            flex: none;
             width: 100%;
             min-width: 0;
             box-sizing: border-box;
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+
+        .filter-bar .search-input,
+        .filter-bar .filter-select:only-of-type,
+        .filter-bar .btn-primary:last-child {
+            grid-column: 1 / -1;
         }
 
         .filter-bar .btn-primary,
         .filter-bar .btn-secondary {
             justify-content: center;
+            padding: 10px 12px;
         }
 
-        /* Tables become one card per layer: name on top, labelled details, actions at the bottom. */
+        .export-actions {
+            width: 100%;
+            gap: 8px;
+        }
+
+        .export-actions .btn-secondary {
+            flex: 1 1 0;
+            justify-content: center;
+            padding: 8px 10px;
+            font-size: 11.5px;
+        }
+
+        /* Rows: one compact card each. Name on top with the status line under it, place/AI and size/date below, owner and
+           the actions along the bottom. The cells are placed by class (see the two list partials). */
         .layer-table-container {
             overflow-x: visible;
         }
@@ -371,7 +416,6 @@
 
         .layer-table,
         .layer-table tbody,
-        .layer-table tr,
         .layer-table td {
             display: block;
             width: 100%;
@@ -379,10 +423,26 @@
         }
 
         .layer-table tbody tr.layer-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-areas:
+                "title title"
+                "status status"
+                "meta meta"
+                "area area"
+                "owner actions";
+            column-gap: 10px;
+            row-gap: 6px;
+            padding: 12px;
             border: 1px solid var(--bd-e0e8e0, #e0e8e0);
-            border-radius: 12px;
-            padding: 12px 14px;
+            border-radius: 14px;
             background: var(--bg-ffffff, #fff);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .layer-table tbody tr {
+            display: block;
         }
 
         .layer-table tbody tr + tr {
@@ -393,14 +453,125 @@
             background: var(--bg-ffffff, #fff);
         }
 
+        /* The card on the map: a green outline instead of a tinted background. */
+        .layer-table tbody tr.layer-row.previewing {
+            background: var(--bg-ffffff, #fff) !important;
+            border-color: #1e9e62;
+            box-shadow: 0 0 0 2px rgba(30, 158, 98, 0.18);
+        }
+
         .layer-table td {
             padding: 0;
             border-bottom: none;
+            min-width: 0;
         }
 
         .layer-table td.cell-title {
-            padding-bottom: 10px;
+            grid-area: title;
             overflow-wrap: anywhere;
+        }
+
+        .layer-table td.cell-title .user-name {
+            font-size: 14px;
+            line-height: 1.3;
+        }
+
+        .layer-table td.cell-status {
+            grid-area: status;
+            text-align: left;
+            font-size: 11px;
+        }
+
+        .layer-table td.cell-status .badge {
+            white-space: normal;
+        }
+
+        .layer-table td.cell-meta {
+            grid-area: meta;
+        }
+
+        .layer-table td.cell-area {
+            grid-area: area;
+        }
+
+        .layer-table td.cell-owner {
+            grid-area: owner;
+            align-self: center;
+        }
+
+        .layer-table td.cell-actions {
+            grid-area: actions;
+            align-self: center;
+            justify-self: end;
+            width: auto;
+        }
+
+        /* A thin rule above the details and one under them. Both sit on full-width cells: on the owner and
+           actions cells the rule would break at the column gap and at the taller Delete button. */
+        .layer-table td.cell-meta {
+            padding-top: 8px;
+            border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        }
+
+        .layer-table td.cell-area {
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--bd-f0f4f0, #f0f4f0);
+        }
+
+        /* Detail cells: a small label, then the value on the same line. */
+        .layer-table td[data-label] {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        .layer-table td[data-label]::before {
+            content: attr(data-label);
+            flex: none;
+            width: 58px;
+            font-size: 9.5px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #9ab0a0;
+        }
+
+        .layer-table td.cell-status {
+            display: block;
+        }
+
+        .layer-table td.cell-status::before {
+            display: none;
+        }
+
+        .layer-table td.cell-status .cell-value {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 3px 8px;
+        }
+
+        .layer-table .cell-value {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        /* Owner: "Alice · Resident" on one line. */
+        .layer-table td.cell-owner .cell-value {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0 4px;
+            font-weight: 600;
+        }
+
+        .layer-table td.cell-owner .cell-value > div + div::before {
+            content: "· ";
+        }
+
+        .layer-table td.cell-owner .muted {
+            font-weight: 500;
         }
 
         .layer-table .clamp {
@@ -411,45 +582,12 @@
             -webkit-box-orient: vertical;
         }
 
-        .layer-table td[data-label] {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 8px 0;
-            border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
-            text-align: right;
-        }
-
-        .layer-table td[data-label]::before {
-            content: attr(data-label);
-            flex: none;
-            padding-top: 3px;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            color: #9ab0a0;
-            text-align: left;
-        }
-
-        .layer-table .cell-value {
-            min-width: 0;
-            overflow-wrap: anywhere;
-        }
-
         .layer-table .status-note {
             max-width: none;
         }
 
-        .layer-table td.cell-actions {
-            padding-top: 10px;
-            border-top: 1px solid var(--bd-f0f4f0, #f0f4f0);
-        }
-
         .layer-table .row-actions {
-            justify-content: flex-end;
-            gap: 8px;
+            gap: 6px;
         }
 
         .layer-table .action-btn {
@@ -471,34 +609,6 @@
             order: -1;
             flex-basis: 100%;
             text-align: center;
-        }
-
-        /* Dialogs: bottom sheet with full-width buttons. */
-        .layer-dialog {
-            width: 100%;
-            max-width: 100%;
-            margin: auto 0 0;
-            border-radius: 16px 16px 0 0;
-            border-bottom: none;
-        }
-
-        .layer-dialog form {
-            padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-        }
-
-        .layer-dialog input,
-        .layer-dialog textarea {
-            font-size: 16px;
-        }
-
-        .dialog-actions {
-            flex-direction: column-reverse;
-        }
-
-        .dialog-actions button {
-            width: 100%;
-            justify-content: center;
-            min-height: 42px;
         }
     }
 
@@ -552,6 +662,39 @@
         text-decoration: underline;
     }
 
+    /* Where a delineation came from: hand-drawn, or a drone survey (links to its imagery). */
+    .source-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 6px;
+        margin-top: 4px;
+    }
+
+    .source-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--bd-d4e0d4, #d4e0d4);
+        background: var(--bg-f0f4f0, #f0f4f0);
+        color: var(--fg-4a6a4a, #4a6a4a);
+        font-size: 11px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .source-tag.drone {
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    a.source-tag.drone:hover {
+        border-color: var(--fg-1e9e62, #1e9e62);
+    }
+
     .linked-record {
         display: flex;
         flex-wrap: wrap;
@@ -560,34 +703,4 @@
         margin-top: 4px;
     }
 
-    @media (max-width: 768px) {
-        .page-sub {
-            margin-top: -4px;
-            font-size: 12.5px;
-        }
-
-        .export-actions {
-            width: 100%;
-        }
-
-        .export-actions .btn-secondary {
-            flex: 1 1 0;
-            justify-content: center;
-        }
-
-
-        /* All three tabs fit without sideways scrolling. */
-        .tabs .tab {
-            padding: 10px 6px;
-            font-size: 12.5px;
-        }
-
-        .tabs .tab i {
-            display: none;
-        }
-
-        .tabs .tab-long {
-            display: none;
-        }
-    }
 </style>

@@ -747,7 +747,7 @@
           coords.push(item);
         }
       };
-      drawnFeatures.forEach(f => add(f.coords));
+      drawnFeatures.forEach(f => { if (!f.removed_in_boundary_edit) add(f.coords); });
       add(currentFeature?.coords);
       return coords;
     }
@@ -789,6 +789,8 @@
     // Editing the boundary of an existing saved delineation (updates the same record in place).
     let boundaryEdit = null; // { delineationId, featureIndexes, originalFeatures }
     let selectedEditVertex = null; // { featureIndex, vertexIndex }
+    // Drawing a new area into the delineation being edited (boundary edit or rejected revision).
+    let addingAreaToEdit = false;
     let editVertexHandles = []; // [{ featureIndex, vertexIndex, handle }] for the vertices currently rendered
     // Handle budget for large shapes (AI-detected areas): see renderEditableVertices.
     const MAX_MIDPOINT_HANDLES = 120;
@@ -798,6 +800,12 @@
 
     function isGeometryEditLocked() {
       return isEditingRejectedRevision || boundaryEdit !== null;
+    }
+
+    // Map clicks draw nothing during a revision or boundary edit, except while a new area is being drawn into
+    // the delineation being edited ("Draw a new area", addingAreaToEdit).
+    function isDrawingLocked() {
+      return (isEditingRejectedRevision || boundaryEdit !== null) && !addingAreaToEdit;
     }
 
     function updateDrawingCursor() {
@@ -1480,6 +1488,7 @@
     }
 
     function finishRejectedDelineationRevision() {
+      resetAreaDrawingOnExit(); // left while drawing a new area: drop the unfinished shape
       rejectedRevisionIndex = -1;
       rejectedRevisionFeatureIndexes = [];
       rejectedRevisionOriginalFeatures = [];
@@ -1489,6 +1498,7 @@
       });
       rejectedRevisionControlStates.clear();
       document.getElementById('rejectedRevisionActions')?.style.setProperty('display', 'none');
+      updateAreaEditButtons();
     }
 
     function setRejectedRevisionControlsLocked(locked, includeHistoryControls = true) {
@@ -1514,10 +1524,13 @@
       rejectedRevisionFeatureIndexes.forEach((featureIndex, snapshotIndex) => {
         drawnFeatures[featureIndex] = rejectedRevisionOriginalFeatures[snapshotIndex];
       });
+      // Areas drawn during the revision go too (appended after the original shapes); removed ones came back above.
+      drawnFeatures = drawnFeatures.filter(item => !item?.added_in_boundary_edit);
+      if (selectedDrawnIndex >= drawnFeatures.length) selectedDrawnIndex = rejectedRevisionFeatureIndexes[0] ?? -1;
       const selectedIndex = selectedDrawnIndex;
       finishRejectedDelineationRevision();
       redrawFeatures();
-      if (restoreSelection && selectedDrawnIndex === selectedIndex) {
+      if (restoreSelection && selectedDrawnIndex === selectedIndex && selectedIndex >= 0) {
         selectDrawnFeature(selectedIndex);
       }
     }
@@ -1544,6 +1557,7 @@
       document.querySelectorAll('.draw-btn').forEach(button => button.classList.remove('active'));
       redrawFeatures();
       selectDrawnFeature(selectedDrawnIndex);
+      zoomToSmallBoundaryEdit();
     }
 
     async function submitRejectedDelineationRevision() {
@@ -1558,8 +1572,14 @@
         return;
       }
 
-      const delineationFeatures = drawnFeatures
-        .filter(item => Number(item.delineation_id) === Number(feature.delineation_id))
+      if (addingAreaToEdit && currentFeature) {
+        window.AppActions.notify('Finish the new area first (click its first point), or stop drawing it.', 'error');
+        return;
+      }
+      stopBoundaryAreaDrawing();
+      // The original shapes plus any area drawn during the revision, without the removed ones.
+      const revisedShapes = shapeEditFeatures();
+      const delineationFeatures = revisedShapes
         .map(item => ({
           type: item.type,
           coords: item.coords,
@@ -1599,7 +1619,7 @@
           throw new Error(payload.message || 'Unable to submit the revised delineation.');
         }
 
-        const relatedFeatures = drawnFeatures.filter(item => Number(item.delineation_id) === Number(feature.delineation_id));
+        const relatedFeatures = revisedShapes;
         (payload.delineation.features || []).forEach((savedFeature, index) => {
           const target = relatedFeatures[index];
           if (!target) return;
@@ -1611,10 +1631,15 @@
             rejection_notes: null,
           });
           delete target.is_editing_revision;
+          delete target.added_in_boundary_edit;
         });
 
-        const selectedIndex = rejectedRevisionIndex;
-        const activeIndex = selectedDrawnIndex;
+        // Areas removed during the revision are gone from the record now; keep the same shape selected.
+        const activeFeature = drawnFeatures[selectedDrawnIndex];
+        drawnFeatures = drawnFeatures.filter(item => !item?.removed_in_boundary_edit);
+        const activeIndex = drawnFeatures.indexOf(activeFeature);
+        const selectedIndex = drawnFeatures.indexOf(revisedShapes[0]);
+        selectedDrawnIndex = activeIndex;
         finishRejectedDelineationRevision();
         redrawFeatures();
         selectDrawnFeature(activeIndex >= 0 ? activeIndex : selectedIndex);
@@ -1661,10 +1686,172 @@
       const deleteVertexBtn = document.getElementById('deleteBoundaryVertexBtn');
       deleteVertexBtn.style.display = editing ? 'block' : 'none';
       deleteVertexBtn.disabled = !(editing && selectedEditVertex);
+      updateAreaEditButtons();
+    }
+
+    // ---- Draw / remove whole areas while editing a delineation ----
+    // Works in both edit modes on a saved delineation: "Edit Delineation" (boundaryEdit) and a resident's
+    // "Revise rejected delineation" (isEditingRejectedRevision). Each panel has its own pair of buttons
+    // (data-area-edit="boundary" | "revision"); only the active mode's pair is shown.
+    function areaEditMode() {
+      if (boundaryEdit) return 'boundary';
+      if (isEditingRejectedRevision) return 'revision';
+      return null;
+    }
+
+    function editedDelineationId() {
+      if (boundaryEdit) return boundaryEdit.delineationId;
+      if (isEditingRejectedRevision) return drawnFeatures[rejectedRevisionIndex]?.delineation_id ?? null;
+      return null;
+    }
+
+    function updateAreaEditButtons() {
+      const mode = areaEditMode();
+      const shapes = shapeEditFeatures();
+      const remaining = shapes.length;
+      const selectedIsPart = shapes.includes(drawnFeatures[selectedDrawnIndex]);
+      // A delineation holds at most MAX_FEATURES_PER_DELINEATION shapes (the server's limit too); AI drone
+      // delineations can already have that many.
+      const full = !addingAreaToEdit && remaining >= MAX_FEATURES_PER_DELINEATION;
+
+      document.querySelectorAll('.area-edit-add').forEach(button => {
+        const shown = button.dataset.areaEdit === mode;
+        button.style.display = shown ? 'block' : 'none';
+        button.disabled = shown && full;
+        button.title = shown && full
+          ? `This delineation already has ${MAX_FEATURES_PER_DELINEATION} areas, the most it can hold. Remove one to draw another.`
+          : '';
+        button.classList.toggle('active', shown && addingAreaToEdit);
+        button.setAttribute('aria-pressed', shown && addingAreaToEdit ? 'true' : 'false');
+        button.innerHTML = shown && addingAreaToEdit
+          ? '<i class="bi bi-x-circle"></i> <span>Stop drawing the new area</span>'
+          : '<i class="bi bi-plus-square-dotted"></i> <span>Draw a new area</span>';
+      });
+      document.querySelectorAll('.area-edit-remove').forEach(button => {
+        const shown = button.dataset.areaEdit === mode;
+        button.style.display = shown ? 'block' : 'none';
+        button.disabled = !shown || !selectedIsPart || remaining < 2 || addingAreaToEdit;
+        button.title = remaining < 2
+          ? 'A delineation needs at least one area. To delete the whole record, use Remove delineation.'
+          : 'Takes the selected area out of this delineation when you save.';
+      });
+      // A disabled button shows no tooltip, so say why on the panel when there is only one area.
+      document.querySelectorAll('.area-edit-note').forEach(note => {
+        note.textContent = 'This delineation has only one area, so it cannot be removed. To delete the whole record, cancel and use Remove delineation.';
+        note.style.display = note.dataset.areaEdit === mode && remaining < 2 ? 'block' : 'none';
+      });
+    }
+
+    // The shapes of the delineation being edited, in map order: the original ones and any drawn during the
+    // edit, without those removed during it.
+    function shapeEditFeatures() {
+      const delineationId = editedDelineationId();
+      if (delineationId === null || delineationId === undefined) return [];
+      return drawnFeatures.filter(item => item && !item.removed_in_boundary_edit
+        && Number(item.delineation_id) === Number(delineationId));
+    }
+
+    // Take the selected shape out of the delineation being edited. It is only flagged (hidden), so
+    // Cancel restores it with the original shapes (and Undo, where it is available); Save leaves it out.
+    function removeSelectedBoundaryArea() {
+      if (!areaEditMode() || addingAreaToEdit) return;
+      const shapes = shapeEditFeatures();
+      const feature = drawnFeatures[selectedDrawnIndex];
+      if (!shapes.includes(feature)) return;
+      if (shapes.length < 2) {
+        window.AppActions.notify('A delineation needs at least one area. To delete the whole record, use Remove delineation.', 'error');
+        return;
+      }
+      feature.removed_in_boundary_edit = true;
+      selectedEditVertex = null;
+      saveDrawingStateToHistory();
+      // Select one of the areas that stay, so the panel keeps showing this delineation.
+      const next = shapeEditFeatures()[0];
+      redrawFeatures();
+      selectDrawnFeature(drawnFeatures.indexOf(next));
+      redrawFeatures();
+      window.AppActions.notify(areaEditMode() === 'revision'
+        ? 'Area removed. Resubmit to keep it this way, or Cancel to undo.'
+        : 'Area removed. Save changes to keep it this way, or Cancel to undo.');
+    }
+
+    // Draw another area into the delineation being edited. Clicking again stops (an unfinished shape is dropped).
+    function toggleBoundaryAreaDrawing() {
+      if (!areaEditMode()) return;
+      if (addingAreaToEdit) {
+        stopBoundaryAreaDrawing();
+        return;
+      }
+      if (shapeEditFeatures().length >= MAX_FEATURES_PER_DELINEATION) {
+        window.AppActions.notify(`This delineation already has ${MAX_FEATURES_PER_DELINEATION} areas, the most it can hold. Remove one to draw another.`, 'error');
+        return;
+      }
+      addingAreaToEdit = true;
+      selectedEditVertex = null;
+      currentFeature = null;
+      // Drawn like on the Delineate page: an open line of clicked points that only becomes an area when it
+      // is closed (first point clicked again, or a double-click), never a polygon as soon as it has 3 points.
+      drawingMode = 'line';
+      updateDrawingCursor();
+      mainMap.doubleClickZoom.disable();
+      redrawFeatures();
+      updateAreaEditButtons();
+      window.AppActions.notify('Click around the new area on the map, then click its first point or double-click to close it.');
+    }
+
+    function stopBoundaryAreaDrawing() {
+      if (!addingAreaToEdit) return;
+      addingAreaToEdit = false;
+      currentFeature = null;
+      drawingMode = null;
+      updateDrawingCursor();
+      mainMap.doubleClickZoom.enable();
+      snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+      redrawFeatures();
+      updateAreaEditButtons();
+    }
+
+    // Leaving an edit (save, submit or cancel) while drawing a new area: drop the unfinished shape and the mode.
+    function resetAreaDrawingOnExit() {
+      if (!addingAreaToEdit) return;
+      addingAreaToEdit = false;
+      currentFeature = null;
+      drawingMode = null;
+      updateDrawingCursor();
+      mainMap.doubleClickZoom.enable();
+    }
+
+    // A new shape started while drawing into the edited delineation: it belongs to that record (status, name,
+    // genera as a starting point) and is editable like its other shapes. Its location is worked out on save.
+    function newBoundaryEditArea() {
+      const template = shapeEditFeatures().find(item => !item.added_in_boundary_edit) || {};
+      return {
+        ...template,
+        type: 'line', // finishAreaDrawing() turns it into an area when it is closed
+        coords: [],
+        location: null,
+        location_status: null,
+        location_details: null,
+        genera: Array.isArray(template.genera) ? [...template.genera] : [],
+        is_editing_boundary: areaEditMode() === 'boundary',
+        is_editing_revision: areaEditMode() === 'revision',
+        added_in_boundary_edit: true,
+      };
+    }
+
+    // Called right after a drawn area is added to drawnFeatures.
+    function finishBoundaryAreaIfAdding() {
+      if (!addingAreaToEdit) return;
+      addingAreaToEdit = false;
+      mainMap.doubleClickZoom.enable();
+      updateAreaEditButtons();
     }
 
     function boundaryEditHasChanges() {
       if (!boundaryEdit) return false;
+      if (shapeEditFeatures().some(item => item.added_in_boundary_edit)) return true;
+      if (drawnFeatures.some(item => item?.removed_in_boundary_edit
+        && Number(item.delineation_id) === Number(boundaryEdit.delineationId))) return true;
       return boundaryEdit.featureIndexes.some((featureIndex, snapshotIndex) =>
         JSON.stringify(drawnFeatures[featureIndex]?.coords) !== JSON.stringify(boundaryEdit.originalFeatures[snapshotIndex]?.coords));
     }
@@ -1713,6 +1900,7 @@
 
     function finishBoundaryEdit() {
       const previousDrawingMode = boundaryEdit?.previousDrawingMode || null;
+      resetAreaDrawingOnExit(); // left while drawing a new area: drop the unfinished shape
       boundaryEdit = null;
       selectedEditVertex = null;
       setBoundaryEditFocus(false);
@@ -1768,6 +1956,22 @@
       redrawFeatures();
       updateHistoryButtons();
       selectDrawnFeature(selectedDrawnIndex);
+      zoomToSmallBoundaryEdit();
+    }
+
+    // A shape only a few pixels wide turns into a pile of overlapping handles: zoom in so its points can be
+    // grabbed. Bigger shapes keep the current view.
+    function zoomToSmallBoundaryEdit() {
+      const coords = shapeEditFeatures().flatMap(item =>
+        item.type === 'point' ? [item.coords] : (Array.isArray(item.coords) ? item.coords : []));
+      if (!coords.length) return;
+      const bounds = L.latLngBounds(coords);
+      if (!bounds.isValid()) return;
+      const topLeft = mainMap.latLngToContainerPoint(bounds.getNorthWest());
+      const bottomRight = mainMap.latLngToContainerPoint(bounds.getSouthEast());
+      const size = Math.max(Math.abs(bottomRight.x - topLeft.x), Math.abs(bottomRight.y - topLeft.y));
+      if (size >= 160) return;
+      mainMap.fitBounds(bounds, { padding: [80, 80], maxZoom: Math.min(mainMap.getMaxZoom(), 21) });
     }
 
     // While a boundary is edited, the panel shows only the edit controls and the map toolbar only Undo / Redo
@@ -1783,7 +1987,10 @@
       boundaryEdit.featureIndexes.forEach((featureIndex, snapshotIndex) => {
         drawnFeatures[featureIndex] = boundaryEdit.originalFeatures[snapshotIndex];
       });
-      const selectedIndex = selectedDrawnIndex;
+      // Areas drawn during the edit go too (they were appended after the original shapes).
+      drawnFeatures = drawnFeatures.filter(item => !item?.added_in_boundary_edit);
+      let selectedIndex = selectedDrawnIndex;
+      if (selectedIndex >= drawnFeatures.length) selectedIndex = boundaryEdit.featureIndexes[0] ?? -1;
       finishBoundaryEdit();
       redrawFeatures();
       if (restoreSelection && selectedIndex >= 0) {
@@ -1793,9 +2000,15 @@
 
     async function saveBoundaryEdit() {
       if (!boundaryEdit) return;
-      const { delineationId, featureIndexes } = boundaryEdit;
+      if (addingAreaToEdit && currentFeature) {
+        window.AppActions.notify('Finish the new area first (click its first point), or stop drawing it.', 'error');
+        return;
+      }
+      stopBoundaryAreaDrawing();
+      const { delineationId } = boundaryEdit;
       const selectedFeature = drawnFeatures[selectedDrawnIndex];
-      const editedFeatures = featureIndexes.map(index => drawnFeatures[index]);
+      // The original shapes plus any area drawn during the edit.
+      const editedFeatures = shapeEditFeatures();
 
       if (!boundaryEditHasChanges()) {
         cancelBoundaryEdit();
@@ -1862,9 +2075,16 @@
             last_revised_at: payload.delineation.last_revised_at || new Date().toISOString(),
           });
         });
-        editedFeatures.forEach(target => { delete target.is_editing_boundary; });
+        editedFeatures.forEach(target => {
+          delete target.is_editing_boundary;
+          delete target.added_in_boundary_edit;
+        });
 
-        const activeIndex = selectedDrawnIndex;
+        // Areas removed during the edit are gone from the record now; keep the same shape selected.
+        const activeFeature = drawnFeatures[selectedDrawnIndex];
+        drawnFeatures = drawnFeatures.filter(item => !item?.removed_in_boundary_edit);
+        const activeIndex = drawnFeatures.indexOf(activeFeature);
+        selectedDrawnIndex = activeIndex;
         finishBoundaryEdit();
         redrawFeatures();
         if (activeIndex >= 0) selectDrawnFeature(activeIndex);
@@ -1893,6 +2113,9 @@
     document.getElementById('saveBoundaryEditBtn')?.addEventListener('click', saveBoundaryEdit);
     document.getElementById('cancelBoundaryEditBtn')?.addEventListener('click', () => cancelBoundaryEdit());
     document.getElementById('deleteBoundaryVertexBtn')?.addEventListener('click', deleteSelectedEditVertex);
+    // Both panels' area buttons (Edit Delineation and Revise rejected delineation).
+    document.querySelectorAll('.area-edit-add').forEach(button => button.addEventListener('click', toggleBoundaryAreaDrawing));
+    document.querySelectorAll('.area-edit-remove').forEach(button => button.addEventListener('click', removeSelectedBoundaryArea));
     document.addEventListener('keydown', (event) => {
       if (!selectedEditVertex || !isGeometryEditLocked()) return;
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
@@ -2349,6 +2572,12 @@
     });
 
     document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && addingAreaToEdit) {
+        // Stops drawing the new area (the boundary edit itself stays open).
+        event.preventDefault();
+        stopBoundaryAreaDrawing();
+        return;
+      }
       if (event.key !== 'Escape' || !drawingMode || isGeometryEditLocked()) return;
       const tag = (event.target?.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || event.target?.isContentEditable) return;
@@ -2817,6 +3046,8 @@
 
       // Draw completed features
       drawnFeatures.forEach((f, i) => {
+        // Taken out during a boundary edit ("Remove selected area"): hidden until Save drops it or Cancel restores it.
+        if (f.removed_in_boundary_edit) return;
         const isSelected = i === selectedDrawnIndex;
         // Added after the year chosen on the slider: not on the map yet (the open one stays, with its panel).
         if (!isSelected && mapTimelineHides(f.created_year ?? null)) return;
@@ -2866,7 +3097,7 @@
             weight: isSelected ? 4 : 3,
           }).addTo(delineationLayer);
           line.on('click', (e) => {
-            if (drawingMode && !lineOnlyDelineation) return;
+            if (drawingMode && (!lineOnlyDelineation || addingAreaToEdit)) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeatureAndRefresh(i);
           });
@@ -2890,7 +3121,8 @@
             weight: isSelected ? 3 : 2,
           }).addTo(delineationLayer);
           polygon.on('click', (e) => {
-            if (drawingMode && !lineOnlyDelineation) return;
+            // While drawing a new area into an edited delineation, a click inside a shape adds a point.
+            if (drawingMode && (!lineOnlyDelineation || addingAreaToEdit)) return;
             if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
             selectDrawnFeatureAndRefresh(i);
           });
@@ -2982,6 +3214,7 @@
       saveDrawingStateToHistory();
       drawingMode = null;
       updateDrawingCursor();
+      finishBoundaryAreaIfAdding();
       mainMap.doubleClickZoom.enable();
       mainMap.dragging.enable();
       snapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -2995,7 +3228,7 @@
     }
 
     mainMap.on('click', (e) => {
-      if (!drawingMode || isGeometryEditLocked()) return;
+      if (!drawingMode || isDrawingLocked()) return;
       const snappedLatLng = getSnappedLatLng(e.latlng) || e.latlng;
       if (currentFeature && ['line', 'area'].includes(drawingMode)) {
         const last = currentFeature.coords[currentFeature.coords.length - 1];
@@ -3005,10 +3238,12 @@
         }
       }
       if (!currentFeature) {
-        currentFeature = {
-          type: drawingMode,
-          coords: []
-        };
+        currentFeature = addingAreaToEdit
+          ? newBoundaryEditArea()
+          : {
+            type: drawingMode,
+            coords: []
+          };
       }
       if (drawingMode === 'point') {
         currentFeature.coords = [snappedLatLng.lat, snappedLatLng.lng];
@@ -3056,6 +3291,7 @@
             mainMap.doubleClickZoom.enable();
             mainMap.dragging.enable();
             document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+            finishBoundaryAreaIfAdding();
             redrawFeatures();
             selectDrawnFeature(drawnFeatures.length - 1);
             return;
@@ -3066,7 +3302,7 @@
     });
 
     mainMap.on('dblclick', () => {
-      if ((lineOnlyDelineation || drawingMode === 'area') && drawingMode && !isGeometryEditLocked()) {
+      if ((lineOnlyDelineation || drawingMode === 'area' || addingAreaToEdit) && drawingMode && !isDrawingLocked()) {
         finishAreaDrawing();
       }
     });
@@ -3082,7 +3318,7 @@
         snapRaf = 0;
         if (!drawingMode || !lastMouseLatLng) return;
         const snapped = getSnappedLatLng(lastMouseLatLng);
-        if (isGeometryEditLocked()) {
+        if (isDrawingLocked()) {
           hideCursorVertex();
         } else {
           showCursorVertex(snapped || lastMouseLatLng);

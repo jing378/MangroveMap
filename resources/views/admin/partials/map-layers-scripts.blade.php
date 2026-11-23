@@ -136,10 +136,26 @@
                 if (reveal) revealPreviewMap();
         }
 
+        // What a click previews: a preview button, or a row carrying the preview data itself (delineations;
+        // the row's other controls, links and Delete, keep their own action).
+        function previewSource(target) {
+            const source = target.closest('[data-preview]');
+            if (!source || source.disabled) return null;
+            if (source.matches('tr') && target.closest('a, button, form, input, select, textarea, label')) return null;
+            return source;
+        }
+
         // Delegated: the list is replaced in place when switching tabs, filtering or paging (see below).
         document.addEventListener('click', event => {
-            const button = event.target.closest('[data-preview]');
-            if (button && !button.disabled) showPreview(button);
+            const source = previewSource(event.target);
+            if (source) showPreview(source);
+        });
+
+        // Rows that preview are focusable; Enter or Space previews them too.
+        document.addEventListener('keydown', event => {
+            if ((event.key !== 'Enter' && event.key !== ' ') || !event.target.matches('tr[data-preview]')) return;
+            event.preventDefault();
+            showPreview(event.target);
         });
 
         // Preview the first previewable row so the map is never empty (without scrolling the page).
@@ -208,51 +224,6 @@
             }
         });
 
-        // ---- Dialogs ----
-        function openDialog(id, action, fill) {
-            const dialog = document.getElementById(id);
-            const form = dialog.querySelector('form');
-            form.action = action;
-            fill(form);
-            dialog.showModal();
-        }
-
-        // Delegated, like the preview buttons: rows are replaced when the list is swapped in place.
-        document.addEventListener('click', event => {
-            const edit = event.target.closest('[data-edit-delineation]');
-            if (edit) {
-                openDialog('editDelineationDialog', edit.dataset.url, () => {
-                    document.getElementById('editDelineationName').value = edit.dataset.name || '';
-                    document.getElementById('editDelineationNotes').value = edit.dataset.notes || '';
-                });
-                return;
-            }
-            const hide = event.target.closest('[data-hide-delineation]');
-            if (hide) {
-                openDialog('hideDelineationDialog', hide.dataset.url, () => {
-                    document.getElementById('hideDelineationName').textContent = hide.dataset.name || '';
-                    document.getElementById('hideDelineationReason').value = '';
-                });
-                return;
-            }
-            const rename = event.target.closest('[data-rename-imagery]');
-            if (rename) {
-                openDialog('renameImageryDialog', rename.dataset.url, () => {
-                    document.getElementById('renameImageryName').value = rename.dataset.name || '';
-                });
-            }
-        });
-
-        document.querySelectorAll('[data-close-dialog]').forEach(button => {
-            button.addEventListener('click', () => button.closest('dialog').close());
-        });
-
-        // Tapping the dimmed area outside a dialog closes it, like the other admin modals.
-        document.querySelectorAll('dialog.layer-dialog').forEach(dialog => {
-            dialog.addEventListener('click', event => {
-                if (event.target === dialog) dialog.close();
-            });
-        });
         // Forms with data-confirm / data-busy-label are handled by partials.action-feedback.
 
         // ---- Tabs, filters and pages without a reload ----

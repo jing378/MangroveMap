@@ -625,6 +625,8 @@ class DroneImageryController extends Controller
                 // Experts also get a list of everyone else's uploads (residents and other experts).
                 'shows_others' => $viewer->isExpert(),
                 'max_files' => self::maxUploadFiles(),
+                // Per file (the chunked upload's limit), checked before anything is sent.
+                'max_file_bytes' => DroneImageryUploadController::MAX_FILE_BYTES,
                 'highlight_id' => $request->integer('layer') ?: null,
             ],
         ]);

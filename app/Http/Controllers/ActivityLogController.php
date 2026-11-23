@@ -24,7 +24,7 @@ class ActivityLogController extends Controller
         $filters = Validator::make($request->query(), [
             'search' => ['nullable', 'string', 'max:255'],
             'module' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'in:' . implode(',', UserActivity::STATUSES)],
+            'status' => ['nullable', 'in:'.implode(',', UserActivity::STATUSES)],
             'role' => ['nullable', 'in:admin,end_user,expert'],
             'user' => ['nullable', 'integer'],
             'from' => ['nullable', 'date_format:Y-m-d'],
@@ -76,20 +76,20 @@ class ActivityLogController extends Controller
     {
         return UserActivity::query()
             ->when($filters['search'] ?? null, function (Builder $query, string $search) {
-                $like = '%' . addcslashes($search, '%_\\') . '%';
+                $like = '%'.addcslashes($search, '%_\\').'%';
                 $query->where(function (Builder $query) use ($like) {
                     $query->where('activity', 'like', $like)
-                        ->orWhereHas('user', fn(Builder $user) => $user
+                        ->orWhereHas('user', fn (Builder $user) => $user
                             ->where('name', 'like', $like)
                             ->orWhere('email', 'like', $like));
                 });
             })
-            ->when($filters['module'] ?? null, fn(Builder $query, string $module) => $query->where('module', $module))
-            ->when($filters['status'] ?? null, fn(Builder $query, string $status) => $query->where('status', $status))
-            ->when($filters['role'] ?? null, fn(Builder $query, string $role) => $query->whereHas('user', fn(Builder $user) => $user->where('role', $role)))
-            ->when($filters['user'] ?? null, fn(Builder $query, int|string $userId) => $query->where('user_id', $userId))
-            ->when($filters['from'] ?? null, fn(Builder $query, string $from) => $query->where('created_at', '>=', Carbon::parse($from)->startOfDay()))
-            ->when($filters['to'] ?? null, fn(Builder $query, string $to) => $query->where('created_at', '<=', Carbon::parse($to)->endOfDay()));
+            ->when($filters['module'] ?? null, fn (Builder $query, string $module) => $query->where('module', $module))
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($filters['role'] ?? null, fn (Builder $query, string $role) => $query->whereHas('user', fn (Builder $user) => $user->where('role', $role)))
+            ->when($filters['user'] ?? null, fn (Builder $query, int|string $userId) => $query->where('user_id', $userId))
+            ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->where('created_at', '>=', Carbon::parse($from)->startOfDay()))
+            ->when($filters['to'] ?? null, fn (Builder $query, string $to) => $query->where('created_at', '<=', Carbon::parse($to)->endOfDay()));
     }
 
     /**
@@ -118,7 +118,7 @@ class ActivityLogController extends Controller
                     'Name' => $subject->name,
                     'Owner' => $subject->user?->name,
                     'Review status' => $subject->is_approved
-                        ? ($subject->isHiddenFromMap() ? 'Approved (hidden from map by an admin)' : 'Approved')
+                        ? 'Approved'
                         : ($subject->is_rejected ? 'Rejected' : 'Pending review'),
                     'Reviewed' => ($subject->approved_at ?? $subject->rejected_at)?->format('M j, Y g:i A'),
                     'Rejection notes' => $subject->rejection_notes,
@@ -133,7 +133,7 @@ class ActivityLogController extends Controller
                     'Status' => ucfirst((string) $subject->status),
                     'Result' => $subject->species_detected,
                     'Confidence' => $subject->classification_confidence !== null
-                        ? round($subject->classification_confidence * ($subject->classification_confidence <= 1 ? 100 : 1), 1) . '%'
+                        ? round($subject->classification_confidence * ($subject->classification_confidence <= 1 ? 100 : 1), 1).'%'
                         : null,
                     'Created' => $subject->created_at?->format('M j, Y g:i A'),
                 ],

@@ -7,7 +7,10 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/** An administrator hid, restored or deleted one of the user's delineations. */
+/**
+ * An administrator deleted one of the user's delineations (from Map Layers). Older stored notifications may
+ * still say "hidden" or "restored" from when admins could hide delineations; they keep their saved text.
+ */
 class DelineationModerated extends Notification
 {
     use Queueable;
@@ -40,13 +43,9 @@ class DelineationModerated extends Notification
             'title' => $this->title(),
             'message' => $this->message(),
             'type' => 'delineation_'.$this->action,
-            'icon' => match ($this->action) {
-                'hidden' => 'bi-eye-slash',
-                'restored' => 'bi-eye',
-                default => 'bi-trash',
-            },
+            'icon' => 'bi-trash',
             // Deleted records have no map location to open.
-            'delineation_id' => $this->action === 'deleted' ? null : $this->delineationId,
+            'delineation_id' => null,
             'delineation_name' => $this->delineationName,
             'reason' => $this->reason,
         ];
@@ -54,20 +53,12 @@ class DelineationModerated extends Notification
 
     private function title(): string
     {
-        return match ($this->action) {
-            'hidden' => 'Delineation hidden from the map',
-            'restored' => 'Delineation restored to the map',
-            default => 'Delineation removed',
-        };
+        return 'Delineation removed';
     }
 
     private function message(): string
     {
-        $message = match ($this->action) {
-            'hidden' => 'An administrator hid your delineation "'.$this->delineationName.'" from the shared map.',
-            'restored' => 'An administrator restored your delineation "'.$this->delineationName.'" to the shared map.',
-            default => 'An administrator deleted your delineation "'.$this->delineationName.'".',
-        };
+        $message = 'An administrator deleted your delineation "'.$this->delineationName.'".';
 
         return $this->reason ? $message.' Reason: '.$this->reason : $message;
     }

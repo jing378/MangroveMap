@@ -3223,6 +3223,47 @@
   #mapRightPanel .panel-btn i {
     margin-right: 2px;
   }
+
+  /* Hover and press feedback for the right-panel buttons. Cancel and the expert Cancel (rejection notes)
+     keep their own hover above; disabled buttons stay flat and say so with the cursor. */
+  #mapRightPanel .panel-btn {
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+  }
+  #mapRightPanel .panel-btn:not(.btn-g):not(.panel-cancel-btn):not(.panel-delete-btn):not(.is-cancel):hover:not(:disabled) {
+    background: var(--bg-edf7f2, #edf7f2);
+    border-color: #1e9e62;
+    color: var(--fg-1e9e62, #1e9e62);
+  }
+  #mapRightPanel .panel-btn.btn-g:not(.is-cancel):hover:not(:disabled) {
+    background: #17834f;
+    border-color: #17834f;
+    box-shadow: 0 2px 8px rgba(30, 158, 98, 0.28);
+  }
+  #mapRightPanel .panel-delete-btn:hover:not(:disabled),
+  #mapRightPanel .area-edit-remove:hover:not(:disabled),
+  #mapRightPanel #expertRejectBtn:hover:not(:disabled) {
+    background: var(--bg-fbe3df, #fbe3df);
+    border-color: #d04030;
+    color: var(--fg-b42318, #b42318);
+  }
+  #mapRightPanel .panel-btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  #mapRightPanel .panel-btn:focus-visible {
+    outline: 2px solid #1e9e62;
+    outline-offset: 2px;
+  }
+  #mapRightPanel .panel-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  /* "Draw a new area" while drawing: stays highlighted, like an active map tool. */
+  #mapRightPanel .area-edit-add.active {
+    background: var(--bg-edf7f2, #edf7f2);
+    border-color: #1e9e62;
+    color: var(--fg-1e9e62, #1e9e62);
+    box-shadow: inset 0 0 0 1px #1e9e62;
+  }
   .boundary-edit-hint { font-size: 11px; color: var(--fg-3c5a3c, #3c5a3c); background: var(--bg-eef6ee, #eef6ee); border: 1px solid var(--bd-cfe3cf, #cfe3cf); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
   .boundary-edit-hint ul { margin: 4px 0 0; padding-left: 16px; }
   .boundary-edit-hint kbd { font-size: 10px; padding: 0 4px; border: 1px solid var(--bd-b8c8b8, #b8c8b8); border-radius: 3px; background: var(--bg-ffffff, #fff); }

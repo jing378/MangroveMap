@@ -582,7 +582,7 @@
                     <label class="drone-drop" id="droneUploadDrop">
                         <i class="bi bi-cloud-arrow-up"></i>
                         <strong>Drop GeoTIFF files here or click to add</strong>
-                        <span>.tif / .tiff, 8-bit RGB orthomosaic · up to {{ $page['max_files'] }} files per upload</span>
+                        <span>.tif / .tiff, 8-bit RGB orthomosaic · up to {{ $page['max_files'] }} files per upload, {{ \Illuminate\Support\Number::fileSize($page['max_file_bytes']) }} each</span>
                         <input id="droneUploadFiles" name="files[]" type="file" accept=".tif,.tiff,image/tiff" multiple required>
                     </label>
                     <div id="droneUploadSelected" class="drone-files" aria-live="polite"></div>

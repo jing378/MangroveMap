@@ -70,8 +70,48 @@ class RejectedDelineationRevisionTest extends TestCase
         Notification::assertSentTo(
             $expert,
             DelineationSubmittedForReview::class,
-            fn(DelineationSubmittedForReview $notification) => $notification->isRevision,
+            fn (DelineationSubmittedForReview $notification) => $notification->isRevision,
         );
+    }
+
+    public function test_revision_can_add_and_remove_areas(): void
+    {
+        Notification::fake();
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $first = ['type' => 'area', 'coords' => [[10.0, 124.0], [10.0, 124.01], [10.01, 124.01], [10.0, 124.0]], 'genera' => ['Rhizophora']];
+        $second = ['type' => 'area', 'coords' => [[10.02, 124.0], [10.02, 124.01], [10.03, 124.01], [10.02, 124.0]], 'genera' => ['Rhizophora']];
+        $missed = ['type' => 'area', 'coords' => [[10.04, 124.0], [10.04, 124.01], [10.05, 124.01], [10.04, 124.0]], 'genera' => ['Rhizophora']];
+        $delineation = Delineation::create([
+            'user_id' => $resident->id,
+            'name' => 'Two patches',
+            'notes' => 'Original notes',
+            'features' => [$first, $second],
+            'is_rejected' => true,
+            'rejection_notes' => 'The second patch is a fishpond; you also missed one to the north.',
+        ]);
+
+        // "Remove selected area" on the second patch and "Draw a new area" for the missed one, then Resubmit.
+        $this->actingAs($resident)
+            ->putJson(route('delineations.revise', $delineation), [
+                'name' => 'Two patches',
+                'notes' => 'Removed the fishpond and added the northern patch.',
+                'features' => [$first, $missed],
+            ])
+            ->assertOk()
+            ->assertJsonCount(2, 'delineation.features');
+
+        $fresh = $delineation->fresh();
+        $this->assertEquals([$first['coords'], $missed['coords']], array_column($fresh->features, 'coords'));
+        $this->assertFalse($fresh->is_rejected); // back to pending, for the experts to review again
+    }
+
+    public function test_resident_delineate_page_has_area_tools_for_revising(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'end_user']))
+            ->get(route('delineate'))
+            ->assertOk()
+            ->assertSee('id="addRevisionAreaBtn"', false)
+            ->assertSee('id="removeRevisionAreaBtn"', false);
     }
 
     public function test_expert_delineate_page_shows_save_button(): void
@@ -79,10 +119,10 @@ class RejectedDelineationRevisionTest extends TestCase
         $expert = User::factory()->create(['role' => 'expert']);
         $this->actingAs($expert);
 
-        $route = new Route(['GET'], '/expert/delineate', ['uses' => fn() => null]);
+        $route = new Route(['GET'], '/expert/delineate', ['uses' => fn () => null]);
         $route->name('expert.delineate');
         $request = Request::create('/expert/delineate', 'GET');
-        $request->setRouteResolver(fn() => $route);
+        $request->setRouteResolver(fn () => $route);
         $this->app->instance('request', $request);
 
         $html = view('users.delineate', [
@@ -105,10 +145,10 @@ class RejectedDelineationRevisionTest extends TestCase
         $resident = User::factory()->create(['role' => 'end_user']);
         $this->actingAs($resident);
 
-        $route = new Route(['GET'], '/delineate', ['uses' => fn() => null]);
+        $route = new Route(['GET'], '/delineate', ['uses' => fn () => null]);
         $route->name('delineate');
         $request = Request::create('/delineate', 'GET');
-        $request->setRouteResolver(fn() => $route);
+        $request->setRouteResolver(fn () => $route);
         $this->app->instance('request', $request);
 
         $html = view('users.delineate', [

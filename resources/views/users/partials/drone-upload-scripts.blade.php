@@ -36,10 +36,21 @@
     const SUBMIT_IDLE_HTML = submit.innerHTML;
     let uploading = false;
 
+    // Files over the per-file limit (the server would refuse them after the upload starts), or null.
+    function oversizedFiles() {
+      if (!page.max_file_bytes) return null;
+      const big = [...(fileInput.files || [])].filter(file => file.size > page.max_file_bytes);
+      if (!big.length) return null;
+      const names = big.slice(0, 3).map(file => `${file.name} (${formatBytes(file.size)})`).join(', ');
+      return `Each file can be at most ${formatBytes(page.max_file_bytes)}. Too large: ${names}${big.length > 3 ? ` and ${big.length - 3} more` : ''}.`;
+    }
+
     function uploadBlocker() {
       const count = fileInput.files?.length || 0;
       if (!count) return 'Choose at least one .tif or .tiff file first.';
       if (page.max_files && count > page.max_files) return `Up to ${page.max_files} files per upload.`;
+      const tooBig = oversizedFiles();
+      if (tooBig) return tooBig;
       if (placeCheck.state === 'checking') return 'Checking where the files are…';
       if (placeCheck.state === 'far') return placeCheck.message;
       return null;
@@ -199,7 +210,21 @@
       renderSelection();
     }
 
+    let sizeNoteShown = false;
+
     function updateSubmitState() {
+      // A file over the limit is named on the page right away (not only in the disabled button's tooltip),
+      // and the note goes again once those files are removed.
+      if (!uploading) {
+        const tooBig = oversizedFiles();
+        if (tooBig) {
+          showMessage(tooBig, true);
+          sizeNoteShown = true;
+        } else if (sizeNoteShown) {
+          sizeNoteShown = false;
+          showMessage(placeCheck.state === 'far' ? placeCheck.message : '', placeCheck.state === 'far');
+        }
+      }
       const blocker = uploadBlocker();
       submit.disabled = uploading || blocker !== null;
       submit.classList.toggle('is-saving', uploading);
@@ -436,6 +461,11 @@
       }
       if (page.max_files && fileInput.files.length > page.max_files) {
         showMessage(`You selected ${fileInput.files.length} files, but the server accepts up to ${page.max_files} per upload. Upload them in smaller batches.`, true);
+        return;
+      }
+      const tooBig = oversizedFiles();
+      if (tooBig) {
+        showMessage(tooBig, true);
         return;
       }
       if (placeCheck.state === 'far') {

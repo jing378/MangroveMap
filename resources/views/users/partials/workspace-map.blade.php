@@ -208,6 +208,14 @@
                 <i class="bi bi-pencil-fill" aria-hidden="true"></i>
                 <span>Revising. Resubmit it for review, or Cancel to undo your changes.</span>
               </div>
+              {{-- The same area tools as Edit Delineation: add a missed patch, or take one out, before resubmitting. --}}
+              <button type="button" id="addRevisionAreaBtn" class="btn panel-btn area-edit-add" data-area-edit="revision" style="display:none;width:100%;margin-bottom:8px;">
+                <i class="bi bi-plus-square-dotted"></i> <span>Draw a new area</span>
+              </button>
+              <button type="button" id="removeRevisionAreaBtn" class="btn panel-btn area-edit-remove" data-area-edit="revision" style="display:none;width:100%;margin-bottom:8px;" disabled>
+                <i class="bi bi-trash3"></i> <span>Remove selected area</span>
+              </button>
+              <p id="removeRevisionAreaNote" class="boundary-observation-note area-edit-note" data-area-edit="revision" style="display:none;margin:-2px 2px 10px;"></p>
               <div id="revisionActionRow" class="panel-actions" style="display:none;">
                 <button type="button" id="cancelRejectedRevisionBtn" class="btn panel-btn panel-cancel-btn">
                   <i class="bi bi-x-lg"></i> Cancel
@@ -232,8 +240,21 @@
                 <li>Drag a point to move it.</li>
                 <li>Drag or click a faded midpoint to add a point.</li>
                 <li>Double-click or right-click a point to delete it, or select it and press <kbd>Delete</kbd>.</li>
+                <li>Use <strong>Draw a new area</strong> to add another mangrove patch to this delineation: click around it, then click the first point (or double-click) to close it.</li>
+                <li>Click one of its areas, then <strong>Remove selected area</strong> to take it out (at least one area stays).</li>
               </ul>
             </div>
+            {{-- Anyone editing a boundary (experts, and residents on their own pending delineations) can add a shape
+                 to the delineation or take one out; both are saved with the boundary change. --}}
+            <button type="button" id="addBoundaryAreaBtn" class="btn panel-btn area-edit-add" data-area-edit="boundary" style="display:none;width:100%;margin-bottom:8px;">
+              <i class="bi bi-plus-square-dotted"></i> <span>Draw a new area</span>
+            </button>
+            {{-- Takes the selected shape out of the delineation (kept until Save; Cancel or Undo bring it back). --}}
+            <button type="button" id="removeBoundaryAreaBtn" class="btn panel-btn area-edit-remove" data-area-edit="boundary" style="display:none;width:100%;margin-bottom:8px;" disabled>
+              <i class="bi bi-trash3"></i> <span>Remove selected area</span>
+            </button>
+            {{-- Why Remove is greyed out (a disabled button shows no tooltip). --}}
+            <p id="removeBoundaryAreaNote" class="boundary-observation-note area-edit-note" data-area-edit="boundary" style="display:none;margin:-2px 2px 10px;"></p>
             @if(Auth::user()->isExpert())
               {{-- An observed change becomes that year's entry in "Changes over time"; a correction does not. --}}
               <fieldset id="boundaryRecordAs" class="boundary-record-as" style="display:none;">

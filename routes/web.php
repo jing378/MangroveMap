@@ -383,20 +383,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/map-layers/export', [MapLayerController::class, 'export'])
             ->middleware('throttle:20,1,admin.map-layers.export')
             ->name('admin.map-layers.export');
-        Route::put('/map-layers/delineations/{delineation}', [MapLayerController::class, 'updateDelineation'])
-            ->name('admin.map-layers.delineations.update');
-        Route::post('/map-layers/delineations/{delineation}/hide', [MapLayerController::class, 'hideDelineation'])
-            ->name('admin.map-layers.delineations.hide');
-        Route::post('/map-layers/delineations/{delineation}/restore', [MapLayerController::class, 'restoreDelineation'])
-            ->name('admin.map-layers.delineations.restore');
         Route::delete('/map-layers/delineations/{delineation}', [MapLayerController::class, 'destroyDelineation'])
             ->name('admin.map-layers.delineations.destroy');
-        Route::put('/map-layers/imagery/{layer}', [MapLayerController::class, 'updateImagery'])
-            ->name('admin.map-layers.imagery.update');
         Route::post('/map-layers/imagery/{layer}/reprocess', [MapLayerController::class, 'reprocessImagery'])
             ->name('admin.map-layers.imagery.reprocess');
-        Route::post('/map-layers/imagery/{layer}/segment', [MapLayerController::class, 'resegmentImagery'])
-            ->name('admin.map-layers.imagery.segment');
         Route::delete('/map-layers/imagery/{layer}', [MapLayerController::class, 'destroyImagery'])
             ->name('admin.map-layers.imagery.destroy');
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('admin.activity-logs.index');

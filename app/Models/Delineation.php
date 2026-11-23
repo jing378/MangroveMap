@@ -35,9 +35,24 @@ class Delineation extends Model
         });
     }
 
+    /** Where a delineation came from (the `source` column), with the label the admin pages show. */
+    public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_DRONE = 'drone';
+
+    public const SOURCES = [
+        self::SOURCE_MANUAL => 'Hand-drawn',
+        self::SOURCE_DRONE => 'Drone survey (AI-assisted)',
+    ];
+
+    protected $attributes = [
+        'source' => self::SOURCE_MANUAL,
+    ];
+
     protected $fillable = [
         'user_id',
         'drone_imagery_layer_id',
+        'source',
         'name',
         'notes',
         'planting_recommendation',
@@ -57,7 +72,6 @@ class Delineation extends Model
         'approved_at' => 'datetime',
         'is_rejected' => 'boolean',
         'rejected_at' => 'datetime',
-        'hidden_at' => 'datetime',
     ];
 
     /** Days a rejected delineation is kept for the resident to revise before experts may remove it. */
@@ -76,21 +90,22 @@ class Delineation extends Model
         return $rejectedAt->copy()->addDays(self::REJECTED_REMOVAL_GRACE_DAYS);
     }
 
+    /** Made from a drone survey's AI-drawn areas (even when that imagery was deleted since). */
+    public function isFromDrone(): bool
+    {
+        return $this->source === self::SOURCE_DRONE || $this->drone_imagery_layer_id !== null;
+    }
+
+    public function sourceLabel(): string
+    {
+        return self::SOURCES[$this->isFromDrone() ? self::SOURCE_DRONE : self::SOURCE_MANUAL];
+    }
+
     public function canBeRemovedByExpert(): bool
     {
         $removableAt = $this->rejectedRemovableAt();
 
         return $removableAt !== null && ! $removableAt->isFuture();
-    }
-
-    public function hiddenBy()
-    {
-        return $this->belongsTo(User::class, 'hidden_by');
-    }
-
-    public function isHiddenFromMap(): bool
-    {
-        return $this->hidden_at !== null;
     }
 
     /** Snapshot stored in delineation_revisions before an edit. */
@@ -176,10 +191,10 @@ class Delineation extends Model
         return route($isExpert ? 'expert.delineate' : 'delineate', ['delineation' => $id], $absolute);
     }
 
-    /** Approved and published: delineations an admin hid from the map are excluded. */
+    /** Approved by an expert: published on the map. */
     public function scopeApproved($query)
     {
-        return $query->where('delineations.is_approved', true)->whereNull('delineations.hidden_at');
+        return $query->where('delineations.is_approved', true);
     }
 
     public function scopeRejected($query)

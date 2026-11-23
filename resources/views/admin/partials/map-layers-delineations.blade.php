@@ -19,38 +19,63 @@
             $areaCount = count(array_filter($mapFeatures, fn ($feature) => $feature['type'] === 'area'));
             // Drawn from drone imagery: the preview shows that imagery under the outline (tiles, or the review image).
             $imagery = \App\Http\Controllers\MapLayerController::imageryPreviewAttributes($delineation->droneImageryLayer);
+            // The drone layer's stage (as on the imagery tab), shown only when it says more than this row's own
+            // status (e.g. Finalizing, Failed): Published / Pending / Rejected just repeat it. The layer belongs to
+            // this delineation and its owner, so reuse those instead of loading them again per row.
+            $droneStage = null;
+            if ($droneLayer = $delineation->droneImageryLayer) {
+                $droneLayer->setRelation('delineation', $delineation)->setRelation('user', $delineation->user);
+                $droneStage = $droneLayer->stage();
+                if (in_array($droneStage, ['published', 'pending_expert', 'rejected'], true)) {
+                    $droneStage = null;
+                }
+            }
             @endphp
-            <tr class="layer-row" data-layer-id="d{{ $delineation->id }}">
+            {{-- Clicking the row shows it on the preview map (map-layers-scripts). --}}
+            <tr class="layer-row" data-layer-id="d{{ $delineation->id }}"
+                @if($mapFeatures !== [])
+                data-preview tabindex="0" title="Show on the preview map"
+                data-kind="delineation"
+                data-name="{{ $delineation->name }}"
+                @if($delineation->is_rejected && ! $delineation->is_approved) data-rejected @endif
+                @foreach($imagery as $attribute => $value) data-{{ $attribute }}="{{ $value }}" @endforeach
+                data-features='@json($mapFeatures)'
+                @endif>
                 <td class="cell-title">
                     <div class="user-name">{{ $delineation->name }}</div>
                     @if($delineation->notes)
                     <div class="muted clamp" title="{{ $delineation->notes }}">{{ $delineation->notes }}</div>
                     @endif
-                    <div class="muted">
-                        Updated {{ $delineation->updated_at?->format('M j, Y') ?? '—' }}
+                    {{-- Where it came from: traced by hand, or a drone survey's AI areas the owner corrected and confirmed. --}}
+                    <div class="muted source-line">
+                        @if($delineation->isFromDrone())
                         @if($delineation->droneImageryLayer)
-                        · <a class="cross-link" href="{{ route('admin.map-layers.index', ['tab' => 'imagery', 'layer' => $delineation->drone_imagery_layer_id]) }}"
-                            title="Open the drone imagery this was drawn from"><i class="bi bi-camera"></i> Drone imagery</a>
+                        <a class="source-tag drone" href="{{ route('admin.map-layers.index', ['tab' => 'imagery', 'layer' => $delineation->drone_imagery_layer_id]) }}"
+                            title="Open the drone imagery this was drawn from"><i class="bi bi-camera"></i> {{ $delineation->sourceLabel() }}</a>
+                        @if($droneStage)
+                        <span class="badge {{ \App\Http\Controllers\MapLayerController::STAGE_BADGES[$droneStage] }}"
+                            title="Stage of the drone imagery">{{ \App\Models\DroneImageryLayer::STAGES[$droneStage] }}</span>
                         @endif
+                        @else
+                        <span class="source-tag drone"><i class="bi bi-camera"></i> {{ $delineation->sourceLabel() }}</span>
+                        <span title="The drone imagery was deleted; this delineation was kept">· imagery deleted</span>
+                        @endif
+                        @else
+                        <span class="source-tag"><i class="bi bi-pencil"></i> {{ $delineation->sourceLabel() }}</span>
+                        @endif
+                        · Updated {{ $delineation->updated_at?->format('M j, Y') ?? '—' }}
                     </div>
                 </td>
-                <td data-label="Owner">
+                <td data-label="Owner" class="cell-owner">
                     <div class="cell-value">
                         <div>{{ $delineation->user?->name ?? 'Deleted user' }}</div>
                         <div class="muted">{{ $delineation->user?->roleLabel() }}</div>
                     </div>
                 </td>
-                <td data-label="Status">
+                <td data-label="Status" class="cell-status">
                     <div class="cell-value">
                         <span class="badge {{ $statusClass }}">{{ $statusLabel }}</span>
-                        @if($delineation->isHiddenFromMap())
-                        <div class="muted">
-                            by {{ $delineation->hiddenBy?->name ?? 'an admin' }}, {{ $delineation->hidden_at?->diffForHumans() }}
-                        </div>
-                        @if($delineation->hidden_reason)
-                        <div class="muted status-note">Reason: {{ $delineation->hidden_reason }}</div>
-                        @endif
-                        @elseif($delineation->is_approved && $delineation->approvedBy)
+                        @if($delineation->is_approved && $delineation->approvedBy)
                         <div class="muted">by {{ $delineation->approvedBy->name }}</div>
                         @elseif($removableAt = $delineation->rejectedRemovableAt())
                         {{-- Kept while the owner may still revise it (REJECTED_REMOVAL_GRACE_DAYS), then removable. --}}
@@ -65,7 +90,7 @@
                         @endif
                     </div>
                 </td>
-                <td data-label="Location">
+                <td data-label="Location" class="cell-meta">
                     <div class="cell-value">
                         <div>{{ $facts['municipality'] ?? 'Not matched yet' }}</div>
                         @if($facts['barangays'])
@@ -73,7 +98,7 @@
                         @endif
                     </div>
                 </td>
-                <td data-label="Area">
+                <td data-label="Area" class="cell-area">
                     <div class="cell-value">
                         <div class="nowrap">{{ number_format($facts['hectares'], 2) }} ha <span class="muted">· {{ $areaCount }} {{ \Illuminate\Support\Str::plural('area', $areaCount) }}</span></div>
                         @if($facts['genera'])
@@ -83,29 +108,6 @@
                 </td>
                 <td class="cell-actions">
                     <div class="row-actions">
-                        <button type="button" class="action-btn" title="Preview on map" data-preview
-                            data-kind="delineation"
-                            data-name="{{ $delineation->name }}"
-                            @if($delineation->is_rejected && ! $delineation->is_approved) data-rejected @endif
-                            @foreach($imagery as $attribute => $value) data-{{ $attribute }}="{{ $value }}" @endforeach
-                            data-features='@json($mapFeatures)'
-                            @disabled($mapFeatures === [])><i class="bi bi-eye"></i></button>
-                        <button type="button" class="action-btn" title="Edit name and notes" data-edit-delineation
-                            data-url="{{ route('admin.map-layers.delineations.update', $delineation) }}"
-                            data-name="{{ $delineation->name }}"
-                            data-notes="{{ $delineation->notes }}"><i class="bi bi-pencil"></i></button>
-                        @if($delineation->isHiddenFromMap())
-                        <form method="POST" action="{{ route('admin.map-layers.delineations.restore', $delineation) }}"
-                            data-confirm="Restore this delineation?" data-confirm-message="&quot;{{ $delineation->name }}&quot; appears on the public and shared maps again, and the owner is notified."
-                            data-confirm-label="Restore" data-busy-label="Restoring...">
-                            @csrf
-                            <button type="submit" class="action-btn" title="Restore to map"><i class="bi bi-arrow-counterclockwise"></i></button>
-                        </form>
-                        @elseif($delineation->is_approved)
-                        <button type="button" class="action-btn" title="Hide from map" data-hide-delineation
-                            data-url="{{ route('admin.map-layers.delineations.hide', $delineation) }}"
-                            data-name="{{ $delineation->name }}"><i class="bi bi-eye-slash"></i></button>
-                        @endif
                         <form method="POST" action="{{ route('admin.map-layers.delineations.destroy', $delineation) }}"
                             data-confirm="Delete this record?" data-confirm-message="&quot;{{ $delineation->name }}&quot; is permanently deleted with its yearly observations and revisions, and the owner is notified. This cannot be undone."
                             data-confirm-label="Delete" data-confirm-tone="danger" data-busy-label="Deleting...">

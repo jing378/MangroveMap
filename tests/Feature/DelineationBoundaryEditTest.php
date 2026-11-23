@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\EndUserController;
 use App\Models\Delineation;
+use App\Models\DelineationAnnualObservation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +93,111 @@ class DelineationBoundaryEditTest extends TestCase
         $this->assertSame(2, Delineation::count());
     }
 
+    public function test_expert_can_add_a_new_area_while_editing_and_record_it_as_an_observation(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation($resident, ['is_approved' => true, 'approved_at' => now()]);
+        $original = $delineation->features[0];
+        $newArea = [
+            'type' => 'area',
+            'coords' => [[10.02, 124.0], [10.02, 124.01], [10.03, 124.01], [10.02, 124.0]],
+            'genera' => ['Rhizophora'],
+        ];
+
+        // "Draw a new area" on the map sends the original shape plus the new one.
+        $this->actingAs($expert)
+            ->putJson(route('delineations.boundary.update', $delineation), [
+                'features' => [$original, $newArea],
+                'record_as' => 'observation',
+                'observation_date' => now()->toDateString(),
+                'observation_source' => array_key_first(DelineationAnnualObservation::SOURCES),
+            ])
+            ->assertOk()
+            ->assertJsonCount(2, 'delineation.features')
+            ->assertJsonPath('observation_year', (int) now()->format('Y'));
+
+        $fresh = $delineation->fresh();
+        $this->assertCount(2, $fresh->features);
+        $this->assertEquals($newArea['coords'], $fresh->features[1]['coords']);
+        $this->assertSame(1, Delineation::count(), 'The area is added to the same record.');
+        $this->assertSame(1, $fresh->revisions()->count());
+        $this->assertSame(1, $fresh->annualObservations()->count());
+    }
+
+    public function test_the_map_offers_draw_and_remove_area_buttons_to_experts_and_residents(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'expert']))
+            ->get(route('expert.map'))
+            ->assertOk()
+            ->assertSee('id="addBoundaryAreaBtn"', false)
+            ->assertSee('id="removeBoundaryAreaBtn"', false);
+
+        // Residents edit their own pending delineations, with the same draw / remove area tools.
+        $this->actingAs(User::factory()->create(['role' => 'end_user']))
+            ->get(route('delineate'))
+            ->assertOk()
+            ->assertSee('id="addBoundaryAreaBtn"', false)
+            ->assertSee('id="removeBoundaryAreaBtn"', false)
+            ->assertDontSee('id="boundaryRecordAs"', false); // recording observations stays expert-only
+    }
+
+    public function test_expert_can_remove_an_area_while_editing(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        $kept = [
+            'type' => 'area',
+            'coords' => [[10.0, 124.0], [10.0, 124.01], [10.01, 124.01], [10.0, 124.0]],
+            'genera' => ['Rhizophora'],
+        ];
+        $removed = [
+            'type' => 'area',
+            'coords' => [[10.02, 124.0], [10.02, 124.01], [10.03, 124.01], [10.02, 124.0]],
+            'genera' => ['Avicennia'],
+        ];
+        $delineation = $this->residentDelineation($resident, ['features' => [$kept, $removed], 'is_approved' => true]);
+
+        // "Remove selected area" leaves that shape out of the list sent on save.
+        $this->actingAs($expert)
+            ->putJson(route('delineations.boundary.update', $delineation), ['features' => [$kept]])
+            ->assertOk()
+            ->assertJsonCount(1, 'delineation.features');
+
+        $fresh = $delineation->fresh();
+        $this->assertCount(1, $fresh->features);
+        $this->assertEquals($kept['coords'], $fresh->features[0]['coords']);
+        $this->assertTrue($fresh->is_approved);
+        // The removed area stays in the revision history.
+        $this->assertCount(2, $fresh->revisions()->firstOrFail()->snapshot['features']);
+
+        // At least one area must stay.
+        $this->actingAs($expert)
+            ->putJson(route('delineations.boundary.update', $delineation), ['features' => []])
+            ->assertStatus(422);
+    }
+
+    public function test_resident_can_add_an_area_to_their_own_pending_delineation(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $delineation = $this->residentDelineation($resident);
+        $original = $delineation->features[0];
+        $newArea = [
+            'type' => 'area',
+            'coords' => [[10.02, 124.0], [10.02, 124.01], [10.03, 124.01], [10.02, 124.0]],
+            'genera' => ['Rhizophora'],
+        ];
+
+        $this->actingAs($resident)
+            ->putJson(route('delineations.boundary.update', $delineation), ['features' => [$original, $newArea]])
+            ->assertOk()
+            ->assertJsonCount(2, 'delineation.features');
+
+        $fresh = $delineation->fresh();
+        $this->assertCount(2, $fresh->features);
+        $this->assertFalse($fresh->is_approved); // still waits for an expert
+    }
+
     public function test_polygon_needs_three_distinct_points(): void
     {
         $resident = User::factory()->create(['role' => 'end_user']);
@@ -119,9 +226,9 @@ class DelineationBoundaryEditTest extends TestCase
 
         $this->actingAs($resident);
         // buildDashboardData uses MySQL's YEAR(); provide it for the in-memory SQLite test DB.
-        \Illuminate\Support\Facades\DB::connection()->getPdo()
-            ->sqliteCreateFunction('YEAR', fn($date) => $date ? (int) substr($date, 0, 4) : null, 1);
-        $data = app(\App\Http\Controllers\EndUserController::class)->buildDashboardData();
+        DB::connection()->getPdo()
+            ->sqliteCreateFunction('YEAR', fn ($date) => $date ? (int) substr($date, 0, 4) : null, 1);
+        $data = app(EndUserController::class)->buildDashboardData();
         $record = collect($data['delineations'])->firstWhere('id', $delineation->id);
 
         $this->assertSame($expert->name, $record['last_revised_by_name']);
@@ -137,7 +244,7 @@ class DelineationBoundaryEditTest extends TestCase
             'planting_recommendation' => 'Plant Rhizophora along the shoreline.',
         ]);
         DB::connection()->getPdo()
-            ->sqliteCreateFunction('YEAR', fn($date) => $date ? (int) substr($date, 0, 4) : null, 1);
+            ->sqliteCreateFunction('YEAR', fn ($date) => $date ? (int) substr($date, 0, 4) : null, 1);
 
         $this->actingAs($resident)
             ->get(route('map'))
@@ -161,7 +268,7 @@ class DelineationBoundaryEditTest extends TestCase
             'planting_recommendation' => 'Plant Avicennia in the intertidal zone.',
         ]);
         DB::connection()->getPdo()
-            ->sqliteCreateFunction('YEAR', fn($date) => $date ? (int) substr($date, 0, 4) : null, 1);
+            ->sqliteCreateFunction('YEAR', fn ($date) => $date ? (int) substr($date, 0, 4) : null, 1);
 
         $this->actingAs($residentViewer)
             ->get(route('map'))

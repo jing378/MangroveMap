@@ -27,7 +27,7 @@ class PlantingRecommendationController extends Controller
             ->latest()
             ->limit(self::MAP_QUERY_LIMIT)
             ->get()
-            ->map(fn(PlantingRecommendation $recommendation) => $this->payload($recommendation, $user->id))
+            ->map(fn (PlantingRecommendation $recommendation) => $this->payload($recommendation, $user->id))
             ->values();
 
         // Approved delineations an expert can select as the area to evaluate (polygons only).
@@ -35,7 +35,7 @@ class PlantingRecommendationController extends Controller
             Delineation::approved()->with('user:id,name'),
             Delineation::MAP_QUERY_LIMIT
         )
-            ->map(fn(Delineation $delineation) => [
+            ->map(fn (Delineation $delineation) => [
                 'id' => $delineation->id,
                 'name' => $delineation->name ?: "Delineation {$delineation->id}",
                 'created_by' => $delineation->user?->name,
@@ -44,7 +44,7 @@ class PlantingRecommendationController extends Controller
                     ->values()
                     ->all(),
             ])
-            ->filter(fn(array $area) => $area['features'] !== [])
+            ->filter(fn (array $area) => $area['features'] !== [])
             ->values();
 
         return view('users.recommendations', [
@@ -113,7 +113,7 @@ class PlantingRecommendationController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:191'],
-            'delineation_id' => ['nullable', 'integer', Rule::exists('delineations', 'id')->where('is_approved', true)->whereNull('hidden_at')],
+            'delineation_id' => ['nullable', 'integer', Rule::exists('delineations', 'id')->where('is_approved', true)],
             'features' => ['required', 'array', 'min:1', 'max:20'],
             'features.*.type' => ['required', 'string', 'in:area'],
             'features.*.coords' => ['required', 'array', 'min:3', 'max:10000'],
@@ -130,13 +130,13 @@ class PlantingRecommendationController extends Controller
         $features = [];
         foreach ($data['features'] as $index => $feature) {
             $coords = collect($feature['coords']);
-            $valid = $coords->every(fn($pair) => is_array($pair)
+            $valid = $coords->every(fn ($pair) => is_array($pair)
                 && count($pair) === 2
                 && is_numeric($pair[0] ?? null) && is_numeric($pair[1] ?? null)
                 && abs((float) $pair[0]) <= 90 && abs((float) $pair[1]) <= 180);
-            $coords = $valid ? $coords->map(fn($pair) => [(float) $pair[0], (float) $pair[1]])->values()->all() : [];
+            $coords = $valid ? $coords->map(fn ($pair) => [(float) $pair[0], (float) $pair[1]])->values()->all() : [];
 
-            if (! $valid || collect($coords)->map(fn($pair) => $pair[0] . ',' . $pair[1])->unique()->count() < 3) {
+            if (! $valid || collect($coords)->map(fn ($pair) => $pair[0].','.$pair[1])->unique()->count() < 3) {
                 throw ValidationException::withMessages([
                     "features.$index.coords" => 'An area needs at least 3 distinct valid points.',
                 ]);
@@ -152,7 +152,7 @@ class PlantingRecommendationController extends Controller
             'suitability' => $data['suitability'],
             'recommended_genera' => $data['suitability'] === 'not_suitable'
                 ? []
-                : array_map(fn(string $genus) => ucfirst(trim($genus)), array_values($data['recommended_genera'])),
+                : array_map(fn (string $genus) => ucfirst(trim($genus)), array_values($data['recommended_genera'])),
             'recommendation' => isset($data['recommendation']) ? (trim($data['recommendation']) ?: null) : null,
             'site_notes' => isset($data['site_notes']) ? (trim($data['site_notes']) ?: null) : null,
         ];

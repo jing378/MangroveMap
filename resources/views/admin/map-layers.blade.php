@@ -5,7 +5,7 @@
 @section('content')
 <div id="map-layers-section">
     <div class="page-title">Map Layers</div>
-    <p class="page-sub">Every delineation and drone imagery layer on the map. Export either list as CSV, or the delineations as GeoJSON for QGIS.</p>
+    <p class="page-sub">Delineations, hand-drawn or from a drone survey, and the drone surveys uploaded for them. Export either list as CSV, or the delineations as GeoJSON for QGIS.</p>
 
     <div class="grid cols-4">
         <div class="stat-card">
@@ -14,15 +14,19 @@
             <div class="stat-change">Visible on the shared map</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Hidden / Pending</div>
-            <div class="stat-value">{{ $counts['hidden'] }} <span class="stat-sub">/ {{ $counts['pending'] }}</span></div>
-            <div class="stat-change">Hidden by admins / awaiting expert review</div>
+            <div class="stat-label">Pending Review</div>
+            <div class="stat-value">{{ $counts['pending'] }}</div>
+            <div class="stat-change">Awaiting expert review</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Drone Imagery Layers</div>
-            <div class="stat-value">{{ $counts['imagery'] }}</div>
-            <div class="stat-change">{{ $counts['imageryReady'] }} ready to view · {{ \App\Http\Controllers\MapLayerController::formatBytes($counts['imageryBytes']) }}</div>
-        </div>
+        <a class="stat-card" href="{{ route('admin.map-layers.index', ['tab' => 'imagery', 'status' => 'waiting_owner']) }}">
+            <div class="stat-label">Waiting for Owner</div>
+            <div class="stat-value {{ $counts['staleDrafts'] ? 'amber' : '' }}">{{ $counts['waitingOwner'] }}</div>
+            <div class="stat-change">
+                {{ $counts['staleDrafts']
+                    ? $counts['staleDrafts'].' over '.\App\Models\DroneImageryLayer::STALE_DRAFT_DAYS.' days · AI drafts not confirmed'
+                    : 'AI drafts the owner has not confirmed' }}
+            </div>
+        </a>
         <div class="stat-card">
             <div class="stat-label">Imagery Issues</div>
             <div class="stat-value {{ $counts['imageryFailed'] ? 'red' : '' }}">{{ $counts['imageryFailed'] }}</div>
@@ -39,10 +43,10 @@
     <div class="section layer-list" id="layerList">
         <nav class="tabs" aria-label="Layer types">
             <a href="{{ route('admin.map-layers.index') }}" class="tab {{ $tab === 'delineations' ? 'active' : '' }}" @if($tab === 'delineations') aria-current="page" @endif>
-                <i class="bi bi-bounding-box"></i> {{-- one flex item, so the tab's gap does not split the words --}}<span><span class="tab-long">Mangrove </span>Delineations</span>
+                <i class="bi bi-bounding-box"></i> Delineations
             </a>
             <a href="{{ route('admin.map-layers.index', ['tab' => 'imagery']) }}" class="tab {{ $tab === 'imagery' ? 'active' : '' }}" @if($tab === 'imagery') aria-current="page" @endif>
-                <i class="bi bi-camera"></i> Drone Imagery
+                <i class="bi bi-camera"></i> Drone Surveys
             </a>
         </nav>
 
@@ -59,6 +63,14 @@
                 <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
+            @if($tab === 'delineations')
+            <select name="source" class="filter-select" aria-label="Source">
+                <option value="">All Sources</option>
+                @foreach(\App\Models\Delineation::SOURCES as $value => $label)
+                <option value="{{ $value }}" @selected(($filters['source'] ?? '') === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            @endif
             <button type="submit" class="btn-primary"><i class="bi bi-funnel"></i> Filter</button>
             @if(array_filter($filters))
             <a href="{{ route('admin.map-layers.index', $tab === 'imagery' ? ['tab' => 'imagery'] : []) }}" class="btn-secondary">Clear</a>
@@ -87,58 +99,6 @@
         @endif
     </div>
 
-    <dialog id="editDelineationDialog" class="layer-dialog" aria-labelledby="editDelineationTitle">
-        <form method="POST" id="editDelineationForm" data-confirm="Save changes?"
-            data-confirm-message="The name and notes are updated; the previous details are kept as a revision."
-            data-confirm-label="Save" data-busy-label="Saving...">
-            @csrf
-            @method('PUT')
-            <h3 id="editDelineationTitle">Edit delineation details</h3>
-            <p class="dialog-note">The boundary is not changed here; a revision of the previous details is kept.</p>
-            <label for="editDelineationName">Name</label>
-            <input id="editDelineationName" name="name" type="text" maxlength="255" required>
-            <label for="editDelineationNotes">Notes</label>
-            <textarea id="editDelineationNotes" name="notes" rows="4" maxlength="5000"></textarea>
-            <div class="dialog-actions">
-                <button type="button" class="btn-secondary" data-close-dialog>Cancel</button>
-                <button type="submit" class="btn-primary">Save changes</button>
-            </div>
-        </form>
-    </dialog>
-
-    <dialog id="hideDelineationDialog" class="layer-dialog" aria-labelledby="hideDelineationTitle">
-        <form method="POST" id="hideDelineationForm" data-confirm="Hide this delineation?"
-            data-confirm-message="It disappears from the public and shared maps until restored, and the owner is notified."
-            data-confirm-label="Hide" data-confirm-tone="danger" data-busy-label="Hiding...">
-            @csrf
-            <h3 id="hideDelineationTitle">Hide from map</h3>
-            <p class="dialog-note">
-                <strong id="hideDelineationName"></strong> will disappear from the public and shared maps until restored.
-                The owner is notified.
-            </p>
-            <label for="hideDelineationReason">Reason (optional, shared with the owner)</label>
-            <textarea id="hideDelineationReason" name="reason" rows="3" maxlength="500"></textarea>
-            <div class="dialog-actions">
-                <button type="button" class="btn-secondary" data-close-dialog>Cancel</button>
-                <button type="submit" class="btn-danger">Hide from map</button>
-            </div>
-        </form>
-    </dialog>
-
-    <dialog id="renameImageryDialog" class="layer-dialog" aria-labelledby="renameImageryTitle">
-        <form method="POST" id="renameImageryForm" data-confirm="Save changes?"
-            data-confirm-message="The imagery layer is renamed." data-confirm-label="Save" data-busy-label="Saving...">
-            @csrf
-            @method('PUT')
-            <h3 id="renameImageryTitle">Rename imagery layer</h3>
-            <label for="renameImageryName">Layer name</label>
-            <input id="renameImageryName" name="name" type="text" maxlength="120" required>
-            <div class="dialog-actions">
-                <button type="button" class="btn-secondary" data-close-dialog>Cancel</button>
-                <button type="submit" class="btn-primary">Save</button>
-            </div>
-        </form>
-    </dialog>
 </div>
 @endsection
 
@@ -153,7 +113,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 @include('admin.partials.map-layers-scripts')
 <script>
-    // Row actions (edit, hide, delete, ...) reload this page; keep the reader where they were instead of
+    // Row actions (delete, reprocess, ...) reload this page; keep the reader where they were instead of
     // jumping back to the top. Tabs, filters and pages swap the list without a reload (map-layers-scripts);
     // they are only saved here when that falls back to a normal load. Restored only coming from this page.
     (function () {

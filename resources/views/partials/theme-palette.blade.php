@@ -144,6 +144,7 @@
         --bg-faf5ff: #160c20;
         --bg-fafbfa: #131813;
         --bg-fafcfa: #101b10;
+        --bg-fbe3df: #2b1410;
         --bg-fbfcfb: #121812;
         --bg-fbfdfb: #0e1c0e;
         --bg-fde8e8: #270f0f;

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -21,6 +22,25 @@ class DroneImageryLayer extends Model
      * Payloads still show them inside segmentation_stats (see aiStats), where they lived before the split.
      */
     public const CLASSIFICATION_STAT_KEYS = ['genus_suggestion', 'canopy_count', 'canopies_by_genus'];
+
+    /**
+     * Where a layer is on its way to the map, in the order it gets there (admin Map Layers "Stage").
+     * waiting_owner: processed, the AI is done (or could not run) and the owner has not confirmed the areas yet.
+     */
+    public const STAGES = [
+        'processing' => 'Processing',
+        'detecting' => 'AI detecting areas',
+        'waiting_owner' => 'Waiting for owner',
+        'finalizing' => 'Finalizing',
+        'pending_expert' => 'Pending expert review',
+        'rejected' => 'Rejected by expert',
+        'published' => 'Published',
+        'not_submitted' => 'Ready, not submitted',
+        'failed' => 'Failed',
+    ];
+
+    /** The AI's areas for a layer waiting for its owner become a "stale draft" after this many days. */
+    public const STALE_DRAFT_DAYS = 7;
 
     protected $fillable = [
         'user_id',
@@ -86,6 +106,62 @@ class DroneImageryLayer extends Model
                 ->orWhereHas('delineation', fn (Builder $delineation) => $delineation
                     ->where('is_approved', true)
                     ->where('is_rejected', false)));
+    }
+
+    /** The key of self::STAGES this layer is at. Uses the user (role) and delineation relations. */
+    public function stage(): string
+    {
+        return match ($this->status) {
+            'failed' => 'failed',
+            'awaiting_review' => $this->isSegmenting() ? 'detecting' : 'waiting_owner',
+            'finalizing' => 'finalizing',
+            'ready' => match ($this->reviewState()) {
+                'approved' => 'published',
+                'rejected' => 'rejected',
+                'pending' => 'pending_expert',
+                // Experts' imagery is published without a delineation; a resident's is not.
+                default => $this->user?->isExpert() ? 'published' : 'not_submitted',
+            },
+            default => 'processing',
+        };
+    }
+
+    /** Since when the owner has had the AI draft (or, without one, the processed imagery) to review. */
+    public function waitingForOwnerSince(): ?Carbon
+    {
+        return $this->status === 'awaiting_review' ? ($this->segmented_at ?? $this->created_at) : null;
+    }
+
+    /** Layers at one stage (a key of self::STAGES); the same rules as stage(). */
+    public function scopeInStage(Builder $query, string $stage): Builder
+    {
+        $segmenting = ['queued', 'processing'];
+
+        return match ($stage) {
+            'failed' => $query->where('drone_imagery_layers.status', 'failed'),
+            'detecting' => $query->where('drone_imagery_layers.status', 'awaiting_review')
+                ->whereIn('drone_imagery_layers.segmentation_status', $segmenting),
+            'waiting_owner' => $query->where('drone_imagery_layers.status', 'awaiting_review')
+                ->where(fn (Builder $q) => $q->whereNull('drone_imagery_layers.segmentation_status')
+                    ->orWhereNotIn('drone_imagery_layers.segmentation_status', $segmenting)),
+            'finalizing' => $query->where('drone_imagery_layers.status', 'finalizing'),
+            'published' => $query->published(),
+            'pending_expert' => $query->awaitingExpertReview(),
+            'rejected' => $query->where('drone_imagery_layers.status', 'ready')
+                ->whereHas('delineation', fn (Builder $d) => $d->where('is_approved', false)->where('is_rejected', true)),
+            'not_submitted' => $query->where('drone_imagery_layers.status', 'ready')
+                ->whereDoesntHave('delineation')
+                ->whereDoesntHave('user', fn (Builder $user) => $user->where('role', 'expert')),
+            'processing' => $query->whereNotIn('drone_imagery_layers.status', ['awaiting_review', 'finalizing', 'ready', 'failed']),
+            default => $query,
+        };
+    }
+
+    /** Waiting for the owner for longer than STALE_DRAFT_DAYS. */
+    public function scopeStaleOwnerDraft(Builder $query): Builder
+    {
+        return $query->inStage('waiting_owner')
+            ->whereRaw('COALESCE(drone_imagery_layers.segmented_at, drone_imagery_layers.created_at) < ?', [now()->subDays(self::STALE_DRAFT_DAYS)]);
     }
 
     /** A resident's tiled imagery whose delineation waits for an expert: experts see it to review. */

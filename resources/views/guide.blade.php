@@ -792,7 +792,8 @@
             <dd>Checked by an expert. It now appears on the public map with your name as the contributor.</dd>
             <dt><span class="guide-pill is-rejected">Rejected</span></dt>
             <dd>The expert explained what to fix. Open it, read the <em>Expert feedback</em>, click <strong>Revise rejected delineation</strong>,
-                fix it, then click <strong>Resubmit for review</strong>.</dd>
+                fix it (move points, <strong>Draw a new area</strong> for a missed patch, or <strong>Remove selected area</strong> for one that
+                isn't mangrove), then click <strong>Resubmit for review</strong>.</dd>
         </dl>
         <div class="guide-warn"><i class="bi bi-hourglass-split"></i><strong>You have 7 days to revise a rejected delineation.</strong> After that,
             an expert may remove it. The deadline is shown in the rejection notice, in the map panel, and on your dashboard.</div>
@@ -803,6 +804,9 @@
                 just the edit controls.</li>
             <li>Drag a point to move it. Drag or click a faded midpoint to add a point. To delete a point, double-click or right-click it,
                 or select it and press <kbd>Delete</kbd>.</li>
+            <li>Missed a patch? Click <i class="bi bi-plus-square-dotted"></i> <strong>Draw a new area</strong>, click around it, then click the
+                first point (or double-click) to close it. To take an area out, click it and then <i class="bi bi-trash3"></i>
+                <strong>Remove selected area</strong> (at least one area stays).</li>
             <li>Click <strong>Save Changes</strong>, or <strong>Cancel</strong> to undo everything.</li>
         </ol>
         <div class="guide-tip"><i class="bi bi-check2-circle"></i><strong>How to get approved:</strong> trace only the mangrove canopy, not open water,
@@ -937,7 +941,8 @@
         <ol class="guide-steps">
             <li>On the <strong>Map</strong> or <strong>Delineate</strong> page, select the area and click
                 <i class="bi bi-bounding-box-circles"></i> <strong>Edit Delineation</strong>.</li>
-            <li>Move, add, or delete points so the boundary matches the mangroves as they are now. While editing, the panel shows only the
+            <li>Move, add, or delete points so the boundary matches the mangroves as they are now. Use <strong>Draw a new area</strong> for a
+                new patch, or <strong>Remove selected area</strong> for one that is gone. While editing, the panel shows only the
                 edit controls; if the genera changed, pick them in the panel before clicking Edit Delineation.</li>
             <li>Under <strong>Record this change as</strong>, choose one:
                 <ul>
