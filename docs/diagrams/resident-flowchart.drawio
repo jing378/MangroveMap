@@ -1,0 +1,777 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram id="f3e42df5dac74d4fb5bf" name="Page-1">
+    <mxGraphModel dx="5757" dy="2489" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0" adaptiveColors="none">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n1" parent="1" style="ellipse;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="Start" vertex="1">
+          <mxGeometry height="44" width="110" x="60" as="geometry" />
+        </mxCell>
+        <mxCell id="NtoKglo1r1GqZzIDWm9l-2" edge="1" parent="1" source="n2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;defaultLabelBackgroundColor=page;" target="n3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Login" vertex="1">
+          <mxGeometry height="40" width="140" x="45" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Valid Login Credentials?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="n1" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="n2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="n3" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="n2" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="190" />
+              <mxPoint x="220" y="100" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n7" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="-40" y="268" as="geometry" />
+        </mxCell>
+        <mxCell id="e135" edge="1" parent="1" source="n7" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-1" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="115" y="283" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-1" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Access Dashboard?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-2" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display coverage, mangrove report and genus types" vertex="1">
+          <mxGeometry height="50" width="170" x="240" y="315" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-3" edge="1" parent="1" source="resident-1" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-2" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-4" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="View municipality report?" vertex="1">
+          <mxGeometry height="80" width="150" x="460" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-5" edge="1" parent="1" source="resident-2" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-6" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Select municipality and view its areas" vertex="1">
+          <mxGeometry height="50" width="140" x="460" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-7" edge="1" parent="1" source="resident-4" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-6" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="535" y="400" /><mxPoint x="530" y="400" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-8" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="520" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-9" edge="1" parent="1" source="resident-6" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-8" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="616" y="445" /><mxPoint x="616" y="515" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-10" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Download report?" vertex="1">
+          <mxGeometry height="80" width="150" x="680" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-11" edge="1" parent="1" source="resident-4" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-10" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-12" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Download report as CSV" vertex="1">
+          <mxGeometry height="50" width="140" x="680" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-13" edge="1" parent="1" source="resident-10" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-12" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="755" y="400" /><mxPoint x="750" y="400" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-14" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="740" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-15" edge="1" parent="1" source="resident-12" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-14" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="836" y="445" /><mxPoint x="836" y="515" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-16" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Open own delineation?" vertex="1">
+          <mxGeometry height="80" width="150" x="900" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-17" edge="1" parent="1" source="resident-10" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-16" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-18" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Open record on Delineate page" vertex="1">
+          <mxGeometry height="50" width="140" x="900" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-19" edge="1" parent="1" source="resident-16" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-18" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="975" y="400" /><mxPoint x="970" y="400" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-20" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="960" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-21" edge="1" parent="1" source="resident-18" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-20" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1056" y="445" /><mxPoint x="1056" y="515" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-22" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1110" y="325" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-23" edge="1" parent="1" source="resident-16" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-22" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-24" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Access Map?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-25" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display mangrove map and layers" vertex="1">
+          <mxGeometry height="50" width="170" x="240" y="615" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-26" edge="1" parent="1" source="resident-24" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-25" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-27" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="View area details?" vertex="1">
+          <mxGeometry height="80" width="150" x="460" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-28" edge="1" parent="1" source="resident-25" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-27" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-29" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Select area and view details" vertex="1">
+          <mxGeometry height="50" width="140" x="460" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-30" edge="1" parent="1" source="resident-27" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-29" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="535" y="700" /><mxPoint x="530" y="700" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-31" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="520" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-32" edge="1" parent="1" source="resident-29" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-31" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="616" y="745" /><mxPoint x="616" y="815" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-33" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="View changes over time?" vertex="1">
+          <mxGeometry height="80" width="150" x="680" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-34" edge="1" parent="1" source="resident-27" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-33" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-35" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Select year on timeline" vertex="1">
+          <mxGeometry height="50" width="140" x="680" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-36" edge="1" parent="1" source="resident-33" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-35" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="755" y="700" /><mxPoint x="750" y="700" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-37" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="740" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-38" edge="1" parent="1" source="resident-35" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-37" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="836" y="745" /><mxPoint x="836" y="815" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-39" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="View planting recommendations?" vertex="1">
+          <mxGeometry height="80" width="150" x="900" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-40" edge="1" parent="1" source="resident-33" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-39" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-41" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display recommended genus per site" vertex="1">
+          <mxGeometry height="50" width="140" x="900" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-42" edge="1" parent="1" source="resident-39" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-41" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="975" y="700" /><mxPoint x="970" y="700" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-43" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="960" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-44" edge="1" parent="1" source="resident-41" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-43" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1056" y="745" /><mxPoint x="1056" y="815" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-45" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="View drone imagery?" vertex="1">
+          <mxGeometry height="80" width="150" x="1120" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-46" edge="1" parent="1" source="resident-39" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-45" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-47" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Show, hide or remove drone layers" vertex="1">
+          <mxGeometry height="50" width="140" x="1120" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-48" edge="1" parent="1" source="resident-45" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-47" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1195" y="700" /><mxPoint x="1190" y="700" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-49" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1180" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-50" edge="1" parent="1" source="resident-47" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-49" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1276" y="745" /><mxPoint x="1276" y="815" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-51" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1330" y="625" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-52" edge="1" parent="1" source="resident-45" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-51" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-53" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Access Delineate?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-54" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display delineate workspace" vertex="1">
+          <mxGeometry height="50" width="170" x="240" y="915" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-55" edge="1" parent="1" source="resident-53" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-54" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-56" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Draw new area?" vertex="1">
+          <mxGeometry height="80" width="150" x="460" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-57" edge="1" parent="1" source="resident-54" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-56" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-58" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Draw polygon and input details" vertex="1">
+          <mxGeometry height="50" width="170" x="450" y="1020" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-59" edge="1" parent="1" source="resident-56" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-58" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-60" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Submit for review" vertex="1">
+          <mxGeometry height="36" width="100" x="485" y="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-61" edge="1" parent="1" source="resident-58" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-60" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-62" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="600" y="1103" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-63" edge="1" parent="1" source="resident-60" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-62" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="535" y="1152" /><mxPoint x="615" y="1152" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-64" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Edit pending area?" vertex="1">
+          <mxGeometry height="80" width="150" x="680" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-65" edge="1" parent="1" source="resident-56" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-64" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-66" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Edit boundary, add or remove shapes" vertex="1">
+          <mxGeometry height="50" width="170" x="670" y="1020" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-67" edge="1" parent="1" source="resident-64" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-66" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-68" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Save" vertex="1">
+          <mxGeometry height="36" width="100" x="705" y="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-69" edge="1" parent="1" source="resident-66" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-68" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-70" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="820" y="1103" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-71" edge="1" parent="1" source="resident-68" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-70" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="755" y="1152" /><mxPoint x="835" y="1152" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-72" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Revise rejected area?" vertex="1">
+          <mxGeometry height="80" width="150" x="900" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-73" edge="1" parent="1" source="resident-64" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-72" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-74" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Correct boundary and details" vertex="1">
+          <mxGeometry height="50" width="170" x="890" y="1020" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-75" edge="1" parent="1" source="resident-72" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-74" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-76" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Resubmit for review" vertex="1">
+          <mxGeometry height="36" width="100" x="925" y="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-77" edge="1" parent="1" source="resident-74" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-76" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-78" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1040" y="1103" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-79" edge="1" parent="1" source="resident-76" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-78" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="975" y="1152" /><mxPoint x="1055" y="1152" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-80" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Delete area?" vertex="1">
+          <mxGeometry height="80" width="150" x="1120" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-81" edge="1" parent="1" source="resident-72" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-80" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-82" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Delete pending or rejected area" vertex="1">
+          <mxGeometry height="50" width="140" x="1120" y="1020" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-83" edge="1" parent="1" source="resident-80" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-82" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1195" y="1000" /><mxPoint x="1190" y="1000" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-84" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1180" y="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-85" edge="1" parent="1" source="resident-82" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-84" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1276" y="1045" /><mxPoint x="1276" y="1115" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-86" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1330" y="925" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-87" edge="1" parent="1" source="resident-80" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-86" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-88" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Access Drone Upload?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-89" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display drone surveys" vertex="1">
+          <mxGeometry height="50" width="170" x="240" y="1215" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-90" edge="1" parent="1" source="resident-88" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-89" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-91" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Upload drone imagery?" vertex="1">
+          <mxGeometry height="80" width="150" x="460" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-92" edge="1" parent="1" source="resident-89" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-91" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-93" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Select GeoTIFF files" vertex="1">
+          <mxGeometry height="50" width="170" x="450" y="1320" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-94" edge="1" parent="1" source="resident-91" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-93" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-95" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Upload and process" vertex="1">
+          <mxGeometry height="36" width="100" x="485" y="1400" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-96" edge="1" parent="1" source="resident-93" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-95" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-97" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="600" y="1403" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-98" edge="1" parent="1" source="resident-95" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-97" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="535" y="1452" /><mxPoint x="615" y="1452" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-99" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Review AI detection?" vertex="1">
+          <mxGeometry height="80" width="150" x="680" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-100" edge="1" parent="1" source="resident-91" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-99" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-101" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Correct areas and select genus" vertex="1">
+          <mxGeometry height="50" width="170" x="670" y="1320" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-102" edge="1" parent="1" source="resident-99" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-101" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-103" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Confirm and submit for review" vertex="1">
+          <mxGeometry height="36" width="100" x="705" y="1400" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-104" edge="1" parent="1" source="resident-101" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-103" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-105" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="820" y="1403" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-106" edge="1" parent="1" source="resident-103" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-105" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="755" y="1452" /><mxPoint x="835" y="1452" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-107" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Re-run genus detection?" vertex="1">
+          <mxGeometry height="80" width="150" x="900" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-108" edge="1" parent="1" source="resident-99" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-107" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-109" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Run genus detection again" vertex="1">
+          <mxGeometry height="50" width="140" x="900" y="1320" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-110" edge="1" parent="1" source="resident-107" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-109" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="975" y="1300" /><mxPoint x="970" y="1300" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-111" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="960" y="1400" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-112" edge="1" parent="1" source="resident-109" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-111" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1056" y="1345" /><mxPoint x="1056" y="1415" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-113" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Delete survey?" vertex="1">
+          <mxGeometry height="80" width="150" x="1120" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-114" edge="1" parent="1" source="resident-107" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-113" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-115" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Delete drone survey and its area" vertex="1">
+          <mxGeometry height="50" width="140" x="1120" y="1320" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-116" edge="1" parent="1" source="resident-113" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-115" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1195" y="1300" /><mxPoint x="1190" y="1300" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-117" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1180" y="1400" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-118" edge="1" parent="1" source="resident-115" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-117" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1276" y="1345" /><mxPoint x="1276" y="1415" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-119" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1330" y="1225" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-120" edge="1" parent="1" source="resident-113" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-119" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-121" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Access Tile Explorer?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="1500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-122" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display tile sources" vertex="1">
+          <mxGeometry height="50" width="170" x="240" y="1515" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-123" edge="1" parent="1" source="resident-121" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-122" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-124" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Upload GeoTIFF?" vertex="1">
+          <mxGeometry height="80" width="150" x="460" y="1500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-125" edge="1" parent="1" source="resident-122" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-124" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-126" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Select file and tile size" vertex="1">
+          <mxGeometry height="50" width="170" x="450" y="1620" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-127" edge="1" parent="1" source="resident-124" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-126" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-128" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Generate tiles" vertex="1">
+          <mxGeometry height="36" width="100" x="485" y="1700" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-129" edge="1" parent="1" source="resident-126" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-128" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-130" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="600" y="1703" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-131" edge="1" parent="1" source="resident-128" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-130" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="535" y="1752" /><mxPoint x="615" y="1752" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-132" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Download tiles?" vertex="1">
+          <mxGeometry height="80" width="150" x="680" y="1500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-133" edge="1" parent="1" source="resident-124" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-132" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-134" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Select tiles" vertex="1">
+          <mxGeometry height="50" width="170" x="670" y="1620" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-135" edge="1" parent="1" source="resident-132" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-134" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-136" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Download GeoTIFF or ZIP" vertex="1">
+          <mxGeometry height="36" width="100" x="705" y="1700" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-137" edge="1" parent="1" source="resident-134" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-136" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-138" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="820" y="1703" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-139" edge="1" parent="1" source="resident-136" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-138" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="755" y="1752" /><mxPoint x="835" y="1752" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-140" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Send tiles to Drone Upload?" vertex="1">
+          <mxGeometry height="80" width="150" x="900" y="1500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-141" edge="1" parent="1" source="resident-132" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-140" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-142" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Send selected tiles to Drone Upload" vertex="1">
+          <mxGeometry height="50" width="140" x="900" y="1620" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-143" edge="1" parent="1" source="resident-140" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-142" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="975" y="1600" /><mxPoint x="970" y="1600" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-144" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="960" y="1700" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-145" edge="1" parent="1" source="resident-142" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-144" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1056" y="1645" /><mxPoint x="1056" y="1715" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-146" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Delete tile source?" vertex="1">
+          <mxGeometry height="80" width="150" x="1120" y="1500" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-147" edge="1" parent="1" source="resident-140" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-146" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-148" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Delete tile source" vertex="1">
+          <mxGeometry height="50" width="140" x="1120" y="1620" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-149" edge="1" parent="1" source="resident-146" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-148" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1195" y="1600" /><mxPoint x="1190" y="1600" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-150" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1180" y="1700" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-151" edge="1" parent="1" source="resident-148" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-150" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1276" y="1645" /><mxPoint x="1276" y="1715" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-152" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1330" y="1525" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-153" edge="1" parent="1" source="resident-146" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-152" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-154" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Access Profile?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-155" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display profile details" vertex="1">
+          <mxGeometry height="50" width="170" x="240" y="1815" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-156" edge="1" parent="1" source="resident-154" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-155" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-157" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Edit profile?" vertex="1">
+          <mxGeometry height="80" width="150" x="460" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-158" edge="1" parent="1" source="resident-155" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-157" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-159" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Input new name, email, phone or photo" vertex="1">
+          <mxGeometry height="50" width="170" x="450" y="1920" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-160" edge="1" parent="1" source="resident-157" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-159" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-161" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Save" vertex="1">
+          <mxGeometry height="36" width="100" x="485" y="2000" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-162" edge="1" parent="1" source="resident-159" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-161" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-163" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="600" y="2003" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-164" edge="1" parent="1" source="resident-161" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-163" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="535" y="2052" /><mxPoint x="615" y="2052" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-165" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Change password?" vertex="1">
+          <mxGeometry height="80" width="150" x="680" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-166" edge="1" parent="1" source="resident-157" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-165" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-167" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Input current and new password" vertex="1">
+          <mxGeometry height="50" width="170" x="670" y="1920" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-168" edge="1" parent="1" source="resident-165" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-167" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-169" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Save" vertex="1">
+          <mxGeometry height="36" width="100" x="705" y="2000" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-170" edge="1" parent="1" source="resident-167" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-169" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-171" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="820" y="2003" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-172" edge="1" parent="1" source="resident-169" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-171" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="755" y="2052" /><mxPoint x="835" y="2052" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-173" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Apply as expert?" vertex="1">
+          <mxGeometry height="80" width="150" x="900" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-174" edge="1" parent="1" source="resident-165" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-173" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-175" parent="1" style="shape=parallelogram;perimeter=parallelogramPerimeter;fixedSize=1;size=10;html=1;whiteSpace=wrap;fontSize=10;" value="Upload certificate" vertex="1">
+          <mxGeometry height="50" width="170" x="890" y="1920" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-176" edge="1" parent="1" source="resident-173" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-175" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-177" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Submit application" vertex="1">
+          <mxGeometry height="36" width="100" x="925" y="2000" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-178" edge="1" parent="1" source="resident-175" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-177" value="">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="resident-179" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1040" y="2003" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-180" edge="1" parent="1" source="resident-177" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-179" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="975" y="2052" /><mxPoint x="1055" y="2052" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-181" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1110" y="1825" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-182" edge="1" parent="1" source="resident-173" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-181" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-183" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Access Notifications?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="2100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-184" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Display all notifications" vertex="1">
+          <mxGeometry height="50" width="170" x="240" y="2115" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-185" edge="1" parent="1" source="resident-183" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-184" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-186" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Open notification?" vertex="1">
+          <mxGeometry height="80" width="150" x="460" y="2100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-187" edge="1" parent="1" source="resident-184" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-186" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-188" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="View related record" vertex="1">
+          <mxGeometry height="50" width="140" x="460" y="2220" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-189" edge="1" parent="1" source="resident-186" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-188" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="535" y="2200" /><mxPoint x="530" y="2200" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-190" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="520" y="2300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-191" edge="1" parent="1" source="resident-188" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-190" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="616" y="2245" /><mxPoint x="616" y="2315" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-192" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Mark as read?" vertex="1">
+          <mxGeometry height="80" width="150" x="680" y="2100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-193" edge="1" parent="1" source="resident-186" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-192" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-194" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Mark one or all as read" vertex="1">
+          <mxGeometry height="50" width="140" x="680" y="2220" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-195" edge="1" parent="1" source="resident-192" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-194" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="755" y="2200" /><mxPoint x="750" y="2200" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-196" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="740" y="2300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-197" edge="1" parent="1" source="resident-194" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-196" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="836" y="2245" /><mxPoint x="836" y="2315" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-198" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Delete notification?" vertex="1">
+          <mxGeometry height="80" width="150" x="900" y="2100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-199" edge="1" parent="1" source="resident-192" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-198" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-200" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Delete one or all notifications" vertex="1">
+          <mxGeometry height="50" width="140" x="900" y="2220" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-201" edge="1" parent="1" source="resident-198" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-200" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="975" y="2200" /><mxPoint x="970" y="2200" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-202" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="960" y="2300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-203" edge="1" parent="1" source="resident-200" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-202" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1056" y="2245" /><mxPoint x="1056" y="2315" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-204" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Turn on device notifications?" vertex="1">
+          <mxGeometry height="80" width="150" x="1120" y="2100" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-205" edge="1" parent="1" source="resident-198" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-204" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-206" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Allow notifications in this browser" vertex="1">
+          <mxGeometry height="50" width="140" x="1120" y="2220" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-207" edge="1" parent="1" source="resident-204" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-206" value="Yes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1195" y="2200" /><mxPoint x="1190" y="2200" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-208" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1180" y="2300" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-209" edge="1" parent="1" source="resident-206" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-208" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points"><mxPoint x="1276" y="2245" /><mxPoint x="1276" y="2315" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="resident-210" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="1330" y="2125" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-211" edge="1" parent="1" source="resident-204" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-210" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-212" edge="1" parent="1" source="n3" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-1" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-213" edge="1" parent="1" source="resident-1" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-24" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-214" edge="1" parent="1" source="resident-24" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-53" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-215" edge="1" parent="1" source="resident-53" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-88" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-216" edge="1" parent="1" source="resident-88" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-121" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-217" edge="1" parent="1" source="resident-121" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-154" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-218" edge="1" parent="1" source="resident-154" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-183" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-219" parent="1" style="rhombus;html=1;whiteSpace=wrap;fontSize=10;" value="Logout?" vertex="1">
+          <mxGeometry height="80" width="150" x="40" y="2400" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-220" parent="1" style="ellipse;aspect=fixed;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="A" vertex="1">
+          <mxGeometry height="30" width="30" x="260" y="2425" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-221" parent="1" style="rounded=1;arcSize=8;html=1;whiteSpace=wrap;fontSize=10;" value="Logout" vertex="1">
+          <mxGeometry height="40" width="140" x="45" y="2520" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-222" parent="1" style="ellipse;html=1;whiteSpace=wrap;fontSize=10;fontStyle=1;" value="END" vertex="1">
+          <mxGeometry height="44" width="110" x="60" y="2600" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-223" parent="1" style="text;html=1;fontFamily=Times New Roman;fontSize=14;" value="Figure X. System Flowchart – Resident" vertex="1">
+          <mxGeometry height="30" width="600" x="200" y="2680" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-224" edge="1" parent="1" source="resident-183" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-219" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-225" edge="1" parent="1" source="resident-219" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;verticalAlign=bottom;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-220" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-226" edge="1" parent="1" source="resident-219" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;labelPlacement=auto;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-221" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="resident-227" edge="1" parent="1" source="resident-221" style="fontSize=10;fontStyle=1;labelBackgroundColor=default;defaultLabelBackgroundColor=page;edgeStyle=orthogonalEdgeStyle;rounded=0;libavoidRouting=1;orthogonalLoop=1;jettySize=auto;html=1;" target="resident-222" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
