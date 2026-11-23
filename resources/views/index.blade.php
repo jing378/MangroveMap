@@ -633,10 +633,11 @@
       letter-spacing: -0.02em;
     }
 
+    /* The unit after the number: a real space before it (in the markup), so "12 Barangays" never runs together. */
     .stat-val span {
       color: var(--fg-4ade80, #4ade80);
       font-size: 0.75em;
-      margin-left: 2px;
+      margin-left: 0.05em;
     }
 
     .stat-label {
@@ -999,6 +1000,55 @@
     .app-embed .leaflet-control-zoom a:hover {
       background: var(--bg-eef7f2, #eef7f2) !important;
       color: var(--primary-green) !important;
+    }
+
+    /* Expand button (under the zoom buttons): the map card fills the window; Esc or the button again restores it. */
+    .app-embed .map-expand-control {
+      border: 1px solid rgba(30, 158, 98, 0.28) !important;
+      border-radius: 8px !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+      overflow: hidden;
+      margin-left: 14px !important;
+    }
+
+    .app-embed .map-expand-control a {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      width: 32px !important;
+      height: 32px !important;
+      font-size: 15px;
+      background: var(--bg-ffffff, #ffffff) !important;
+      color: var(--primary-forest) !important;
+      transition: all 0.15s ease;
+    }
+
+    .app-embed .map-expand-control a:hover,
+    .app-embed .map-expand-control a:focus-visible {
+      background: var(--bg-eef7f2, #eef7f2) !important;
+      color: var(--primary-green) !important;
+    }
+
+    .map-browser-frame.is-expanded {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      margin: 0;
+      border-radius: 0;
+      border: none;
+      transform: none !important; /* the scroll-reveal transform would otherwise offset a fixed box */
+      opacity: 1 !important;
+    }
+
+    .map-browser-frame.is-expanded .app-embed {
+      flex: 1 1 auto;
+      height: auto;
+      min-height: 0;
+    }
+
+    html.map-expanded,
+    html.map-expanded body {
+      overflow: hidden;
     }
 
     /* Floating Legend */
@@ -2681,23 +2731,23 @@
       <div class="hero-stats-strip hero-enter" style="--d:4">
         {{-- All figures are from expert-approved delineations. data-count drives the count-up animation. --}}
         <div class="hero-stat-card">
-          <div class="stat-val"><b data-count="{{ round($mappedAreaHa ?? 0, 2) }}" data-decimals="2">{{ number_format($mappedAreaHa ?? 0, 2) }}</b><span>ha</span></div>
+          <div class="stat-val"><b data-count="{{ round($mappedAreaHa ?? 0, 2) }}" data-decimals="2">{{ number_format($mappedAreaHa ?? 0, 2) }}</b> <span>ha</span></div>
           <div class="stat-label">Mapped Mangrove Area</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val"><b data-count="{{ $barangayCount ?? 0 }}">{{ number_format($barangayCount ?? 0) }}</b><span>barangays</span></div>
+          <div class="stat-val"><b data-count="{{ $barangayCount ?? 0 }}">{{ number_format($barangayCount ?? 0) }}</b> <span>Barangays</span></div>
           <div class="stat-label">Areas Mapped</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val"><b data-count="{{ $generaCount ?? 0 }}">{{ number_format($generaCount ?? 0) }}</b><span>genera</span></div>
+          <div class="stat-val"><b data-count="{{ $generaCount ?? 0 }}">{{ number_format($generaCount ?? 0) }}</b> <span>Genera</span></div>
           <div class="stat-label">Mangrove Genera Recorded</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val"><b data-count="{{ count($delineations ?? []) }}">{{ number_format(count($delineations ?? [])) }}</b><span>records</span></div>
+          <div class="stat-val"><b data-count="{{ count($delineations ?? []) }}">{{ number_format(count($delineations ?? [])) }}</b> <span>Records</span></div>
           <div class="stat-label">Approved Delineations</div>
         </div>
         <div class="hero-stat-card">
-          <div class="stat-val"><b data-count="{{ $contributorCount ?? 0 }}">{{ number_format($contributorCount ?? 0) }}</b><span>people</span></div>
+          <div class="stat-val"><b data-count="{{ $contributorCount ?? 0 }}">{{ number_format($contributorCount ?? 0) }}</b> <span>People</span></div>
           <div class="stat-label">Contributors</div>
         </div>
       </div>
@@ -3263,6 +3313,60 @@
 
     @include('partials.map-place-labels')
     attachPlaceLabels(mainMap, [satL]);
+
+    // ---- Expand ----
+    // The map card (toolbar, map, details drawer) fills the window and keeps the same view; Esc or the button
+    // again puts it back. A CSS overlay rather than the Fullscreen API, which iPhones do not support. While
+    // expanded the card is moved to <body>, so no section wrapper can clip it or keep it under the header.
+    (function () {
+      const frame = document.querySelector('.map-browser-frame');
+      if (!frame) return;
+      const home = document.createComment('map-browser-frame');
+      frame.before(home);
+      let button = null;
+
+      function setExpanded(expanded) {
+        const wasExpanded = frame.classList.contains('is-expanded');
+        if (expanded) {
+          document.body.appendChild(frame);
+        } else {
+          home.after(frame);
+        }
+        frame.classList.toggle('is-expanded', expanded);
+        document.documentElement.classList.toggle('map-expanded', expanded);
+        button.innerHTML = `<i class="bi ${expanded ? 'bi-fullscreen-exit' : 'bi-arrows-fullscreen'}" aria-hidden="true"></i>`;
+        button.title = expanded ? 'Back to normal size (Esc)' : 'Expand map';
+        button.setAttribute('aria-label', button.title);
+        button.setAttribute('aria-pressed', String(expanded));
+        mainMap.invalidateSize();
+        // Once more after the browser has laid out the new size, so the newly visible tiles load.
+        requestAnimationFrame(() => mainMap.invalidateSize());
+        // Back where the reader was (only when leaving the expanded view, never on page load).
+        if (wasExpanded && !expanded) frame.scrollIntoView({ block: 'nearest' });
+      }
+
+      const ExpandControl = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd() {
+          const bar = L.DomUtil.create('div', 'leaflet-bar map-expand-control');
+          button = L.DomUtil.create('a', '', bar);
+          button.href = '#';
+          button.setAttribute('role', 'button');
+          L.DomEvent.disableClickPropagation(bar);
+          L.DomEvent.on(button, 'click', event => {
+            L.DomEvent.preventDefault(event);
+            setExpanded(!frame.classList.contains('is-expanded'));
+          });
+          return bar;
+        },
+      });
+      new ExpandControl().addTo(mainMap);
+      setExpanded(false);
+
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && frame.classList.contains('is-expanded')) setExpanded(false);
+      });
+    })();
 
     let polys = [];
     zones.forEach((z, i) => {
