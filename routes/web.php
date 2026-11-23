@@ -206,6 +206,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('sourceId')
         ->middleware('throttle:20,1,tile-explorer.sets.store')
         ->name('tile-explorer.sets.store');
+    Route::post('/tile-explorer/sources/{sourceId}/detect', [TileExplorerController::class, 'redetect'])
+        ->whereNumber('sourceId')
+        ->middleware('throttle:10,1,tile-explorer.sources.detect')
+        ->name('tile-explorer.sources.detect');
     Route::delete('/tile-explorer/sources/{sourceId}', [TileExplorerController::class, 'destroySource'])
         ->whereNumber('sourceId')
         ->name('tile-explorer.sources.destroy');
@@ -329,7 +333,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.destroy-all');
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 
-    // Dashboard "Field conditions" card (residents and experts): weather forecast from Open-Meteo, cached.
+    // Dashboard "Field conditions" card (residents, experts and admins): weather forecast from Open-Meteo, cached.
     Route::get('/dashboard/field-conditions', [EndUserController::class, 'fieldConditions'])
         ->middleware('throttle:30,1,dashboard.field-conditions')
         ->name('dashboard.field-conditions');

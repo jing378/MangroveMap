@@ -9,16 +9,18 @@ use RuntimeException;
 
 /**
  * The resampled RGB(A) raster both AI jobs run on (SegmentDroneImagery for the mangrove areas,
- * ClassifyDroneImagery for the genus). Same settings, so both land on the same pixel grid.
+ * ClassifyDroneImagery for the genus). They pass their own ground resolution (ml.drone.resolution,
+ * ml.genus.resolution); each result carries its own bounds, so the grids need not match.
  */
 trait PreparesAiRaster
 {
     /**
-     * Resamples the layer's reviewed (or unedited) mosaic to the AI ground resolution in $workDirectory.
+     * Resamples the layer's reviewed (or unedited) mosaic to $groundResolution metres per pixel (default
+     * ml.drone.resolution; never finer than the mosaic, capped by ml.drone.max_dimension) in $workDirectory.
      *
      * @return array{input_path: string, bounds: array{0: float, 1: float, 2: float, 3: float}, latitude: float, offset: array{east_m: float, north_m: float}, pixel_size: float, mercator_scale: float, pixel_m: float}
      */
-    private function prepareAiRaster(GdalCommandRunner $gdal, DroneImageryLayer $layer, string $workDirectory): array
+    private function prepareAiRaster(GdalCommandRunner $gdal, DroneImageryLayer $layer, string $workDirectory, ?float $groundResolution = null): array
     {
         $localDisk = Storage::disk('local');
         // The reviewed raster (removed areas transparent, cropped or shifted) when the owner edited it.
@@ -37,7 +39,8 @@ trait PreparesAiRaster
         $latitude = $this->centerLatitude($layer, $mosaicInfo);
         // The mosaic is EPSG:3857, whose units are stretched by 1/cos(latitude) relative to ground metres.
         $mercatorScale = 1 / max(0.01, cos(deg2rad($latitude)));
-        $pixelSize = $this->resamplePixelSize($mosaicInfo, $mercatorScale);
+        $pixelSize = $this->resamplePixelSize($mosaicInfo, $mercatorScale,
+            $groundResolution ?? (float) config('ml.drone.resolution', 0.15));
 
         $gdal->run([
             'gdal_translate', '-q',
@@ -112,12 +115,12 @@ trait PreparesAiRaster
         return $latitudes !== [] ? array_sum($latitudes) / count($latitudes) : 0.0;
     }
 
-    /** Target pixel size in mosaic (EPSG:3857) units: the configured ground resolution, capped by max dimension. */
-    private function resamplePixelSize(array $info, float $mercatorScale): float
+    /** Target pixel size in mosaic (EPSG:3857) units: the ground resolution, capped by max dimension. */
+    private function resamplePixelSize(array $info, float $mercatorScale, float $groundResolution): float
     {
         $nativePixel = abs((float) $info['geoTransform'][1]);
         [$width, $height] = $info['size'];
-        $pixelSize = max($nativePixel, (float) config('ml.drone.resolution', 0.15) * $mercatorScale);
+        $pixelSize = max($nativePixel, max(0.01, $groundResolution) * $mercatorScale);
 
         $maxDimension = max(512, (int) config('ml.drone.max_dimension', 12000));
         $longestSide = max($width, $height) * $nativePixel;

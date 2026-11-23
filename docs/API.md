@@ -59,6 +59,7 @@ Limits are per user (or per IP for guests), per minute, and each endpoint counts
 | `POST /reset-password` | 10 per IP |
 | `POST /tile-explorer/sources/{id}/sets`, `.../download` | 20 |
 | `POST /tile-explorer/sets/{id}/drone-imagery` | 10 |
+| `POST /tile-explorer/sources/{id}/detect` | 10 |
 
 ## Map data
 
@@ -86,7 +87,7 @@ OpenStreetMap place names for the satellite map labels: `{"places": [...]}`. Cac
 Satellite mangrove extent by year (Global Mangrove Watch). Gzipped when the browser accepts it, cached for 24 hours. Returns `404` when the data isn't installed.
 
 ### `GET /dashboard/field-conditions?lat=&lng=`
-Weather forecast for the dashboard's Field Conditions card. Returns an HTML fragment, not JSON. `lat` and `lng` are optional; both or neither must be sent.
+Weather forecast for the dashboard's Field Conditions card (resident, expert and admin dashboards). Returns an HTML fragment, not JSON. `lat` and `lng` are optional; both or neither must be sent.
 
 ## Delineations
 
@@ -201,6 +202,7 @@ The AI runs in two separate jobs, each with its own status in the layer payloads
 | `POST /tile-explorer/sets/{id}/download` | The chosen tiles as GeoTIFFs: one tile is sent as its `.tif`, two or more as a ZIP holding only the `.tif` files (streamed). Body: `ids`, optional `token` (set as the `tile_download_token` cookie when the file starts). |
 | `POST /tile-explorer/sets/{id}/drone-imagery` | Send the chosen tiles to Drone Imagery: their GeoTIFFs are copied into a new drone layer (one batch, the tiles stay) and queued like a Drone Upload. Body: `ids` (at most `gdal.max_upload_files`), optional `name` (defaults to the GeoTIFF's name). Returns `202` with the layer (`id`, `name`, `status`, `source_type`, `file_count`, `drone_upload_url`), `409` if the set isn't ready. |
 | `GET /tile-explorer/sets/{id}/tiles/{tileId}/{variant}` | One tile image or thumbnail |
+| `POST /tile-explorer/sources/{id}/detect` | Detect the mangroves again with the current extent model (`ML_DRONE_EXTENT_MODEL`) and remake every tile size of the GeoTIFF with the new labels, one after another. No body. Returns `202` with the GeoTIFF (`areas_status`/`areas_model` cleared, every `tile_sets[].status` `queued`), `409` while tiles are being made, `422` when it has no tiles yet. Each GeoTIFF in the page data and `GET /tile-explorer/sets/{id}` (`source`) has `areas_model` (`roboflow`, `unet`, `yolo`, or null for uploads labelled before it was recorded) and `areas_model_label`. |
 | `DELETE /tile-explorer/sources/{id}` | Delete the GeoTIFF and its tiles. Returns `409` while tiles are still being made. |
 
 ## Notifications

@@ -173,9 +173,9 @@ class GenerateTiles implements ShouldQueue
         try {
             $result = $detector->detect($rasterPath, $info, $workDirectory);
             Storage::disk('local')->put($source->areasPath(), json_encode($result['geojson'], JSON_UNESCAPED_SLASHES));
-            $source->update(['areas_status' => 'ready', 'areas_error' => null]);
+            $source->update(['areas_status' => 'ready', 'areas_error' => null, 'areas_model' => $result['model'] ?? null]);
         } catch (Throwable $exception) {
-            $source->update(['areas_status' => 'failed', 'areas_error' => mb_substr($exception->getMessage(), 0, 2000)]);
+            $source->update(['areas_status' => 'failed', 'areas_error' => mb_substr($exception->getMessage(), 0, 2000), 'areas_model' => null]);
             Log::warning('Tile Explorer mangrove detection failed; tiles are made without labels.', [
                 'tile_source_id' => $source->id,
                 'exception' => $exception,

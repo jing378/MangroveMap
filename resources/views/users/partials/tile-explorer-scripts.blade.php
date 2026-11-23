@@ -26,6 +26,7 @@
     const current = $('txCurrent');
     const sizeSelect = $('txSize');
     const generateButton = $('txGenerate');
+    const detectButton = $('txDetect');
     const status = $('txStatus');
     const statusTitle = $('txStatusTitle');
     const statusText = $('txStatusText');
@@ -424,8 +425,40 @@
       if (source.width && source.height) parts.push(`${source.width.toLocaleString()} × ${source.height.toLocaleString()} px`);
       if (source.crs) parts.push(source.crs);
       if (set?.status === 'ready' && set.columns && set.rows) parts.push(`${set.tile_count} tiles in a ${set.columns} × ${set.rows} grid`);
+      if (source.areas_status === 'ready') parts.push(`mangroves found by ${source.areas_model_label || 'an older model'}`);
       return parts.join(' · ');
     }
+
+    // "Detect mangroves again": once nothing is being made, offer it for uploads that have tiles.
+    function paintDetectButton(source) {
+      const sets = source?.tile_sets || [];
+      detectButton.hidden = !sets.length || sets.some(isBusy);
+    }
+
+    detectButton.addEventListener('click', async () => {
+      const source = currentSource();
+      if (!source) return;
+      const sizes = source.tile_sets.map(set => `${set.tile_size} px`).join(', ');
+      const confirmed = await window.AppActions.confirm({
+        title: 'Detect mangroves again?',
+        message: `The ${page.detection_model_label || 'current'} model looks for mangroves in "${source.name}" again, and its tiles (${sizes}) are made again with the new labels. Your selection is kept for tiles that still exist.`,
+        confirmLabel: 'Detect again',
+      });
+      if (!confirmed) return;
+      window.AppActions.setBusy(detectButton, 'Starting…');
+      currentSet = null; // never show the old tile list while it is being remade
+      tiles = [];
+      try {
+        const payload = await request('POST', `${page.sources_url}/${source.id}/detect`);
+        sources.set(payload.id, payload);
+      } catch (error) {
+        notify(error.message, 'error');
+      } finally {
+        window.AppActions.clearBusy(detectButton);
+      }
+      renderSources();
+      refreshSet();
+    });
 
     function refreshSet() {
       clearTimeout(pollTimer);
@@ -435,6 +468,7 @@
       storage.set('tileExplorer.current', { source: source.id, size });
       const set = setFor(source, size);
       $('txMeta').textContent = sourceMeta(source, set);
+      paintDetectButton(source);
 
       generateButton.disabled = isBusy(set);
       generateButton.innerHTML = !set
@@ -559,6 +593,7 @@
         }
       }));
       renderSources();
+      paintDetectButton(currentSource());
       if ([...sources.values()].some(source => source.tile_sets.some(isBusy))) schedulePoll();
     }
 

@@ -24,7 +24,7 @@ class MangroveAreaDetector
 
     /**
      * @param  array  $info  gdalinfo -json of $rasterPath
-     * @return array{geojson: array, coverage_percent: float}
+     * @return array{geojson: array, coverage_percent: float, model: string}
      */
     public function detect(string $rasterPath, array $info, string $workDirectory): array
     {
@@ -102,6 +102,8 @@ class MangroveAreaDetector
         return [
             'geojson' => $geoJson,
             'coverage_percent' => (float) ($prediction['mangrove_coverage_percent'] ?? 0),
+            // Which model drew them (after any fallback): "roboflow", "yolo" or "unet".
+            'model' => (string) ($prediction['extent_model'] ?? 'unet'),
         ];
     }
 

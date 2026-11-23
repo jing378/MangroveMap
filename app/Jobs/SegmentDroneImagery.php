@@ -121,7 +121,7 @@ class SegmentDroneImagery implements ShouldQueue
                 'resolution_m' => round($raster['pixel_m'], 3),
                 'tiles' => (int) ($prediction['tiles'] ?? 0),
                 'device' => $prediction['device'] ?? null,
-                // Which model drew the extent: "yolo" (the canopy model) or "unet".
+                // Which model drew the extent: "yolo" (the canopy model), "roboflow" (the hosted workflow) or "unet".
                 'extent_model' => (string) ($prediction['extent_model'] ?? 'unet'),
                 // Position nudge already contained in the coordinates (the edited raster is shifted),
                 // so the review editor can line the areas up with the preview.

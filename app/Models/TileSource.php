@@ -27,7 +27,20 @@ class TileSource extends Model
         'height',
         'areas_status',
         'areas_error',
+        'areas_model',
     ];
+
+    /** Names shown for MangroveSegmentationService::extentModel() values. */
+    public const AREAS_MODEL_LABELS = [
+        'roboflow' => 'Roboflow workflow',
+        'unet' => 'U-Net',
+        'yolo' => 'Canopy model (YOLO)',
+    ];
+
+    public static function areasModelLabel(?string $model): ?string
+    {
+        return $model === null ? null : (self::AREAS_MODEL_LABELS[$model] ?? $model);
+    }
 
     protected function casts(): array
     {

@@ -299,13 +299,40 @@ class AdminController extends Controller
 
         // Genus suggestions run on their own model (YOLO .pt): an active registry model, else the configured file.
         $genusModelPath = app(MangroveSegmentationService::class)->genusWeightsPath();
+        // The hosted Roboflow Workflow has no file here, so it is not in the registry; show it beside it.
+        $usesRoboflow = app(MangroveSegmentationService::class)->extentModel() === 'roboflow';
+        $genusOnRoboflow = (bool) config('ml.genus.enabled', true)
+            && app(MangroveSegmentationService::class)->genusModel() === 'roboflow';
 
         return view('admin.model-training', [
             'models' => $models,
             'availableModelCount' => $availableModelCount,
             'modelsWithAccuracy' => $modelsWithAccuracy,
-            'inferenceReady' => $runtimeModelPath !== null,
-            'genusReady' => $genusModelPath !== null,
+            'inferenceReady' => $runtimeModelPath !== null || $usesRoboflow,
+            // Both hosted Roboflow Workflows, listed whenever an API key is set, in use or not.
+            'hostedModels' => trim((string) config('ml.roboflow.api_key')) === '' ? [] : [
+                [
+                    'kind' => 'extent',
+                    'in_use' => $usesRoboflow,
+                    'label' => $usesRoboflow ? 'Mangrove areas are drawn by' : 'Can draw the mangrove areas',
+                    'workflow' => (string) config('ml.roboflow.workflow'),
+                    'workspace' => (string) config('ml.roboflow.workspace'),
+                    'local' => $runtimeModelPath !== null ? basename((string) $runtimeModelPath) : null,
+                    'local_kind' => 'U-Net checkpoint',
+                    'setting' => 'ML_DRONE_EXTENT_MODEL=roboflow',
+                ],
+                [
+                    'kind' => 'genus',
+                    'in_use' => $genusOnRoboflow,
+                    'label' => $genusOnRoboflow ? 'Canopies and genus are found by' : 'Can find the canopies and genus',
+                    'workflow' => (string) config('ml.roboflow.genus_workflow'),
+                    'workspace' => (string) config('ml.roboflow.workspace'),
+                    'local' => $genusModelPath !== null ? basename((string) $genusModelPath) : null,
+                    'local_kind' => 'YOLO genus model',
+                    'setting' => 'ML_GENUS_MODEL=roboflow',
+                ],
+            ],
+            'genusReady' => $genusModelPath !== null || $genusOnRoboflow,
             'runtimeModelSource' => $runtimeModelSource,
             'accuracyChartLabels' => $accuracyChart->map(fn (AIModel $model) => $model->name)->all(),
             'accuracyChartValues' => $accuracyChart->map(fn (AIModel $model) => $model->accuracyPercent())->all(),
@@ -680,6 +707,28 @@ class AdminController extends Controller
                     ? 'The AI cannot draw mangrove areas on drone imagery or Tile Explorer uploads. Upload a .pth model.'
                     : 'Drone imagery gets no genus suggestion or canopies. Upload a .pt model.',
             ];
+        }
+
+        // The hosted Roboflow Workflow draws the mangrove areas (ML_DRONE_EXTENT_MODEL=roboflow); the U-Net
+        // above is then only the fallback.
+        if (app(MangroveSegmentationService::class)->extentModel() === 'roboflow') {
+            $fallback = $status['segmentation']['ready'] ? ' · falls back to '.$status['segmentation']['name'] : '';
+            $status['segmentation'] = [
+                'ready' => true,
+                'name' => 'Roboflow workflow',
+                'detail' => 'Hosted on Roboflow (RF-DETR)'.$fallback,
+            ] + $status['segmentation'];
+        }
+
+        // Likewise the hosted canopy Workflow finds the canopies and genus (ML_GENUS_MODEL=roboflow).
+        if ((bool) config('ml.genus.enabled', true) && app(MangroveSegmentationService::class)->genusModel() === 'roboflow') {
+            $fallback = $status['classification']['ready'] && $status['classification']['name'] !== null
+                ? ' · falls back to '.$status['classification']['name'] : '';
+            $status['classification'] = [
+                'ready' => true,
+                'name' => 'Roboflow workflow',
+                'detail' => 'Hosted on Roboflow (RF-DETR)'.$fallback,
+            ] + $status['classification'];
         }
 
         return $this->aiModelStatus = $status;

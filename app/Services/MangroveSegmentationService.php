@@ -123,14 +123,126 @@ class MangroveSegmentationService
     }
 
     /**
+     * Which canopy model the genus job runs: "roboflow" (the hosted canopy Workflow, when configured and
+     * ROBOFLOW_API_KEY is set) or "yolo" (genusWeightsPath). See config ml.genus.model.
+     */
+    public function genusModel(): string
+    {
+        $configured = strtolower(trim((string) config('ml.genus.model', 'yolo')));
+
+        return $configured === 'roboflow' && trim((string) config('ml.roboflow.api_key')) !== '' ? 'roboflow' : 'yolo';
+    }
+
+    /** Whether the genus classification can run at all: the Roboflow canopy Workflow or YOLO weights. */
+    public function genusAvailable(): bool
+    {
+        if (! config('ml.genus.enabled', true)) {
+            return false;
+        }
+
+        return $this->genusModel() === 'roboflow' || $this->genusWeightsPath() !== null;
+    }
+
+    /**
+     * The genus classification with the configured canopy model (genusModel): the Roboflow canopy Workflow,
+     * falling back to the YOLO weights when it fails (logged), or the YOLO weights. Same arguments as
+     * predictGenera; the result has 'genus_model' ("roboflow" or "yolo").
+     *
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
+    public function classifyGenera(string $rasterAbsolutePath, ?string $labelsOutPath = null, int $minPatchPixels = 0, array $options = []): array
+    {
+        if (! config('ml.genus.enabled', true)) {
+            throw new RuntimeException('Genus suggestion is turned off.');
+        }
+
+        if ($this->genusModel() === 'roboflow') {
+            try {
+                $result = $this->predictGenera($rasterAbsolutePath, null, null, $labelsOutPath, $minPatchPixels, $options);
+
+                return ['genus_model' => 'roboflow', 'genus_workflow' => (string) config('ml.roboflow.genus_workflow')] + $result;
+            } catch (RuntimeException $exception) {
+                if ($this->genusWeightsPath() === null) {
+                    throw $exception;
+                }
+                Log::warning('Roboflow canopy detection failed; falling back to the YOLO weights.', [
+                    'raster' => $rasterAbsolutePath,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $weights = $this->genusWeightsPath();
+        if ($weights === null) {
+            throw new RuntimeException('No genus model is installed.');
+        }
+
+        return ['genus_model' => 'yolo'] + $this->predictGenera($rasterAbsolutePath, null, $weights, $labelsOutPath, $minPatchPixels, $options);
+    }
+
+    /**
      * Which model delineates the mangrove extent of drone imagery: "yolo" (the canopy model, when its
-     * weights exist) or "unet". See config ml.drone.extent_model.
+     * weights exist), "roboflow" (the hosted workflow, when ROBOFLOW_API_KEY is set) or "unet".
+     * See config ml.drone.extent_model.
      */
     public function extentModel(): string
     {
         $configured = strtolower(trim((string) config('ml.drone.extent_model', 'yolo')));
 
-        return $configured === 'yolo' && $this->genusWeightsPath() !== null ? 'yolo' : 'unet';
+        return match (true) {
+            $configured === 'yolo' && $this->genusWeightsPath() !== null => 'yolo',
+            $configured === 'roboflow' && trim((string) config('ml.roboflow.api_key')) !== '' => 'roboflow',
+            default => 'unet',
+        };
+    }
+
+    /**
+     * Mangrove extent of a raster from the Roboflow Workflow (ml/predict_roboflow.py): the raster is cut
+     * into tiles, each tile is sent to the workflow, and the masks are stitched into a 0/1 mask PNG on
+     * the raster's pixel grid. The API key goes to Python in the environment, never on the command line.
+     *
+     * @return array<string, mixed>
+     */
+    public function predictRoboflowExtent(string $rasterAbsolutePath, string $maskAbsolutePath, int $closeIterations): array
+    {
+        $python = config('ml.python');
+        $script = (string) config('ml.roboflow.script');
+        $apiKey = trim((string) config('ml.roboflow.api_key'));
+
+        if (! is_file((string) $python) && $python !== 'python' && $python !== 'python3') {
+            throw new RuntimeException('Python interpreter not found. Create ml/.venv and install ml/requirements.txt.');
+        }
+
+        if (! is_file($script)) {
+            throw new RuntimeException('Roboflow prediction script is missing: '.$script);
+        }
+
+        if ($apiKey === '') {
+            throw new RuntimeException('ROBOFLOW_API_KEY is not set.');
+        }
+
+        if (! is_file($rasterAbsolutePath)) {
+            throw new RuntimeException('Raster not found: '.$rasterAbsolutePath);
+        }
+
+        return $this->runScript([
+            (string) $python,
+            $script,
+            '--raster', $rasterAbsolutePath,
+            '--mask', $maskAbsolutePath,
+            '--api-url', (string) config('ml.roboflow.api_url'),
+            '--workspace', (string) config('ml.roboflow.workspace'),
+            '--workflow', (string) config('ml.roboflow.workflow'),
+            '--output', (string) config('ml.roboflow.output', ''),
+            '--classes', (string) config('ml.roboflow.classes', 'mangrove-area'),
+            '--tile-size', (string) (int) config('ml.roboflow.tile_size', 1024),
+            '--overlap', (string) (int) config('ml.roboflow.tile_overlap', 64),
+            '--parallel', (string) max(1, (int) config('ml.roboflow.parallel', 4)),
+            '--request-timeout', (string) (int) config('ml.roboflow.request_timeout', 60),
+            '--retries', (string) max(0, (int) config('ml.roboflow.retries', 3)),
+            '--close', (string) max(0, $closeIterations),
+        ], (int) config('ml.roboflow.timeout', 3600), ['ROBOFLOW_API_KEY' => $apiKey]);
     }
 
     /**
@@ -138,14 +250,31 @@ class MangroveSegmentationService
      *
      * With the canopy model, $yoloOptions are passed on to predictGenera (labels_out, canopies_out, bounds…)
      * so one run gives the extent, the genus suggestion and the canopies; the result then carries the
-     * genus summary too. If that run fails, the U-Net takes over (logged). The result has 'extent_model'.
+     * genus summary too. With the Roboflow Workflow only close_iterations is used. If the canopy model or
+     * Roboflow fails, the U-Net takes over (logged). The result has 'extent_model'.
      *
      * @param  array<string, mixed>  $yoloOptions
      * @return array<string, mixed>
      */
     public function predictExtent(string $rasterAbsolutePath, string $maskAbsolutePath, array $yoloOptions = []): array
     {
-        if ($this->extentModel() === 'yolo') {
+        $model = $this->extentModel();
+
+        if ($model === 'roboflow') {
+            try {
+                $result = $this->predictRoboflowExtent($rasterAbsolutePath, $maskAbsolutePath,
+                    (int) ($yoloOptions['close_iterations'] ?? config('ml.drone.close_iterations', 2)));
+
+                return ['extent_model' => 'roboflow', 'extent_workflow' => (string) config('ml.roboflow.workflow')] + $result;
+            } catch (RuntimeException $exception) {
+                Log::warning('Roboflow extent detection failed; falling back to the U-Net.', [
+                    'raster' => $rasterAbsolutePath,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if ($model === 'yolo') {
             $weights = $this->genusWeightsPath();
             try {
                 $result = $this->predictGenera($rasterAbsolutePath, null, (string) $weights, $yoloOptions['labels_out'] ?? null,
@@ -173,6 +302,8 @@ class MangroveSegmentationService
      * extent_out (write the model's mangrove extent mask PNG there), canopies_out (write every
      * canopy as JSON there; needs bounds = EPSG:3857 corners [ulx, uly, lrx, lry]), pixel_m (ground metres
      * per pixel, for canopy areas), canopy_min_px, close_iterations.
+     * A null $weightsPath runs the hosted Roboflow canopy Workflow (ml.roboflow.genus_workflow) instead
+     * of YOLO weights; the API key then reaches Python in the environment only.
      *
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
@@ -180,7 +311,7 @@ class MangroveSegmentationService
     public function predictGenera(
         string $rasterAbsolutePath,
         ?string $maskAbsolutePath,
-        string $weightsPath,
+        ?string $weightsPath,
         ?string $labelsOutPath = null,
         int $minPatchPixels = 0,
         array $options = [],
@@ -199,6 +330,11 @@ class MangroveSegmentationService
         $areasPath = isset($options['areas']) ? (string) $options['areas'] : null;
         if ($maskAbsolutePath === null && $areasPath === null && empty($options['extent_out'])) {
             throw new RuntimeException('The canopy model needs a mangrove mask, mangrove areas or an extent output path.');
+        }
+
+        $apiKey = trim((string) config('ml.roboflow.api_key'));
+        if ($weightsPath === null && $apiKey === '') {
+            throw new RuntimeException('ROBOFLOW_API_KEY is not set.');
         }
 
         foreach (array_filter([$weightsPath, $rasterAbsolutePath, $maskAbsolutePath, $areasPath]) as $path) {
@@ -220,10 +356,21 @@ class MangroveSegmentationService
             $rasterAbsolutePath,
             ...($maskAbsolutePath !== null ? ['--mask', $maskAbsolutePath] : []),
             ...($maskAbsolutePath === null && $areasPath !== null ? ['--areas', $areasPath] : []),
-            '--weights',
-            $weightsPath,
+            ...($weightsPath !== null ? ['--weights', $weightsPath] : [
+                '--roboflow',
+                '--rf-api-url', (string) config('ml.roboflow.api_url'),
+                '--rf-workspace', (string) config('ml.roboflow.workspace'),
+                '--rf-workflow', (string) config('ml.roboflow.genus_workflow'),
+                '--rf-output', (string) config('ml.roboflow.genus_output', ''),
+                '--rf-classes', (string) config('ml.roboflow.genus_classes'),
+                '--rf-parallel', (string) max(1, (int) config('ml.roboflow.parallel', 4)),
+                '--rf-request-timeout', (string) (int) config('ml.roboflow.request_timeout', 60),
+                '--rf-retries', (string) max(0, (int) config('ml.roboflow.retries', 3)),
+            ]),
             '--size',
             (string) config('ml.genus.input_size', 640),
+            '--overlap',
+            (string) max(0, (int) config('ml.genus.tile_overlap', 160)),
             '--conf',
             (string) config('ml.genus.confidence', 0.1),
             '--prob-conf',
@@ -248,7 +395,7 @@ class MangroveSegmentationService
                 '--canopy-conf', (string) (float) config('ml.genus.canopy_confidence', 0.4),
                 '--canopy-overlap', (string) (float) config('ml.genus.canopy_overlap', 0.5),
             ] : []),
-        ], (int) config('ml.genus.timeout', 1800));
+        ], (int) config('ml.genus.timeout', 1800), $weightsPath === null ? ['ROBOFLOW_API_KEY' => $apiKey] : []);
     }
 
     /**
@@ -399,11 +546,12 @@ class MangroveSegmentationService
 
     /**
      * @param  array<int, string>  $command
+     * @param  array<string, string>  $extraEnv  passed to this process only (secrets, never on the command line)
      * @return array<string, mixed>
      */
-    private function runScript(array $command, int $timeout): array
+    private function runScript(array $command, int $timeout, array $extraEnv = []): array
     {
-        $env = $this->pythonProcessEnvironment();
+        $env = $extraEnv + $this->pythonProcessEnvironment();
         $this->exposeWindowsSocketEnv($env);
 
         $pending = Process::timeout($timeout)->env($env);

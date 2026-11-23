@@ -32,6 +32,34 @@
         </div>
     </div>
 
+    @foreach($hostedModels as $hosted)
+        <div class="section hosted-model {{ $hosted['in_use'] ? '' : 'is-idle' }}" data-hosted-model="{{ $hosted['kind'] }}">
+            <div class="hosted-model-icon"><i class="bi {{ $hosted['in_use'] ? 'bi-cloud-check' : 'bi-cloud' }}"></i></div>
+            <div class="hosted-model-body">
+                <div class="hosted-model-label">{{ $hosted['label'] }}</div>
+                <div class="hosted-model-name">
+                    Roboflow workflow
+                    <span class="hosted-model-tag">Hosted · RF-DETR</span>
+                    <span class="hosted-model-state {{ $hosted['in_use'] ? 'on' : 'off' }}">{{ $hosted['in_use'] ? 'In use' : 'Not in use' }}</span>
+                </div>
+                <div class="hosted-model-detail" title="{{ $hosted['workspace'] }}/{{ $hosted['workflow'] }}">{{ $hosted['workspace'] }}/{{ $hosted['workflow'] }}</div>
+                <div class="hosted-model-note">
+                    It runs on Roboflow, so it has no file in the registry below.
+                    @if($hosted['in_use'])
+                        @if($hosted['local'])
+                            If Roboflow cannot be reached, {{ $hosted['local'] }} is used instead.
+                        @else
+                            No {{ $hosted['local_kind'] }} is available as a fallback if Roboflow cannot be reached.
+                        @endif
+                    @else
+                        {{ $hosted['local'] ? $hosted['local'].' is used now.' : '' }}
+                        To use the workflow, set <code>{{ $hosted['setting'] }}</code> in <code>.env</code> and restart the drone imagery worker.
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endforeach
+
     <div class="section">
         <div class="section-title-with-actions">
             <div><i class="bi bi-robot"></i> Model Registry</div>
@@ -729,6 +757,107 @@
 
     .ready-flag.off {
         color: var(--fg-d04030, #d04030);
+    }
+
+    .hosted-model {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        border-left: 4px solid #1e9e62;
+    }
+
+    .hosted-model-icon {
+        flex: none;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .hosted-model-body {
+        min-width: 0;
+    }
+
+    .hosted-model-label {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--fg-6b7f6b, #6b7f6b);
+    }
+
+    .hosted-model-name {
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        margin-top: 2px;
+    }
+
+    .hosted-model-tag {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        vertical-align: middle;
+        background: var(--bg-edf7f2, #edf7f2);
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .hosted-model.is-idle {
+        border-left-color: var(--bd-c9d4cc, #c9d4cc);
+    }
+
+    .hosted-model.is-idle .hosted-model-icon {
+        background: var(--bg-f5f7f6, #f5f7f6);
+        color: var(--fg-6b7f6b, #6b7f6b);
+    }
+
+    .hosted-model-state {
+        display: inline-block;
+        margin-left: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        vertical-align: middle;
+        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+    }
+
+    .hosted-model-state.on {
+        color: var(--fg-16a34a, #16a34a);
+        border-color: currentColor;
+    }
+
+    .hosted-model-state.off {
+        color: var(--fg-6b7f6b, #6b7f6b);
+        background: var(--bg-f5f7f6, #f5f7f6);
+    }
+
+    .hosted-model-note code {
+        font-size: 12px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--bg-f5f7f6, #f5f7f6);
+        color: var(--fg-1a2e1a, #1a2e1a);
+    }
+
+    .hosted-model-detail {
+        font-size: 12px;
+        color: var(--fg-6b7f6b, #6b7f6b);
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+
+    .hosted-model-note {
+        font-size: 13px;
+        color: var(--fg-1a2e1a, #1a2e1a);
+        margin-top: 8px;
     }
 
 

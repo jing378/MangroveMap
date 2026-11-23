@@ -457,7 +457,7 @@ class DroneImageryController extends Controller
             ], 409);
         }
 
-        if ($segmentation->genusWeightsPath() === null) {
+        if (! $segmentation->genusAvailable()) {
             return response()->json([
                 'message' => 'No genus model is installed. An admin can upload one on the AI Models page.',
             ], 409);
@@ -667,7 +667,7 @@ class DroneImageryController extends Controller
                 'genus_preview_url' => route('drone-imagery.segmentation.genus-preview', $layer->id),
                 'segment_url' => route('drone-imagery.segmentation.store', $layer->id),
                 // Re-run only the genus classification (the areas stay); null without a genus model.
-                'classify_url' => app(MangroveSegmentationService::class)->genusWeightsPath() !== null
+                'classify_url' => app(MangroveSegmentationService::class)->genusAvailable()
                     ? route('drone-imagery.classification.store', $layer->id)
                     : null,
                 'save_url' => route('drone-imagery.edits.update', $layer->id),

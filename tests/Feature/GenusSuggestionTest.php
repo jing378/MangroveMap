@@ -193,6 +193,22 @@ class GenusSuggestionTest extends TestCase
         Process::assertNotRan(fn (PendingProcess $process) => str_ends_with($process->command[1], 'predict_genus.py'));
     }
 
+    public function test_the_canopy_model_runs_on_overlapping_tiles(): void
+    {
+        config(['ml.genus.tile_overlap' => 128]);
+        Process::fake(['*' => Process::result(json_encode(['ok' => true, 'genera' => []]))]);
+
+        app(MangroveSegmentationService::class)->predictGenera(
+            $this->file('seg_input.tif'), $this->file('mask.png'), $this->file('best.pt')
+        );
+
+        Process::assertRan(function (PendingProcess $process) {
+            $command = $process->command;
+
+            return $command[array_search('--overlap', $command, true) + 1] === '128';
+        });
+    }
+
     public function test_the_canopy_model_needs_a_mask_or_an_extent_output(): void
     {
         Process::fake();

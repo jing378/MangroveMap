@@ -61,13 +61,13 @@ class FieldConditionsTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_experts_see_the_card_too_but_admins_do_not(): void
+    public function test_experts_and_admins_see_the_card_too(): void
     {
         $expert = User::factory()->create(['role' => 'expert']);
         $this->actingAs($expert)->get(route('expert.dashboard'))->assertOk()->assertSee('Field Conditions');
 
         $admin = User::factory()->create(['role' => 'admin']);
-        $this->actingAs($admin)->get(route('admin.dashboard'))->assertOk()->assertDontSee('Field Conditions');
+        $this->actingAs($admin)->get(route('admin.dashboard'))->assertOk()->assertSee('Field Conditions')->assertSee(route('dashboard.field-conditions'));
     }
 
     public function test_forecast_card_shows_only_todays_field_work_rating(): void

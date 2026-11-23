@@ -807,24 +807,8 @@
       renderCanopies();
     }
 
-    // Opening view (and after an AI run): the mangrove classification first; the AI delineation stays
-    // hidden until "Show AI delineation". Without a classification the delineation shows as before.
-    async function showClassificationFirst() {
-      if (!canopies.url || canopies.shown) return;
-      if (areas().length) {
-        setDrawing(false);
-        setEditing(false);
-        areasHidden = true;
-        areas().forEach(applyAreaVisibility);
-      }
-      canopies.shown = true;
-      await loadCanopies();
-      if (!canopies.shown && areasHidden) { // the classification failed to load: show the delineation instead
-        areasHidden = false;
-        areas().forEach(applyAreaVisibility);
-      }
-      refresh();
-    }
+    // Opening view (and after an AI run): the AI delineation is shown; the mangrove classification is the
+    // owner's choice (its card's Show button) and stays off until then (resetCanopies sets shown = false).
 
     canopyToggle?.addEventListener('click', async () => {
       canopies.shown = !canopies.shown;
@@ -889,7 +873,6 @@
             if (wasSegmenting && ai.status === 'ready') {
               resetCanopies(body.canopies_url);
               await loadAiAreas();
-              await showClassificationFirst();
             } else if (wasClassifying && !classificationIsRunning()) {
               resetCanopies(body.canopies_url);
               scheduleGenusPreview(); // unsaved edits: recount them with the new genus map
@@ -1720,7 +1703,7 @@
     renderStatus();
     resetHistory(); // starts empty; replaced when the AI areas load
     refresh();
-    loadAiAreas().then(showClassificationFirst);
+    loadAiAreas();
     scheduleAiPoll();
     setTimeout(() => map.invalidateSize(), 100);
   })();

@@ -1369,7 +1369,18 @@
                 <h2 id="droneEditorAiTitle"><span class="drone-editor-step" aria-hidden="true">1</span> Check the AI results</h2>
                 <div id="droneEditorAiStatus" class="drone-editor-ai-status" aria-live="polite"></div>
                 <div class="drone-editor-layers">
-                    {{-- Mangrove classification: every canopy the canopy model found (canopies_url), coloured by genus. Shown first when the editor opens. --}}
+                    {{-- AI delineation: the mangrove areas, shown / hidden on the map without removing them. Shown when the editor opens. --}}
+                    <div class="drone-editor-layer" id="droneEditorAreasCard" hidden>
+                        <div class="drone-editor-layer-head">
+                            <span class="drone-editor-layer-swatch is-delineation" aria-hidden="true"></span>
+                            <div class="drone-editor-layer-text">
+                                <strong>AI delineation</strong>
+                                <small>The green outline: your mangrove areas.{{ $editor['read_only'] ? '' : ' Shown while you edit it.' }}</small>
+                            </div>
+                            <button type="button" class="drone-editor-btn drone-editor-layer-toggle" id="droneEditorAreasToggle" aria-pressed="true" hidden><i class="bi bi-eye-slash"></i> Hide</button>
+                        </div>
+                    </div>
+                    {{-- Mangrove classification: every canopy the canopy model found (canopies_url), coloured by genus. Off until the owner clicks Show. --}}
                     <div class="drone-editor-layer" id="droneEditorCanopyCard" hidden>
                         <div class="drone-editor-layer-head">
                             <span class="drone-editor-layer-swatch is-classification" aria-hidden="true"></span>
@@ -1380,17 +1391,6 @@
                             <button type="button" class="drone-editor-btn drone-editor-layer-toggle" id="droneEditorCanopyToggle" aria-pressed="false" hidden><i class="bi bi-eye"></i> Show</button>
                         </div>
                         <div class="drone-editor-canopy-legend" id="droneEditorCanopyLegend" aria-live="polite" hidden></div>
-                    </div>
-                    {{-- AI delineation: the mangrove areas, shown / hidden on the map without removing them. Hidden when the editor opens with a classification. --}}
-                    <div class="drone-editor-layer" id="droneEditorAreasCard" hidden>
-                        <div class="drone-editor-layer-head">
-                            <span class="drone-editor-layer-swatch is-delineation" aria-hidden="true"></span>
-                            <div class="drone-editor-layer-text">
-                                <strong>AI delineation</strong>
-                                <small>The green outline: your mangrove areas.{{ $editor['read_only'] ? '' : ' Show it to edit.' }}</small>
-                            </div>
-                            <button type="button" class="drone-editor-btn drone-editor-layer-toggle" id="droneEditorAreasToggle" aria-pressed="false" hidden><i class="bi bi-eye"></i> Show</button>
-                        </div>
                     </div>
                 </div>
                 <div class="drone-editor-tools">

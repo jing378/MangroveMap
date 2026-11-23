@@ -844,14 +844,14 @@
         <h3>Check the AI results</h3>
         <ol class="guide-steps">
             <li>When the imagery is ready, click <strong>Edit imagery</strong> in <em>Your drone imagery</em>.</li>
-            <li><strong>Mangrove classification</strong> shows each tree canopy the AI found as a pin, coloured by genus. Click a pin to see it or remove it.</li>
-            <li><strong>AI delineation</strong> is the green outline that becomes your delineation. Click <strong>Show</strong> to edit it:
+            <li><strong>AI delineation</strong> is the green outline that becomes your delineation. It is shown when the editor opens, so you can edit it straight away:
                 <ul>
                     <li><i class="bi bi-pentagon"></i> <strong>Draw area</strong> adds mangroves the AI missed.</li>
                     <li>Drag corners to adjust a shape. Double-click a corner to delete it.</li>
                     <li>Click an area to remove it if it isn't mangrove, for example coconut trees or shadows.</li>
                 </ul>
             </li>
+            <li><strong>Mangrove classification</strong> is optional: click <strong>Show</strong> on its card to see each tree canopy the AI found as a pin, coloured by genus. Click a pin to see it or remove it, and <strong>Hide</strong> to turn it off again.</li>
         </ol>
 
         <h3>Add the details and confirm</h3>

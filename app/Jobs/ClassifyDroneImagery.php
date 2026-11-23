@@ -49,7 +49,7 @@ class ClassifyDroneImagery implements ShouldQueue
      */
     public static function queueFor(DroneImageryLayer $layer): bool
     {
-        if (app(MangroveSegmentationService::class)->genusWeightsPath() === null) {
+        if (! app(MangroveSegmentationService::class)->genusAvailable()) {
             return false;
         }
 
@@ -95,8 +95,7 @@ class ClassifyDroneImagery implements ShouldQueue
         ]);
 
         try {
-            $weights = $segmentation->genusWeightsPath();
-            if ($weights === null) {
+            if (! $segmentation->genusAvailable()) {
                 throw new RuntimeException('No genus model is installed.');
             }
 
@@ -104,7 +103,8 @@ class ClassifyDroneImagery implements ShouldQueue
             $areasVersion = $layer->segmented_at?->toIso8601String();
 
             File::ensureDirectoryExists($workDirectory);
-            $raster = $this->prepareAiRaster($gdal, $layer, $workDirectory);
+            // Finer than the mangrove-area step: the canopy model needs single crowns (ml.genus.resolution).
+            $raster = $this->prepareAiRaster($gdal, $layer, $workDirectory, (float) config('ml.genus.resolution', 0.05));
             $areasPath = $workDirectory.DIRECTORY_SEPARATOR.'areas.json';
             file_put_contents($areasPath, json_encode([
                 'rings' => $rings,
@@ -113,8 +113,9 @@ class ClassifyDroneImagery implements ShouldQueue
             ]));
 
             $options = $this->canopyModelOptions($workDirectory, $raster) + ['areas' => $areasPath];
-            $result = $segmentation->predictGenera(
-                $raster['input_path'], null, $weights, $options['labels_out'], $options['min_patch_px'], $options
+            // The Roboflow canopy Workflow or the YOLO weights (ml.genus.model).
+            $result = $segmentation->classifyGenera(
+                $raster['input_path'], $options['labels_out'], $options['min_patch_px'], $options
             );
 
             $suggestion = $rings === [] ? $this->emptySuggestion() : MangroveSegmentationService::genusSuggestionFromResult($result);
@@ -139,6 +140,7 @@ class ClassifyDroneImagery implements ShouldQueue
                     'offset' => $raster['offset'],
                     'resolution_m' => round($raster['pixel_m'], 3),
                     'device' => $result['device'] ?? null,
+                    'genus_model' => $result['genus_model'] ?? null,
                 ],
                 'classification_error' => null,
                 'classified_at' => now(),

@@ -49,6 +49,12 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # predict_roboflow, the shared Roboflow client
+
+# The hosted canopy Workflow (--roboflow): RF-DETR instance segmentation trained on mangrove-canopy v3.
+DEFAULT_CANOPY_WORKFLOW = "mangrove-canopy-3-rfdetr-seg-small-t1-vmangrove-canopy-3-rfdetr-seg-small-t1-logic"
+DEFAULT_CANOPY_CLASSES = "Avicennia,Nypa,Rhizophora,Sonneratia"
+
 
 def load_model(weights_path: Path):
     from ultralytics import YOLO
@@ -103,10 +109,12 @@ def class_names(model) -> list[str]:
     return [str(name) for name in names]
 
 
-def tile_starts(length: int, size: int) -> list[int]:
+def tile_starts(length: int, size: int, stride: int | None = None) -> list[int]:
+    """Tile origins along one axis, `stride` apart (default: size, no overlap); the last one is shifted
+    back so it ends at the edge."""
     if length <= size:
         return [0]
-    starts = list(range(0, length - size, size))
+    starts = list(range(0, length - size, max(1, stride or size)))
     starts.append(length - size)
     return starts
 
@@ -119,17 +127,89 @@ def tile_starts(length: int, size: int) -> list[int]:
 # Any set of areas (the U-Net mask, or the owner's corrected polygons) is then counted from that map
 # (summarize), so editing the areas never needs the model again (--recount).
 
-def label_raster(model, rgb: np.ndarray, valid: np.ndarray, size: int, conf_floor: float,
-                 batch_size: int, device: str, classes: int,
+# A detector runs the canopy model on a batch of size x size RGB tiles and returns, per tile,
+# (masks (N, size, size) bool, class indexes (N,) int, confidences (N,) float32).
+Detection = tuple[np.ndarray, np.ndarray, np.ndarray]
+
+
+def _no_detections(size: int) -> Detection:
+    return np.zeros((0, size, size), dtype=bool), np.zeros(0, dtype=int), np.zeros(0, dtype=np.float32)
+
+
+def yolo_detector(model, size: int, conf_floor: float, device: str):
+    """The local Ultralytics YOLO weights as a detector."""
+    def detect(tiles: list[np.ndarray]) -> list[Detection]:
+        bgr = [np.ascontiguousarray(tile[:, :, ::-1]) for tile in tiles]  # Ultralytics expects BGR arrays
+        results = model.predict(bgr, imgsz=size, conf=conf_floor, retina_masks=True, device=device, verbose=False)
+        out: list[Detection] = []
+        for result in results:
+            if result.masks is None or result.boxes is None or len(result.boxes) == 0:
+                out.append(_no_detections(size))
+                continue
+            out.append((
+                result.masks.data.cpu().numpy() > 0.5,
+                result.boxes.cls.cpu().numpy().astype(int),
+                result.boxes.conf.cpu().numpy().astype(np.float32),
+            ))
+        return out
+    return detect
+
+
+def roboflow_detector(names: list[str], size: int, conf_floor: float, api: dict, output: str | None, parallel: int):
+    """The hosted Roboflow canopy Workflow (RF-DETR instance segmentation) as a detector.
+
+    Each tile is one request (ml/predict_roboflow.py run_workflow: Bearer header, retries with backoff).
+    The workflow answers per detection with `class` (a genus name), `confidence` and the mask as polygon
+    `points` (or `rle_mask`); the mask is drawn at once and the points are dropped. Detections are mapped
+    to `names` by class name, so the workflow's own class ids do not matter; unknown classes are skipped.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    import predict_roboflow as rf
+
+    index = {name.strip().lower(): i for i, name in enumerate(names)}
+
+    def detect_one(tile: np.ndarray) -> Detection:
+        segmentation = rf.find_segmentation(rf.run_workflow(rf.encode_jpeg(tile), **api), output or None)
+        masks, labels, scores = [], [], []
+        for prediction in segmentation.get("predictions", []):
+            if not isinstance(prediction, dict):
+                continue
+            cls = index.get(str(prediction.get("class", "")).strip().lower())
+            score = prediction.get("confidence")
+            if cls is None or not isinstance(score, (int, float)) or score < conf_floor:
+                continue
+            mask = rf.prediction_mask(prediction, size, size)
+            if mask is None or not mask.any():
+                continue
+            masks.append(mask)
+            labels.append(cls)
+            scores.append(float(score))
+        if not masks:
+            return _no_detections(size)
+        return np.stack(masks), np.asarray(labels, dtype=int), np.asarray(scores, dtype=np.float32)
+
+    def detect(tiles: list[np.ndarray]) -> list[Detection]:
+        with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
+            return list(pool.map(detect_one, tiles))  # re-raises the first failed tile
+    return detect
+
+
+def label_raster(detect, rgb: np.ndarray, valid: np.ndarray, size: int,
+                 batch_size: int, classes: int,
                  canopies: list | None = None, canopy_min_px: int = 0,
                  canopy_conf: float = 0.0, canopy_clip: np.ndarray | None = None,
-                 canopy_overlap: float = 0.5) -> tuple[np.ndarray, np.ndarray, int]:
+                 canopy_overlap: float = 0.5, tile_overlap: int = 0) -> tuple[np.ndarray, np.ndarray, int]:
     """Label every valid pixel; with a `canopies` list also keep each detection as one canopy.
 
     A canopy entry is {cls, conf, pixels, center: (x, y) raster pixels, rings: [(N, 2) raster pixels]}.
     The canopy is clipped to canopy_clip (the mangrove extent; default: the valid pixels), so its outline
     follows the delineation. Only detections at >= canopy_conf count as a canopy, and canopies (or parts
     of one) smaller than canopy_min_px pixels are dropped (slivers along edges).
+
+    Tiles overlap by tile_overlap pixels. A crown on a tile border is then seen by both tiles; the two
+    views of the same genus are joined into one canopy (merge_canopy_views), so it is not cut straight at
+    the border. In the genus map each pixel goes to the most confident detection of any tile.
 
     Duplicates: the model often detects one stand of trees twice with different genera (e.g. Sonneratia
     63% and Avicennia 24% on the same crowns). Canopies are taken most confident first, and one whose
@@ -138,18 +218,18 @@ def label_raster(model, rgb: np.ndarray, valid: np.ndarray, size: int, conf_floo
     """
     clip = valid if canopy_clip is None else canopy_clip
     height, width = rgb.shape[:2]
-    # Non-overlapping tiles (the last row/column shifted back to fit), so each pixel is labelled once.
+    stride = size - max(0, min(int(tile_overlap), size // 2))
     windows: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
-    for y in tile_starts(height, size):
-        for x in tile_starts(width, size):
+    for y in tile_starts(height, size, stride):
+        for x in tile_starts(width, size, stride):
             if (x, y) not in seen and valid[y:y + size, x:x + size].any():
                 seen.add((x, y))
                 windows.append((x, y))
 
     class_map = np.zeros((height, width), dtype=np.uint8)
     conf_map = np.zeros((height, width), dtype=np.uint8)
-    counted = np.zeros((height, width), dtype=bool)  # shifted edge tiles overlap their neighbours
+    views: list[dict] = []  # every confident detection of every tile, cropped to its bounding box
 
     for start in range(0, len(windows), max(1, batch_size)):
         batch = windows[start:start + batch_size]
@@ -158,21 +238,14 @@ def label_raster(model, rgb: np.ndarray, valid: np.ndarray, size: int, conf_floo
             tile = np.zeros((size, size, 3), dtype=np.uint8)
             patch = rgb[y:y + size, x:x + size]
             tile[: patch.shape[0], : patch.shape[1]] = patch
-            tiles.append(np.ascontiguousarray(tile[:, :, ::-1]))  # Ultralytics expects BGR arrays
-        results = model.predict(tiles, imgsz=size, conf=conf_floor, retina_masks=True, device=device, verbose=False)
-        for (x, y), result in zip(batch, results):
+            tiles.append(tile)
+        for tile_index, ((x, y), (masks, labels, scores)) in enumerate(zip(batch, detect(tiles)), start=start):
             h = min(size, height - y)
             w = min(size, width - x)
             tile_valid = valid[y:y + h, x:x + w]
-            already = counted[y:y + h, x:x + w].copy()  # pixels a previous (overlapping edge) tile labelled
-            region = tile_valid & ~already
-            counted[y:y + h, x:x + w] |= tile_valid
-            if result.masks is None or result.boxes is None or len(result.boxes) == 0:
+            if len(scores) == 0:
                 continue
 
-            masks = result.masks.data.cpu().numpy() > 0.5
-            labels = result.boxes.cls.cpu().numpy().astype(int)
-            scores = result.boxes.conf.cpu().numpy().astype(np.float32)
             # Each pixel goes to the most confident detection covering it.
             best_conf = np.zeros((h, w), dtype=np.float32)
             best_class = np.full((h, w), -1, dtype=np.int16)
@@ -186,38 +259,136 @@ def label_raster(model, rgb: np.ndarray, valid: np.ndarray, size: int, conf_floo
 
             if canopies is not None:
                 tile_clip = clip[y:y + h, x:x + w]
-                taken = np.zeros((h, w), dtype=bool)  # pixels of the canopies kept in this tile
-                for index in np.argsort(-scores, kind="stable"):
+                for index in range(len(scores)):
                     cls, score = int(labels[index]), float(scores[index])
                     if not 0 <= cls < classes or score < canopy_conf:
                         continue
                     crown = masks[index][:h, :w] & tile_clip
-                    crown_pixels = int(crown.sum())
-                    if crown_pixels == 0:
+                    rows = np.flatnonzero(crown.any(axis=1))
+                    if rows.size == 0:
                         continue
-                    if (crown & taken).sum() >= canopy_overlap * crown_pixels:
-                        continue  # mostly the same trees as a more confident canopy: a duplicate
-                    canopy = crown_shape(crown, canopy_min_px)
-                    if canopy is None:
-                        continue
-                    center_col, center_row = canopy["center"]
-                    if already[int(center_row), int(center_col)]:
-                        continue  # the same crown was already kept from the neighbouring tile
-                    taken |= crown
-                    offset = np.array([x, y], dtype=np.float32)
-                    canopies.append({
-                        "cls": cls,
-                        "conf": score,
-                        "pixels": canopy["pixels"],
-                        "center": (x + center_col, y + center_row),
-                        "rings": [ring + offset for ring in canopy["rings"]],
+                    cols = np.flatnonzero(crown.any(axis=0))
+                    views.append({
+                        "cls": cls, "conf": score, "tile": tile_index, "window": (x, y, w, h),
+                        "x": x + int(cols[0]), "y": y + int(rows[0]),
+                        "mask": crown[rows[0]:rows[-1] + 1, cols[0]:cols[-1] + 1].copy(),
                     })
 
-            selected = region & (best_class >= 0)
-            class_map[y:y + h, x:x + w][selected] = (best_class[selected] + 1).astype(np.uint8)
-            conf_map[y:y + h, x:x + w][selected] = np.clip(np.rint(best_conf[selected] * 255), 1, 255).astype(np.uint8)
+            # Each pixel goes to the most confident detection of any tile covering it.
+            level = np.clip(np.rint(best_conf * 255), 1, 255).astype(np.uint8)
+            better = tile_valid & (best_class >= 0) & (level > conf_map[y:y + h, x:x + w])
+            class_map[y:y + h, x:x + w][better] = (best_class[better] + 1).astype(np.uint8)
+            conf_map[y:y + h, x:x + w][better] = level[better]
+
+    if canopies is not None:
+        canopies.extend(merge_canopy_views(views, height, width, canopy_min_px, canopy_overlap))
 
     return class_map, conf_map, len(windows)
+
+
+def _view_box(view: dict) -> tuple[int, int, int, int]:
+    """x0, y0, x1, y1 (exclusive) of a view's mask on the raster."""
+    height, width = view["mask"].shape
+    return view["x"], view["y"], view["x"] + width, view["y"] + height
+
+
+def _same_crown(a: dict, b: dict, min_iou: float) -> bool:
+    """Two views (from different tiles, same genus) of the same crown: inside the part of the raster both
+    tiles saw, their masks largely agree."""
+    ax, ay, aw, ah = a["window"]
+    bx, by, bw, bh = b["window"]
+    a0, a1, a2, a3 = _view_box(a)
+    b0, b1, b2, b3 = _view_box(b)
+    # Shared window, limited to where either mask has pixels.
+    x0, y0 = max(ax, bx, min(a0, b0)), max(ay, by, min(a1, b1))
+    x1, y1 = min(ax + aw, bx + bw, max(a2, b2)), min(ay + ah, by + bh, max(a3, b3))
+    if x0 >= x1 or y0 >= y1:
+        return False
+
+    def crop(view: dict) -> np.ndarray:
+        out = np.zeros((y1 - y0, x1 - x0), dtype=bool)
+        vx0, vy0, vx1, vy1 = _view_box(view)
+        sx0, sy0, sx1, sy1 = max(x0, vx0), max(y0, vy0), min(x1, vx1), min(y1, vy1)
+        if sx0 < sx1 and sy0 < sy1:
+            out[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = view["mask"][sy0 - vy0:sy1 - vy0, sx0 - vx0:sx1 - vx0]
+        return out
+
+    first, second = crop(a), crop(b)
+    union = int((first | second).sum())
+    return union > 0 and int((first & second).sum()) >= min_iou * union
+
+
+def merge_canopy_views(views: list[dict], height: int, width: int, min_px: int,
+                       duplicate_overlap: float, min_iou: float = 0.3) -> list[dict]:
+    """One canopy per crown from the detections of overlapping tiles.
+
+    Views of the same genus from different tiles that agree where both tiles looked are joined (their
+    masks united), so a crown on a tile border keeps its full outline. Then, most confident first, a
+    canopy mostly covered by kept ones (>= duplicate_overlap, any genus) is a duplicate and dropped.
+    (Letting weaker views complete a canopy was tried: it chains neighbouring stands into one blob.)
+    """
+    count = len(views)
+    parent = list(range(count))
+
+    def find(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    if count:
+        boxes = np.array([_view_box(view) for view in views], dtype=np.int64)
+        cls = np.array([view["cls"] for view in views])
+        tile = np.array([view["tile"] for view in views])
+        for index in range(count):
+            x0, y0, x1, y1 = boxes[index]
+            others = np.flatnonzero(
+                (np.arange(count) > index) & (cls == cls[index]) & (tile != tile[index])
+                & (boxes[:, 0] < x1) & (boxes[:, 2] > x0) & (boxes[:, 1] < y1) & (boxes[:, 3] > y0)
+            )
+            for other in others:
+                if find(index) != find(int(other)) and _same_crown(views[index], views[int(other)], min_iou):
+                    parent[find(int(other))] = find(index)
+
+    groups: dict[int, list[dict]] = {}
+    for index, view in enumerate(views):
+        groups.setdefault(find(index), []).append(view)
+
+    merged = []
+    for members in groups.values():
+        x0 = min(view["x"] for view in members)
+        y0 = min(view["y"] for view in members)
+        x1 = max(_view_box(view)[2] for view in members)
+        y1 = max(_view_box(view)[3] for view in members)
+        mask = np.zeros((y1 - y0, x1 - x0), dtype=bool)
+        for view in members:
+            vh, vw = view["mask"].shape
+            mask[view["y"] - y0:view["y"] - y0 + vh, view["x"] - x0:view["x"] - x0 + vw] |= view["mask"]
+        merged.append({"cls": members[0]["cls"], "conf": max(view["conf"] for view in members),
+                       "x": x0, "y": y0, "mask": mask})
+
+    taken = np.zeros((height, width), dtype=bool)  # pixels of the canopies kept so far
+    canopies = []
+    for item in sorted(merged, key=lambda entry: entry["conf"], reverse=True):
+        x0, y0, mask = item["x"], item["y"], item["mask"]
+        mh, mw = mask.shape
+        pixels = int(mask.sum())
+        if pixels == 0 or (mask & taken[y0:y0 + mh, x0:x0 + mw]).sum() >= duplicate_overlap * pixels:
+            continue  # mostly the same trees as a more confident canopy: a duplicate
+        shape = crown_shape(mask, min_px)
+        if shape is None:
+            continue
+        taken[y0:y0 + mh, x0:x0 + mw] |= mask
+        offset = np.array([x0, y0], dtype=np.float32)
+        center_col, center_row = shape["center"]
+        canopies.append({
+            "cls": item["cls"],
+            "conf": item["conf"],
+            "pixels": shape["pixels"],
+            "center": (x0 + center_col, y0 + center_row),
+            "rings": [ring + offset for ring in shape["rings"]],
+        })
+    return canopies
 
 
 def crown_shape(crown: np.ndarray, min_px: int) -> dict | None:
@@ -414,7 +585,7 @@ def load_label_map(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 def predict_genera(
     raster_path: Path,
-    weights_path: Path,
+    weights_path: Path | None,
     mask_path: Path | None,
     size: int,
     conf: float,
@@ -433,13 +604,25 @@ def predict_genera(
     canopy_conf: float | None = None,
     canopy_overlap: float = 0.5,
     areas_path: Path | None = None,
+    tile_overlap: int = 0,
+    roboflow: dict | None = None,
 ) -> dict:
-    import torch
-
+    """Run the canopy model over the raster: the local YOLO weights, or with `roboflow` (settings from
+    main(): names, api, output, parallel) the hosted Roboflow canopy Workflow."""
     Image.MAX_IMAGE_PIXELS = None
-    model = load_model(weights_path)
-    names = class_names(model)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    conf_floor = min(conf, prob_conf)
+    if roboflow is not None:
+        names = list(roboflow["names"])
+        device = "roboflow"
+        detect = roboflow_detector(names, size, conf_floor, roboflow["api"], roboflow.get("output"), roboflow["parallel"])
+        batch_size = max(batch_size, roboflow["parallel"])
+    else:
+        import torch
+
+        model = load_model(weights_path)
+        names = class_names(model)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        detect = yolo_detector(model, size, conf_floor, device)
 
     source = Image.open(raster_path)
     source.load()
@@ -474,9 +657,9 @@ def predict_genera(
     # keep, for the model's own extent, or to pinpoint every canopy.
     label_area = valid if (labels_out is not None or extent_out is not None or canopies is not None) else target
     class_map, conf_map, tiles = label_raster(
-        model, rgb, label_area, size, min(conf, prob_conf), batch_size, device, len(names),
+        detect, rgb, label_area, size, batch_size, len(names),
         canopies, canopy_min_px, conf if canopy_conf is None else canopy_conf,
-        target if has_target else None, canopy_overlap,
+        target if has_target else None, canopy_overlap, tile_overlap,
     )
     if labels_out is not None:
         save_label_map(labels_out, class_map, conf_map, valid)
@@ -607,6 +790,8 @@ def main() -> int:
     parser.add_argument("--areas", default=None,
                         help="Count inside these mangrove areas instead of a mask (JSON: rings, offset, raster position)")
     parser.add_argument("--size", type=int, default=640)
+    parser.add_argument("--overlap", type=int, default=0,
+                        help="Pixels neighbouring tiles overlap (--raster); crowns on tile borders are then joined")
     parser.add_argument("--conf", type=float, default=0.1)
     parser.add_argument("--batch", type=int, default=4)
     parser.add_argument("--prob-conf", type=float, default=0.01,
@@ -632,14 +817,44 @@ def main() -> int:
     parser.add_argument("--canopy-overlap", type=float, default=0.5,
                         help="Drop a canopy when this share of it is covered by more confident canopies (duplicates)")
     parser.add_argument("--canopy-max", type=int, default=3000, help="Keep at most this many canopies (largest first)")
+    # The hosted Roboflow canopy Workflow instead of --weights (--raster only). The API key is read from the
+    # ROBOFLOW_API_KEY environment variable only and sent as an Authorization: Bearer header.
+    parser.add_argument("--roboflow", action="store_true", help="Use the Roboflow canopy Workflow instead of --weights")
+    parser.add_argument("--rf-api-url", default=os.environ.get("ROBOFLOW_API_URL") or "https://serverless.roboflow.com")
+    parser.add_argument("--rf-workspace", default=os.environ.get("ROBOFLOW_WORKSPACE") or "denje-s-works")
+    parser.add_argument("--rf-workflow", default=os.environ.get("ROBOFLOW_GENUS_WORKFLOW") or DEFAULT_CANOPY_WORKFLOW)
+    parser.add_argument("--rf-output", default="", help="Workflow output name (default: auto-detect)")
+    parser.add_argument("--rf-classes", default=DEFAULT_CANOPY_CLASSES,
+                        help="Comma-separated genus classes of the workflow, in the order the genus map stores them")
+    parser.add_argument("--rf-parallel", type=int, default=4, help="Tiles sent to Roboflow at once")
+    parser.add_argument("--rf-request-timeout", type=float, default=60.0)
+    parser.add_argument("--rf-retries", type=int, default=3)
     args = parser.parse_args()
+
+    roboflow = None
+    if args.roboflow:
+        roboflow = {
+            "names": [c.strip() for c in args.rf_classes.split(",") if c.strip()],
+            "output": args.rf_output,
+            "parallel": max(1, args.rf_parallel),
+            "api": {
+                "api_key": os.environ.get("ROBOFLOW_API_KEY", "").strip(),
+                "workspace": args.rf_workspace,
+                "workflow_id": args.rf_workflow,
+                "api_url": args.rf_api_url,
+                "timeout": args.rf_request_timeout,
+                "retries": max(0, args.rf_retries),
+            },
+        }
 
     try:
         if args.recount:
             if not args.labels or not args.meta:
                 raise RuntimeError("--recount needs --labels and --meta.")
             result = recount(Path(args.labels), Path(args.meta), Path(args.recount), args.min_patch_m2)
-        elif not args.weights:
+        elif roboflow is not None and not args.raster:
+            raise RuntimeError("--roboflow works with --raster only.")
+        elif roboflow is None and not args.weights:
             raise RuntimeError("--weights is required.")
         elif args.validate_weights:
             model = load_model(Path(args.weights))
@@ -647,7 +862,7 @@ def main() -> int:
         else:
             result = predict_genera(
                 Path(args.raster),
-                Path(args.weights),
+                Path(args.weights) if args.weights else None,
                 Path(args.mask) if args.mask else None,
                 args.size,
                 args.conf,
@@ -666,9 +881,11 @@ def main() -> int:
                 args.canopy_conf,
                 args.canopy_overlap,
                 Path(args.areas) if args.areas else None,
+                args.overlap,
+                roboflow,
             )
     except Exception as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}), flush=True)
+        print(json.dumps({"ok": False, "error": str(exc), "error_type": type(exc).__name__}), flush=True)
         return 1
 
     print(json.dumps(result), flush=True)

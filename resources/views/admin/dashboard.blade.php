@@ -14,6 +14,8 @@
             <h1>Welcome back, {{ Auth::user()->name }}</h1>
             <p>Manage user accounts, oversee mangrove delineations and drone imagery, and keep the AI models running.</p>
         </div>
+
+        @include('partials.field-conditions-card')
     </div>
 
     <div class="grid cols-4">
@@ -410,6 +412,10 @@
         position: relative;
         overflow: hidden;
         box-shadow: 0 8px 24px rgba(22, 83, 55, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
     }
 
     .dash-hero::after {
@@ -425,6 +431,8 @@
     }
 
     .hero-content {
+        flex: 1 1 auto;
+        min-width: 0;
         position: relative;
         z-index: 1;
     }

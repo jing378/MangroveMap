@@ -1398,6 +1398,7 @@
                     <label for="txSize" class="tx-inline-label">Tile size</label>
                     <select id="txSize" class="tx-select tx-sort"></select>
                     <button type="button" class="tx-btn" id="txGenerate"></button>
+                    <button type="button" class="tx-btn" id="txDetect" hidden><i class="bi bi-stars"></i> Detect mangroves again</button>
                 </div>
             </div>
 

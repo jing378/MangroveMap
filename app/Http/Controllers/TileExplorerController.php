@@ -7,9 +7,11 @@ use App\Models\DroneImageryLayer;
 use App\Models\TileSet;
 use App\Models\TileSource;
 use App\Models\User;
+use App\Services\MangroveSegmentationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -55,6 +57,8 @@ class TileExplorerController extends Controller
                 'sources_url' => url('/tile-explorer/sources'),
                 'sets_url' => url('/tile-explorer/sets'),
                 'download_cookie' => self::DOWNLOAD_COOKIE,
+                // The model "Detect mangroves again" would use now.
+                'detection_model_label' => TileSource::areasModelLabel(app(MangroveSegmentationService::class)->extentModel()),
             ],
         ]);
     }
@@ -114,6 +118,45 @@ class TileExplorerController extends Controller
         }
 
         return response()->json($this->setSummary($tileSet->refresh()), $alreadyThere ? 200 : 202);
+    }
+
+    /**
+     * "Detect mangroves again": runs the current extent model (MangroveSegmentationService::extentModel) over
+     * the upload again and remakes every tile size with the new labels, one after another (GenerateTiles
+     * detects in the first job, because the source's areas are cleared here).
+     */
+    public function redetect(Request $request, int $sourceId): JsonResponse
+    {
+        $source = $this->source($request, $sourceId)->load('tileSets');
+        if ($source->tileSets->contains(fn (TileSet $set) => $set->isBusy())) {
+            return response()->json(['message' => 'Wait until the tiles are finished before detecting the mangroves again.'], 409);
+        }
+        if ($source->tileSets->isEmpty()) {
+            return response()->json(['message' => 'Make tiles from this GeoTIFF first.'], 422);
+        }
+
+        $sets = $source->tileSets->sortBy('tile_size')->values();
+        $disk = Storage::disk('local');
+        DB::transaction(function () use ($source, $sets) {
+            $source->update(['areas_status' => null, 'areas_error' => null, 'areas_model' => null]);
+            foreach ($sets as $set) {
+                $set->update(['status' => 'queued', 'error_message' => null]);
+            }
+        });
+        $disk->delete($source->areasPath());
+        foreach ($sets as $set) {
+            $disk->delete($set->directory().'/progress.json');
+        }
+
+        try {
+            Bus::chain($sets->map(fn (TileSet $set) => new GenerateTiles($set->id))->all())
+                ->onConnection('drone_imagery')->onQueue('drone-imagery')->dispatch();
+        } catch (Throwable $exception) {
+            TileSet::whereIn('id', $sets->pluck('id'))->update(['status' => 'failed', 'error_message' => 'Unable to queue tile generation. Please try again later.']);
+            Log::error('Unable to queue mangrove detection for Tile Explorer.', ['tile_source_id' => $source->id, 'exception' => $exception]);
+        }
+
+        return response()->json($this->sourcePayload($source->refresh()->load('tileSets')), 202);
     }
 
     public function destroySource(Request $request, int $sourceId): JsonResponse
@@ -315,6 +358,9 @@ class TileExplorerController extends Controller
             'height' => $source->height,
             'areas_status' => $source->areas_status,
             'areas_error' => $source->areas_status === 'failed' ? $this->friendlyAreasError($source->areas_error) : null,
+            // Which model labelled the tiles (null for uploads labelled before this was recorded).
+            'areas_model' => $source->areas_model,
+            'areas_model_label' => TileSource::areasModelLabel($source->areas_model),
             'uploaded_at' => $source->created_at?->toIso8601String(),
             'tile_sets' => $source->tileSets->sortBy('tile_size')->map(fn (TileSet $set) => $this->setSummary($set))->values(),
         ];

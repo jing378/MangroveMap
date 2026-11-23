@@ -10,6 +10,7 @@ use App\Models\TileSet;
 use App\Models\TileSource;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -309,6 +310,42 @@ class TileExplorerTest extends TestCase
         $this->assertDatabaseCount('tile_sources', 0);
         $this->assertDatabaseCount('tile_sets', 0);
         Storage::disk('local')->assertMissing($source->directory());
+    }
+
+    public function test_owner_can_detect_the_mangroves_again_which_remakes_every_tile_size(): void
+    {
+        Bus::fake();
+        config(['ml.drone.extent_model' => 'roboflow', 'ml.roboflow.api_key' => 'k']);
+        $owner = User::factory()->create();
+        $source = $this->source($owner);
+        $first = $this->readySet($source);
+        $second = $source->tileSets()->create(['tile_size' => 1024, 'status' => 'failed', 'error_message' => 'Old error']);
+        $source->update(['areas_status' => 'ready', 'areas_model' => 'unet']);
+        Storage::disk('local')->put($source->areasPath(), '{"type":"FeatureCollection","features":[]}');
+
+        $this->actingAs($owner)->get(route('tile-explorer.page'))
+            ->assertOk()->assertSee('Roboflow workflow')->assertSee('U-Net');
+
+        $this->actingAs(User::factory()->create())->postJson(route('tile-explorer.sources.detect', $source->id))->assertNotFound();
+
+        $first->update(['status' => 'processing']);
+        $this->actingAs($owner)->postJson(route('tile-explorer.sources.detect', $source->id))->assertConflict();
+        $first->update(['status' => 'ready']);
+
+        $this->postJson(route('tile-explorer.sources.detect', $source->id))
+            ->assertAccepted()
+            ->assertJsonPath('areas_status', null)
+            ->assertJsonPath('areas_model', null)
+            ->assertJsonPath('tile_sets.0.status', 'queued')
+            ->assertJsonPath('tile_sets.1.status', 'queued');
+
+        Storage::disk('local')->assertMissing($source->areasPath());
+        $this->assertNull($second->refresh()->error_message);
+        // One after another: the first job detects (the areas were cleared), the next ones reuse them.
+        Bus::assertChained([
+            fn (GenerateTiles $job) => $job->tileSetId === $first->id,
+            fn (GenerateTiles $job) => $job->tileSetId === $second->id,
+        ]);
     }
 
     public function test_crs_name_prefers_the_epsg_code(): void

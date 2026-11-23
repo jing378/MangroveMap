@@ -9,8 +9,8 @@ A web system for mapping and monitoring mangrove areas in **Southern Leyte, Phil
 - **Expert review:** experts approve or reject submissions. Residents can revise a rejected one within 7 days, and every revision is kept.
 - **Yearly observations and planting recommendations** for each mangrove area, recorded by experts.
 - **Drone imagery pipeline:** upload GeoTIFF orthomosaics. The system mosaics and tiles them with GDAL, then:
-  - a **U-Net** segmentation model detects the mangrove extent;
-  - a **YOLO** model suggests which genus is present.
+  - a **U-Net** segmentation model detects the mangrove extent (or, optionally, a hosted **Roboflow Workflow** with an RF-DETR segmentation model);
+  - a **YOLO** model (or, optionally, a hosted **Roboflow Workflow** with an RF-DETR instance segmentation model) pinpoints the canopies and suggests which genus is present.
 
   The owner corrects the detected areas, and the result becomes a delineation that goes through expert review.
 - **Roles:** resident, expert (applies with credentials, approved by an admin), and admin (users, AI models, map layers, feedback, activity log).
@@ -54,6 +54,14 @@ composer setup                      # install deps, create .env, generate key, m
    ```bash
    python -m venv ml/.venv
    ml/.venv/Scripts/pip install -r ml/requirements.txt      # Linux: ml/.venv/bin/pip
+   ```
+   To let the hosted Roboflow Workflow draw the mangrove areas instead of the U-Net, set `ML_DRONE_EXTENT_MODEL=roboflow` and `ROBOFLOW_API_KEY` (from app.roboflow.com/settings/api) in `.env`. If Roboflow fails, the U-Net is used. Check the connection with a live call on one image:
+   ```bash
+   ml/.venv/Scripts/python ml/smoke_roboflow.py path/to/tile.jpg
+   ```
+   Likewise `ML_GENUS_MODEL=roboflow` lets the hosted canopy Workflow (`mangrove-canopy-3-rfdetr-seg-small-t1…`, set by `ROBOFLOW_GENUS_WORKFLOW`) find the canopies and genus instead of the YOLO weights, which take over if it fails. Live check:
+   ```bash
+   ml/.venv/Scripts/python ml/smoke_roboflow_genus.py path/to/tile.jpg
    ```
 4. GDAL: on Windows, set `GDAL_QGIS_ENV` in `.env` if your QGIS version differs from the default in `config/gdal.php`. On Linux, set `GDAL_PYTHON` if `python3` is not the Python with GDAL.
 5. Email: fill in the `MAIL_*` settings (an SMTP account) so verification and review emails can be sent.
@@ -100,7 +108,7 @@ Format code with `vendor/bin/pint`.
 app/Http/Controllers     Resident, expert, admin, and drone imagery controllers
 app/Jobs                 Drone imagery processing, segmentation, and finalizing (queued)
 app/Services             GDAL runner, AI segmentation service, boundary lookup
-ml/                      predict.py (U-Net), predict_genus.py (YOLO), model weights
+ml/                      predict.py (U-Net), predict_genus.py (YOLO or the Roboflow canopy Workflow), predict_roboflow.py (Roboflow client + extent Workflow), model weights
 resources/views          Blade pages; most map code lives in resources/views/users/partials
 database/migrations      Schema
 tests/                   Feature and unit tests
