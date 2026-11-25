@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DroneImageryLayer;
 use App\Models\TileSet;
+use App\Services\DronePhotoGeoreferencer;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,17 +42,24 @@ class DroneImageryUploadController extends Controller
     {
         // purpose "tiles": one GeoTIFF for the Tile Explorer (TileExplorerController), not a drone survey.
         $forTiles = $request->input('purpose') === 'tiles';
+        // Drone surveys also take JPG/PNG drone photos and their location files (DronePhotoGeoreferencer).
+        $allowedNames = $forTiles ? '/\.tiff?$/i' : '/\.(tiff?|jpe?g|png|jgw|jpgw|jpegw|pgw|pngw|wld|prj|aux\.xml)$/i';
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:120'],
             'purpose' => ['nullable', 'in:drone,tiles'],
             'tile_size' => [$forTiles ? 'required' : 'nullable', 'integer', 'in:'.implode(',', TileSet::TILE_SIZES)],
-            'files' => ['required', 'array', 'min:1', 'max:'.($forTiles ? 1 : DroneImageryController::maxUploadFiles())],
-            'files.*.name' => ['required', 'string', 'max:255', 'regex:/\.tiff?$/i'],
+            'files' => ['required', 'array', 'min:1', 'max:'.($forTiles ? 1 : max(DroneImageryController::maxUploadFiles(), 3 * DroneImageryController::maxUploadPhotos()))],
+            'files.*.name' => ['required', 'string', 'max:255', 'regex:'.$allowedNames],
             'files.*.size' => ['required', 'integer', 'min:1', 'max:'.self::MAX_FILE_BYTES],
         ], [
-            'files.*.name.regex' => 'Only .tif or .tiff files can be uploaded.',
+            'files.*.name.regex' => $forTiles
+                ? 'Only .tif or .tiff files can be uploaded.'
+                : 'Only GeoTIFFs (.tif, .tiff) or drone photos (.jpg, .png, with their .jgw/.pgw/.wld/.prj files if they have any) can be uploaded.',
             'files.*.size.max' => 'Each file can be at most 1 GB.',
         ]);
+        if (! $forTiles) {
+            $this->validateDroneBatch(array_column($validated['files'], 'name'));
+        }
 
         self::pruneStaleSessions();
 
@@ -142,33 +150,60 @@ class DroneImageryUploadController extends Controller
             return $response;
         }
 
+        // Location files (.jgw, .prj, ...) are not images of the layer: they are stored next to their picture.
+        $images = array_filter($manifest['files'], fn (array $file) => DronePhotoGeoreferencer::kind($file['name']) !== 'sidecar');
+        $sidecars = array_diff_key($manifest['files'], $images);
+
         $movedPaths = [];
         try {
-            $layer = DB::transaction(function () use ($request, $manifest, $disk, $session, &$movedPaths) {
-                $files = $manifest['files'];
+            $layer = DB::transaction(function () use ($request, $manifest, $images, $sidecars, $disk, $session, &$movedPaths) {
                 $layer = DroneImageryLayer::create([
                     'user_id' => $request->user()->id,
                     'name' => $manifest['name'] ?: 'Drone imagery',
                     'status' => 'queued',
-                    'source_type' => count($files) > 1 ? 'batch' : 'single',
+                    'source_type' => count($images) > 1 ? 'batch' : 'single',
                 ]);
 
-                foreach ($files as $index => $file) {
-                    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) === 'tiff' ? 'tiff' : 'tif';
+                $pathByStem = [];
+                $sortOrder = 0;
+                foreach ($images as $index => $file) { // $index: the file's slot in the upload session
+                    $extension = match (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION))) {
+                        'tiff' => 'tiff',
+                        'jpg', 'jpeg' => 'jpg',
+                        'png' => 'png',
+                        default => 'tif',
+                    };
                     $storedPath = "drone-imagery/uploads/{$layer->id}/".Str::random(40).".{$extension}";
                     // Same disk: a rename, not a copy, so even 1 GB files are moved instantly.
                     if (! $disk->move("{$session}/{$index}.part", $storedPath)) {
-                        throw new RuntimeException('Unable to save an uploaded TIFF file.');
+                        throw new RuntimeException('Unable to save an uploaded file.');
                     }
                     $movedPaths[] = $storedPath;
+                    $pathByStem[DronePhotoGeoreferencer::stem($file['name'])] = $storedPath;
 
                     $layer->files()->create([
                         'original_name' => $file['name'],
                         'stored_path' => $storedPath,
-                        'mime_type' => 'image/tiff',
+                        'mime_type' => match ($extension) {
+                            'jpg' => 'image/jpeg',
+                            'png' => 'image/png',
+                            default => 'image/tiff',
+                        },
                         'file_size' => $file['size'],
-                        'sort_order' => $index,
+                        'sort_order' => $sortOrder++,
                     ]);
+                }
+
+                foreach ($sidecars as $index => $file) {
+                    $picturePath = $pathByStem[DronePhotoGeoreferencer::stem($file['name'])] ?? null;
+                    if ($picturePath === null) {
+                        continue; // start() refuses location files without their picture
+                    }
+                    $storedPath = DronePhotoGeoreferencer::sidecarPath($picturePath, $file['name']);
+                    if (! $disk->move("{$session}/{$index}.part", $storedPath)) {
+                        throw new RuntimeException('Unable to save an uploaded file.');
+                    }
+                    $movedPaths[] = $storedPath;
                 }
 
                 return $layer;
@@ -180,7 +215,7 @@ class DroneImageryUploadController extends Controller
 
         $disk->deleteDirectory($session);
 
-        return DroneImageryController::queueProcessing($layer, count($manifest['files']));
+        return DroneImageryController::queueProcessing($layer, count($images));
     }
 
     public function cancel(Request $request, string $uploadId): JsonResponse
@@ -210,6 +245,37 @@ class DroneImageryUploadController extends Controller
         }
 
         return $removed;
+    }
+
+    /**
+     * One drone upload is either GeoTIFFs or pictures (photos), each within its own limit, and every location
+     * file (.jgw, .prj, ...) belongs to a picture of the same name.
+     *
+     * @param  list<string>  $names
+     */
+    private function validateDroneBatch(array $names): void
+    {
+        $kinds = array_map(DronePhotoGeoreferencer::kind(...), $names);
+        $geotiffs = count(array_keys($kinds, 'geotiff', true));
+        $pictures = array_keys($kinds, 'picture', true);
+        $fail = fn (string $message) => throw ValidationException::withMessages(['files' => $message]);
+
+        if ($geotiffs > 0 && $pictures !== []) {
+            $fail('Upload GeoTIFFs and photos separately: one upload is either GeoTIFF files or photos.');
+        }
+        if ($geotiffs > DroneImageryController::maxUploadFiles()) {
+            $fail('Up to '.DroneImageryController::maxUploadFiles().' GeoTIFF files per upload.');
+        }
+        if (count($pictures) > DroneImageryController::maxUploadPhotos()) {
+            $fail('Up to '.DroneImageryController::maxUploadPhotos().' photos per upload. Upload the rest as another survey.');
+        }
+
+        $pictureStems = array_flip(array_map(fn (int $index) => DronePhotoGeoreferencer::stem($names[$index]), $pictures));
+        foreach (array_keys($kinds, 'sidecar', true) as $index) {
+            if (! isset($pictureStems[DronePhotoGeoreferencer::stem($names[$index])])) {
+                $fail("\"{$names[$index]}\" is a location file, but no photo with the same name is in this upload. Add the photo or remove the file.");
+            }
+        }
     }
 
     public static function chunkSize(): int

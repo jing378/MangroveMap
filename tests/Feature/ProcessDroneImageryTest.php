@@ -9,6 +9,7 @@ use App\Services\GdalCommandRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\DronePhotoFactory;
 use Tests\TestCase;
 
 class ProcessDroneImageryTest extends TestCase
@@ -158,6 +159,94 @@ class ProcessDroneImageryTest extends TestCase
             File::deleteDirectory($sourceDirectory);
             File::deleteDirectory(storage_path('app/private/drone-imagery-test-inputs'));
         }
+    }
+
+    public function test_drone_photos_are_placed_from_their_camera_data_with_the_top_edge_facing_the_heading(): void
+    {
+        $environmentScript = config('gdal.qgis_env');
+        if (! is_string($environmentScript) || ! is_file($environmentScript)) {
+            $this->markTestSkipped('QGIS GDAL is not installed in this test environment.');
+        }
+
+        Storage::fake('local');
+        config(['gdal.photo_resolution_m' => 0.02, 'gdal.photo_keep_fraction' => 0.8, 'ml.drone.auto_segment' => false]);
+        $localDisk = Storage::disk('local');
+        $lat = 10.3755;
+        $lng = 125.0144;
+
+        // Two neighbouring photos: one facing north, one facing east (DJI's rolled-over gimbal: yaw -90 + 180).
+        $layer = DroneImageryLayer::create(['name' => 'Photo test', 'status' => 'queued', 'source_type' => 'batch']);
+        foreach ([
+            'DJI_0001_V.JPG' => DronePhotoFactory::straightDown($lat, $lng),
+            'DJI_0002_V.JPG' => DronePhotoFactory::straightDown($lat, $lng + 0.0004, yaw: -90, roll: 180),
+        ] as $name => $xmp) {
+            $storedPath = "drone-imagery/uploads/{$layer->id}/".uniqid().'.jpg';
+            $localDisk->put($storedPath, DronePhotoFactory::jpeg($xmp));
+            $layer->files()->create([
+                'original_name' => $name,
+                'stored_path' => $storedPath,
+                'mime_type' => 'image/jpeg',
+                'file_size' => $localDisk->size($storedPath),
+                'sort_order' => $layer->files()->count(),
+            ]);
+        }
+
+        (new ProcessDroneImagery($layer->id))->handle(app(GdalCommandRunner::class));
+        $layer->refresh();
+
+        $this->assertSame('awaiting_review', $layer->status, $layer->error_message ?? '');
+        $this->assertSame('photos', $layer->metadata['source_format']);
+        $this->assertSame('photos', $layer->sourceFormat());
+
+        // 400 x 300 px at 0.1 m, centre 80% kept: the first photo covers 32 m east-west and 24 m north-south
+        // around the camera; the second is turned (24 m east-west, 32 m north-south), ~44 m further east.
+        $metresPerDegLat = 110_574;
+        $metresPerDegLng = 111_320 * cos(deg2rad($lat));
+        $this->assertEqualsWithDelta($lat + 16 / $metresPerDegLat, $layer->bounds['north'], 0.5 / $metresPerDegLat);
+        $this->assertEqualsWithDelta($lat - 16 / $metresPerDegLat, $layer->bounds['south'], 0.5 / $metresPerDegLat);
+        $this->assertEqualsWithDelta($lng - 16 / $metresPerDegLng, $layer->bounds['west'], 0.5 / $metresPerDegLng);
+        $this->assertEqualsWithDelta($lng + 0.0004 + 12 / $metresPerDegLng, $layer->bounds['east'], 0.5 / $metresPerDegLng);
+
+        // The red top half lands north of the first camera and east of the second.
+        $mosaic = $localDisk->path($layer->mosaic_path);
+        $colourAt = fn (float $y, float $x) => array_map('intval', preg_split('/\s+/', trim(app(GdalCommandRunner::class)->run(
+            ['gdallocationinfo', '-valonly', '-wgs84', $mosaic, (string) $x, (string) $y],
+            dirname($mosaic),
+            30,
+        ))));
+        $isRed = fn (array $rgba) => $rgba[0] > 150 && $rgba[2] < 100;
+        $isBlue = fn (array $rgba) => $rgba[2] > 150 && $rgba[0] < 100;
+        $this->assertTrue($isRed($colourAt($lat + 6 / $metresPerDegLat, $lng)));
+        $this->assertTrue($isBlue($colourAt($lat - 6 / $metresPerDegLat, $lng)));
+        $this->assertTrue($isRed($colourAt($lat, $lng + 0.0004 + 6 / $metresPerDegLng)));
+        $this->assertTrue($isBlue($colourAt($lat, $lng + 0.0004 - 6 / $metresPerDegLng)));
+    }
+
+    public function test_a_picture_without_camera_data_or_world_file_fails_with_a_reason(): void
+    {
+        $environmentScript = config('gdal.qgis_env');
+        if (! is_string($environmentScript) || ! is_file($environmentScript)) {
+            $this->markTestSkipped('QGIS GDAL is not installed in this test environment.');
+        }
+
+        Storage::fake('local');
+        $localDisk = Storage::disk('local');
+        $layer = DroneImageryLayer::create(['name' => 'Plain picture', 'status' => 'queued', 'source_type' => 'single']);
+        $storedPath = "drone-imagery/uploads/{$layer->id}/plain.jpg";
+        $localDisk->put($storedPath, DronePhotoFactory::jpeg([]));
+        $layer->files()->create([
+            'original_name' => 'holiday.jpg',
+            'stored_path' => $storedPath,
+            'mime_type' => 'image/jpeg',
+            'file_size' => $localDisk->size($storedPath),
+            'sort_order' => 0,
+        ]);
+
+        (new ProcessDroneImagery($layer->id))->handle(app(GdalCommandRunner::class));
+        $layer->refresh();
+
+        $this->assertSame('failed', $layer->status);
+        $this->assertStringContainsString('holiday.jpg has no location', $layer->error_message);
     }
 
     /**

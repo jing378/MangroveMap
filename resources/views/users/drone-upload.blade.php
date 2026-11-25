@@ -157,6 +157,22 @@
             gap: 10px;
         }
 
+        /* Photo uploads: how photos are placed, and why a mix of files cannot be uploaded. */
+        .drone-files-note {
+            margin: 8px 0 0;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: var(--bg-edf7f2, #edf7f2);
+            color: var(--fg-4c6b5d, #4c6b5d);
+            font-size: 12.5px;
+            line-height: 1.45;
+        }
+
+        .drone-files-note.is-error {
+            background: var(--bg-fef3f2, #fef3f2);
+            color: var(--fg-b42318, #b42318);
+        }
+
         .drone-files-clear {
             flex: none;
             padding: 4px 10px;
@@ -560,11 +576,11 @@
 @section('content')
     <main class="drone-upload-page">
         <h1>Drone Upload</h1>
-        <p class="drone-upload-sub">Upload georeferenced drone orthomosaics (GeoTIFF). Each upload is checked by the AI and
-            reviewed by you before it is placed on the map.</p>
+        <p class="drone-upload-sub">Upload georeferenced drone orthomosaics (GeoTIFF), or the drone's own photos (JPG) taken
+            straight down. Each upload is checked by the AI and reviewed by you before it is placed on the map.</p>
 
         <ol class="drone-flow" aria-label="How drone uploads work">
-            <li>Upload GeoTIFF</li>
+            <li>Upload GeoTIFF or photos</li>
             <li>Preview is prepared</li>
             <li>AI detects mangroves</li>
             <li>You remove non-mangrove areas</li>
@@ -578,12 +594,14 @@
                     <label for="droneUploadName">Survey name</label>
                     <input id="droneUploadName" name="name" type="text" maxlength="120" placeholder="e.g. Brgy. San Isidro, March 2026">
 
-                    <label for="droneUploadFiles">GeoTIFF files</label>
+                    <label for="droneUploadFiles">GeoTIFF files or drone photos</label>
                     <label class="drone-drop" id="droneUploadDrop">
                         <i class="bi bi-cloud-arrow-up"></i>
-                        <strong>Drop GeoTIFF files here or click to add</strong>
-                        <span>.tif / .tiff, 8-bit RGB orthomosaic · up to {{ $page['max_files'] }} files per upload, {{ \Illuminate\Support\Number::fileSize($page['max_file_bytes']) }} each</span>
-                        <input id="droneUploadFiles" name="files[]" type="file" accept=".tif,.tiff,image/tiff" multiple required>
+                        <strong>Drop GeoTIFF files or drone photos here or click to add</strong>
+                        <span>.tif / .tiff 8-bit RGB orthomosaic (up to {{ $page['max_files'] }} files) or .jpg / .png drone
+                            photos with GPS (up to {{ $page['max_photos'] }}) · {{ \Illuminate\Support\Number::fileSize($page['max_file_bytes']) }} each</span>
+                        <input id="droneUploadFiles" name="files[]" type="file"
+                            accept=".tif,.tiff,image/tiff,.jpg,.jpeg,.png,image/jpeg,image/png,.jgw,.jpgw,.pgw,.pngw,.wld,.prj,.xml" multiple required>
                     </label>
                     <div id="droneUploadSelected" class="drone-files" aria-live="polite"></div>
 

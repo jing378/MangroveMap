@@ -124,8 +124,10 @@ class MapMangroveHistoryTest extends TestCase
             ->assertSee('id="mangroveHistoryRange"', false)
             ->assertSee('Mangroves mapped by year')
             ->assertSee('window.refreshMapTimeline', false)
-            ->assertDontSee('Global Mangrove Watch v4.1')
-            ->assertDontSee(route('map.mangrove-history'), false);
+            ->assertDontSee('Mangrove extent by year')
+            // The satellite only appears through the card's own "Compare with previous data" switch, off by default.
+            ->assertSee('id="mangroveHistorySatToggle"', false)
+            ->assertSee('<div class="mh-sat" id="mangroveHistorySat" hidden', false);
 
         config(['map.mangrove_history.enabled' => true]);
 

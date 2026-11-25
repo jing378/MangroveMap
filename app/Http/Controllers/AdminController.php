@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\UserActivity;
 use App\Notifications\ExpertApplicationReviewed;
 use App\Services\ApprovedCoverageStats;
+use App\Services\MangroveComparison;
 use App\Services\MangroveSegmentationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class AdminController extends Controller
 
     private const TODAY_USERS_LIMIT = 25;
 
-    public function dashboard(ApprovedCoverageStats $coverage)
+    public function dashboard(ApprovedCoverageStats $coverage, MangroveComparison $comparison)
     {
         abort_if(Auth::user()->role !== 'admin', 403);
 
@@ -114,6 +115,8 @@ class AdminController extends Controller
             ->each->mergeCasts(['last_submitted_at' => 'datetime']);
 
         return view('admin.dashboard', [
+            // "Compared with official figures": PSA/provincial totals, satellite per municipality, AI accuracy.
+            'comparison' => $comparison->summary(),
             'totalUsers' => $totalUsers,
             'newUsersThisMonth' => $newUsersThisMonth,
             'expertCount' => $expertCount,

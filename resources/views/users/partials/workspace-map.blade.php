@@ -1,3 +1,4 @@
+@include('partials.genus-info')
 <div class="enduser-workspace">
     <!-- COVERAGE MAP -->
     <div class="view on" id="v-map">
@@ -131,7 +132,7 @@
               <div class="d-row"><span class="d-key"><i class="bi bi-layers-fill" aria-hidden="true"></i> Source</span><span class="d-val" id="delineationFeatureType">-</span></div>
               <div class="d-row"><span class="d-key"><i class="bi bi-rulers" aria-hidden="true"></i> Area (ha)</span><span class="d-val" id="delineationFeatureArea">-</span></div>
               <div class="d-row d-row-wide"><span class="d-key"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> Location</span><span class="d-val" id="delineationFeatureLocation">-</span></div>
-              <div class="d-row d-row-wide d-row-genera" style="display:none;"><span class="d-key"><i class="bi bi-tree-fill" aria-hidden="true"></i> Mangrove Genus Present</span><span class="d-val" id="delineationFeatureGenera">None recorded</span></div>
+              <div class="d-row d-row-wide d-row-genera" style="display:none;"><span class="d-key"><i class="bi bi-tree-fill" aria-hidden="true"></i> Mangrove Genus Present</span><div class="d-val" id="delineationFeatureGenera">None recorded</div></div>
               <div class="d-row"><span class="d-key"><i class="bi bi-person-fill" aria-hidden="true"></i> Delineated by</span><span class="d-val" id="delineationCreatedBy">-</span></div>
               <div class="d-row"><span class="d-key"><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Review status</span><span class="d-val" id="delineationReviewStatus">-</span></div>
               <div class="d-row d-row-wide d-row-recommendation"><span class="d-key"><i class="bi bi-flower1" aria-hidden="true"></i> Planting recommendation</span><span class="d-val" id="delineationPlantingRecommendation" style="white-space:pre-line;overflow-wrap:anywhere;">No recommendation provided</span></div>
@@ -147,14 +148,15 @@
             <div id="delineationGenusEditor" class="d-field">
               <span class="d-field-label"><i class="bi bi-tree-fill" aria-hidden="true"></i> Mangrove Genus Present <em class="is-required">required</em></span>
               <div id="genusQuickSelector" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-                <button type="button" class="genus-pill-btn" data-genus="Rhizophora" onclick="toggleGenusSelection('Rhizophora')"><i class="bi bi-plus"></i> Rhizophora <span class="genus-local-name">(Bakawan)</span></button>
-                <button type="button" class="genus-pill-btn" data-genus="Avicennia" onclick="toggleGenusSelection('Avicennia')"><i class="bi bi-plus"></i> Avicennia <span class="genus-local-name">(Bungalon)</span></button>
-                <button type="button" class="genus-pill-btn" data-genus="Sonneratia" onclick="toggleGenusSelection('Sonneratia')"><i class="bi bi-plus"></i> Sonneratia <span class="genus-local-name">(Pagatpat)</span></button>
-                <button type="button" class="genus-pill-btn" data-genus="Bruguiera" onclick="toggleGenusSelection('Bruguiera')"><i class="bi bi-plus"></i> Bruguiera <span class="genus-local-name">(Miapi)</span></button>
-                <button type="button" class="genus-pill-btn" data-genus="Ceriops" onclick="toggleGenusSelection('Ceriops')"><i class="bi bi-plus"></i> Ceriops <span class="genus-local-name">(Tungog)</span></button>
-                <button type="button" class="genus-pill-btn" data-genus="Xylocarpus" onclick="toggleGenusSelection('Xylocarpus')"><i class="bi bi-plus"></i> Xylocarpus <span class="genus-local-name">(Tabigi)</span></button>
-                <button type="button" class="genus-pill-btn" data-genus="Nypa" onclick="toggleGenusSelection('Nypa')"><i class="bi bi-plus"></i> Nypa <span class="genus-local-name">(Nipa/Sasa)</span></button>
+                @foreach(\App\Support\MangroveGenera::INFO as $genus => $genusInfo)
+                  <span class="genus-pick">
+                    <button type="button" class="genus-pill-btn" data-genus="{{ $genus }}" onclick="toggleGenusSelection('{{ $genus }}')"><i class="bi bi-plus"></i> {{ $genus }} <span class="genus-local-name">({{ $genusInfo['local'] }})</span></button>
+                    <button type="button" class="genus-info-btn" data-genus-info="{{ $genus }}" aria-label="What does {{ $genus }} look like?" title="What does it look like?"><i class="bi bi-info-circle"></i></button>
+                  </span>
+                @endforeach
               </div>
+              <div id="genusPickerInfo" hidden style="margin:-2px 0 8px;"></div>
+              <script>GenusInfo.bindInfoButtons(document.getElementById('genusQuickSelector'), document.getElementById('genusPickerInfo'));</script>
               <div style="display:flex;gap:6px;">
                 <input id="delineationCustomGenusInput" type="text"
                   style="flex:1;padding:8px 10px;border:1px solid var(--bd-d4dfd4, #d4dfd4);border-radius:8px;background:var(--bg-f8faf7, #f8faf7);color:var(--fg-182918, #182918);font-size:12px;"
@@ -351,6 +353,63 @@
               <div class="sec">Annual observations</div>
               <p class="timeline-history-caption">Recorded history for this delineated area.</p>
               <div class="temporal-epoch-list" id="temporalEpochList"></div>
+              {{-- Previous data: the satellite's mangrove hectares inside this area's boundary, every year since
+                   1985 (annual-observations' previousData), so the area can be compared with what came before. --}}
+              <div class="timeline-previous" id="timelinePrevious" hidden>
+                <div class="div"></div>
+                <div class="sec">Previous data and now</div>
+                <p class="timeline-history-caption" id="timelinePreviousCaption"></p>
+                {{-- One timeline, two series kept apart: previous data (satellite, up to its latest year) in amber, then
+                     MangroveMap's own figure for the area (from the year it was added) in green, with a break between.
+                     Pick or play a year: satellite years show that year's previous data on the map, later years only
+                     the mapped boundary. --}}
+                {{-- Year filter: the timeline, chart and table cover only these years. --}}
+                <div class="timeline-previous-years">
+                  Years
+                  <select id="timelinePreviousFrom" aria-label="Show from year"></select>
+                  to
+                  <select id="timelinePreviousTo" aria-label="Show to year"></select>
+                </div>
+                <div class="timeline-previous-scrub">
+                  <button type="button" class="timeline-previous-play" id="timelinePreviousPlay" aria-label="Play through the years" title="Play through the years">
+                    <i class="bi bi-play-fill"></i>
+                  </button>
+                  <span class="timeline-previous-readout" aria-live="polite">
+                    <strong id="timelinePreviousYear">-</strong>
+                    <span id="timelinePreviousHa">-</span>
+                  </span>
+                </div>
+                <div class="timeline-previous-chart" id="timelinePreviousChart" title="">
+                  <svg viewBox="0 0 300 48" preserveAspectRatio="none" aria-hidden="true">
+                    <path class="timeline-previous-fill" id="timelinePreviousFill" d=""></path>
+                    <path class="timeline-previous-line" id="timelinePreviousLine" d="" vector-effect="non-scaling-stroke"></path>
+                    <line class="timeline-previous-break" id="timelinePreviousBreak" y1="0" y2="48" vector-effect="non-scaling-stroke"></line>
+                    <path class="timeline-mapped-line" id="timelineMappedLine" d="" vector-effect="non-scaling-stroke"></path>
+                    <g id="timelineMappedDots"></g>
+                    <line class="timeline-previous-cursor" id="timelinePreviousCursor" y1="0" y2="48" vector-effect="non-scaling-stroke"></line>
+                  </svg>
+                  <span class="timeline-previous-dot" id="timelinePreviousDot"></span>
+                </div>
+                <input type="range" class="timeline-previous-range" id="timelinePreviousRange" min="0" max="0" step="1" value="0" aria-label="Year">
+                <div class="timeline-previous-axis" aria-hidden="true"><span id="timelinePreviousFirst"></span><span id="timelinePreviousLast"></span></div>
+                <div class="timeline-previous-legend" aria-hidden="true">
+                  <span><i class="timeline-swatch timeline-swatch-previous"></i> Previous data (satellite, ~30 m)</span>
+                  <span><i class="timeline-swatch timeline-swatch-mapped"></i> MangroveMap (surveyed)</span>
+                </div>
+                <details class="timeline-previous-table">
+                  <summary>Year by year</summary>
+                  <div class="timeline-previous-scroll">
+                    <table>
+                      <thead><tr><th scope="col">Year</th><th scope="col">Previous data (ha)</th><th scope="col">MangroveMap (ha)</th></tr></thead>
+                      <tbody id="timelinePreviousRows"></tbody>
+                    </table>
+                  </div>
+                </details>
+                <button type="button" class="timeline-previous-btn" id="timelinePreviousShow">
+                  <i class="bi bi-layers"></i> Compare with previous data on the map
+                </button>
+                <p class="timeline-previous-source" id="timelinePreviousSource"></p>
+              </div>
             </div>
           </section>
         </div>

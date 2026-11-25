@@ -54,6 +54,7 @@ class DroneImageryController extends Controller
         $layers = $this->visibleLayersQuery($viewer)
             ->whereDoesntHave('hiddenByUsers', fn (Builder $query) => $query->whereKey($viewer->id))
             ->with(['user:id,name,role', 'delineation:id,drone_imagery_layer_id,is_approved,is_rejected,rejection_notes'])
+            ->withExists('photoFiles')
             ->latest()
             ->get();
 
@@ -66,6 +67,8 @@ class DroneImageryController extends Controller
                 'is_owner' => (int) $layer->user_id === (int) $viewer->id,
                 'status' => $layer->status,
                 'source_type' => $layer->source_type,
+                // "photos": made from drone photos placed one by one (DronePhotoGeoreferencer), else GeoTIFFs.
+                'source_format' => $layer->sourceFormat(),
                 'bounds' => $layer->status === 'ready' ? $layer->bounds : null,
                 'zoom_min' => $layer->zoom_min,
                 'zoom_max' => $layer->zoom_max,
@@ -502,6 +505,12 @@ class DroneImageryController extends Controller
         return $phpLimit > 0 ? min($appLimit, $phpLimit) : $appLimit;
     }
 
+    /** Drone photos (JPG/PNG) per upload. Chunked uploads only, so PHP's max_file_uploads does not cap it. */
+    public static function maxUploadPhotos(): int
+    {
+        return max(1, (int) config('gdal.max_upload_photos', 500));
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -628,6 +637,7 @@ class DroneImageryController extends Controller
                 // Experts also get a list of everyone else's uploads (residents and other experts).
                 'shows_others' => $viewer->isExpert(),
                 'max_files' => self::maxUploadFiles(),
+                'max_photos' => self::maxUploadPhotos(),
                 // Per file (the chunked upload's limit), checked before anything is sent.
                 'max_file_bytes' => DroneImageryUploadController::MAX_FILE_BYTES,
                 'highlight_id' => $request->integer('layer') ?: null,

@@ -52,7 +52,7 @@ class SegmentDroneImagery implements ShouldQueue
         $gdalTimeout = (int) config('gdal.timeout');
 
         // New areas: the genus classified for the old ones no longer applies.
-        $localDisk->delete([$layer->genusLabelsPath(), $layer->genusLabelsMetaPath(), $layer->canopiesPath()]);
+        $localDisk->delete([$layer->genusLabelsPath(), $layer->genusLabelsMetaPath(), $layer->canopiesPath(), $layer->aiOriginalExtentPath()]);
         $layer->update([
             'segmentation_status' => 'processing',
             'segmentation_error' => null,
@@ -129,10 +129,13 @@ class SegmentDroneImagery implements ShouldQueue
                 'edited' => false,
             ];
 
-            $localDisk->put($resultRelativePath, json_encode([
+            $result = json_encode([
                 'features' => $built['features'],
                 'stats' => $stats,
-            ], JSON_UNESCAPED_SLASHES));
+            ], JSON_UNESCAPED_SLASHES);
+            $localDisk->put($resultRelativePath, $result);
+            // Untouched copy for the accuracy check: the owner's corrections overwrite ai_extent.json.
+            $localDisk->put($layer->aiOriginalExtentPath(), $result);
 
             $layer->update([
                 'segmentation_status' => 'ready',

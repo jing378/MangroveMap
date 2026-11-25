@@ -243,6 +243,12 @@
         </div>
     </div>
 
+    @include('partials.mangrove-comparison', [
+        'comparison' => $comparison,
+        'cardClass' => 'section',
+        'showSurveys' => true,
+    ])
+
     <div class="section" id="today-users">
         <div class="section-title"><i class="bi bi-calendar-check"></i> Today
             <span class="section-note">{{ now($todayTimezone)->format('F j, Y') }}</span>

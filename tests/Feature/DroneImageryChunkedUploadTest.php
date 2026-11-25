@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\DroneImageryUploadController;
 use App\Jobs\ProcessDroneImagery;
 use App\Models\DroneImageryLayer;
+use App\Models\TileSet;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -124,7 +125,7 @@ class DroneImageryChunkedUploadTest extends TestCase
         config(['gdal.max_upload_files' => 2]);
 
         $this->actingAs($user)->postJson(route('drone-imagery.uploads.start'), [
-            'files' => [['name' => 'photo.jpg', 'size' => 10]],
+            'files' => [['name' => 'notes.txt', 'size' => 10]],
         ])->assertUnprocessable()->assertJsonValidationErrors('files.0.name');
 
         $this->postJson(route('drone-imagery.uploads.start'), [
@@ -134,6 +135,64 @@ class DroneImageryChunkedUploadTest extends TestCase
         $this->postJson(route('drone-imagery.uploads.start'), [
             'files' => array_fill(0, 3, ['name' => 'a.tif', 'size' => 10]),
         ])->assertUnprocessable()->assertJsonValidationErrors('files');
+    }
+
+    public function test_drone_photos_are_stored_with_their_location_files_next_to_them(): void
+    {
+        $user = User::factory()->create();
+        $photo = random_bytes(300);
+        $worldFile = "0.1\n0\n0\n-0.1\n720500\n1147650\n";
+        $tile = random_bytes(200);
+        $id = $this->startUpload($user, [
+            'DJI_0001_V.JPG' => $photo,
+            'tile.jgw' => $worldFile,
+            'tile.jpg' => $tile,
+        ], 'Photo survey');
+
+        $this->putChunk($id, 0, 0, $photo)->assertOk();
+        $this->putChunk($id, 1, 0, $worldFile)->assertOk();
+        $this->putChunk($id, 2, 0, $tile)->assertOk();
+
+        // Location files are not images of the layer: two pictures, one batch.
+        $this->postJson("/drone-imagery/uploads/{$id}/complete")->assertAccepted()
+            ->assertJsonPath('source_type', 'batch')
+            ->assertJsonPath('file_count', 2);
+
+        $layer = DroneImageryLayer::with('files')->sole();
+        $this->assertSame(['DJI_0001_V.JPG', 'tile.jpg'], $layer->files->pluck('original_name')->all());
+        $this->assertSame(['image/jpeg', 'image/jpeg'], $layer->files->pluck('mime_type')->all());
+        $tilePath = $layer->files[1]->stored_path;
+        $this->assertStringEndsWith('.jpg', $tilePath);
+        // GDAL finds the world file because it has the stored picture's name.
+        $this->assertSame($worldFile, Storage::disk('local')->get(substr($tilePath, 0, -4).'.jgw'));
+        Queue::assertPushedOn('drone-imagery', ProcessDroneImagery::class);
+    }
+
+    public function test_start_refuses_geotiffs_mixed_with_photos_and_location_files_without_their_photo(): void
+    {
+        $user = User::factory()->create();
+        $start = fn (array $names) => $this->actingAs($user)->postJson(route('drone-imagery.uploads.start'), [
+            'files' => array_map(fn (string $name) => ['name' => $name, 'size' => 10], $names),
+        ]);
+
+        $start(['ortho.tif', 'DJI_0001_V.JPG'])->assertUnprocessable()
+            ->assertJsonPath('errors.files.0', 'Upload GeoTIFFs and photos separately: one upload is either GeoTIFF files or photos.');
+        $start(['DJI_0001_V.JPG', 'other.jgw'])->assertUnprocessable()->assertJsonValidationErrors('files');
+
+        config(['gdal.max_upload_photos' => 2]);
+        $start(['a.jpg', 'b.jpg', 'c.jpg'])->assertUnprocessable()->assertJsonValidationErrors('files');
+        $start(['a.jpg', 'b.png', 'b.pgw'])->assertCreated();
+    }
+
+    public function test_tile_explorer_uploads_still_take_geotiffs_only(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->postJson(route('drone-imagery.uploads.start'), [
+            'purpose' => 'tiles',
+            'tile_size' => TileSet::TILE_SIZES[0],
+            'files' => [['name' => 'DJI_0001_V.JPG', 'size' => 10]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('files.0.name');
     }
 
     public function test_other_users_cannot_touch_an_upload_session(): void

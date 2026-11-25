@@ -261,9 +261,8 @@
         if (!currentSelectedGenera.length) {
           displayEl.innerHTML = '<span style="color:#9ab0a0;font-weight:400;font-style:italic;">None recorded</span>';
         } else {
-          displayEl.innerHTML = currentSelectedGenera
-            .map(g => `<span class="genus-tag">${getGenusDisplayLabel(g)}</span>`)
-            .join(' ');
+          // Clicking a genus shows its sample photo and description (partials/genus-info).
+          displayEl.replaceChildren(...GenusInfo.chips(currentSelectedGenera));
         }
       }
 
@@ -3582,8 +3581,245 @@
       return !!document.getElementById('delineationToolbar')?.classList.contains('active');
     }
 
+    // "Previous data and now" in Changes over time: one timeline with two series kept apart, the satellite's
+    // mangrove hectares inside the area each year (annual-observations' previousData, amber) and then
+    // MangroveMap's own figure for it from the year it was added (`mapped`, plus any expert observations, green),
+    // with a dashed break where the method changes. Hidden while loading, without the satellite data, or with no
+    // area selected. One year at a time (slider, play, or the chart); once the user picks a year the map
+    // follows: satellite years show that year's previous data (window.showPreviousDataYear in
+    // map-timeline-scripts), later years only the mapped boundary.
+    // from / to: the year filter (null = every year); args: the last data, to redraw when the filter changes.
+    const previousTimeline = { rows: [], index: 0, points: [], timer: null, from: null, to: null, args: null };
+    const formatPreviousHa = value => new Intl.NumberFormat(undefined, { maximumFractionDigits: value < 10 ? 2 : 1 }).format(value);
+
+    function stopPreviousPlay() {
+      if (previousTimeline.timer) clearInterval(previousTimeline.timer);
+      previousTimeline.timer = null;
+      const play = document.getElementById('timelinePreviousPlay');
+      if (play) {
+        play.querySelector('i').className = 'bi bi-play-fill';
+        play.setAttribute('aria-label', 'Play through the years');
+      }
+    }
+
+    // showOnMap: the user chose this year, so the map follows (not on first load).
+    function selectPreviousYear(index, showOnMap = true) {
+      const { rows, points } = previousTimeline;
+      if (!rows.length) return;
+      const next = Math.max(0, Math.min(rows.length - 1, Number(index) || 0));
+      previousTimeline.index = next;
+      const row = rows[next];
+      const parts = [];
+      if (row.previous !== null) parts.push(`previous data ${formatPreviousHa(row.previous)} ha`);
+      if (row.mapped !== null) parts.push(`MangroveMap ${formatPreviousHa(row.mapped)} ha${row.pending ? ' (awaiting review)' : ''}`);
+      document.getElementById('timelinePreviousYear').textContent = row.year;
+      document.getElementById('timelinePreviousHa').textContent = parts.join(' · ') || 'no record';
+      const range = document.getElementById('timelinePreviousRange');
+      range.value = next;
+      range.setAttribute('aria-valuetext', `${row.year}: ${parts.join(', ') || 'no record'}`);
+      const [x, y] = points[next];
+      const cursor = document.getElementById('timelinePreviousCursor');
+      cursor.setAttribute('x1', x);
+      cursor.setAttribute('x2', x);
+      const dot = document.getElementById('timelinePreviousDot');
+      dot.style.left = `${x / 300 * 100}%`;
+      dot.style.top = `${y / 48 * 100}%`;
+      dot.style.background = row.mapped !== null ? '#1e9e62' : '#c98f00';
+      // Years after the satellite's latest: no previous data on the map, only the mapped boundary.
+      if (showOnMap) window.showPreviousDataYear?.(row.year, { exact: true });
+    }
+
+    function startPreviousPlay() {
+      const count = previousTimeline.rows.length;
+      if (count < 2) return;
+      if (previousTimeline.index >= count - 1) selectPreviousYear(0);
+      const play = document.getElementById('timelinePreviousPlay');
+      play.querySelector('i').className = 'bi bi-pause-fill';
+      play.setAttribute('aria-label', 'Pause');
+      previousTimeline.timer = setInterval(() => {
+        if (previousTimeline.index >= previousTimeline.rows.length - 1) return stopPreviousPlay();
+        selectPreviousYear(previousTimeline.index + 1);
+      }, 700);
+    }
+
+    (function bindPreviousTimeline() {
+      const range = document.getElementById('timelinePreviousRange');
+      const play = document.getElementById('timelinePreviousPlay');
+      const chart = document.getElementById('timelinePreviousChart');
+      if (!range || !play || !chart) return;
+      range.addEventListener('input', () => {
+        stopPreviousPlay();
+        selectPreviousYear(range.value);
+      });
+      play.addEventListener('click', () => (previousTimeline.timer ? stopPreviousPlay() : startPreviousPlay()));
+      const indexAt = event => {
+        const box = chart.getBoundingClientRect();
+        const share = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
+        return Math.round(share * (previousTimeline.rows.length - 1));
+      };
+      let dragging = false;
+      chart.addEventListener('pointerdown', event => {
+        dragging = true;
+        chart.setPointerCapture(event.pointerId);
+        stopPreviousPlay();
+        selectPreviousYear(indexAt(event));
+      });
+      chart.addEventListener('pointermove', event => { if (dragging) selectPreviousYear(indexAt(event)); });
+      chart.addEventListener('pointerup', () => { dragging = false; });
+      chart.addEventListener('pointercancel', () => { dragging = false; });
+    })();
+
+    // MangroveMap's figure for the area in a year: that year's expert observation (or the latest before it),
+    // the current boundary for this year and when there is none; null before the area was added.
+    function mappedHectaresIn(year, mapped, observations, currentYear) {
+      if (!mapped || year < Number(mapped.since)) return null;
+      if (year >= currentYear) return Number(mapped.areaHa) || 0;
+      const before = observations.filter(item => Number(item.year) <= year);
+      if (before.length) return Number(before[before.length - 1].coverageAreaHa) || 0;
+      return Number(mapped.areaHa) || 0;
+    }
+
+    // keepRange: redrawn for the year filter (a new area starts with every year).
+    function renderPreviousData(previous, mapped = null, coverage = [], keepRange = false) {
+      const section = document.getElementById('timelinePrevious');
+      if (!section) return;
+      stopPreviousPlay();
+      previousTimeline.args = [previous, mapped, coverage];
+      if (!keepRange) previousTimeline.from = previousTimeline.to = null;
+      const satellite = Array.isArray(previous?.years) ? previous.years : [];
+      // Another area (or none): the map's previous data goes back to following the year card.
+      if (previousTimeline.rows.length) window.showPreviousDataYear?.(null);
+      previousTimeline.rows = [];
+      section.hidden = !satellite.length;
+      if (!satellite.length) return;
+
+      const format = formatPreviousHa;
+      const currentYear = new Date().getFullYear();
+      const observations = (Array.isArray(coverage) ? coverage : []).slice().sort((a, b) => a.year - b.year);
+      const firstYear = Number(satellite[0].year);
+      const lastSatelliteYear = Number(satellite[satellite.length - 1].year);
+      const lastYear = Math.max(lastSatelliteYear, mapped ? currentYear : lastSatelliteYear, Number(mapped?.since) || 0);
+      const byYear = new Map(satellite.map(item => [Number(item.year), Number(item.mangroveHa) || 0]));
+      let rows = [];
+      for (let year = firstYear; year <= lastYear; year++) {
+        rows.push({
+          year,
+          previous: byYear.has(year) ? byYear.get(year) : null,
+          mapped: mappedHectaresIn(year, mapped, observations, currentYear),
+          pending: mapped ? !mapped.approved : false,
+        });
+      }
+      // Year filter: fill the pickers with every year, then keep only the chosen ones.
+      const fromEl = document.getElementById('timelinePreviousFrom');
+      const toEl = document.getElementById('timelinePreviousTo');
+      if (fromEl && toEl) {
+        const options = rows.map(row => `<option value="${row.year}">${row.year}</option>`).join('');
+        fromEl.innerHTML = options;
+        toEl.innerHTML = options;
+        let from = previousTimeline.from ?? firstYear;
+        let to = previousTimeline.to ?? lastYear;
+        if (from > to) [from, to] = [to, from];
+        fromEl.value = String(from);
+        toEl.value = String(to);
+        rows = rows.filter(row => row.year >= from && row.year <= to);
+      }
+      previousTimeline.rows = rows;
+
+      // Caption: the satellite record, then the area as mapped here, said to be a different method.
+      const areaHa = Number(previous.areaHa) || 0;
+      const satValues = satellite.map(item => Number(item.mangroveHa) || 0);
+      const latestSat = satValues[satValues.length - 1];
+      const peak = Math.max(...satValues);
+      const peakYear = satellite[satValues.indexOf(peak)].year;
+      let caption = peak <= 0
+        ? `The satellite record shows no mangroves inside this area in any year from ${firstYear} to ${lastSatelliteYear} (it misses stands narrower than about 30 m).`
+        : `Satellite record inside this area: ${format(latestSat)} ha in ${lastSatelliteYear}`
+          + (peak > latestSat ? `, most in ${peakYear} with ${format(peak)} ha.` : ', the most of any year.');
+      if (mapped) {
+        caption += ` MangroveMap: ${format(Number(mapped.areaHa) || 0)} ha surveyed${mapped.approved ? '' : ' (awaiting review)'}, from ${mapped.since}. The two are different methods, so the step between them is not a change on the ground.`;
+      }
+      document.getElementById('timelinePreviousCaption').textContent = caption;
+
+      // Chart: amber previous data, then the green mapped figure, with a dashed break between the methods.
+      const W = 300, H = 48, PAD = 4;
+      const high = Math.max(0.0001, ...rows.map(row => Math.max(row.previous ?? 0, row.mapped ?? 0)));
+      const xAt = index => rows.length > 1 ? index / (rows.length - 1) * W : W / 2;
+      const yAt = value => PAD + (1 - value / high) * (H - 2 * PAD);
+      const path = key => rows
+        .map((row, index) => row[key] === null ? null : [xAt(index), yAt(row[key])])
+        .filter(Boolean)
+        .map(([x, y], index) => `${index ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`)
+        .join(' ');
+      const previousLine = path('previous');
+      const lastPreviousIndex = rows.reduce((last, row, index) => row.previous !== null ? index : last, 0);
+      document.getElementById('timelinePreviousLine').setAttribute('d', previousLine);
+      document.getElementById('timelinePreviousFill').setAttribute('d', previousLine
+        ? `${previousLine} L${xAt(lastPreviousIndex).toFixed(1)} ${H} L0 ${H} Z` : '');
+      document.getElementById('timelineMappedLine').setAttribute('d', path('mapped'));
+      const NS = 'http://www.w3.org/2000/svg';
+      const dots = [];
+      rows.forEach((row, index) => {
+        if (row.mapped === null) return;
+        const circle = document.createElementNS(NS, 'circle');
+        circle.setAttribute('cx', xAt(index));
+        circle.setAttribute('cy', yAt(row.mapped));
+        circle.setAttribute('r', 2.5);
+        circle.setAttribute('class', 'timeline-mapped-dot');
+        dots.push(circle);
+      });
+      document.getElementById('timelineMappedDots').replaceChildren(...dots);
+      const breakLine = document.getElementById('timelinePreviousBreak');
+      const hasLater = rows.some(row => row.previous === null) && rows.some(row => row.previous !== null);
+      breakLine.style.display = mapped && hasLater ? '' : 'none';
+      if (hasLater) {
+        const breakX = (xAt(lastPreviousIndex) + xAt(lastPreviousIndex + 1)) / 2;
+        breakLine.setAttribute('x1', breakX);
+        breakLine.setAttribute('x2', breakX);
+      }
+      previousTimeline.points = rows.map((row, index) => [xAt(index), yAt(row.mapped ?? row.previous ?? 0)]);
+      document.getElementById('timelinePreviousChart').title = peak > 0 ? `Previous data, most: ${format(peak)} ha (${peakYear})` : '';
+      document.getElementById('timelinePreviousFirst').textContent = rows[0].year;
+      document.getElementById('timelinePreviousLast').textContent = rows[rows.length - 1].year;
+      document.getElementById('timelinePreviousRange').max = rows.length - 1;
+      selectPreviousYear(rows.length - 1, false);
+
+      const cell = value => {
+        const td = document.createElement('td');
+        td.textContent = value === null ? '—' : format(value);
+        return td;
+      };
+      document.getElementById('timelinePreviousRows').replaceChildren(...rows.slice().reverse().map(row => {
+        const tr = document.createElement('tr');
+        const year = document.createElement('td');
+        year.textContent = row.year;
+        tr.append(year, cell(row.previous), cell(row.mapped));
+        return tr;
+      }));
+
+      const source = document.getElementById('timelinePreviousSource');
+      const link = document.createElement('a');
+      link.href = previous.sourceUrl || 'https://doi.org/10.5281/zenodo.21346456';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = previous.source || 'Global Mangrove Watch';
+      source.replaceChildren('Previous data: satellite record of ', link, `${previous.license ? ` (${previous.license})` : ''}, about 30 m per pixel, inside this area's current boundary (${format(areaHa)} ha). MangroveMap: the surveyed boundary and expert observations.`);
+
+      // Turns on the year card's "Compare with previous data" (map-timeline-scripts), where the map has it.
+      const showButton = document.getElementById('timelinePreviousShow');
+      showButton.hidden = typeof window.setPreviousDataComparison !== 'function';
+    }
+
+    document.getElementById('timelinePreviousShow')?.addEventListener('click', () => window.setPreviousDataComparison?.(true));
+    ['timelinePreviousFrom', 'timelinePreviousTo'].forEach(id => document.getElementById(id)?.addEventListener('change', () => {
+      if (!previousTimeline.args) return;
+      previousTimeline.from = Number(document.getElementById('timelinePreviousFrom').value);
+      previousTimeline.to = Number(document.getElementById('timelinePreviousTo').value);
+      renderPreviousData(...previousTimeline.args, true);
+    }));
+
     function loadAnnualObservationCharts(delineationId) {
       annualObservationRequest?.abort();
+      renderPreviousData(null);
       if (isDelineationModeActive()) {
         // Users are actively delineating: keep "Changes over time" (and its
         // historical map overlay) out of the way.
@@ -3613,6 +3849,7 @@
         .then(data => {
           const coverage = Array.isArray(data.coverage) ? data.coverage : [];
           setTemporalHistory(coverage);
+          renderPreviousData(data.previousData, data.mapped, coverage);
           const genusDistribution = Array.isArray(data.genusDistribution) ? data.genusDistribution : [];
           const genusEmpty = document.getElementById('genusDistributionEmpty');
           const coverageEmpty = document.getElementById('coverageTrendEmpty');

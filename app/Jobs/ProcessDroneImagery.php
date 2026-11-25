@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\InteractsWithDroneRasters;
 use App\Models\DroneImageryLayer;
 use App\Services\DroneBatchFootprints;
+use App\Services\DronePhotoGeoreferencer;
 use App\Services\GdalCommandRunner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -63,12 +64,19 @@ class ProcessDroneImagery implements ShouldQueue
             $totalSize = 0;
             $alphaSources = [];
             $footprints = [];
-            foreach ($layer->files as $file) {
+            $photoCount = 0;
+            $photos = app(DronePhotoGeoreferencer::class);
+            foreach ($layer->files as $index => $file) {
                 if (! $localDisk->exists($file->stored_path)) {
                     throw new RuntimeException("Uploaded file is missing: {$file->original_name}");
                 }
 
                 $inputPath = $localDisk->path($file->stored_path);
+                // A JPG/PNG drone photo is placed from its camera data (or world file) as a VRT over the picture.
+                if (DronePhotoGeoreferencer::kind($file->original_name) === 'picture') {
+                    $inputPath = $photos->georeference($gdal, $inputPath, $file->original_name, $workDirectory, $index);
+                    $photoCount++;
+                }
                 $info = $this->readRasterInfo($gdal, $inputPath, $workDirectory);
                 $this->validateSourceRaster($info, $file->original_name);
                 $alphaSources[$file->original_name] = $this->hasAlphaBand($info);
@@ -105,6 +113,12 @@ class ProcessDroneImagery implements ShouldQueue
                 throw new RuntimeException('Unable to create the processed raster directory.');
             }
 
+            // The inputs go in an option file: hundreds of photo paths would pass cmd.exe's 8191-character line limit.
+            $inputListPath = $workDirectory.DIRECTORY_SEPARATOR.'inputs.txt';
+            if (file_put_contents($inputListPath, implode("\n", array_map(fn (string $path) => '"'.$path.'"', $inputPaths))) === false) {
+                throw new RuntimeException('Unable to prepare the list of files to mosaic.');
+            }
+
             $gdal->run([
                 'gdalwarp',
                 '-overwrite',
@@ -123,7 +137,8 @@ class ProcessDroneImagery implements ShouldQueue
                 'COMPRESS=DEFLATE',
                 '-co',
                 'BIGTIFF=IF_SAFER',
-                ...$inputPaths,
+                '--optfile',
+                $inputListPath,
                 $mosaicPath,
             ], $workDirectory, (int) config('gdal.timeout'));
 
@@ -138,6 +153,8 @@ class ProcessDroneImagery implements ShouldQueue
                 'preview_bounds' => $bounds,
                 'metadata' => [
                     'source_count' => $layer->files->count(),
+                    // Photos placed one by one from their camera data (DronePhotoGeoreferencer), not an orthomosaic.
+                    'source_format' => $photoCount > 0 ? 'photos' : 'geotiff',
                     'source_size_bytes' => $totalSize,
                     'target_crs' => 'EPSG:3857',
                     'raster_size' => $mosaicInfo['size'] ?? null,

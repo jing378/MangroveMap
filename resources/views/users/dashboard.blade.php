@@ -238,6 +238,72 @@
         color: var(--fg-1a2e1a, #1a2e1a);
     }
 
+    .trend-key {
+        display: inline-block;
+        width: 14px;
+        height: 3px;
+        border-radius: 2px;
+        vertical-align: middle;
+    }
+
+    .trend-key-previous {
+        background: #c98f00;
+    }
+
+    .trend-key-own {
+        background: #1e9e62;
+    }
+
+    .trend-range {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--fg-4a6a4a, #4a6a4a);
+    }
+
+    .trend-range[hidden] {
+        display: none;
+    }
+
+    .trend-range label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .trend-range .chart-select {
+        padding: 3px 6px;
+        font-size: 12px;
+    }
+
+    .trend-previous-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--fg-1e7a4f, #1e7a4f);
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .trend-previous-toggle input {
+        accent-color: #1e9e62;
+        margin: 0;
+    }
+
+    .trend-previous-note a {
+        color: var(--fg-1e9e62, #1e9e62);
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .trend-previous-note a:hover {
+        text-decoration: underline;
+    }
+
     .chart-note a {
         color: var(--fg-1e9e62, #1e9e62);
     }
@@ -1164,7 +1230,7 @@
             <div>
                 <div class="table-title" id="municipalityReportTitle"><i class="bi bi-geo-alt me-2"></i> Mangrove Report</div>
                 <div class="rep-subtitle">
-                    Approved areas only @if($report->isNotEmpty())· {{ $reportPlaces->count() }}{{ !empty($municipalitiesWithoutAreas) ? ' of '.$municipalityTotal : '' }} {{ Str::plural('municipality', $municipalityTotal ?: $reportPlaces->count()) }} mapped @endif
+                    Mapped areas @if($report->isNotEmpty())· {{ $reportPlaces->count() }}{{ !empty($municipalitiesWithoutAreas) ? ' of '.$municipalityTotal : '' }} {{ Str::plural('municipality', $municipalityTotal ?: $reportPlaces->count()) }} @endif
                 </div>
             </div>
             <div class="rep-head-tools">
@@ -1288,8 +1354,19 @@
         </section>
 
         <div class="chart-card">
-            <div class="chart-header">
+            <div class="chart-header" style="flex-wrap: wrap; gap: 8px 12px;">
                 <div class="chart-title"><i class="bi bi-graph-up me-2"></i> Coverage Trend (ha)</div>
+                {{-- Off by default: one line from 1985, previous data (satellite) then MangroveMap's own years. --}}
+                @if(!empty($trendValues) && !empty($previousDataTrend))
+                    <label class="trend-previous-toggle" title="Continue the line back to {{ $previousDataTrend['years'][0] }} with the satellite record for {{ $previousDataTrend['province'] }}">
+                        <input type="checkbox" id="trendPreviousToggle"> Include previous data
+                    </label>
+                    {{-- Year filter: which years the chart shows (filled by the script from the chart's years). --}}
+                    <span class="trend-range" id="trendRange" hidden>
+                        <label>From <select id="trendFrom" class="chart-select" aria-label="Show from year"></select></label>
+                        <label>to <select id="trendTo" class="chart-select" aria-label="Show to year"></select></label>
+                    </span>
+                @endif
             </div>
             <div class="chart-canvas-wrap">
                 @if(!empty($trendValues))
@@ -1298,6 +1375,23 @@
                     <div class="chart-empty">No approved mangrove areas yet.</div>
                 @endif
             </div>
+            {{-- With "Include previous data" on, the chart is one line: previous data (satellite) up to its latest year
+                 in amber, then MangroveMap's own years in green. The note explains the drop where it turns green. --}}
+            @if(!empty($previousDataTrend))
+                <p class="chart-note trend-previous-explain" id="trendPreviousExplain" hidden>
+                    <span class="trend-key trend-key-previous" aria-hidden="true"></span> Previous data (satellite, about 30 m), {{ $previousDataTrend['province'] }}
+                    · <span class="trend-key trend-key-own" aria-hidden="true"></span> MangroveMap.
+                    The drop after {{ end($previousDataTrend['years']) }} is a change of method, not mangrove loss: MangroveMap counts only the areas surveyed so far.
+                    <span class="trend-previous-note"><a href="{{ $mapRoute }}?compare=previous">Compare on the map <i class="bi bi-arrow-right" aria-hidden="true"></i></a></span>
+                </p>
+            @endif
+            @if(!empty($comparison['satellite']))
+                <p class="chart-note trend-previous-note" id="trendPreviousNote">
+                    Previous data (satellite, {{ $comparison['satellite']['latest_year'] }}):
+                    <strong>{{ rtrim(rtrim(number_format($comparison['satellite']['latest_hectares'], 2), '0'), '.') }} ha</strong>
+                    · <a href="{{ $mapRoute }}?compare=previous">Compare on the map <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                </p>
+            @endif
         </div>
 
         {{-- Satellite estimate for the whole province: a different measure from the approved-area trend above. --}}
@@ -1325,6 +1419,15 @@
             </div>
         @endif
     </div>
+
+    @if(!empty($comparison))
+        @include('partials.mangrove-comparison', [
+            'comparison' => $comparison,
+            'cardClass' => 'table-card',
+            'showSurveys' => auth()->user()->isExpert(),
+            'mapUrl' => $mapRoute,
+        ])
+    @endif
 
     <!-- Top Contributors Leaderboard -->
     <div class="table-card">
@@ -1721,46 +1824,180 @@
         }
 
         // Coverage Trend Line
+        // Coverage Trend: MangroveMap's mapped hectares per year. "Include previous data" (off by default,
+        // remembered per browser) turns it into one line from the satellite's first year: previous data (amber)
+        // up to the satellite's latest year, then MangroveMap's later years (green), joined by a dashed segment
+        // and a dashed marker where the method changes; the note under the chart explains the drop there.
         const trendCtx = document.getElementById('coverageTrendChart');
         if (trendCtx) {
             const years = @json($trendYears ?? []);
             const values = @json($trendValues ?? []);
+            const previous = @json($previousDataTrend ?? null);
+            const GREEN = '#1e9e62', AMBER = '#c98f00';
+            const KEY = 'mangrovemap-trend-previous';
+            const toggle = document.getElementById('trendPreviousToggle');
+            const explain = document.getElementById('trendPreviousExplain');
+            const note = document.getElementById('trendPreviousNote');
+            const gridColor = () => (window.MangroveTheme?.get() === 'dark' ? 'rgba(255, 255, 255, 0.07)' : '#f0f4f0');
+            const tickFont = { family: 'Manrope', size: 11 };
+            const formatHa = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: value < 100 ? 2 : 1 });
 
-            new Chart(trendCtx, {
+            function series(withPrevious) {
+                if (!withPrevious || !previous) {
+                    return { labels: years, data: values, switchAt: null };
+                }
+                const lastPrevious = previous.years[previous.years.length - 1];
+                const own = years.map((year, index) => [year, values[index]]).filter(([year]) => year > lastPrevious);
+                return {
+                    labels: [...previous.years, ...own.map(([year]) => year)],
+                    data: [...previous.hectares, ...own.map(([, value]) => value)],
+                    // Index of the last previous-data point: later points are MangroveMap's.
+                    switchAt: previous.years.length - 1,
+                };
+            }
+
+            const isOwn = (chart, index) => chart.$switchAt === null || chart.$switchAt === undefined || index > chart.$switchAt;
+
+            // Dashed vertical marker between the satellite's latest year and MangroveMap's first.
+            const methodBreak = {
+                id: 'methodBreak',
+                afterDatasetsDraw(chart) {
+                    const index = chart.$switchAt;
+                    if (index === null || index === undefined || index < 0 || index + 1 >= chart.data.labels.length) return;
+                    const x = (chart.scales.x.getPixelForValue(index) + chart.scales.x.getPixelForValue(index + 1)) / 2;
+                    const ctx = chart.ctx;
+                    ctx.save();
+                    ctx.strokeStyle = '#6a8a6a';
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(x, chart.chartArea.top);
+                    ctx.lineTo(x, chart.chartArea.bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                },
+            };
+
+            let showPrevious = false;
+            try { showPrevious = !!toggle && localStorage.getItem(KEY) === '1'; } catch (error) { /* private mode */ }
+            const initial = series(showPrevious);
+
+            const trendChart = new Chart(trendCtx, {
                 type: 'line',
                 data: {
-                    labels: years,
+                    labels: initial.labels,
                     datasets: [{
-                        label: 'Total Mangrove Area (ha)',
-                        data: values,
-                        borderColor: '#1e9e62',
+                        label: 'MangroveMap (ha)',
+                        data: initial.data,
+                        borderColor: GREEN,
                         backgroundColor: 'rgba(30, 158, 98, 0.08)',
                         fill: true,
-                        tension: 0.35,
-                        pointBackgroundColor: '#1e9e62',
-                        pointRadius: 4,
-                        pointHoverRadius: 6
+                        tension: 0.3,
+                        // Amber for previous data, green for MangroveMap; the joining segment is dashed.
+                        segment: {
+                            borderColor: ctx => (isOwn(ctx.chart, ctx.p1DataIndex) ? GREEN : AMBER),
+                            borderDash: ctx => (ctx.chart.$switchAt !== null && ctx.chart.$switchAt !== undefined
+                                && ctx.p0DataIndex === ctx.chart.$switchAt ? [4, 4] : undefined),
+                        },
+                        pointBackgroundColor: ctx => (isOwn(ctx.chart, ctx.dataIndex) ? GREEN : AMBER),
+                        pointBorderColor: ctx => (isOwn(ctx.chart, ctx.dataIndex) ? GREEN : AMBER),
+                        pointRadius: ctx => (isOwn(ctx.chart, ctx.dataIndex) ? 4 : 0),
+                        pointHoverRadius: 6,
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: item => `${isOwn(item.chart, item.dataIndex) ? 'MangroveMap' : 'Previous data (satellite)'}: ${formatHa(item.raw)} ha`,
+                            },
+                        },
                     },
                     scales: {
                         y: {
-                            beginAtZero: false,
-                            grid: { color: () => (window.MangroveTheme?.get() === 'dark' ? 'rgba(255, 255, 255, 0.07)' : '#f0f4f0') },
-                            ticks: { font: { family: 'Manrope', size: 11 } }
+                            beginAtZero: showPrevious,
+                            grid: { color: gridColor },
+                            ticks: { font: tickFont }
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { font: { family: 'Manrope', size: 11 } }
+                            // Long ranges (with previous data, 1985 →) label only round years, every 5, plus the
+                            // last year (e.g. 1985, 1990, … 2025, 2026); short ranges label every year.
+                            ticks: {
+                                font: tickFont,
+                                maxRotation: 0,
+                                autoSkip: false,
+                                callback(value, index, ticks) {
+                                    const year = Number(this.getLabelForValue(value));
+                                    if (ticks.length <= 12) return year;
+                                    const isLast = index === ticks.length - 1;
+                                    // Keep the last year apart from a round year right before it, unless they'd collide.
+                                    if (isLast) return year;
+                                    if (year % 5 !== 0) return null;
+                                    const lastYear = Number(this.getLabelForValue(ticks[ticks.length - 1].value));
+                                    return lastYear - year === 1 && ticks.length > 30 ? null : year;
+                                },
+                            }
                         }
                     }
-                }
+                },
+                plugins: [methodBreak],
             });
+            trendChart.$switchAt = initial.switchAt;
+
+            // Year filter (From / To): which years the chart shows while previous data is on. Reset to all
+            // years whenever the switch changes.
+            const rangeEl = document.getElementById('trendRange');
+            const fromEl = document.getElementById('trendFrom');
+            const toEl = document.getElementById('trendTo');
+
+            function fillRange(labels) {
+                if (!fromEl || !toEl) return;
+                const options = labels.map(year => `<option value="${year}">${year}</option>`).join('');
+                fromEl.innerHTML = options;
+                toEl.innerHTML = options;
+                fromEl.value = String(labels[0]);
+                toEl.value = String(labels[labels.length - 1]);
+            }
+
+            function apply(on) {
+                const full = series(on);
+                let from = Number(fromEl?.value) || full.labels[0];
+                let to = Number(toEl?.value) || full.labels[full.labels.length - 1];
+                if (!on) {
+                    from = full.labels[0];
+                    to = full.labels[full.labels.length - 1];
+                }
+                if (from > to) [from, to] = [to, from];
+                const start = Math.max(0, full.labels.findIndex(year => year >= from));
+                let end = full.labels.length - 1;
+                while (end > start && full.labels[end] > to) end--;
+
+                trendChart.data.labels = full.labels.slice(start, end + 1);
+                trendChart.data.datasets[0].data = full.data.slice(start, end + 1);
+                trendChart.$switchAt = full.switchAt === null ? null : full.switchAt - start;
+                trendChart.options.scales.y.beginAtZero = on;
+                trendChart.update();
+                if (explain) explain.hidden = !on;
+                if (note) note.hidden = on;
+                if (rangeEl) rangeEl.hidden = !on;
+            }
+
+            if (toggle) {
+                toggle.checked = showPrevious;
+                fillRange(series(showPrevious).labels);
+                apply(showPrevious);
+                toggle.addEventListener('change', () => {
+                    fillRange(series(toggle.checked).labels);
+                    apply(toggle.checked);
+                    try { localStorage.setItem(KEY, toggle.checked ? '1' : '0'); } catch (error) { /* private mode */ }
+                });
+                fromEl?.addEventListener('change', () => apply(toggle.checked));
+                toEl?.addEventListener('change', () => apply(toggle.checked));
+            }
         }
 
         // Mangrove extent by year (satellite): province total, or one municipality from the picker.

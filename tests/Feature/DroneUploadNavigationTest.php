@@ -30,7 +30,10 @@ class DroneUploadNavigationTest extends TestCase
             ->assertSee('id="droneUploadForm"', false)
             ->assertSee('Your drone imagery')
             // The per-file limit is shown and given to the page, which blocks bigger files before uploading.
-            ->assertSee('files per upload, 1 GB each')
+            ->assertSee('1 GB each')
+            // Drone photos are accepted too, with their own limit.
+            ->assertSee('accept=".tif,.tiff,image/tiff,.jpg', false)
+            ->assertSee('"max_photos":500', false)
             ->assertSee('"max_file_bytes":1073741824', false)
             ->assertSee(str_replace('/', '\/', route('drone-imagery.store')), false)
             ->assertDontSee('View on map');

@@ -80,6 +80,10 @@ The delineations the map draws for the current user. The map calls it after ever
 ### `GET /delineations/{delineation}/annual-observations`
 The "Changes over time" timeline for one delineation: one entry per observed year, with `year`, `coverageAreaHa`, `source` and the boundary `features`.
 
+`previousData` is the earlier satellite record of the same place: `{source, sourceUrl, license, areaHa, years: [{year, mangroveHa}]}`, the hectares Global Mangrove Watch saw as mangrove inside the area's current boundary in each year from 1985 (`areaHa` is the boundary's own area). `null` when the satellite data isn't installed.
+
+`mapped` is MangroveMap's own figure for the area, which the timeline draws after the previous data as a separate series: `{since, areaHa, approved}`, the year it was added, its current boundary's hectares, and whether it is expert-approved.
+
 ### `GET /map/place-labels`
 OpenStreetMap place names for the satellite map labels: `{"places": [...]}`. Cached by browsers for 24 hours.
 
@@ -159,7 +163,11 @@ Large GeoTIFFs are uploaded in pieces so that a dropped connection doesn't resta
 ### Chunked upload
 1. **`POST /drone-imagery/uploads`**: start.
    - **Body:**
-     - `files`: `[{"name": "survey.tif", "size": 123456789}]`, `.tif`/`.tiff` only, up to 1 GB each
+     - `files`: `[{"name": "survey.tif", "size": 123456789}]`, up to 1 GB each. For `tiles`: one `.tif`/`.tiff`. For `drone`, either:
+       - GeoTIFFs (`.tif`/`.tiff`, up to `gdal.max_upload_files`), or
+       - drone photos (`.jpg`/`.jpeg`/`.png`, up to `gdal.max_upload_photos`, 500), each optionally with location files of the same name (`.jgw`, `.jpgw`, `.pgw`, `.pngw`, `.wld`, `.prj`, `<photo>.jpg.aux.xml`).
+
+       Mixing GeoTIFFs and photos, or a location file without its photo, returns `422` (`errors.files`).
      - `name` (optional)
      - `purpose`: `drone` (default) or `tiles`
      - `tile_size`: required for `tiles`; one of 256, 512, 640, 1024, 1280
@@ -172,7 +180,9 @@ Large GeoTIFFs are uploaded in pieces so that a dropped connection doesn't resta
    - **Returns `202`:** the new layer (`id`, `name`, `status`, `files`). Processing continues in the background. Responds with `503` if it couldn't be queued.
 5. **`DELETE /drone-imagery/uploads/{uploadId}`**: cancel. Returns `{"cancelled": true}`.
 
-`POST /drone-imagery` (one multipart request with `files[]`) still works for small uploads.
+Location files are stored next to their photo and are not counted as layer files (`file_count` counts photos). The layer list (`GET /drone-imagery`) gives each layer a `source_format`: `photos` or `geotiff`.
+
+`POST /drone-imagery` (one multipart request with `files[]`) still works for small GeoTIFF uploads (GeoTIFFs only).
 
 ### Layers
 | Method and URL | Purpose |

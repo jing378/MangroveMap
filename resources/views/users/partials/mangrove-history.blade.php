@@ -49,7 +49,7 @@
       </button>
       <div class="mh-figure">
         <span class="mh-year" id="mangroveHistoryYear">-</span>
-        <span class="mh-area"><strong id="mangroveHistoryArea">-</strong> {{ $satelliteHistory ? 'ha mapped' : 'ha approved' }}</span>
+        <span class="mh-area"><strong id="mangroveHistoryArea">-</strong> ha mapped</span>
       </div>
       <div class="mh-change" id="mangroveHistoryChange"></div>
     </div>
@@ -60,6 +60,8 @@
         <svg viewBox="0 0 400 72" preserveAspectRatio="none" aria-hidden="true">
           <path class="mh-chart-fill" id="mangroveHistoryFill" d=""></path>
           <path class="mh-chart-line" id="mangroveHistoryLine" d="" vector-effect="non-scaling-stroke"></path>
+          {{-- Previous data (satellite) beside the approved hectares while "Compare with previous data" is on. --}}
+          <path class="mh-chart-prev" id="mangroveHistoryPrevLine" d="" vector-effect="non-scaling-stroke"></path>
           <line class="mh-chart-base" id="mangroveHistoryBaseLine" y1="0" y2="72" vector-effect="non-scaling-stroke"></line>
           <line class="mh-chart-cursor" id="mangroveHistoryCursor" y1="0" y2="72" vector-effect="non-scaling-stroke"></line>
         </svg>
@@ -69,6 +71,16 @@
     </div>
     <input type="range" class="mh-range" id="mangroveHistoryRange" min="0" max="0" step="1" value="0" aria-label="Year">
     <div class="mh-ticks" aria-hidden="true"><span id="mangroveHistoryFirst"></span><span id="mangroveHistoryLast"></span></div>
+    @unless ($satelliteHistory)
+      {{-- Year filter while comparing with previous data (map-timeline-scripts): the slider, play and chart
+           cover only these years. --}}
+      <div class="mh-years" id="mangroveHistoryYears" hidden>
+        Years
+        <select id="mangroveHistoryFrom" class="mh-select" aria-label="Show from year"></select>
+        to
+        <select id="mangroveHistoryTo" class="mh-select" aria-label="Show to year"></select>
+      </div>
+    @endunless
 
     @if ($satelliteHistory)
       <div class="mh-legend">
@@ -80,8 +92,18 @@
         </label>
       </div>
     @else
+      {{-- "Compare with previous data" (map-timeline-scripts): the Global Mangrove Watch satellite record for the
+           chosen year in amber under the areas, its hectares, and how much of the approved areas it also has. --}}
+      <div class="mh-sat" id="mangroveHistorySat" hidden aria-live="polite">
+        <span class="mh-sat-figure"><i class="mh-swatch mh-swatch-sat"></i> Previous data <span id="mangroveHistorySatYear"></span>:
+          <strong id="mangroveHistorySatArea">-</strong> ha</span>
+        <span class="mh-sat-agree" id="mangroveHistorySatAgree"></span>
+      </div>
       <div class="mh-legend">
-        <span>The map shows the areas and drone uploads added up to this year.</span>
+        <span id="mangroveHistoryLegendText">The map shows the areas and drone uploads added up to this year.</span>
+        <label class="mh-sat-toggle" id="mangroveHistorySatToggleWrap" title="Show the earlier satellite record of mangroves (Global Mangrove Watch) for the chosen year">
+          <input type="checkbox" id="mangroveHistorySatToggle"> Compare with previous data
+        </label>
       </div>
     @endif
 
@@ -89,7 +111,7 @@
       <summary>{{ $satelliteHistory ? 'Table and source' : 'Table' }}</summary>
       <div class="mh-table-scroll">
         <table>
-          <thead><tr><th scope="col">Year</th><th scope="col">Hectares</th></tr></thead>
+          <thead><tr><th scope="col">Year</th><th scope="col">Hectares</th>@unless ($satelliteHistory)<th scope="col" id="mangroveHistorySatColumn" hidden>Previous data</th>@endunless</tr></thead>
           <tbody id="mangroveHistoryRows"></tbody>
         </table>
       </div>
@@ -100,6 +122,8 @@
         @else
           Hectares are the expert-approved areas in this system, the same figures as the dashboard's Coverage Trend.
           An area or drone upload counts from the year it was added. Pick a municipality to see only its figures.
+          <span id="mangroveHistorySatNote" hidden>Previous data: the satellite record of <a href="https://doi.org/10.5281/zenodo.21346456" target="_blank" rel="noopener">Global Mangrove Watch v4.1</a>
+            (CC BY 4.0), about 30 m per pixel, so small stands are missed; years after its latest use the latest.</span>
         @endif
       </p>
     </details>
@@ -139,6 +163,7 @@
   .mh-card.is-minimized .mh-chart-wrap,
   .mh-card.is-minimized .mh-ticks,
   .mh-card.is-minimized .mh-legend,
+  .mh-card.is-minimized .mh-years,
   .mh-card.is-minimized .mh-table {
     display: none;
   }
@@ -374,6 +399,13 @@
     opacity: .14;
   }
 
+  .mh-chart-prev {
+    fill: none;
+    stroke: var(--fg-c98f00, #c98f00);
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+
   .mh-chart-line {
     fill: none;
     stroke: var(--fg-1e9e62, #1e9e62);
@@ -461,6 +493,63 @@
   .mh-swatch-stable { background-color: rgb(45, 212, 191); }
   .mh-swatch-gain { background-color: rgb(250, 204, 21); }
   .mh-swatch-loss { background-color: rgb(244, 63, 94); }
+
+  /* Previous data (satellite pixels) in "Mangroves mapped by year" (map-timeline-scripts SATELLITE_COLOR). */
+  .mh-swatch-sat { background-color: rgb(245, 179, 1); }
+
+  .mh-sat {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 10px;
+    margin-top: 5px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: var(--bg-fff8e1, #fff8e1);
+    font-size: 11.5px;
+    color: var(--fg-4c6b5d, #4c6b5d);
+  }
+
+  .mh-sat-figure {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .mh-sat-figure strong {
+    color: var(--fg-1a2e1a, #1a2e1a);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mh-sat-agree {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mh-sat-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--fg-1e7a4f, #1e7a4f);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .mh-sat-toggle input {
+    accent-color: #1e9e62;
+    margin: 0;
+  }
+
+  .mh-years {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--fg-4c6b5d, #4c6b5d);
+  }
 
   .mh-compare {
     display: inline-flex;

@@ -45,10 +45,42 @@
       return `Each file can be at most ${formatBytes(page.max_file_bytes)}. Too large: ${names}${big.length > 3 ? ` and ${big.length - 3} more` : ''}.`;
     }
 
+    // ---- File kinds: GeoTIFFs, or drone photos (JPG/PNG) with optional location files --------
+    // Photos are placed on the map from their own GPS and camera data on the server (DronePhotoGeoreferencer);
+    // a .jgw/.pgw/.wld/.prj/.aux.xml file belongs to the photo with the same name.
+    const ACCEPTED_FILE = /\.(tiff?|jpe?g|png|jgw|jpgw|jpegw|pgw|pngw|wld|prj|aux\.xml)$/i;
+    function fileKind(name) {
+      if (/\.tiff?$/i.test(name)) return 'geotiff';
+      if (/\.(jpe?g|png)$/i.test(name)) return 'picture';
+      return ACCEPTED_FILE.test(name) ? 'sidecar' : null;
+    }
+    // "a" for a.jpg, a.jgw, a.prj and a.jpg.aux.xml (DronePhotoGeoreferencer::stem).
+    function fileStem(name) {
+      const lower = name.toLowerCase();
+      if (lower.endsWith('.aux.xml')) return lower.slice(0, -8).replace(/\.(jpe?g|png)$/, '');
+      return lower.replace(/\.[^.]+$/, '');
+    }
+    const kindCount = (files, kind) => files.filter(file => fileKind(file.name) === kind).length;
+
+    // Why this mix of files cannot be uploaded (like DroneImageryUploadController::validateDroneBatch), or null.
+    function batchProblem(files) {
+      const geotiffs = kindCount(files, 'geotiff');
+      const pictures = kindCount(files, 'picture');
+      if (geotiffs && pictures) return 'Upload GeoTIFFs and photos separately: one upload is either GeoTIFF files or photos.';
+      if (page.max_files && geotiffs > page.max_files) return `Up to ${page.max_files} GeoTIFF files per upload.`;
+      if (page.max_photos && pictures > page.max_photos) return `Up to ${page.max_photos} photos per upload. Upload the rest as another survey.`;
+      const stems = new Set(files.filter(file => fileKind(file.name) === 'picture').map(file => fileStem(file.name)));
+      const orphan = files.find(file => fileKind(file.name) === 'sidecar' && !stems.has(fileStem(file.name)));
+      if (orphan) return `"${orphan.name}" is a location file, but no photo with the same name is selected. Add the photo or remove the file.`;
+      return null;
+    }
+
     function uploadBlocker() {
-      const count = fileInput.files?.length || 0;
-      if (!count) return 'Choose at least one .tif or .tiff file first.';
-      if (page.max_files && count > page.max_files) return `Up to ${page.max_files} files per upload.`;
+      const files = [...(fileInput.files || [])];
+      if (!files.length) return 'Choose GeoTIFF files or drone photos first.';
+      if (!kindCount(files, 'geotiff') && !kindCount(files, 'picture')) return 'Add the photo that goes with the location file.';
+      const problem = batchProblem(files);
+      if (problem) return problem;
       const tooBig = oversizedFiles();
       if (tooBig) return tooBig;
       if (placeCheck.state === 'checking') return 'Checking where the files are…';
@@ -131,6 +163,23 @@
       return Object.values(box).every(Number.isFinite) && Math.abs(box.south) <= 90 && Math.abs(box.west) <= 180 ? box : null;
     }
 
+    // A drone photo's position from the camera data near the start of the file (DJI XMP), as a small box;
+    // null for photos without it (e.g. pictures with a world file: the server checks those).
+    async function readPhotoFootprint(file) {
+      const head = new TextDecoder('latin1').decode(await file.slice(0, 512 * 1024).arrayBuffer());
+      const value = key => {
+        const match = head.match(new RegExp(`drone-dji:${key}="\\s*([-+]?[0-9.]+)"`))
+          || head.match(new RegExp(`<drone-dji:${key}>\\s*([-+]?[0-9.]+)\\s*<`));
+        return match ? Number(match[1]) : null;
+      };
+      const lat = value('GpsLatitude') ?? value('Latitude');
+      const lng = value('GpsLongitude') ?? value('Longitude');
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+      const halfLat = 50 / 110574; // a photo covers a few dozen metres around the camera
+      const halfLng = 50 / (111320 * Math.cos(lat * Math.PI / 180));
+      return { west: lng - halfLng, south: lat - halfLat, east: lng + halfLng, north: lat + halfLat };
+    }
+
     function gapMetres(a, b) {
       const lngGap = Math.max(0, a.west - b.east, b.west - a.east);
       const latGap = Math.max(0, a.south - b.north, b.south - a.north);
@@ -175,7 +224,8 @@
     async function checkSamePlace(files) {
       const run = ++placeCheckRun;
       const hadNote = ['far', 'checking'].includes(placeCheck.state);
-      if (files.length < 2 || !window.GeoTIFF) {
+      const placeable = files.filter(file => fileKind(file.name) !== 'sidecar');
+      if (placeable.length < 2 || (!window.GeoTIFF && kindCount(files, 'geotiff'))) {
         placeCheck = { state: 'idle', message: '' };
         if (hadNote) showMessage('');
         updateSubmitState();
@@ -187,9 +237,11 @@
       updateSubmitState();
       const footprints = [];
       for (const [index, file] of files.entries()) {
+        const kind = fileKind(file.name);
+        if (kind === 'sidecar') continue;
         let box = null;
         try {
-          box = await readFootprint(file);
+          box = kind === 'picture' ? await readPhotoFootprint(file) : await readFootprint(file);
         } catch {
           box = null; // unreadable header: the server reports it after upload
         }
@@ -243,7 +295,7 @@
         if (autoName && nameInput.value === autoName) nameInput.value = '';
         autoName = '';
       } else if (!nameInput.value.trim()) {
-        nameInput.value = autoName = files[0].name.replace(/\.(tiff?|TIFF?)$/, '').slice(0, 120);
+        nameInput.value = autoName = files[0].name.replace(/\.(tiff?|jpe?g|png)$/i, '').slice(0, 120);
       }
       renderSelection();
     }
@@ -279,10 +331,13 @@
       if (!files.length) return;
 
       const total = files.reduce((sum, file) => sum + file.size, 0);
+      const photos = kindCount(files, 'picture');
       const head = element('div', 'drone-files-head');
-      head.append(element('span', '', files.length === 1
-        ? `1 file selected (${formatBytes(total)})`
-        : `${files.length} files selected (${formatBytes(total)}), stitched into one mosaic`));
+      head.append(element('span', '', photos
+        ? `${photos === 1 ? '1 photo' : `${photos} photos`}${files.length > photos ? ` + ${files.length - photos} location file${files.length - photos === 1 ? '' : 's'}` : ''} selected (${formatBytes(total)})${photos > 1 ? ', placed into one image' : ''}`
+        : (files.length === 1
+          ? `1 file selected (${formatBytes(total)})`
+          : `${files.length} files selected (${formatBytes(total)}), stitched into one mosaic`)));
       const clear = element('button', 'drone-btn drone-files-clear');
       clear.type = 'button';
       clear.disabled = uploading;
@@ -292,6 +347,17 @@
       });
       head.append(clear);
       selected.append(head);
+      if (photos) {
+        // Photos are placed one by one, not stitched: say so before the user uploads.
+        const note = element('p', 'drone-files-note');
+        note.innerHTML = '<i class="bi bi-info-circle" aria-hidden="true"></i> ';
+        note.append('Each photo is placed on the map from its own GPS and camera data, taken straight down. '
+          + 'They are not stitched, so neighbouring photos can be a few metres apart. '
+          + 'For the most accurate map, upload a stitched orthomosaic (GeoTIFF) instead.');
+        selected.append(note);
+      }
+      const problem = batchProblem(files);
+      if (problem) selected.append(element('p', 'drone-files-note is-error', problem));
 
       const listNode = element('ul', 'drone-file-list');
       files.forEach((file, index) => {
@@ -333,9 +399,9 @@
       drop.classList.remove('is-over');
     }));
     drop.addEventListener('drop', event => {
-      const files = [...(event.dataTransfer?.files || [])].filter(file => /\.tiff?$/i.test(file.name));
+      const files = [...(event.dataTransfer?.files || [])].filter(file => ACCEPTED_FILE.test(file.name));
       if (!files.length) {
-        showMessage('Only .tif or .tiff files can be uploaded.', true);
+        showMessage('Only GeoTIFFs (.tif, .tiff) or drone photos (.jpg, .png) can be uploaded.', true);
         return;
       }
       if (!uploading) addFiles(files);
@@ -456,11 +522,12 @@
     form.addEventListener('submit', async event => {
       event.preventDefault();
       if (!fileInput.files?.length) {
-        showMessage('Choose at least one .tif or .tiff file.', true);
+        showMessage('Choose GeoTIFF files or drone photos first.', true);
         return;
       }
-      if (page.max_files && fileInput.files.length > page.max_files) {
-        showMessage(`You selected ${fileInput.files.length} files, but the server accepts up to ${page.max_files} per upload. Upload them in smaller batches.`, true);
+      const problem = batchProblem([...fileInput.files]);
+      if (problem) {
+        showMessage(problem, true);
         return;
       }
       const tooBig = oversizedFiles();
@@ -475,11 +542,14 @@
 
       // Confirmation → Processing (button label + progress bar) → Success or Error (message below the form).
       const count = fileInput.files.length;
+      const photoCount = kindCount([...fileInput.files], 'picture');
       const confirmed = await window.AppActions.confirm({
         title: 'Upload and process?',
-        message: count === 1
-          ? `"${fileInput.files[0].name}" is uploaded, prepared for review and checked by the AI.`
-          : `${count} GeoTIFF files are uploaded, stitched into one mosaic and checked by the AI.`,
+        message: photoCount
+          ? `${photoCount === 1 ? 'The photo is' : `${photoCount} photos are`} uploaded, placed on the map from their GPS and camera data${photoCount > 1 ? ', combined into one image' : ''} and checked by the AI.`
+          : (count === 1
+            ? `"${fileInput.files[0].name}" is uploaded, prepared for review and checked by the AI.`
+            : `${count} GeoTIFF files are uploaded, stitched into one mosaic and checked by the AI.`),
         confirmLabel: 'Upload',
       });
       if (!confirmed || uploading || uploadBlocker()) return;
@@ -581,6 +651,11 @@
       return node;
     }
 
+    function sourceLabel(layer) {
+      if (layer.source_format === 'photos') return layer.source_type === 'batch' ? 'Drone photos placed into one image' : 'Single drone photo';
+      return layer.source_type === 'batch' ? 'Mosaic of several GeoTIFFs' : 'Single GeoTIFF';
+    }
+
     function linkButton(href, label, icon, primary = false) {
       const link = element('a', `drone-btn${primary ? ' primary' : ''}`);
       link.href = href;
@@ -598,7 +673,7 @@
       const title = element('div');
       title.append(element('div', 'drone-item-name', layer.name));
       const uploaded = layer.created_at ? new Date(layer.created_at).toLocaleString() : '';
-      title.append(element('div', 'drone-item-meta', `${layer.source_type === 'batch' ? 'Mosaic of several GeoTIFFs' : 'Single GeoTIFF'}${uploaded ? ` · uploaded ${uploaded}` : ''}`));
+      title.append(element('div', 'drone-item-meta', `${sourceLabel(layer)}${uploaded ? ` · uploaded ${uploaded}` : ''}`));
       head.append(title, element('span', `drone-badge is-${stage.tone}`, stage.badge));
 
       const steps = element('div', 'drone-steps');
@@ -670,7 +745,7 @@
       if (!layers.length) {
         const empty = element('div', 'drone-empty');
         empty.innerHTML = '<i class="bi bi-airplane"></i>';
-        empty.append('No drone imagery yet. Upload a GeoTIFF to get started.');
+        empty.append('No drone imagery yet. Upload a GeoTIFF or drone photos to get started.');
         list.append(empty);
         return;
       }
@@ -725,7 +800,7 @@
       }
       title.append(uploader);
       const uploaded = layer.created_at ? new Date(layer.created_at).toLocaleString() : '';
-      title.append(element('div', 'drone-item-meta', `${layer.source_type === 'batch' ? 'Mosaic of several GeoTIFFs' : 'Single GeoTIFF'}${uploaded ? ` · uploaded ${uploaded}` : ''}`));
+      title.append(element('div', 'drone-item-meta', `${sourceLabel(layer)}${uploaded ? ` · uploaded ${uploaded}` : ''}`));
       head.append(title, element('span', `drone-badge is-${stage.tone}`, stage.badge));
 
       const stateText = element('div', `drone-item-state${stage.tone === 'failed' ? ' is-failed' : ''}`, stage.text);

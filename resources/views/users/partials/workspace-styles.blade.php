@@ -1269,10 +1269,14 @@
   }
 
   .d-row-genera .d-val {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    display: block;
     text-align: left;
+  }
+
+  .genus-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
   }
 
   .d-row-recommendation {
@@ -2367,6 +2371,257 @@
     padding: 8px 0;
     color: var(--fg-6a8a6a, #6a8a6a);
     font-size: 12px;
+  }
+
+  /* "Previous data" in Changes over time: the satellite's mangroves inside the area, by year. */
+  .timeline-previous[hidden] {
+    display: none;
+  }
+
+  .timeline-previous-years {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 11.5px;
+    color: var(--fg-4c6b5d, #4c6b5d);
+  }
+
+  .timeline-previous-years select {
+    padding: 2px 4px;
+    border: 1px solid var(--bd-d4dfd4, #d4dfd4);
+    border-radius: 6px;
+    background: var(--bg-f8faf7, #f8faf7);
+    color: var(--fg-182918, #182918);
+    font: inherit;
+    font-size: 11.5px;
+  }
+
+  .timeline-previous-scrub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .timeline-previous-play {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: #1e9e62;
+    color: #ffffff;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .timeline-previous-play:hover {
+    background: #1a8a56;
+  }
+
+  .timeline-previous-readout {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--fg-4c6b5d, #4c6b5d);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timeline-previous-readout strong {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--fg-1a2e1a, #1a2e1a);
+  }
+
+  .timeline-previous-chart {
+    position: relative;
+    height: 44px;
+    border-bottom: 1px solid var(--bd-e0e8e0, #e0e8e0);
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  /* MangroveMap's own figure after the previous data, and the break where the method changes. */
+  .timeline-mapped-line {
+    fill: none;
+    stroke: var(--fg-1e9e62, #1e9e62);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+
+  .timeline-mapped-dot {
+    fill: var(--fg-1e9e62, #1e9e62);
+    stroke: #ffffff;
+    stroke-width: 1;
+  }
+
+  .timeline-previous-break {
+    stroke: var(--fg-6a8a6a, #6a8a6a);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+  }
+
+  .timeline-previous-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px 12px;
+    margin-top: 4px;
+    font-size: 10.5px;
+    color: var(--fg-4c6b5d, #4c6b5d);
+  }
+
+  .timeline-previous-legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .timeline-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 4px;
+    border-radius: 2px;
+  }
+
+  .timeline-swatch-previous {
+    background: #c98f00;
+  }
+
+  .timeline-swatch-mapped {
+    background: #1e9e62;
+  }
+
+  .timeline-previous-cursor {
+    stroke: var(--fg-1a2e1a, #1a2e1a);
+    stroke-width: 1;
+  }
+
+  .timeline-previous-dot {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    background: #c98f00;
+    border: 2px solid var(--bd-ffffff, #ffffff);
+    pointer-events: none;
+  }
+
+  .timeline-previous-range {
+    display: block;
+    width: 100%;
+    margin: 4px 0 0;
+    accent-color: #c98f00;
+  }
+
+  .timeline-previous-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .timeline-previous-fill {
+    fill: var(--fg-f5b301, #f5b301);
+    opacity: .22;
+  }
+
+  .timeline-previous-line {
+    fill: none;
+    stroke: var(--fg-c98f00, #c98f00);
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+
+  .timeline-previous-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2px;
+    font-size: 10.5px;
+    color: var(--fg-6a8a6a, #6a8a6a);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timeline-previous-table {
+    margin-top: 6px;
+    font-size: 11.5px;
+  }
+
+  .timeline-previous-table summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--fg-1e7a4f, #1e7a4f);
+  }
+
+  .timeline-previous-scroll {
+    max-height: 130px;
+    margin-top: 6px;
+    overflow-y: auto;
+    border: 1px solid var(--bd-e0e8e0, #e0e8e0);
+    border-radius: 8px;
+  }
+
+  .timeline-previous-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timeline-previous-table th,
+  .timeline-previous-table td {
+    padding: 3px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--bd-e0e8e0, #e0e8e0);
+  }
+
+  .timeline-previous-table th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-f8faf7, #f8faf7);
+    color: var(--fg-4c6b5d, #4c6b5d);
+  }
+
+  .timeline-previous-table td:not(:first-child),
+  .timeline-previous-table th:not(:first-child) {
+    text-align: right;
+  }
+
+  .timeline-previous-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--bd-b8d9c6, #b8d9c6);
+    border-radius: 8px;
+    background: var(--bg-edf7f2, #edf7f2);
+    color: var(--fg-1e7a4f, #1e7a4f);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .timeline-previous-btn:hover {
+    background: var(--bg-dff0e7, #dff0e7);
+  }
+
+  .timeline-previous-source {
+    margin: 6px 0 0;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--fg-6a8a6a, #6a8a6a);
+  }
+
+  .timeline-previous-source a {
+    color: var(--fg-1e7a4f, #1e7a4f);
   }
 
   .timeline-badge {

@@ -723,6 +723,12 @@
             margin-bottom: 8px;
         }
 
+        .genus-pick {
+            display: inline-flex;
+            align-items: center;
+            gap: 1px;
+        }
+
         .drone-editor-genus {
             all: unset;
             display: inline-flex;
@@ -1426,21 +1432,19 @@
                         <span class="drone-editor-field-label" id="droneEditorGeneraLabel"><i class="bi bi-tree-fill" aria-hidden="true"></i> Mangrove Genus Present <em class="is-required">required</em></span>
                         {{-- Filled from segmentation_stats.genus_suggestion by the editor script. --}}
                         <div class="drone-editor-genus-suggestion" id="droneEditorGenusSuggestion" aria-live="polite" hidden></div>
+                        @include('partials.genus-info')
                         <div class="drone-editor-genera" id="droneEditorGenera">
-                            @foreach ([
-                                'Rhizophora' => 'Bakawan',
-                                'Avicennia' => 'Bungalon',
-                                'Sonneratia' => 'Pagatpat',
-                                'Bruguiera' => 'Miapi',
-                                'Ceriops' => 'Tungog',
-                                'Xylocarpus' => 'Tabigi',
-                                'Nypa' => 'Nipa/Sasa',
-                            ] as $genus => $localName)
-                                <button type="button" class="drone-editor-genus" data-genus="{{ $genus }}" aria-pressed="false">
-                                    <i class="bi bi-plus" aria-hidden="true"></i> {{ $genus }} <small>({{ $localName }})</small>
-                                </button>
+                            @foreach (\App\Support\MangroveGenera::INFO as $genus => $genusInfo)
+                                <span class="genus-pick">
+                                    <button type="button" class="drone-editor-genus" data-genus="{{ $genus }}" aria-pressed="false">
+                                        <i class="bi bi-plus" aria-hidden="true"></i> {{ $genus }} <small>({{ $genusInfo['local'] }})</small>
+                                    </button>
+                                    <button type="button" class="genus-info-btn" data-genus-info="{{ $genus }}" aria-label="What does {{ $genus }} look like?" title="What does it look like?"><i class="bi bi-info-circle"></i></button>
+                                </span>
                             @endforeach
                         </div>
+                        <div id="droneEditorGenusInfo" hidden style="margin:-2px 0 8px;"></div>
+                        <script>GenusInfo.bindInfoButtons(document.getElementById('droneEditorGenera'), document.getElementById('droneEditorGenusInfo'));</script>
                         <div class="drone-editor-other-genera-row">
                             <input type="text" id="droneEditorOtherGenera" maxlength="200" placeholder="Other genus…" aria-label="Other genus">
                             <button type="button" class="drone-editor-btn primary drone-editor-add-genus" id="droneEditorAddGenus">

@@ -1500,23 +1500,6 @@
       text-align: right;
     }
 
-    .d-genera {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 4px;
-    }
-
-    .d-genera span {
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--bg-edf7f2, #edf7f2);
-      border: 1px solid var(--bd-bce6cf, #bce6cf);
-      color: var(--fg-147a46, #147a46);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
     .d-empty {
       font-size: 12px;
       color: var(--fg-6a8a6a, #6a8a6a);
@@ -1603,6 +1586,32 @@
       font-size: 14.5px;
       line-height: 1.65;
       color: #cbd5e1;
+    }
+
+    /* Citation under each figure, so the numbers can be checked. */
+    .impact-source {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 12px;
+      line-height: 1.5;
+      color: #94a3b8;
+    }
+
+    .impact-source a {
+      color: #86efac;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .impact-source a:hover {
+      color: #bbf7d0;
+    }
+
+    .impact-figure small {
+      font-size: 0.45em;
+      font-weight: 700;
+      letter-spacing: 0;
     }
 
     /* Minimal Professional Footer */
@@ -3116,7 +3125,7 @@
                   </div>
                   <div class="div"></div>
                   <div class="sec">Mangrove Genera Present</div>
-                  <div id="dGenera" class="d-genera"></div>
+                  <div id="dGenera"></div>
                   <div class="div"></div>
                   <div class="sec">Planting Recommendation</div>
                   <div id="dRecommendations"></div>
@@ -3139,28 +3148,37 @@
     <div class="impact-grid">
       <div class="impact-card reveal" style="--i:0">
         <div class="impact-icon"><i class="bi bi-cloud-arrow-down-fill"></i></div>
-        <div class="impact-figure">up to <span data-count="4">4</span>&times;</div>
-        <h3 class="impact-title">Blue Carbon Sequestration</h3>
+        <div class="impact-figure"><span data-count="1023">1,023</span> <small>t C/ha</small></div>
+        <h3 class="impact-title">Blue Carbon Storage</h3>
         <p class="impact-text">
-          Mangrove forests capture carbon up to 4 times faster than tropical terrestrial rainforests, burying carbon safely in coastal sediments for millennia.
+          Across 25 Indo-Pacific mangrove forests, researchers measured an average of 1,023 tonnes of carbon per hectare, placing mangroves among the most carbon-rich forests in the tropics. 49&ndash;98% of it is held in their deep, waterlogged soils.
+        </p>
+        <p class="impact-source">
+          Source: Donato et al. (2011), <a href="https://doi.org/10.1038/ngeo1123" target="_blank" rel="noopener" data-no-progress><cite>Nature Geoscience</cite> 4, 293&ndash;297</a>
         </p>
       </div>
 
       <div class="impact-card reveal" style="--i:1">
         <div class="impact-icon"><i class="bi bi-shield-shaded"></i></div>
-        <div class="impact-figure"><span data-count="66">66</span>%</div>
-        <h3 class="impact-title">Coastal Storm Protection</h3>
+        <div class="impact-figure">13&ndash;<span data-count="66">66</span>%</div>
+        <h3 class="impact-title">Coastal Wave Protection</h3>
         <p class="impact-text">
-          Dense root networks absorb wave energy, attenuating storm surges by up to 66% and preventing critical shoreline erosion in vulnerable coastal regions.
+          A review of field studies found that wind and swell wave height drops by 13&ndash;66% across 100&nbsp;m of mangroves, with most of the reduction at the forest edge, where dense roots and trunks slow the water.
+        </p>
+        <p class="impact-source">
+          Source: McIvor et al. (2012), <a href="https://www.wetlands.org/publication/reduction-of-wind-and-swell-waves-by-mangroves/" target="_blank" rel="noopener" data-no-progress>The Nature Conservancy &amp; Wetlands International</a>
         </p>
       </div>
 
       <div class="impact-card reveal" style="--i:2">
         <div class="impact-icon"><i class="bi bi-water"></i></div>
-        <div class="impact-figure"><span data-count="100">100</span>s</div>
-        <h3 class="impact-title">Biodiversity &amp; Livelihoods</h3>
+        <div class="impact-figure"><span data-count="4.1" data-decimals="1">4.1</span> <small>million</small></div>
+        <h3 class="impact-title">Fisheries &amp; Livelihoods</h3>
         <p class="impact-text">
-          Serving as vital nursery grounds for hundreds of marine species, mangroves sustain local artisanal fisheries and provide economic resilience for coastal communities.
+          An estimated 4.1 million small-scale fishers worldwide fish in and around mangroves, which serve as nursery grounds for the fish, shrimp, crabs and shellfish that coastal communities depend on.
+        </p>
+        <p class="impact-source">
+          Source: zu Ermgassen et al., <a href="https://www.research.ed.ac.uk/en/publications/fishers-who-rely-on-mangroves-modelling-and-mapping-the-global-in/" target="_blank" rel="noopener" data-no-progress><cite>Estuarine, Coastal and Shelf Science</cite></a>
         </p>
       </div>
     </div>
@@ -3226,6 +3244,8 @@
   <button id="mobileInstallBtn" class="mobile-install-btn" title="Install App">
     <i class="bi bi-phone"></i>
   </button>
+
+  @include('partials.genus-info')
 
   <!-- GIS Logic & Scripts (Preserving all original variables and functions) -->
   <script>
@@ -3471,7 +3491,7 @@
       if (generaEl) {
         const genera = Array.isArray(feature.genera) && feature.genera.length ? feature.genera : (record.genera || []);
         generaEl.replaceChildren(...(genera.length
-          ? genera.map(name => Object.assign(document.createElement('span'), { textContent: name }))
+          ? GenusInfo.chips(genera)
           : [Object.assign(document.createElement('div'), { className: 'd-empty', textContent: 'No genera recorded.' })]));
       }
 

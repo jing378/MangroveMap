@@ -15,6 +15,7 @@ use App\Services\ApprovedCoverageStats;
 use App\Services\BoundaryResolver;
 use App\Services\DelineationObservationRecorder;
 use App\Services\FieldWeatherService;
+use App\Services\MangroveComparison;
 use App\Services\MangroveHistoryStats;
 use App\Services\MunicipalityBounds;
 use Carbon\Carbon;
@@ -98,6 +99,17 @@ class EndUserController extends Controller
             $reported,
         ));
         sort($data['municipalitiesWithoutAreas'], SORT_NATURAL | SORT_FLAG_CASE);
+        // "Compared with official figures": PSA/provincial totals, satellite per municipality, AI accuracy.
+        $data['comparison'] = app(MangroveComparison::class)->summary();
+        // Coverage Trend's "Include previous data" switch: the province's satellite hectares per year (read even
+        // while the satellite chart and map layer are switched off).
+        $history = $data['mangroveHistory'] ?? app(MangroveHistoryStats::class)->summary();
+        $data['previousDataTrend'] = $history === null ? null : [
+            'years' => $history['years'],
+            'hectares' => $history['total_ha'],
+            'source' => $history['source'],
+            'province' => $history['province'],
+        ];
 
         return view('users.dashboard', $data);
     }
@@ -142,6 +154,15 @@ class EndUserController extends Controller
         $data['page'] = 'map';
         // Where each municipality is, so the year slider's place picker can zoom to it.
         $data['municipalityBounds'] = app(MunicipalityBounds::class)->all();
+        // The year slider's "Compare with previous data": share of the approved areas the satellite record also has.
+        $comparison = app(MangroveComparison::class)->summary();
+        $data['satelliteAgreement'] = [
+            'total' => $comparison['agreement']['agreement'] ?? null,
+            'places' => (object) collect($comparison['municipalities'])
+                ->pluck('agreement', 'name')
+                ->filter(fn ($share) => $share !== null)
+                ->all(),
+        ];
         $data['plantingRecommendationsForMap'] = PlantingRecommendation::query()
             ->visibleOnMapTo(Auth::user())
             ->with(['user:id,name', 'delineation:id,name'])

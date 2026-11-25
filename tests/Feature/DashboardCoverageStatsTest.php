@@ -136,6 +136,9 @@ class DashboardCoverageStatsTest extends TestCase
         $this->assertEqualsWithDelta($oneSquare, $summary['genera_ha']['Avicennia'], 0.01);
         $this->assertArrayNotHasKey('Ceriops', $summary['genera_ha']);
 
+        // Without the satellite file, so "Compared with official figures" doesn't list every municipality
+        // the satellite saw (the report itself must leave out places without approved areas).
+        config(['map.mangrove_history.path' => storage_path('framework/testing/no-such-file.json')]);
         $this->actingAs($resident)->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Mangrove Report')

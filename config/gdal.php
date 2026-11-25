@@ -15,6 +15,15 @@ return [
     'preview_max_dimension' => (int) env('GDAL_PREVIEW_MAX_DIMENSION', 2048),
     // Files per drone imagery batch. PHP's max_file_uploads (php.ini) must be at least this high.
     'max_upload_files' => (int) env('DRONE_MAX_UPLOAD_FILES', 100),
+    // Drone photos (JPG/PNG, see DronePhotoGeoreferencer) per upload: a flight has hundreds of small ones.
+    // They only go through the chunked upload, so PHP's max_file_uploads does not apply.
+    'max_upload_photos' => (int) env('DRONE_MAX_UPLOAD_PHOTOS', 500),
+    // Photos are scaled to this ground resolution (m/pixel) before mosaicking (never finer than the photo):
+    // 2 cm is about the map's deepest zoom, and full-size photos (<1 cm) would make a huge mosaic.
+    'photo_resolution_m' => (float) env('DRONE_PHOTO_RESOLUTION_M', 0.02),
+    // Share of each photo's width and height kept, around its centre: the edges are the most distorted
+    // and carry the dark lens corners, and overlapping neighbours cover them.
+    'photo_keep_fraction' => (float) env('DRONE_PHOTO_KEEP_FRACTION', 0.8),
     // Files of one batch must lie within this distance (m) of each other, directly or through other files.
     // A batch is one mosaic, so files from different places (e.g. Macrohon + Bontoc) are rejected.
     'batch_max_gap_m' => (float) env('DRONE_BATCH_MAX_GAP_M', 1000),

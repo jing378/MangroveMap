@@ -282,6 +282,16 @@ class DroneImageryLayer extends Model
      * Every canopy the last genus classification pinpointed (genus, confidence, area, centre and outline),
      * see ml/predict_genus.py --canopies-out. Shown as pins on the map and in the review editor.
      */
+    /**
+     * The mangrove areas exactly as the AI drew them (SegmentDroneImagery), kept when the owner saves
+     * corrections over ai_extent.json, so the AI can be scored against the reviewed boundary
+     * (ExtentAccuracyReport, `php artisan mangroves:accuracy`).
+     */
+    public function aiOriginalExtentPath(): string
+    {
+        return "drone-imagery/processed/{$this->id}/ai_extent_original.json";
+    }
+
     public function canopiesPath(): string
     {
         return "drone-imagery/processed/{$this->id}/canopies.json";
@@ -290,6 +300,20 @@ class DroneImageryLayer extends Model
     public function currentEdits(): array
     {
         return $this->edits ?? self::EMPTY_EDITS;
+    }
+
+    /**
+     * "photos" when the imagery was made from drone photos (JPG/PNG placed by DronePhotoGeoreferencer), else
+     * "geotiff". Set by ProcessDroneImagery; before that, from the uploaded files when a query loaded
+     * withExists('photoFiles').
+     */
+    public function sourceFormat(): string
+    {
+        if (isset($this->metadata['source_format'])) {
+            return $this->metadata['source_format'];
+        }
+
+        return ($this->attributes['photo_files_exists'] ?? false) ? 'photos' : 'geotiff';
     }
 
     /** The saved edits differ from the ones the current map tiles were built from. */
@@ -330,6 +354,12 @@ class DroneImageryLayer extends Model
     public function files(): HasMany
     {
         return $this->hasMany(DroneImageryFile::class)->orderBy('sort_order');
+    }
+
+    /** Uploaded JPG/PNG photos (for withExists in listings; see sourceFormat()). */
+    public function photoFiles(): HasMany
+    {
+        return $this->hasMany(DroneImageryFile::class)->whereIn('mime_type', ['image/jpeg', 'image/png']);
     }
 
     public function hiddenByUsers(): BelongsToMany
