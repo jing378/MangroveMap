@@ -523,6 +523,10 @@
         margin-bottom: 8px;
     }
 
+    .stat-label > .bi {
+        margin-right: 6px;
+    }
+
     .stat-value {
         font-size: 32px;
         font-weight: 800;

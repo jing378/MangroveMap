@@ -154,6 +154,8 @@
         font-weight: 700;
     }
 
+    .field-head .chart-title > .bi { margin-right: 6px; }
+
 </style>
 
 <!-- Field conditions: weather forecast for surveys and planting, loaded after the page -->

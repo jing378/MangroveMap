@@ -339,6 +339,10 @@
         color: var(--fg-1a2e1a, #1a2e1a);
     }
 
+    /* Bootstrap's CSS is not loaded (only its icons), so its me-* spacing classes do nothing here. */
+    .bi.me-1 { margin-right: 4px; }
+    .bi.me-2 { margin-right: 6px; }
+
     .custom-table {
         width: 100%;
         border-collapse: collapse;
