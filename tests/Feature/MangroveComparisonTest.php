@@ -201,11 +201,11 @@ class MangroveComparisonTest extends TestCase
             ->assertSee(route('map').'?compare=previous&amp;municipality=Bontoc', false);
         $this->actingAs($expert)->get(route('expert.dashboard'))
             ->assertSee(route('expert.map').'?compare=previous', false);
-        // One line under the Coverage Trend with the latest previous data (the fixture's 2025 total).
+        // One line under Mangrove Area Over Time with the latest previous data (the fixture's 2025 total).
         $this->actingAs($resident)->get(route('dashboard'))
             ->assertSee('Previous data (satellite, 2025):')
             ->assertSee('<strong>45 ha</strong>', false)
-            // The Coverage Trend's switch, with the province's previous data for its second scale.
+            // The Mangrove Area Over Time switch, with the province's previous data for its second scale.
             ->assertSee('id="trendPreviousToggle"', false)
             ->assertViewHas('previousDataTrend', fn ($trend) => $trend['years'] === [2020, 2021, 2022, 2023, 2024, 2025]
                 && $trend['hectares'] === [40, 41, 42, 43, 44, 45]);

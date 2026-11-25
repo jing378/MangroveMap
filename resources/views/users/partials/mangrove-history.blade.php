@@ -7,7 +7,7 @@
 
   While the satellite data is hidden (config map.mangrove_history.enabled off), the same card and slider show
   this system's own records instead, driven by users.partials.map-timeline-scripts: approved hectares per year
-  (the dashboard's Coverage Trend), and the delineations and drone uploads added up to the chosen year.
+  (the dashboard's Mangrove Area Over Time chart), and the delineations and drone uploads added up to the chosen year.
 --}}
 @php
   $satelliteHistory = (bool) config('map.mangrove_history.enabled');
@@ -120,7 +120,7 @@
           Satellite estimate, about 30 m per pixel, not checked on the ground. Years before 2000 are less certain.
           Source: <a href="https://doi.org/10.5281/zenodo.21346456" target="_blank" rel="noopener">Global Mangrove Watch v4.1</a> (CC BY 4.0).
         @else
-          Hectares are the expert-approved areas in this system, the same figures as the dashboard's Coverage Trend.
+          Hectares are the expert-approved areas in this system, the same figures as the dashboard's Mangrove Area Over Time chart.
           An area or drone upload counts from the year it was added. Pick a municipality to see only its figures.
           <span id="mangroveHistorySatNote" hidden>Previous data: the satellite record of <a href="https://doi.org/10.5281/zenodo.21346456" target="_blank" rel="noopener">Global Mangrove Watch v4.1</a>
             (CC BY 4.0), about 30 m per pixel, so small stands are missed; years after its latest use the latest.</span>

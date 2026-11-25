@@ -101,7 +101,7 @@ class EndUserController extends Controller
         sort($data['municipalitiesWithoutAreas'], SORT_NATURAL | SORT_FLAG_CASE);
         // "Compared with official figures": PSA/provincial totals, satellite per municipality, AI accuracy.
         $data['comparison'] = app(MangroveComparison::class)->summary();
-        // Coverage Trend's "Include previous data" switch: the province's satellite hectares per year (read even
+        // Mangrove Area Over Time's "Include previous data" switch: the province's satellite hectares per year (read even
         // while the satellite chart and map layer are switched off).
         $history = $data['mangroveHistory'] ?? app(MangroveHistoryStats::class)->summary();
         $data['previousDataTrend'] = $history === null ? null : [

@@ -1,5 +1,5 @@
     {{-- "Mangroves mapped by year" (the users.partials.mangrove-history card while the satellite data is hidden):
-         the year slider over this system's own records. Hectares per year are the dashboard's Coverage Trend
+         the year slider over this system's own records. Hectares per year are the dashboard's Mangrove Area Over Time chart
          (approved areas); the map keeps only the delineations, pins and drone uploads added up to the chosen
          year (mapTimelineYear, read by redrawFeatures and renderZoneMarkers). Inlined in workspace-scripts
          after the delineations are loaded. --}}

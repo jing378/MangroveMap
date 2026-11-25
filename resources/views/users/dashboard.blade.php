@@ -1359,12 +1359,14 @@
 
         <div class="chart-card">
             <div class="chart-header" style="flex-wrap: wrap; gap: 8px 12px;">
-                <div class="chart-title"><i class="bi bi-graph-up me-2"></i> Coverage Trend (ha)</div>
+                <div class="chart-title"><i class="bi bi-graph-up me-2"></i> Mangrove Area Over Time (ha)</div>
                 {{-- Off by default: one line from 1985, previous data (satellite) then MangroveMap's own years. --}}
                 @if(!empty($trendValues) && !empty($previousDataTrend))
                     <label class="trend-previous-toggle" title="Continue the line back to {{ $previousDataTrend['years'][0] }} with the satellite record for {{ $previousDataTrend['province'] }}">
                         <input type="checkbox" id="trendPreviousToggle"> Include previous data
                     </label>
+                @endif
+                @if(!empty($previousDataTrend))
                     {{-- Year filter: which years the chart shows (filled by the script from the chart's years). --}}
                     <span class="trend-range" id="trendRange" hidden>
                         <label>From <select id="trendFrom" class="chart-select" aria-label="Show from year"></select></label>
@@ -1373,7 +1375,8 @@
                 @endif
             </div>
             <div class="chart-canvas-wrap">
-                @if(!empty($trendValues))
+                {{-- No approved areas yet: the chart still shows the previous data (satellite) on its own. --}}
+                @if(!empty($trendValues) || !empty($previousDataTrend))
                     <canvas id="coverageTrendChart"></canvas>
                 @else
                     <div class="chart-empty">No approved mangrove areas yet.</div>
@@ -1381,7 +1384,13 @@
             </div>
             {{-- With "Include previous data" on, the chart is one line: previous data (satellite) up to its latest year
                  in amber, then MangroveMap's own years in green. The note explains the drop where it turns green. --}}
-            @if(!empty($previousDataTrend))
+            @if(!empty($previousDataTrend) && empty($trendValues))
+                <p class="chart-note trend-previous-explain">
+                    <span class="trend-key trend-key-previous" aria-hidden="true"></span> Previous data (satellite, about 30 m), {{ $previousDataTrend['province'] }}.
+                    No MangroveMap areas are approved yet; they will continue this line in green.
+                    <span class="trend-previous-note"><a href="{{ $mapRoute }}?compare=previous">Compare on the map <i class="bi bi-arrow-right" aria-hidden="true"></i></a></span>
+                </p>
+            @elseif(!empty($previousDataTrend))
                 <p class="chart-note trend-previous-explain" id="trendPreviousExplain" hidden>
                     <span class="trend-key trend-key-previous" aria-hidden="true"></span> Previous data (satellite, about 30 m), {{ $previousDataTrend['province'] }}
                     · <span class="trend-key trend-key-own" aria-hidden="true"></span> MangroveMap.
@@ -1389,7 +1398,7 @@
                     <span class="trend-previous-note"><a href="{{ $mapRoute }}?compare=previous">Compare on the map <i class="bi bi-arrow-right" aria-hidden="true"></i></a></span>
                 </p>
             @endif
-            @if(!empty($comparison['satellite']))
+            @if(!empty($comparison['satellite']) && !empty($trendValues))
                 <p class="chart-note trend-previous-note" id="trendPreviousNote">
                     Previous data (satellite, {{ $comparison['satellite']['latest_year'] }}):
                     <strong>{{ rtrim(rtrim(number_format($comparison['satellite']['latest_hectares'], 2), '0'), '.') }} ha</strong>
@@ -1827,8 +1836,8 @@
             });
         }
 
-        // Coverage Trend Line
-        // Coverage Trend: MangroveMap's mapped hectares per year. "Include previous data" (off by default,
+        // Mangrove Area Over Time line
+        // Mangrove Area Over Time: MangroveMap's mapped hectares per year. "Include previous data" (off by default,
         // remembered per browser) turns it into one line from the satellite's first year: previous data (amber)
         // up to the satellite's latest year, then MangroveMap's later years (green), joined by a dashed segment
         // and a dashed marker where the method changes; the note under the chart explains the drop there.
@@ -1881,8 +1890,10 @@
                 },
             };
 
-            let showPrevious = false;
-            try { showPrevious = !!toggle && localStorage.getItem(KEY) === '1'; } catch (error) { /* private mode */ }
+            // Nothing approved yet: show the previous data alone (no switch then).
+            const onlyPrevious = !values.length && !!previous;
+            let showPrevious = onlyPrevious;
+            try { showPrevious = onlyPrevious || (!!toggle && localStorage.getItem(KEY) === '1'); } catch (error) { /* private mode */ }
             const initial = series(showPrevious);
 
             const trendChart = new Chart(trendCtx, {
@@ -2001,6 +2012,11 @@
                 });
                 fromEl?.addEventListener('change', () => apply(toggle.checked));
                 toEl?.addEventListener('change', () => apply(toggle.checked));
+            } else if (onlyPrevious) {
+                fillRange(series(true).labels);
+                apply(true);
+                fromEl?.addEventListener('change', () => apply(true));
+                toEl?.addEventListener('change', () => apply(true));
             }
         }
 
