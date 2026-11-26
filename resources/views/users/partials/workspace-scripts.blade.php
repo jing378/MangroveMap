@@ -238,7 +238,7 @@
       'Rhizophora': 'Bakawan',
       'Avicennia': 'Bungalon',
       'Sonneratia': 'Pagatpat',
-      'Bruguiera': 'Miapi',
+      'Bruguiera': 'Pototan',
       'Ceriops': 'Tungog',
       'Xylocarpus': 'Tabigi',
       'Nypa': 'Nipa/Sasa',
@@ -254,17 +254,48 @@
       return local ? `${genus} (${local})` : genus;
     }
 
+    // Areas drawn from a drone survey: the AI genus model's canopy share per genus (genus_canopy in the map
+    // payload, DroneImageryLayer::genusCanopyShares). Set when a feature is selected; renderDelineationGenera puts
+    // each share inside its genus chip and a one-line note under them.
+    let currentGenusCanopy = null;
+
+    function genusCanopyShares() {
+      const shares = {};
+      (Array.isArray(currentGenusCanopy?.genera) ? currentGenusCanopy.genera : [])
+        .filter(item => item?.genus && Number(item.percent) > 0)
+        .forEach(item => { shares[item.genus] = Number(item.percent); });
+      return shares;
+    }
+
+    function renderGenusCanopyNote(shares) {
+      const note = document.getElementById('delineationGenusCanopy');
+      if (!note) return;
+      const pct = value => `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+      const recognised = Number(currentGenusCanopy?.recognised_percent);
+      note.hidden = Object.keys(shares).length === 0;
+      note.textContent = note.hidden ? '' : `% = share of the canopy, by AI from the drone survey${recognised > 0 ? ` (it named the genus on ${pct(recognised)} of this area)` : ''}.`;
+    }
+
     function renderDelineationGenera(genera) {
       currentSelectedGenera = Array.isArray(genera) ? [...genera] : [];
       const displayEl = document.getElementById('delineationFeatureGenera');
+      const shares = genusCanopyShares();
       if (displayEl) {
-        if (!currentSelectedGenera.length) {
+        // The recorded genera plus any the AI found in the drone survey, largest canopy share first; the share sits
+        // inside each chip. Only the recorded ones stay in currentSelectedGenera (what is saved).
+        const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+        const shown = [...currentSelectedGenera];
+        Object.keys(shares).forEach(genus => { if (!shown.some(name => same(name, genus))) shown.push(genus); });
+        const shareOf = name => Object.entries(shares).find(([genus]) => same(genus, name))?.[1] ?? -1;
+        shown.sort((a, b) => shareOf(b) - shareOf(a));
+        if (!shown.length) {
           displayEl.innerHTML = '<span style="color:#9ab0a0;font-weight:400;font-style:italic;">None recorded</span>';
         } else {
           // Clicking a genus shows its sample photo and description (partials/genus-info).
-          displayEl.replaceChildren(...GenusInfo.chips(currentSelectedGenera));
+          displayEl.replaceChildren(...GenusInfo.chips(shown, { shares }));
         }
       }
+      renderGenusCanopyNote(shares);
 
       // Update quick selection buttons
       document.querySelectorAll('#genusQuickSelector .genus-pill-btn').forEach(btn => {
@@ -835,6 +866,7 @@
               approved_by_name: record.approved_by_name || null,
               delineation_id: record.id,
               drone_imagery_layer_id: record.drone_imagery_layer_id || null,
+              genus_canopy: record.genus_canopy || null,
               reassesses: record.reassesses || null,
               is_approved: !!record.is_approved,
               is_rejected: !!record.is_rejected,
@@ -878,6 +910,7 @@
           created_year: mapRecordYear(record.created_at),
           municipality,
           drone_imagery_layer_id: record.drone_imagery_layer_id || null,
+          genus_canopy: record.genus_canopy || null,
           reassesses: record.reassesses || null,
           is_approved: !!record.is_approved,
           is_rejected: !!record.is_rejected,
@@ -1359,6 +1392,7 @@
 
       // Mangrove Genus Present
       currentSelectedGenera = Array.isArray(feature.genera) ? [...feature.genera] : [];
+      currentGenusCanopy = feature.genus_canopy || null;
       renderDelineationGenera(currentSelectedGenera);
 
       const createdByEl = document.getElementById('delineationCreatedBy');

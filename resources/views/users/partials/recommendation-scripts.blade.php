@@ -20,7 +20,7 @@
       Rhizophora: 'Bakawan',
       Avicennia: 'Bungalon',
       Sonneratia: 'Pagatpat',
-      Bruguiera: 'Miapi',
+      Bruguiera: 'Pototan',
       Ceriops: 'Tungog',
       Xylocarpus: 'Tabigi',
       Nypa: 'Nipa/Sasa',

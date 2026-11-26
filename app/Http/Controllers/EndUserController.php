@@ -35,6 +35,9 @@ class EndUserController extends Controller
     /** Expert Recommender-tab entries linked to a delineation (shown in its details panel). */
     private const PLANTING_RECOMMENDATIONS_RELATION = 'plantingRecommendations.user:id,name';
 
+    /** Just what the AI canopy shares per genus need (DroneImageryLayer::genusCanopyShares). */
+    private const DRONE_CANOPY_RELATION = 'droneImageryLayer:id,classification_status,classification_stats';
+
     /** Same cap as the expert Recommender tab. */
     private const PLANTING_RECOMMENDATIONS_MAP_LIMIT = 300;
 
@@ -245,7 +248,7 @@ class EndUserController extends Controller
                 ->all()
             : [];
 
-        $payload = array_merge(Arr::except($delineation->toArray(), ['latest_revision']), $extra, [
+        $payload = array_merge(Arr::except($delineation->toArray(), ['latest_revision', 'drone_imagery_layer']), $extra, [
             'planting_recommendations' => $plantingRecommendations,
             'features' => self::sanitizeFeaturesForMap($delineation->features),
             // For the year slider's municipality picker (the features above are sent without location details).
@@ -255,6 +258,10 @@ class EndUserController extends Controller
             'approved_by_name' => $delineation->approvedBy?->name ?? $delineation->approved_by_name ?? null,
             'last_revised_by_name' => $latestRevision?->reviser?->name,
             'last_revised_at' => $latestRevision?->created_at?->toIso8601String(),
+            // Drawn from drone imagery: the AI's canopy share per genus ("Mangrove Genus Present").
+            'genus_canopy' => $delineation->drone_imagery_layer_id
+                ? $delineation->loadMissing(self::DRONE_CANOPY_RELATION)->droneImageryLayer?->genusCanopyShares()
+                : null,
             // Rejected delineations: experts may remove them from this moment on (the resident is told).
             'removable_after' => $delineation->rejectedRemovableAt()?->toIso8601String(),
             // A drone re-survey of an area already on the map (the panel's Source says which).
@@ -358,7 +365,7 @@ class EndUserController extends Controller
         $delineationModels = Delineation::fetchForMap(
             $user->delineations()->withoutAppliedReassessments()->with(['user:id,name,role', 'approvedBy:id,name']),
             Delineation::MAP_QUERY_LIMIT_OWN,
-            ['latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION]
+            ['latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION, self::DRONE_CANOPY_RELATION]
         );
         $delineations = $delineationModels
             ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d))
@@ -367,7 +374,7 @@ class EndUserController extends Controller
         $approvedForMapModels = Delineation::fetchForMap(
             Delineation::approved()->withoutAppliedReassessments()->where('user_id', '!=', $user->id)->with(['user:id,name,role', 'approvedBy:id,name']),
             Delineation::MAP_QUERY_LIMIT,
-            [self::PLANTING_RECOMMENDATIONS_RELATION]
+            [self::PLANTING_RECOMMENDATIONS_RELATION, self::DRONE_CANOPY_RELATION]
         );
 
         $approvedDelineations = $approvedForMapModels;
@@ -383,7 +390,7 @@ class EndUserController extends Controller
         $residentDelineationsForMap = collect();
         if ($user->isExpert()) {
             $residentDelineationsForMap = Delineation::fetchResidentDelineationsForExpertMap()
-                ->load(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION])
+                ->load(['user:id,name,role', 'approvedBy:id,name', 'latestRevision.reviser:id,name', self::PLANTING_RECOMMENDATIONS_RELATION, self::DRONE_CANOPY_RELATION])
                 ->map(fn (Delineation $d) => $this->delineationPayloadForMap($d))
                 ->values();
         }

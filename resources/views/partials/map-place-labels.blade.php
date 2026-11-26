@@ -131,5 +131,44 @@
       map.on('zoomend moveend', placeOsmLabels);
       map.whenReady(placeOsmLabels);
       sync();
+      attachLeafletVersion(map);
       return esriPlaces;
+    }
+
+    {{-- "Leaflet 1.9.4 · May 2023" in the map's bottom-left corner: the map library's version (read from the loaded
+         Leaflet, L.version) and its release date. Add the date to RELEASES when Leaflet is upgraded; an unknown
+         version shows without a date. Links to leafletjs.com. --}}
+    function attachLeafletVersion(map) {
+      const RELEASES = { '1.9.4': 'May 2023' };
+      if (!document.getElementById('leafletVersionStyles')) {
+        const style = document.createElement('style');
+        style.id = 'leafletVersionStyles';
+        style.textContent = `
+          .leaflet-version {
+            display: inline-flex; align-items: center; gap: 5px; margin: 0 0 8px 8px !important;
+            padding: 3px 9px; border-radius: 999px; background: rgba(10, 22, 15, 0.65); color: #fff !important;
+            font: 600 11px/1.3 Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif; text-decoration: none;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+          }
+          .leaflet-version:hover { background: rgba(10, 22, 15, 0.85); }
+          .leaflet-version span { font-weight: 500; opacity: 0.8; }`;
+        document.head.appendChild(style);
+      }
+      const VersionControl = L.Control.extend({
+        options: { position: 'bottomleft' },
+        onAdd() {
+          const link = L.DomUtil.create('a', 'leaflet-version');
+          const released = RELEASES[L.version];
+          link.href = 'https://leafletjs.com';
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.dataset.noProgress = '';
+          link.title = `Map library: Leaflet ${L.version}${released ? `, released ${released}` : ''}`;
+          link.textContent = `Leaflet ${L.version}`;
+          if (released) link.append(' ', Object.assign(document.createElement('span'), { textContent: `· ${released}` }));
+          L.DomEvent.disableClickPropagation(link);
+          return link;
+        },
+      });
+      return new VersionControl().addTo(map);
     }

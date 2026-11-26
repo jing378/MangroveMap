@@ -241,6 +241,43 @@ class DroneImageryLayer extends Model
         return [...$stats, ...array_intersect_key($classification, array_flip(self::CLASSIFICATION_STAT_KEYS))];
     }
 
+    /**
+     * The AI's canopy share per genus for the map's "Mangrove Genus Present": each genus's share of the canopy the
+     * genus model recognised (confident detections, recounted for the owner's saved areas), largest first, summing
+     * to 100. `recognised_percent` is how much of the mapped area it recognised at all; the rest it could not name.
+     * Null until the classification is ready or when it found no genus.
+     *
+     * @return array{genera: list<array{genus: string, percent: float}>, recognised_percent: float, canopy_count: ?int}|null
+     */
+    public function genusCanopyShares(): ?array
+    {
+        if ($this->classification_status !== 'ready') {
+            return null;
+        }
+        $suggestion = $this->classification_stats['genus_suggestion'] ?? null;
+        if (! is_array($suggestion) || isset($suggestion['error'])) {
+            return null;
+        }
+
+        $genera = collect($suggestion['genera'] ?? [])
+            ->filter(fn ($item) => is_array($item) && ($item['genus'] ?? '') !== '' && (float) ($item['share_percent'] ?? 0) > 0)
+            ->map(fn (array $item) => ['genus' => ucfirst((string) $item['genus']), 'percent' => round((float) $item['share_percent'], 1)])
+            ->sortByDesc('percent')
+            ->values()
+            ->all();
+        if ($genera === []) {
+            return null;
+        }
+
+        $canopies = $this->classification_stats['canopy_count'] ?? null;
+
+        return [
+            'genera' => $genera,
+            'recognised_percent' => round((float) ($suggestion['labeled_percent'] ?? 0), 1),
+            'canopy_count' => is_numeric($canopies) ? (int) $canopies : null,
+        ];
+    }
+
     /** A GDAL job is queued or running (preparing the preview, or applying edits and tiling). */
     public function isProcessing(): bool
     {

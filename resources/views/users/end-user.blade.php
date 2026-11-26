@@ -2740,7 +2740,7 @@
                 <button type="button" class="genus-pill-btn" data-genus="Rhizophora" onclick="toggleGenusSelection('Rhizophora')"><i class="bi bi-plus"></i> Rhizophora <span class="genus-local-name">(Bakawan)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Avicennia" onclick="toggleGenusSelection('Avicennia')"><i class="bi bi-plus"></i> Avicennia <span class="genus-local-name">(Bungalon)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Sonneratia" onclick="toggleGenusSelection('Sonneratia')"><i class="bi bi-plus"></i> Sonneratia <span class="genus-local-name">(Pagatpat)</span></button>
-                <button type="button" class="genus-pill-btn" data-genus="Bruguiera" onclick="toggleGenusSelection('Bruguiera')"><i class="bi bi-plus"></i> Bruguiera <span class="genus-local-name">(Miapi)</span></button>
+                <button type="button" class="genus-pill-btn" data-genus="Bruguiera" onclick="toggleGenusSelection('Bruguiera')"><i class="bi bi-plus"></i> Bruguiera <span class="genus-local-name">(Pototan)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Ceriops" onclick="toggleGenusSelection('Ceriops')"><i class="bi bi-plus"></i> Ceriops <span class="genus-local-name">(Tungog)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Xylocarpus" onclick="toggleGenusSelection('Xylocarpus')"><i class="bi bi-plus"></i> Xylocarpus <span class="genus-local-name">(Tabigi)</span></button>
                 <button type="button" class="genus-pill-btn" data-genus="Nypa" onclick="toggleGenusSelection('Nypa')"><i class="bi bi-plus"></i> Nypa <span class="genus-local-name">(Nipa/Sasa)</span></button>
@@ -3150,7 +3150,7 @@
       'Rhizophora': 'Bakawan',
       'Avicennia': 'Bungalon',
       'Sonneratia': 'Pagatpat',
-      'Bruguiera': 'Miapi',
+      'Bruguiera': 'Pototan',
       'Ceriops': 'Tungog',
       'Xylocarpus': 'Tabigi',
       'Nypa': 'Nipa/Sasa',

@@ -1273,6 +1273,18 @@
     text-align: left;
   }
 
+  /* One line under the genus chips explaining their AI canopy shares (drone-survey areas; renderGenusCanopyNote). */
+  .genus-canopy {
+    margin-top: 6px;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--fg-6a8c79, #6a8c79);
+  }
+
+  .genus-canopy[hidden] {
+    display: none;
+  }
+
   .genus-pick {
     display: inline-flex;
     align-items: center;

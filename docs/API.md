@@ -75,7 +75,7 @@ The delineations the map draws for the current user. The map calls it after ever
     "residentDelineationsForMap": [ /* experts only: residents' delineations, pending first, at most 150 */ ]
   }
   ```
-  Each delineation includes `id`, `name`, `notes`, `features`, `is_approved`, `is_rejected`, `rejection_notes`, `user_name`, `approved_by_name`, `municipality`, `planting_recommendations`, `last_revised_by_name`, `last_revised_at`, `removable_after` and `reassesses` (`{id, name}` of the area a drone re-survey reassesses, else `null`). Approved re-surveys are left out: their boundary is on the area they updated.
+  Each delineation includes `id`, `name`, `notes`, `features`, `is_approved`, `is_rejected`, `rejection_notes`, `user_name`, `approved_by_name`, `municipality`, `planting_recommendations`, `last_revised_by_name`, `last_revised_at`, `removable_after`, `reassesses` (`{id, name}` of the area a drone re-survey reassesses, else `null`) and `genus_canopy` (areas drawn from a drone survey whose genus classification is ready: `{genera: [{genus, percent}], recognised_percent, canopy_count}`, each genus's share of the canopy the AI recognised, largest first; else `null`). Approved re-surveys are left out: their boundary is on the area they updated.
 
 ### `GET /delineations/{delineation}/annual-observations`
 The "Changes over time" timeline for one delineation: one entry per observed year, with `year`, `coverageAreaHa`, `source` and the boundary `features`.
