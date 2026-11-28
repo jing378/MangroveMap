@@ -3,6 +3,7 @@
 use App\Http\Controllers\TileExplorerController;
 use App\Http\Middleware\EnsureUserIsEndUser;
 use App\Http\Middleware\EnsureUserIsExpert;
+use App\Http\Middleware\EnsureUserIsNotAdmin;
 use App\Http\Middleware\IsAdmin;
 use App\Http\Middleware\TrackUserPresence;
 use Illuminate\Foundation\Application;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => IsAdmin::class,
             'end_user' => EnsureUserIsEndUser::class,
             'expert' => EnsureUserIsExpert::class,
+            'not_admin' => EnsureUserIsNotAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

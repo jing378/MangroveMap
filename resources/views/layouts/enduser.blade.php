@@ -640,6 +640,22 @@
         <aside class="sidebar">
             <div class="sidebar-section">
                 <div class="sidebar-title">MAIN</div>
+                @if (auth()->user()->isAdmin())
+                    {{-- Admins only reach the shared Map here (the dashboard's "Compare on the map"); the resident
+                         tools are closed to them (not_admin middleware), so lead back to the admin pages. --}}
+                    <a href="{{ route('admin.dashboard') }}" class="sidebar-item">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>Admin Dashboard</span>
+                    </a>
+                    <a href="{{ route('map') }}" class="sidebar-item {{ request()->routeIs('map') ? 'active' : '' }}">
+                        <i class="bi bi-map"></i>
+                        <span>Map</span>
+                    </a>
+                    <a href="{{ route('admin.map-layers.index') }}" class="sidebar-item">
+                        <i class="bi bi-layers"></i>
+                        <span>Map Layers</span>
+                    </a>
+                @else
                 <a href="{{ auth()->user()->isExpert() ? route('expert.dashboard') : route('dashboard') }}"
                     class="sidebar-item {{ request()->routeIs('dashboard') || request()->routeIs('expert.dashboard') ? 'active' : '' }}">
                     <i class="bi bi-speedometer2"></i>
@@ -672,6 +688,7 @@
                     <i class="bi bi-grid-3x3-gap"></i>
                     <span>Tile Explorer</span>
                 </a>
+                @endif
             </div>
 
             <div class="sidebar-section">

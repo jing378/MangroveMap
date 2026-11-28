@@ -174,7 +174,7 @@ Route::get('/map/mangrove-history', MapMangroveHistoryController::class)
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Drone Upload tab: upload GeoTIFFs, then review and manage them
-    Route::get('/drone-upload', [DroneImageryController::class, 'page'])->name('drone-imagery.page');
+    Route::get('/drone-upload', [DroneImageryController::class, 'page'])->middleware('not_admin')->name('drone-imagery.page');
     Route::get('/drone-imagery', [DroneImageryController::class, 'index'])
         ->name('drone-imagery.index');
     Route::post('/drone-imagery', [DroneImageryController::class, 'store'])
@@ -201,7 +201,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('drone-imagery.uploads.cancel');
 
     // Tile Explorer: upload a GeoTIFF (chunked uploads above, purpose "tiles"), cut it into tiles, download a selection
-    Route::get('/tile-explorer', [TileExplorerController::class, 'page'])->name('tile-explorer.page');
+    Route::get('/tile-explorer', [TileExplorerController::class, 'page'])->middleware('not_admin')->name('tile-explorer.page');
     Route::post('/tile-explorer/sources/{sourceId}/sets', [TileExplorerController::class, 'storeSet'])
         ->whereNumber('sourceId')
         ->middleware('throttle:20,1,tile-explorer.sets.store')
@@ -257,6 +257,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Review editor: preview the prepared mosaic, mask non-mangrove areas, adjust, then confirm onto the map
     Route::get('/drone-imagery/{layerId}/edit', [DroneImageryController::class, 'edit'])
         ->whereNumber('layerId')
+        ->middleware('not_admin')
         ->name('drone-imagery.edit');
     Route::get('/drone-imagery/{layerId}/preview', [DroneImageryController::class, 'preview'])
         ->whereNumber('layerId')
@@ -308,7 +309,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Map viewer & Delineate studio (accessible to authenticated users)
     Route::get('/map', [EndUserController::class, 'map'])->name('map');
-    Route::get('/delineate', [EndUserController::class, 'delineate'])->name('delineate');
+    Route::get('/delineate', [EndUserController::class, 'delineate'])->middleware('not_admin')->name('delineate');
     // The map's delineations as JSON: the map redraws from it right after a save, edit, review or removal.
     Route::get('/map/delineations', [EndUserController::class, 'mapDelineations'])
         ->middleware('throttle:120,1,map.delineations')

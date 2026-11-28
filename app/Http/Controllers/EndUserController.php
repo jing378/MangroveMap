@@ -20,6 +20,7 @@ use App\Services\MangroveHistoryStats;
 use App\Services\MunicipalityBounds;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -153,6 +154,10 @@ class EndUserController extends Controller
 
     public function map()
     {
+        if ($redirect = $this->expertVariantRedirect('map', 'expert.map')) {
+            return $redirect;
+        }
+
         $data = $this->buildDashboardData();
         $data['page'] = 'map';
         // Where each municipality is, so the year slider's place picker can zoom to it.
@@ -181,10 +186,28 @@ class EndUserController extends Controller
 
     public function delineate()
     {
+        if ($redirect = $this->expertVariantRedirect('delineate', 'expert.delineate')) {
+            return $redirect;
+        }
+
         $data = $this->buildDashboardData();
         $data['page'] = 'delineate';
 
         return view('users.delineate', $data);
+    }
+
+    /**
+     * Experts have their own Map/Delineate under /expert (ExpertController calls these same methods there):
+     * the resident address sends them to theirs, keeping the query (?delineation=ID, ?compare=previous, ...).
+     */
+    private function expertVariantRedirect(string $residentRoute, string $expertRoute): ?RedirectResponse
+    {
+        $request = request();
+        if (! $request->routeIs($residentRoute) || ! $request->user()?->isExpert()) {
+            return null;
+        }
+
+        return redirect()->route($expertRoute, $request->query());
     }
 
     /**
