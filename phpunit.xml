@@ -32,5 +32,10 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- AI models: the local defaults, whatever .env picks, and no Roboflow key, so tests never call the
+             hosted Roboflow API. Roboflow tests set the key and model in config themselves. -->
+        <env name="ML_DRONE_EXTENT_MODEL" value="unet"/>
+        <env name="ML_GENUS_MODEL" value="yolo"/>
+        <env name="ROBOFLOW_API_KEY" value=""/>
     </php>
 </phpunit>
