@@ -3,11 +3,10 @@
      keeps whatever they were doing on the page (e.g. a half-drawn delineation). --}}
 <style>
     /* The sidebar item is a <button>: match the <a> sidebar items. */
+    /* No border at all: a <button> gets the browser's default border, which showed as a stripe on its left. */
     button.sidebar-item {
         width: calc(100% - 16px);
-        border-top: 0;
-        border-right: 0;
-        border-bottom: 0;
+        border: 0;
         background: transparent;
         font-family: inherit;
         text-align: left;

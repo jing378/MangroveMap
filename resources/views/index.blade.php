@@ -1248,8 +1248,7 @@
     }
 
     .d-rec {
-      border: 1px solid var(--bd-e0ece4, #e0ece4);
-      border-left: 4px solid var(--rec-color, #7a9a7a);
+            border: 1px solid var(--bd-e0ece4, #e0ece4);
       border-radius: 8px;
       padding: 8px 10px;
       margin-bottom: 8px;
@@ -1257,10 +1256,16 @@
       color: var(--fg-2f4a3a, #2f4a3a);
     }
 
+        /* The suitability as a small pill in its colour. */
     .d-rec strong {
-      display: block;
+      display: inline-block;
+      margin-bottom: 6px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--rec-color, #7a9a7a) 14%, transparent);
       color: var(--rec-color, var(--fg-1a3324, #1a3324));
-      margin-bottom: 4px;
+      font-size: 11px;
+      font-weight: 800;
     }
 
     .d-rec p {

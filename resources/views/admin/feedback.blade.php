@@ -169,14 +169,13 @@
 
     .feedback-item {
         padding: 16px;
-        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
-        border-left: 3px solid var(--bd-e0e8e0, #e0e8e0);
+                border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 10px;
         background: var(--bg-ffffff, #fff);
     }
 
-    .feedback-item.is-new {
-        border-left-color: #c07818;
+        .feedback-item.is-new {
+        border-color: var(--bd-f0dbb4, #f0dbb4);
         background: var(--bg-fffcf5, #fffcf5);
     }
 

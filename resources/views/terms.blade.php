@@ -160,10 +160,10 @@
 
         .note {
             margin-top: 12px;
-            padding: 12px 14px;
-            border-left: 4px solid #1e9e62;
+                        padding: 12px 14px;
+            border: 1px solid var(--bd-cfe9da, #cfe9da);
             background: var(--bg-f3faf6, #f3faf6);
-            border-radius: 0 10px 10px 0;
+            border-radius: 10px;
         }
 
         a {

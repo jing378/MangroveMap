@@ -324,10 +324,9 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 10px 16px;
+                        padding: 10px 16px 10px 19px;
             color: var(--fg-6a8a6a, #6a8a6a);
             transition: all 0.15s;
-            border-left: 3px solid transparent;
             margin: 0 8px;
             border-radius: 8px;
             font-size: 13px;
@@ -376,8 +375,7 @@
 
         .sidebar-item.active {
             background: #1d593d;
-            color: #fff;
-            border-left-color: var(--bd-a9e3bf, #a9e3bf);
+                        color: #fff;
             font-weight: 700;
             box-shadow: 0 3px 9px rgba(29, 89, 61, 0.18);
         }

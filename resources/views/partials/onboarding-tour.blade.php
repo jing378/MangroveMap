@@ -72,11 +72,14 @@
                 'icon' => 'bi-cpu',
                 'title' => 'Look after the AI models',
                 'text' => 'Drone surveys are outlined and classified by AI.',
-                'points' => [
+                'points' => array_values(array_filter([
                     'Upload a U-Net <code>.pth</code> (mangrove areas) or a YOLO <code>.pt</code> (genus).',
                     'The green check activates or deactivates a model.',
-                    'The hosted <strong>Roboflow workflows</strong> show whether they are in use.',
-                ],
+                    // Only when a Roboflow key is set: that is when the AI Models page lists the hosted workflows.
+                    trim((string) config('ml.roboflow.api_key')) !== ''
+                        ? 'The hosted <strong>Roboflow workflows</strong> show whether they are in use.'
+                        : null,
+                ])),
                 'link' => [route('admin.models'), 'Go to AI Models'],
             ],
             $helpStep,
@@ -468,21 +471,43 @@
         list-style: none;
     }
 
+    /* Key points: a plain list with bullets, no boxes. */
     .onboarding-points li {
         position: relative;
-        padding: 9px 12px 9px 14px;
-        border: 1px solid var(--bd-e0ebe2, #e0ebe2);
-        border-left: 3px solid #1e9e62;
-        border-radius: 10px;
-        background: var(--bg-f8fbf9, #f8fbf9);
-        font-size: 13px;
-        line-height: 1.45;
+        padding-left: 24px;
+        font-size: 13.5px;
+        line-height: 1.5;
         color: var(--fg-2f4a3a, #2f4a3a);
     }
 
-    .onboarding-points li .bi {
-        margin-right: 4px;
+    /* Bullet: the point's own icon when it has one, else a small green dot. */
+    .onboarding-points li::before {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: .55em;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #1e9e62;
+    }
+
+    .onboarding-points li:has(> .bi:first-child)::before,
+    .onboarding-points li:has(> .onboarding-pill:first-child)::before {
+        display: none;
+    }
+
+    .onboarding-points li > .bi:first-child {
+        position: absolute;
+        left: 0;
+        top: .1em;
+        font-size: 15px;
         color: var(--fg-1e7a4f, #1e7a4f);
+    }
+
+    /* Status pills (Pending, Approved, Rejected) lead their line instead of a bullet. */
+    .onboarding-points li:has(> .onboarding-pill:first-child) {
+        padding-left: 0;
     }
 
     .onboarding-points strong,

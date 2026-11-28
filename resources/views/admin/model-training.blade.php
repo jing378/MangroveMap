@@ -759,11 +759,13 @@
         color: var(--fg-d04030, #d04030);
     }
 
+        /* In use: a soft green tint and border (the icon tile and "In use" pill say what it is). */
     .hosted-model {
         display: flex;
         gap: 16px;
         align-items: flex-start;
-        border-left: 4px solid #1e9e62;
+        border: 1px solid var(--bd-bce6cf, #bce6cf);
+        background: var(--bg-f5fbf7, #f5fbf7);
     }
 
     .hosted-model-icon {
@@ -809,8 +811,9 @@
         color: var(--fg-1e9e62, #1e9e62);
     }
 
-    .hosted-model.is-idle {
-        border-left-color: var(--bd-c9d4cc, #c9d4cc);
+        .hosted-model.is-idle {
+        border-color: var(--bd-e0e8e0, #e0e8e0);
+        background: var(--bg-ffffff, #ffffff);
     }
 
     .hosted-model.is-idle .hosted-model-icon {

@@ -730,8 +730,7 @@
         align-items: center;
         gap: 14px;
         padding: 12px 14px;
-        border: 1px solid var(--bd-e0e8e0, #e0e8e0);
-        border-left-width: 4px;
+                border: 1px solid var(--bd-e0e8e0, #e0e8e0);
         border-radius: 10px;
         margin-bottom: 10px;
         color: inherit;
@@ -770,20 +769,24 @@
         }
     }
 
-    .attention-item:hover {
-        background: var(--bg-f5f7f6, #f5f7f6);
+        .attention-item:hover {
+        box-shadow: 0 2px 10px rgba(15, 40, 25, .08);
     }
 
+    /* Tinted by tone (the coloured icon carries it too), no coloured edge. */
     .attention-item.tone-danger {
-        border-left-color: #d04030;
+        border-color: var(--bd-f2cdc6, #f2cdc6);
+        background: var(--bg-fdf5f3, #fdf5f3);
     }
 
     .attention-item.tone-warning {
-        border-left-color: #c07818;
+        border-color: var(--bd-f0dbb4, #f0dbb4);
+        background: var(--bg-fdf8ef, #fdf8ef);
     }
 
     .attention-item.tone-info {
-        border-left-color: #1e9e62;
+        border-color: var(--bd-cfe9da, #cfe9da);
+        background: var(--bg-f5fbf7, #f5fbf7);
     }
 
     .attention-icon {

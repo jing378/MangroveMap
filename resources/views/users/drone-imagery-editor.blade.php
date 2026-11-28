@@ -324,8 +324,7 @@
 
         .drone-editor-layer.is-on {
             border-color: #1e9e62;
-            background: var(--bg-f3fbf6, #f3fbf6);
-            box-shadow: inset 3px 0 0 #1e9e62;
+                        background: var(--bg-f3fbf6, #f3fbf6);
         }
 
         .drone-editor-layer-head {

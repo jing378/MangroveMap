@@ -264,26 +264,34 @@
     .guide-tip,
     .guide-warn {
         margin-top: 14px;
-        padding: 11px 14px;
-        border-radius: 0 10px 10px 0;
+                padding: 11px 14px;
+        border-radius: 10px;
         font-size: 13.5px;
     }
 
     .guide-tip {
-        border-left: 4px solid #1e9e62;
+        border: 1px solid var(--bd-cfe9da, #cfe9da);
         background: var(--bg-f3faf6, #f3faf6);
         color: var(--fg-2f4a3a, #2f4a3a);
     }
 
-    .guide-warn {
-        border-left: 4px solid #d08a30;
+        .guide-warn {
+        border: 1px solid var(--bd-f0dbb4, #f0dbb4);
         background: var(--bg-fdf7ee, #fdf7ee);
         color: var(--fg-5a4020, #5a4020);
     }
 
-    .guide-tip i,
+        .guide-tip i,
     .guide-warn i {
         margin-right: 4px;
+    }
+
+    .guide-tip > i:first-child {
+        color: var(--fg-1e9e62, #1e9e62);
+    }
+
+    .guide-warn > i:first-child {
+        color: var(--fg-c07818, #c07818);
     }
 
     .guide-actions {

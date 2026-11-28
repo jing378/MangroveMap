@@ -156,9 +156,21 @@ if ($currentUser && $currentUser->role === 'admin') {
         transition: all 0.15s;
     }
 
-    .notification-card.unread {
-        border-left: 4px solid #1e9e62;
+        .notification-card.unread {
+        border-color: var(--bd-cfe9da, #cfe9da);
         background: var(--bg-f8fcfa, #f8fcfa);
+    }
+
+    /* Unread: a dot before the title (no coloured edge). */
+    .notification-card.unread .notification-card-title::before {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin: 0 8px 2px 0;
+        border-radius: 50%;
+        background: #1e9e62;
+        vertical-align: middle;
     }
 
     .notification-card-icon {
