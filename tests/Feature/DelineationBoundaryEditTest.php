@@ -282,4 +282,56 @@ class DelineationBoundaryEditTest extends TestCase
             ->assertSee('Rhizophora')
             ->assertSee('Plant Avicennia in the intertidal zone.');
     }
+
+    public function test_edit_saves_genus_and_notes_with_the_boundary(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $expert = User::factory()->create(['role' => 'expert']);
+        $delineation = $this->residentDelineation($resident, ['is_approved' => true, 'approved_at' => now()]);
+        $unchangedShape = $delineation->features[0];
+
+        // Genus and notes only, same boundary: saved, with the old notes kept in the revision.
+        $this->actingAs($expert)
+            ->putJson(route('delineations.boundary.update', $delineation), [
+                'features' => [array_merge($unchangedShape, ['genera' => ['Rhizophora', 'Avicennia']])],
+                'notes' => '  Checked in the field; Avicennia on the seaward edge.  ',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Delineation updated.')
+            ->assertJsonPath('delineation.notes', 'Checked in the field; Avicennia on the seaward edge.');
+
+        $fresh = $delineation->fresh();
+        $this->assertSame('Checked in the field; Avicennia on the seaward edge.', $fresh->notes);
+        $this->assertSame(['Rhizophora', 'Avicennia'], $fresh->features[0]['genera']);
+        $this->assertSame('Drawn by a resident', $fresh->revisions()->firstOrFail()->snapshot['notes']);
+        $this->assertTrue($fresh->is_approved, 'Editing the details keeps the review status.');
+    }
+
+    public function test_notes_are_kept_when_left_out_and_cannot_be_emptied(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+        $delineation = $this->residentDelineation($resident);
+
+        $this->actingAs($resident)
+            ->putJson(route('delineations.boundary.update', $delineation), $this->editedPayload())
+            ->assertOk();
+        $this->assertSame('Drawn by a resident', $delineation->fresh()->notes);
+
+        $this->actingAs($resident)
+            ->putJson(route('delineations.boundary.update', $delineation), $this->editedPayload() + ['notes' => '   '])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['notes' => 'Notes cannot be empty.']);
+        $this->assertSame('Drawn by a resident', $delineation->fresh()->notes);
+    }
+
+    public function test_map_panel_shows_notes_as_text_and_edits_them_only_in_edit_mode(): void
+    {
+        $expert = User::factory()->create(['role' => 'expert']);
+
+        $this->actingAs($expert)->get(route('expert.map'))
+            ->assertOk()
+            ->assertSee('id="delineationNotesRow"', false)
+            ->assertSee('id="delineationNotesView"', false)
+            ->assertSee('Change the boundary, genus and notes');
+    }
 }

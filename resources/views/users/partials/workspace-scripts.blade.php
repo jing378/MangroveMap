@@ -305,10 +305,13 @@
         btn.innerHTML = `<i class="bi ${isActive ? 'bi-check2' : 'bi-plus'}"></i> ${getGenusDisplayLabel(genus)}`;
       });
 
-      // Update selected tags with remove button
+      // Tags with a remove button, only for genera typed in by hand: the listed ones are already shown by their
+      // ticked pill above, and listing them twice was confusing.
       const container = document.getElementById('delineationSelectedGeneraContainer');
       if (container) {
-        container.innerHTML = currentSelectedGenera.map(genus => `
+        const listedGenera = new Set([...document.querySelectorAll('#genusQuickSelector .genus-pill-btn')]
+          .map(btn => String(btn.dataset.genus).toLowerCase()));
+        container.innerHTML = currentSelectedGenera.filter(genus => !listedGenera.has(String(genus).toLowerCase())).map(genus => `
           <span class="genus-tag">
             ${getGenusDisplayLabel(genus)}
             <span class="genus-tag-remove" onclick="removeGenusSelection('${escapeHtml(genus)}')" title="Remove">&times;</span>
@@ -1329,16 +1332,33 @@
       document.getElementById('delineationInfoCard').style.display = 'block';
       document.getElementById('zoneDetailsContent').style.display = 'none';
 
-      const showResidentEditors = isExpertUser || !feature.is_approved;
+      // View first, edit on demand: the genus and notes form is only for a new drawing (to save it) and while
+      // the area is being edited (Edit Delineation, or a resident's revision). A saved area that is only being
+      // looked at shows its genus and notes as text, and Edit Delineation saves any change to them.
+      const editingDetails = !feature.delineation_id || !!feature.is_editing_boundary || !!feature.is_editing_revision;
       const genusEditor = document.getElementById('delineationGenusEditor');
       const generaRow = document.querySelector('.d-row-genera');
       const notesEditor = document.getElementById('delineationNotesEditor');
-      if (genusEditor) genusEditor.style.display = showResidentEditors ? '' : 'none';
-      if (generaRow) generaRow.style.display = feature.delineation_id ? '' : 'none';
-      if (notesEditor) notesEditor.style.display = showResidentEditors ? '' : 'none';
+      if (genusEditor) genusEditor.style.display = editingDetails ? '' : 'none';
+      if (generaRow) generaRow.style.display = feature.delineation_id && !editingDetails ? '' : 'none';
+      if (notesEditor) notesEditor.style.display = editingDetails ? '' : 'none';
       // The "Details" heading belongs to the genus and notes fields.
       const detailsTitle = document.getElementById('delineationDetailsTitle');
-      if (detailsTitle) detailsTitle.style.display = showResidentEditors ? '' : 'none';
+      if (detailsTitle) detailsTitle.style.display = editingDetails ? '' : 'none';
+      const notesRow = document.getElementById('delineationNotesRow');
+      if (notesRow) {
+        const notesText = String(feature.notes || '').trim();
+        notesRow.style.display = feature.delineation_id && !editingDetails && notesText ? '' : 'none';
+        document.getElementById('delineationNotesView').textContent = notesText || '-';
+      }
+      // The panel is titled with the area itself, not a generic "Selected Zone".
+      const panelTitle = document.getElementById('panelHeaderTitle');
+      if (panelTitle) {
+        panelTitle.textContent = feature.delineation_id
+          ? (String(feature.label || feature.name || feature.location || '').trim() || 'Saved delineation')
+          : 'New area';
+        panelTitle.title = panelTitle.textContent;
+      }
 
       const removeBtn = document.getElementById('removeDelineationBtn');
       if (removeBtn) {
@@ -1886,13 +1906,28 @@
       updateAreaEditButtons();
     }
 
+    // The notes typed while editing, compared with what the delineation had when the edit began.
+    function boundaryEditNotes() {
+      return document.getElementById('delineationNotes')?.value.trim() ?? '';
+    }
+
+    function boundaryEditNotesChanged() {
+      return !!boundaryEdit && boundaryEditNotes() !== boundaryEdit.originalNotes;
+    }
+
+    // Shapes, genera (per shape) or notes: any of them counts as a change to save.
     function boundaryEditHasChanges() {
       if (!boundaryEdit) return false;
       if (shapeEditFeatures().some(item => item.added_in_boundary_edit)) return true;
       if (drawnFeatures.some(item => item?.removed_in_boundary_edit
         && Number(item.delineation_id) === Number(boundaryEdit.delineationId))) return true;
-      return boundaryEdit.featureIndexes.some((featureIndex, snapshotIndex) =>
-        JSON.stringify(drawnFeatures[featureIndex]?.coords) !== JSON.stringify(boundaryEdit.originalFeatures[snapshotIndex]?.coords));
+      if (boundaryEditNotesChanged()) return true;
+      return boundaryEdit.featureIndexes.some((featureIndex, snapshotIndex) => {
+        const now = drawnFeatures[featureIndex];
+        const before = boundaryEdit.originalFeatures[snapshotIndex];
+        return JSON.stringify(now?.coords) !== JSON.stringify(before?.coords)
+          || JSON.stringify(now?.genera || []) !== JSON.stringify(before?.genera || []);
+      });
     }
 
     // true = nothing to lose, go on now. Otherwise asks with the shared dialog (partials.action-feedback);
@@ -1972,6 +2007,7 @@
         delineationId: feature.delineation_id,
         featureIndexes,
         originalFeatures: featureIndexes.map(index => JSON.parse(JSON.stringify(drawnFeatures[index]))),
+        originalNotes: String(feature.notes || '').trim(),
         previousDrawingMode: drawingMode,
       };
       selectedEditVertex = null;
@@ -2056,6 +2092,18 @@
 
       const saveBtn = document.getElementById('saveBoundaryEditBtn');
       if (saveBtn?.dataset.loading === 'true') return;
+      // Notes are sent only when they changed; they can't be emptied, and the genus can't be left blank.
+      const notesChanged = boundaryEditNotesChanged();
+      if (notesChanged && !boundaryEditNotes()) {
+        window.AppActions.notify('Notes cannot be empty.', 'error');
+        document.getElementById('delineationNotes')?.focus();
+        return;
+      }
+      if (!currentSelectedGenera.length) {
+        window.AppActions.notify('Choose at least one Mangrove Genus Present.', 'error');
+        document.getElementById('genusQuickSelector')?.classList.add('input-error');
+        return;
+      }
       const observationChoice = isExpertUser ? boundaryObservationChoice() : { record_as: 'correction' };
       const recordsObservation = observationChoice.record_as === 'observation';
       if (recordsObservation) {
@@ -2073,10 +2121,10 @@
       }
       const observationYear = recordsObservation ? observationChoice.observation_date.slice(0, 4) : null;
       const confirmed = await window.AppActions.confirm({
-        title: recordsObservation ? `Record as the ${observationYear} observation?` : 'Save boundary changes?',
+        title: recordsObservation ? `Record as the ${observationYear} observation?` : 'Save changes?',
         message: recordsObservation
-          ? `The boundary is updated and its area is saved as the ${observationYear} entry in "Changes over time". The previous boundary is kept as a revision.`
-          : 'The delineation boundary is updated; the previous boundary is kept as a revision. This correction is not added to the timeline.',
+          ? `The delineation is updated and its area is saved as the ${observationYear} entry in "Changes over time". The previous version is kept as a revision.`
+          : 'The delineation is updated; the previous version is kept as a revision. This correction is not added to the timeline.',
         confirmLabel: 'Save',
       });
       if (!confirmed || !boundaryEdit || saveBtn?.dataset.loading === 'true') return;
@@ -2097,6 +2145,7 @@
               coords: item.coords,
               genera: item === selectedFeature ? currentSelectedGenera : (Array.isArray(item.genera) ? item.genera : []),
             })),
+            ...(notesChanged ? { notes: boundaryEditNotes() } : {}),
             ...observationChoice,
           }),
         });
@@ -2115,6 +2164,7 @@
           });
         });
         editedFeatures.forEach(target => {
+          target.notes = payload.delineation.notes ?? target.notes;
           delete target.is_editing_boundary;
           delete target.added_in_boundary_edit;
         });
@@ -2128,7 +2178,7 @@
         redrawFeatures();
         if (activeIndex >= 0) selectDrawnFeature(activeIndex);
         // After "Got it", reload from the server so the new area, location and "last edited by" show everywhere.
-        await showSuccessModal(payload.message || 'Delineation boundary updated.', 'Changes saved');
+        await showSuccessModal(payload.message || 'Delineation updated.', 'Changes saved');
         await refreshMapData({ selectDelineationId: delineationId });
         // Show the new year in "Changes over time" and the coverage trend.
         if (payload.observation_year) loadAnnualObservationCharts(delineationId);

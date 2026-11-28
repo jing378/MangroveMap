@@ -823,7 +823,7 @@
         <h3>Edit a boundary</h3>
         <ol class="guide-steps">
             <li>Select the area and click <i class="bi bi-bounding-box-circles"></i> <strong>Edit Delineation</strong>. The panel switches to
-                just the edit controls.</li>
+                the edit controls, with the genus and notes at the top.</li>
             <li>Drag a point to move it. Drag or click a faded midpoint to add a point. To delete a point, double-click or right-click it,
                 or select it and press <kbd>Delete</kbd>.</li>
             <li>Missed a patch? Click <i class="bi bi-plus-square-dotted"></i> <strong>Draw a new area</strong>, click around it, then click the
@@ -974,8 +974,8 @@
             <li>On the <strong>Map</strong> or <strong>Delineate</strong> page, select the area and click
                 <i class="bi bi-bounding-box-circles"></i> <strong>Edit Delineation</strong>.</li>
             <li>Move, add, or delete points so the boundary matches the mangroves as they are now. Use <strong>Draw a new area</strong> for a
-                new patch, or <strong>Remove selected area</strong> for one that is gone. While editing, the panel shows only the
-                edit controls; if the genera changed, pick them in the panel before clicking Edit Delineation.</li>
+                new patch, or <strong>Remove selected area</strong> for one that is gone. If the genera changed, update them
+                in the panel while editing; they are saved with the boundary.</li>
             <li>Under <strong>Record this change as</strong>, choose one:
                 <ul>
                     <li><strong>Correction</strong>: you're only fixing how the area was drawn. It's saved, but it doesn't appear in the timeline.</li>
@@ -1007,8 +1007,8 @@
                 <strong>Site assessment notes</strong> (substrate, tidal flooding, salinity, threats).</li>
             <li>Click <strong>Save recommendation</strong>. Only the expert who wrote it can edit or delete it.</li>
         </ol>
-        <div class="guide-tip"><i class="bi bi-bounding-box-circles"></i><strong>Change a saved site's outline:</strong> open it and click
-            <strong>Edit area</strong>. The panel shows only the edit controls until you Save or Cancel.</div>
+        <div class="guide-tip"><i class="bi bi-bounding-box-circles"></i><strong>Change a saved recommendation:</strong> open it and click
+            <strong>Edit recommendation</strong>. The area and all its details can then be changed together until you Save or Cancel.</div>
         <div class="guide-warn"><i class="bi bi-exclamation-triangle"></i>Recommendations are advice, not permits. Remind communities to coordinate
             with DENR (CENRO/PENRO) and the LGU before planting.</div>
         <div class="guide-actions">

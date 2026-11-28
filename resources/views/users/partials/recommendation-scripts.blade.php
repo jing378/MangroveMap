@@ -678,8 +678,10 @@
       });
       customGenusInput.disabled = disabled;
       addCustomGenusButton.disabled = disabled;
+      // Tags only for genera typed in by hand: the listed ones already show as ticked pills above.
+      const listedGenera = new Set(genusButtons.map(button => String(button.dataset.genus).toLowerCase()));
       document.getElementById('recSelectedGenera').innerHTML = draft
-        ? [...draft.genera].map(genus => `
+        ? [...draft.genera].filter(genus => !listedGenera.has(String(genus).toLowerCase())).map(genus => `
           <span class="genus-tag">
             ${genusLabelHtml(genus)}
             <button type="button" class="genus-tag-remove" data-remove-genus="${encodeURIComponent(genus)}"
@@ -757,14 +759,21 @@
       const saved = draft.id !== null;
       setAreaEditFocus(saved && draft.can_edit && draft.editingArea);
       const dirty = isDraftDirty();
+      // View first, edit on demand: a saved recommendation shows its details as text until its author clicks
+      // "Edit recommendation" (editingArea), which opens the area and all the fields together. A new one is a form.
+      const viewing = saved && !(draft.can_edit && draft.editingArea);
+      form.classList.toggle('is-viewing', viewing);
+      document.querySelectorAll('.rec-view-only').forEach(row => {
+        row.style.display = viewing && row.dataset.hasValue === '1' ? '' : 'none';
+      });
       document.getElementById('recEditAreaBtn').style.display = saved && draft.can_edit && !draft.editingArea ? 'block' : 'none';
       document.getElementById('recEditHint').style.display = draft.editingArea ? 'block' : 'none';
       const deleteVertexBtn = document.getElementById('recDeleteVertexBtn');
       deleteVertexBtn.style.display = draft.editingArea ? 'block' : 'none';
       deleteVertexBtn.disabled = !selectedVertex;
-      // Editing: a new recommendation, the area being edited, or changed fields. Then only Save / Cancel are
+      // Editing: a new recommendation, or a saved one after "Edit recommendation". Then only Save / Cancel are
       // offered; Delete is for a saved recommendation that is just being viewed.
-      const editing = draft.can_edit && (!saved || dirty || draft.editingArea);
+      const editing = draft.can_edit && (!saved || draft.editingArea);
       const saveBtn = document.getElementById('recSaveBtn');
       saveBtn.style.display = editing ? '' : 'none';
       saveBtn.disabled = saved && !dirty; // editing the area, nothing moved yet
@@ -776,18 +785,45 @@
       const editingNote = document.getElementById('recEditingNote');
       if (editingNote) {
         editingNote.style.display = editing && saved ? 'flex' : 'none';
-        document.getElementById('recEditingNoteText').textContent = draft.editingArea
-          ? 'Editing the area. Save your changes, or Cancel to undo them.'
-          : 'Unsaved changes. Save them, or Cancel to undo them.';
+        document.getElementById('recEditingNoteText').textContent =
+          'Editing. Change the area on the map and the details below, then Save. Cancel undoes everything.';
       }
       document.getElementById('recDeleteZone').style.display = saved && draft.can_edit && !editing ? 'block' : 'none';
       updateHistoryButtons();
     }
 
+    // The saved details as text, for viewing (shown by updatePanelActions while not editing).
+    function renderViewRows() {
+      const setRow = (rowId, hasValue) => { document.getElementById(rowId).dataset.hasValue = hasValue ? '1' : '0'; };
+      const escape = value => String(value).replace(/[&<>"']/g, ch => `&#${ch.charCodeAt(0)};`);
+
+      const suitability = draft.suitability || '';
+      const suitabilityEl = document.getElementById('recSuitabilityView');
+      suitabilityEl.innerHTML = suitability
+        ? `<span class="rec-suitability-pill" style="--rec-color:${SUITABILITY_COLORS[suitability] || '#7a9a7a'}">${escape(suitabilityLabels[suitability] || suitability)}</span>`
+        : '-';
+      setRow('recSuitabilityViewRow', !!suitability);
+
+      const genera = suitability === 'not_suitable' ? [] : [...draft.genera];
+      document.getElementById('recGeneraView').innerHTML = genera.length
+        ? genera.map(genus => `<span class="genus-tag">${genusLabelHtml(genus)}</span>`).join('')
+        : '<span style="color:#7a9a7a;">None (not suitable for planting)</span>';
+      setRow('recGeneraViewRow', !!suitability);
+
+      document.getElementById('recRecommendationView').textContent = draft.recommendation || '';
+      setRow('recRecommendationViewRow', !!String(draft.recommendation || '').trim());
+      document.getElementById('recSiteNotesView').textContent = draft.site_notes || '';
+      setRow('recSiteNotesViewRow', !!String(draft.site_notes || '').trim());
+    }
+
     function fillForm() {
       const saved = draft.id !== null;
       document.getElementById('recFormTitle').textContent = saved ? draft.name : 'New recommendation';
-      document.getElementById('panelHeaderTitle').textContent = saved ? 'Planting Recommendation' : 'New Recommendation';
+      // The panel is titled with the recommendation itself.
+      const panelTitle = document.getElementById('panelHeaderTitle');
+      panelTitle.textContent = saved ? (draft.name || 'Planting Recommendation') : 'New Recommendation';
+      panelTitle.title = panelTitle.textContent;
+      renderViewRows();
       document.getElementById('recArea').textContent = formatHectares(draft.features);
       document.getElementById('recSource').textContent = draft.delineation_id
         ? `Approved delineation: ${draft.source_name || `#${draft.delineation_id}`}`

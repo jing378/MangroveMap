@@ -65,7 +65,7 @@
                 '<i class="bi bi-pentagon"></i> <strong>Draw area</strong>, or <i class="bi bi-hand-index"></i> <strong>Select area</strong> for an approved delineation.',
                 'Choose the <strong>suitability</strong> and <strong>genus</strong> (not needed if Not suitable).',
                 'Add advice and site notes if needed.',
-                '<strong>Save recommendation</strong>. Open a saved one and <strong>Edit area</strong> to change its outline.',
+                '<strong>Save recommendation</strong>. Open a saved one and <strong>Edit recommendation</strong> to change it.',
             ],
         ],
     ];

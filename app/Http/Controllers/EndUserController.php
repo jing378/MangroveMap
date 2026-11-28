@@ -702,6 +702,8 @@ class EndUserController extends Controller
             'features.*.coords' => ['required', 'array', 'min:1', 'max:10000'],
             'features.*.genera' => ['nullable', 'array'],
             'features.*.genera.*' => ['string', 'max:100'],
+            // Edit Delineation also saves the notes (the genus travels with each shape above). Left out = unchanged.
+            'notes' => ['sometimes', 'required', 'string', 'max:5000'],
             // Experts say whether the edit fixes the drawing or records a real change in the mangroves.
             'record_as' => ['nullable', 'string', 'in:correction,observation'],
             // The app clock is UTC; "today" is judged in local (Philippine) time like the date picker.
@@ -713,6 +715,7 @@ class EndUserController extends Controller
             'observation_date.after_or_equal' => 'The observation date must be in 2000 or later.',
             'observation_source.required' => 'Choose where the change was observed.',
             'observation_source.in' => 'Choose where the change was observed.',
+            'notes.required' => 'Notes cannot be empty.',
         ]);
 
         $recordsObservation = ($data['record_as'] ?? 'correction') === 'observation';
@@ -786,8 +789,13 @@ class EndUserController extends Controller
 
             $previousFeatures = $delineation->features ?? [];
 
-            // Only the geometry changes: owner, name, notes and review status are preserved.
-            $delineation->update(['features' => $features]);
+            // The shapes (with their genera) and, when sent, the notes change; owner, name and review status are
+            // preserved. The previous notes are in the revision snapshot above.
+            $changes = ['features' => $features];
+            if (array_key_exists('notes', $data)) {
+                $changes['notes'] = trim($data['notes']);
+            }
+            $delineation->update($changes);
 
             if ($recordsObservation) {
                 $observation = $observationRecorder->record(
@@ -807,7 +815,7 @@ class EndUserController extends Controller
             'message' => $observation
                 ? "Boundary updated and recorded as the {$observation->year} observation ("
                     .number_format($observation->coverage_area_ha, 2).' ha).'
-                : 'Delineation boundary updated.',
+                : 'Delineation updated.',
             'delineation' => $this->delineationPayloadForMap($delineation),
             'observation_year' => $observation?->year,
         ]);

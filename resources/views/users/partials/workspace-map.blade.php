@@ -139,6 +139,8 @@
               <div class="d-row"><span class="d-key"><i class="bi bi-rulers" aria-hidden="true"></i> Area (ha)</span><span class="d-val" id="delineationFeatureArea">-</span></div>
               <div class="d-row d-row-wide"><span class="d-key"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> Location</span><span class="d-val" id="delineationFeatureLocation">-</span></div>
               <div class="d-row d-row-wide d-row-genera" style="display:none;"><span class="d-key"><i class="bi bi-tree-fill" aria-hidden="true"></i> Mangrove Genus Present</span><div class="d-val" id="delineationFeatureGenera">None recorded</div><div class="genus-canopy" id="delineationGenusCanopy" hidden></div></div>
+              {{-- Saved areas show their notes as text; they are changed with Edit Delineation, not here. --}}
+              <div class="d-row d-row-wide" id="delineationNotesRow" style="display:none;"><span class="d-key"><i class="bi bi-chat-left-text-fill" aria-hidden="true"></i> Notes</span><span class="d-val" id="delineationNotesView" style="white-space:pre-line;overflow-wrap:anywhere;">-</span></div>
               <div class="d-row"><span class="d-key"><i class="bi bi-person-fill" aria-hidden="true"></i> Delineated by</span><span class="d-val" id="delineationCreatedBy">-</span></div>
               <div class="d-row"><span class="d-key"><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Review status</span><span class="d-val" id="delineationReviewStatus">-</span></div>
               <div class="d-row d-row-wide d-row-recommendation"><span class="d-key"><i class="bi bi-flower1" aria-hidden="true"></i> Planting recommendation</span><span class="d-val" id="delineationPlantingRecommendation" style="white-space:pre-line;overflow-wrap:anywhere;">No recommendation provided</span></div>
@@ -235,34 +237,46 @@
             </div>
           @endif
           <div id="boundaryEditActions" class="boundary-edit-actions" style="display:none;">
-            <button type="button" id="startBoundaryEditBtn" class="btn panel-btn" style="width:100%;margin-bottom:8px;">
+            <button type="button" id="startBoundaryEditBtn" class="btn panel-btn" style="width:100%;margin-bottom:8px;"
+              title="Change the boundary, genus and notes">
               <i class="bi bi-bounding-box-circles"></i> Edit Delineation
             </button>
             <div id="boundaryEditingNote" class="panel-editing-note" style="display:none;" role="status">
               <i class="bi bi-pencil-fill" aria-hidden="true"></i>
-              <span>Editing the boundary. Save your changes, or Cancel to undo them.</span>
+              <span>Editing. Change the boundary on the map and the details below, then Save. Cancel undoes everything.</span>
             </div>
-            <div id="boundaryEditHint" class="boundary-edit-hint" style="display:none;">
-              <strong>Editing boundary</strong>
-              <ul>
-                <li>Drag a point to move it.</li>
-                <li>Drag or click a faded midpoint to add a point.</li>
-                <li>Double-click or right-click a point to delete it, or select it and press <kbd>Delete</kbd>.</li>
-                <li>Use <strong>Draw a new area</strong> to add another mangrove patch to this delineation: click around it, then click the first point (or double-click) to close it.</li>
-                <li>Click one of its areas, then <strong>Remove selected area</strong> to take it out (at least one area stays).</li>
-              </ul>
-            </div>
-            {{-- Anyone editing a boundary (experts, and residents on their own pending delineations) can add a shape
-                 to the delineation or take one out; both are saved with the boundary change. --}}
-            <button type="button" id="addBoundaryAreaBtn" class="btn panel-btn area-edit-add" data-area-edit="boundary" style="display:none;width:100%;margin-bottom:8px;">
-              <i class="bi bi-plus-square-dotted"></i> <span>Draw a new area</span>
-            </button>
-            {{-- Takes the selected shape out of the delineation (kept until Save; Cancel or Undo bring it back). --}}
-            <button type="button" id="removeBoundaryAreaBtn" class="btn panel-btn area-edit-remove" data-area-edit="boundary" style="display:none;width:100%;margin-bottom:8px;" disabled>
-              <i class="bi bi-trash3"></i> <span>Remove selected area</span>
-            </button>
-            {{-- Why Remove is greyed out (a disabled button shows no tooltip). --}}
-            <p id="removeBoundaryAreaNote" class="boundary-observation-note area-edit-note" data-area-edit="boundary" style="display:none;margin:-2px 2px 10px;"></p>
+            {{-- Edit mode is laid out by section (workspace-styles, body.is-boundary-editing): this Boundary card,
+                 then the genus and notes, then "Record this change as" (experts), then Cancel / Save. --}}
+            <section id="boundaryToolsSection" class="edit-section" aria-labelledby="boundaryToolsTitle">
+              <div class="edit-section-title" id="boundaryToolsTitle"><i class="bi bi-bounding-box-circles" aria-hidden="true"></i> Boundary</div>
+              <div class="edit-tools">
+                {{-- Anyone editing a boundary (experts, and residents on their own pending delineations) can add a shape
+                     to the delineation or take one out; both are saved with the boundary change. --}}
+                <button type="button" id="addBoundaryAreaBtn" class="btn panel-btn area-edit-add" data-area-edit="boundary" style="display:none;">
+                  <i class="bi bi-plus-square-dotted"></i> <span>Draw a new area</span>
+                </button>
+                {{-- Takes the selected shape out of the delineation (kept until Save; Cancel or Undo bring it back). --}}
+                <button type="button" id="removeBoundaryAreaBtn" class="btn panel-btn area-edit-remove" data-area-edit="boundary" style="display:none;" disabled>
+                  <i class="bi bi-trash3"></i> <span>Remove selected area</span>
+                </button>
+                <button type="button" id="deleteBoundaryVertexBtn" class="btn panel-btn edit-tools-wide" style="display:none;" disabled
+                  title="Click a point on the map first">
+                  <i class="bi bi-dash-circle"></i> Delete selected point
+                </button>
+              </div>
+              {{-- Why Remove is greyed out (a disabled button shows no tooltip). --}}
+              <p id="removeBoundaryAreaNote" class="boundary-observation-note area-edit-note" data-area-edit="boundary" style="display:none;"></p>
+              <details id="boundaryEditHint" class="boundary-edit-hint" style="display:none;">
+                <summary>How to change the boundary</summary>
+                <ul>
+                  <li>Drag a point to move it.</li>
+                  <li>Drag or click a faded midpoint to add a point.</li>
+                  <li>Double-click or right-click a point to delete it, or select it and press <kbd>Delete</kbd>.</li>
+                  <li><strong>Draw a new area</strong> adds another patch: click around it, then click the first point (or double-click) to close it.</li>
+                  <li>Click one of its areas, then <strong>Remove selected area</strong> to take it out (at least one area stays).</li>
+                </ul>
+              </details>
+            </section>
             @if(Auth::user()->isExpert())
               {{-- An observed change becomes that year's entry in "Changes over time"; a correction does not. --}}
               <fieldset id="boundaryRecordAs" class="boundary-record-as" style="display:none;">
@@ -289,9 +303,6 @@
                 </div>
               </fieldset>
             @endif
-            <button type="button" id="deleteBoundaryVertexBtn" class="btn panel-btn" style="display:none;width:100%;margin-bottom:8px;" disabled>
-              <i class="bi bi-dash-circle"></i> Delete selected point
-            </button>
             <div id="boundaryEditActionRow" class="panel-actions" style="display:none;">
               <button type="button" id="cancelBoundaryEditBtn" class="btn panel-btn panel-cancel-btn">
                 <i class="bi bi-x-lg"></i> Cancel

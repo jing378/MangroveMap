@@ -3385,12 +3385,158 @@
   /* Saved-delineation boundary editing */
   .boundary-edit-actions { margin-bottom: 12px; }
 
-  /* Editing a boundary: only the edit controls in the panel, only Undo / Redo on the map toolbar. */
-  body.is-boundary-editing #mapRightPanel .scroll > :not(#boundaryEditActions),
+  /* Editing a delineation: the panel shows the genus and notes form, then the edit controls (Save / Cancel);
+     the rest of the area info is hidden. Only Undo / Redo stay on the map toolbar. */
+  body.is-boundary-editing #mapRightPanel .scroll > :not(#boundaryEditActions):not(#delineationInfoCard),
+  body.is-boundary-editing #delineationInfoCard > :not(#delineationDetailsTitle):not(#delineationGenusEditor):not(#delineationNotesEditor),
   body.is-boundary-editing #delineationToolbar .draw-select-wrapper,
   body.is-boundary-editing #delineationToolbar .delineation-separator,
   body.is-boundary-editing #delineationToolbar .toolbar-save-btn {
     display: none !important;
+  }
+
+  /* ---- Edit mode layout (Edit Delineation) ----
+     The panel's two wrappers step aside (display: contents) so their pieces line up as one column, in this order:
+     1 "Editing" note, 2 Boundary card, 3 genus, 4 notes, 5 "Record this change as" (experts), 6 Cancel / Save. */
+  .edit-section {
+    display: none;
+  }
+
+  body.is-boundary-editing #mapRightPanel .scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  body.is-boundary-editing #delineationInfoCard,
+  body.is-boundary-editing #boundaryEditActions {
+    display: contents !important;
+  }
+
+  body.is-boundary-editing #delineationDetailsTitle {
+    display: none !important;
+  }
+
+  body.is-boundary-editing #boundaryEditingNote { order: 1; margin: 0; }
+  body.is-boundary-editing #boundaryToolsSection { order: 2; display: block; }
+  body.is-boundary-editing #delineationGenusEditor { order: 3; margin: 0; }
+  body.is-boundary-editing #delineationNotesEditor { order: 4; margin: 0; }
+  body.is-boundary-editing #boundaryRecordAs { order: 5; margin: 0; }
+  body.is-boundary-editing #boundaryEditActionRow { order: 6; margin: auto 0 0; }
+
+  /* Boundary card (delineations) / Area card (planting recommendations): same look as the field cards. */
+  #boundaryToolsSection,
+  #recAreaSection {
+    padding: 10px 12px 12px;
+    border: 1px solid var(--bd-dfe9e1, #dfe9e1);
+    border-radius: 12px;
+    background: var(--bg-ffffff, #ffffff);
+  }
+
+  .edit-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--fg-2f5a46, #2f5a46);
+  }
+
+  .edit-section-title i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: var(--bg-e3f4ea, #e3f4ea);
+    color: var(--fg-1e9e62, #1e9e62);
+    font-size: 11px;
+  }
+
+  /* Draw / Remove side by side; Delete selected point on its own row. */
+  #boundaryToolsSection .edit-tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #mapRightPanel #boundaryToolsSection .edit-tools .panel-btn {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 8px 10px;
+    justify-content: center;
+    font-size: 12px;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  /* "Record this change as": a card like the others, its title inside rather than on the border. */
+  body.is-boundary-editing #boundaryRecordAs {
+    padding: 10px 12px 8px;
+    border-color: var(--bd-dfe9e1, #dfe9e1);
+    border-radius: 12px;
+  }
+
+  body.is-boundary-editing #boundaryRecordAs legend {
+    float: left;
+    width: 100%;
+    margin-bottom: 6px;
+    padding: 0;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--fg-2f5a46, #2f5a46);
+  }
+
+  body.is-boundary-editing #boundaryRecordAs legend + * {
+    clear: both;
+  }
+
+  /* Notes in the panel's own font, not the browser's typewriter default for text boxes. */
+  #delineationNotes {
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  #boundaryToolsSection .edit-tools-wide {
+    grid-column: 1 / -1;
+  }
+
+  #boundaryToolsSection .area-edit-note {
+    margin: 8px 2px 0;
+  }
+
+  /* The how-to is folded away until asked for. */
+  :is(#boundaryToolsSection, #recAreaSection) .boundary-edit-hint {
+    margin: 10px 0 0;
+  }
+
+  :is(#boundaryToolsSection, #recAreaSection) .boundary-edit-hint summary {
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  :is(#boundaryToolsSection, #recAreaSection) .boundary-edit-hint[open] summary {
+    margin-bottom: 2px;
+  }
+
+  /* Cancel / Save stay in view at the bottom of the panel while the form scrolls. */
+  @media (min-width: 781px) {
+    body.is-boundary-editing #boundaryEditActionRow {
+      position: sticky;
+      bottom: -14px; /* the panel's bottom padding, so it sits flush with the panel's edge */
+      z-index: 2;
+      padding: 10px 0 14px;
+      background: var(--bg-ffffff, #ffffff);
+      box-shadow: 0 -8px 12px rgba(var(--bd-ffffff-rgb, 255, 255, 255), 0.9);
+    }
   }
 
   /* Right-panel edit buttons, shared by the delineation and Planting Recommendation panels: an "Editing" note,
