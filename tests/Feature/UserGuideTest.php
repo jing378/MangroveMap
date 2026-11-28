@@ -49,6 +49,24 @@ class UserGuideTest extends TestCase
             ->assertOk()
             ->assertSee('id="delineate"', false)
             ->assertSee('id="review"', false)
-            ->assertSee('id="admin"', false);
+            ->assertSee('id="admin"', false)
+            // Admins' cleanup-only Map Layers, and no links into pages they can't open.
+            ->assertDontSee('Hide from map')
+            ->assertSee('Retry processing')
+            ->assertDontSee(route('tile-explorer.page'), false)
+            ->assertDontSee(route('drone-imagery.page'), false);
+    }
+
+    public function test_guide_describes_current_features(): void
+    {
+        $resident = User::factory()->create(['role' => 'end_user']);
+
+        $this->actingAs($resident)->get('/guide')
+            ->assertOk()
+            ->assertSee('Import shapefile')
+            ->assertSee('Send to Drone Imagery')
+            ->assertSee('Mangrove 400-ft View')
+            ->assertDontSee('JPEG only (Roboflow)')
+            ->assertSee(route('tile-explorer.page'), false);
     }
 }

@@ -6,10 +6,14 @@
 --}}
 @php
     $isExpertGuide = auth()->user()?->isExpert();
-    // The year slider: satellite extent when that data is switched on, else this system's own records.
+    // Keep each step to one short line that names the real button (with its icon), so it can be followed on the map.
+    $searchStep = '<i class="bi bi-search"></i> <strong>Search</strong> a name, genus or status to jump to an area.';
+    $detailsStep = '<strong>Click a shape</strong> for its details. Tap a <strong>genus</strong> to see what it looks like.';
+    $layersStep = '<i class="bi bi-layers-fill"></i> <strong>Layers</strong>: Satellite, Street, Topo or <strong>Mangrove 400-ft View</strong>.';
+    // The year card: satellite extent when that data is switched on, else this system's own records.
     $yearSliderStep = config('map.mangrove_history.enabled')
         ? '<i class="bi bi-graph-up"></i> See <strong>mangrove extent by year</strong> since 1985.'
-        : '<i class="bi bi-graph-up"></i> Drag the <strong>year slider</strong> to see what was mapped by each year.';
+        : '<i class="bi bi-graph-up"></i> <strong>Year slider</strong>: what was mapped by each year. Turn on <strong>Compare with previous data</strong> for the satellite record.';
     // The map-controls refresh button (workspace-map): Map and Delineate only.
     $refreshStep = '<i class="bi bi-arrow-repeat"></i> <strong>Refresh</strong> for the latest areas. New ones also appear by themselves.';
     $guides = [
@@ -18,18 +22,18 @@
             'anchor' => 'map',
             'steps' => $isExpertGuide
                 ? [
-                    '<strong>Click a shape</strong> to see its details.',
-                    'Pending resident areas: <strong>Approve</strong> or <strong>Reject</strong> in the panel.',
-                    '<i class="bi bi-layers-fill"></i> Switch to <strong>Satellite</strong> to see the canopy.',
-                    'Open an area\'s <strong>Changes over time</strong>.',
+                    $searchStep,
+                    '<strong>Click a shape</strong>. Pending ones: <strong>Approve</strong> or <strong>Reject</strong> in the panel.',
+                    '<i class="bi bi-bounding-box-circles"></i> <strong>Edit Delineation</strong> to fix a boundary or record an observed change.',
+                    $layersStep,
                     $yearSliderStep,
                     $refreshStep,
                 ]
                 : [
-                    '<strong>Click a shape</strong> to see its details.',
-                    '<i class="bi bi-layers-fill"></i> Switch to <strong>Satellite</strong> to see the canopy.',
-                    '<i class="bi bi-flower1"></i> Show or hide planting recommendations.',
-                    'Open an area\'s <strong>Changes over time</strong>.',
+                    $searchStep,
+                    $detailsStep,
+                    $layersStep,
+                    '<i class="bi bi-flower1"></i> Show or hide <strong>planting recommendations</strong>.',
                     $yearSliderStep,
                     $refreshStep,
                 ],
@@ -39,17 +43,18 @@
             'anchor' => $isExpertGuide ? 'review' : 'delineate',
             'steps' => $isExpertGuide
                 ? [
-                    '<i class="bi bi-pentagon"></i> <strong>Draw area</strong> to add your own (approved right away).',
-                    'Click a pending area, then <strong>Approve</strong> or <strong>Reject</strong>.',
-                    '<i class="bi bi-bounding-box-circles"></i> <strong>Edit Delineation</strong> to fix a boundary or record a change.',
+                    '<i class="bi bi-pentagon"></i> <strong>Draw area</strong> or <i class="bi bi-file-earmark-arrow-up"></i> <strong>Import shapefile</strong>. Yours are approved right away.',
+                    'Click a pending area, then <strong>Approve</strong> or <strong>Reject</strong> (say what to fix).',
+                    '<i class="bi bi-bounding-box-circles"></i> <strong>Edit Delineation</strong>: a <strong>Correction</strong>, or an <strong>Observed change</strong> for that year.',
                     '<strong>Save</strong> when you\'re done.',
                     $refreshStep,
                 ]
                 : [
-                    '<i class="bi bi-pentagon"></i> Click <strong>Draw area</strong> and trace the mangroves.',
-                    'Click the first point to finish.',
-                    'Choose the <strong>genus</strong> and add notes.',
-                    '<strong>Save</strong>. An expert reviews it.',
+                    '<i class="bi bi-pentagon"></i> <strong>Draw area</strong> and click along the mangroves\' edge.',
+                    'Click the first point or double-click to finish. <kbd>Esc</kbd> cancels.',
+                    'Have a shapefile? <i class="bi bi-file-earmark-arrow-up"></i> <strong>Import shapefile</strong> (a .zip).',
+                    'Choose the <strong>genus</strong>, add notes, then <strong>Save delineation</strong>. An expert reviews it.',
+                    'Rejected? Open it and <strong>Revise rejected delineation</strong> within 7 days.',
                     $refreshStep,
                 ],
         ],
@@ -58,9 +63,9 @@
             'anchor' => 'recommendations',
             'steps' => [
                 '<i class="bi bi-pentagon"></i> <strong>Draw area</strong>, or <i class="bi bi-hand-index"></i> <strong>Select area</strong> for an approved delineation.',
-                'Choose the <strong>suitability</strong> and <strong>genus</strong>.',
-                'Add notes if needed.',
-                '<strong>Save recommendation</strong>.',
+                'Choose the <strong>suitability</strong> and <strong>genus</strong> (not needed if Not suitable).',
+                'Add advice and site notes if needed.',
+                '<strong>Save recommendation</strong>. Open a saved one and <strong>Edit area</strong> to change its outline.',
             ],
         ],
     ];
@@ -174,6 +179,15 @@
 
     .map-guide-card li .bi {
         color: var(--fg-1e7a4f, #1e7a4f);
+    }
+
+    .map-guide-card kbd {
+        padding: 0 4px;
+        border: 1px solid var(--bd-cfe5d8, #cfe5d8);
+        border-radius: 4px;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 700;
     }
 
     .map-guide-more {

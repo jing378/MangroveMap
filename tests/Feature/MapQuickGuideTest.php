@@ -28,7 +28,14 @@ class MapQuickGuideTest extends TestCase
             ->assertSee('<strong>Refresh</strong> for the latest areas', false)
             ->assertSee('Quick guide: Delineating')
             ->assertSee('An expert reviews it.')
+            ->assertSee('<strong>Import shapefile</strong>', false)
             ->assertSee(route('guide').'#delineate', false);
+
+        // The map's steps name the controls that exist now.
+        $this->actingAs($resident)->get(route('map'))
+            ->assertSee('<strong>Mangrove 400-ft View</strong>', false)
+            ->assertSee('Tap a <strong>genus</strong>', false)
+            ->assertDontSee('Switch to <strong>Satellite</strong>', false);
     }
 
     public function test_expert_pages_get_the_expert_steps(): void

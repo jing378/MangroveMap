@@ -1341,10 +1341,10 @@
                         </ol>
                     @else
                         <ol>
-                            <li><strong>Check</strong> the AI's areas and canopy pins.</li>
+                            <li><strong>Check</strong> the AI's areas. For canopy pins, click <strong>Show</strong> on Mangrove classification.</li>
                             <li><strong>Fix</strong> them: <i class="bi bi-pentagon"></i> draw, <i class="bi bi-pencil"></i> edit, or click to remove.</li>
                             @if ($editor['needs_delineation'])
-                                <li><strong>Choose</strong> the genus.</li>
+                                <li><strong>Choose</strong> the genus. The <strong>AI genus suggestion</strong> helps but never picks it for you.</li>
                             @endif
                             <li><strong>{{ ! $editor['needs_delineation'] ? 'Confirm & apply' : ($editor['needs_expert_review'] ? 'Confirm & submit' : 'Confirm & publish') }}</strong>, or save a draft.</li>
                         </ol>

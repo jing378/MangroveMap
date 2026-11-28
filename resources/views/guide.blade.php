@@ -726,8 +726,9 @@
         <h3>Moving around</h3>
         <ul>
             <li><strong>Pan and zoom:</strong> drag to move, scroll or pinch to zoom.</li>
-            <li><strong>Base map:</strong> use the layer control to switch between <em>Satellite</em>, <em>Street</em>, and <em>Topo</em>.
-                Satellite is best for seeing the mangrove canopy.</li>
+            <li><strong>Base map:</strong> the map opens on <em>Satellite</em>, which is best for seeing the mangrove canopy. The
+                <i class="bi bi-layers-fill"></i> layer button switches to <em>Street</em>, <em>Topo</em>, or the sharper
+                <em>Mangrove 400-ft View</em>.</li>
             <li><strong>Search:</strong> type a name, genus, or status in the search box at the top of the map to jump to an area.</li>
         </ul>
 
@@ -735,8 +736,11 @@
         <ul>
             <li><strong>Area details:</strong> click a shape to open the side panel. It shows the size in hectares, the barangay and municipality,
                 the genera present, who drew it, its review status, and any planting recommendation.</li>
-            <li><strong>Drone imagery:</strong> approved drone surveys appear as photo layers. Use the Drone Imagery panel to show or hide them,
-                and to see the tree canopies the AI found, coloured by genus.</li>
+            <li><strong>Genus:</strong> in the panel, tap a genus to see a photo, its local name, how to recognise it, and its Philippine
+                species. For areas from a drone survey, each genus also shows its share of the canopy the AI found.</li>
+            <li><strong>Drone imagery:</strong> approved drone surveys appear as photo layers. The Drone Imagery panel lists them:
+                <strong>View</strong> zooms to one, and you can delete your own or hide someone else's. The AI's canopy pins are in the
+                review editor on <strong>Drone Upload</strong>.</li>
             <li><strong>Planting recommendations:</strong> the <i class="bi bi-flower1"></i> button shows or hides the recommendation layer.</li>
             <li><strong>Changes over time:</strong> when experts have recorded yearly observations, the <em>Changes over time</em> timeline shows
                 how the area grew or shrank.</li>
@@ -746,7 +750,9 @@
                     It is a satellite estimate (Global Mangrove Watch), not a ground survey.</li>
             @else
                 <li><strong>Mangroves mapped by year:</strong> the <i class="bi bi-graph-up"></i> button opens a year slider. Drag it or press play
-                    to see the approved hectares for each year, and only the areas and drone uploads that had been added by then.</li>
+                    to see the approved hectares for each year, and only the areas and drone uploads that had been added by then.
+                    Turn on <strong>Compare with previous data</strong> to see the satellite record (Global Mangrove Watch) in amber
+                    beside them.</li>
             @endif
             <li><strong>On a phone:</strong> the side panel opens as a sheet at the bottom. Drag it up for more, or tap outside it to close it.</li>
         </ul>
@@ -774,7 +780,7 @@
 
         <h3>Draw and save an area</h3>
         <ol class="guide-steps">
-            <li>Open <strong>Delineate</strong> from the sidebar. Switch to the Satellite base map and zoom in on the mangroves.</li>
+            <li>Open <strong>Delineate</strong> from the sidebar and zoom in on the mangroves (the map opens on satellite imagery).</li>
             <li>Click <i class="bi bi-pentagon"></i> <strong>Draw area</strong>.</li>
             <li>Click along the edge of the mangroves to add points. Click the first point or double-click to finish.
                 Press <kbd>Esc</kbd> to cancel. <i class="bi bi-arrow-counterclockwise"></i> Undo and <i class="bi bi-arrow-clockwise"></i> Redo fix mistakes.</li>
@@ -783,6 +789,10 @@
             <li>Add <strong>Notes</strong>: what you saw, when you visited, and the condition of the trees.</li>
             <li>Click <strong>Save delineation</strong>. The location is filled in automatically and experts are notified.</li>
         </ol>
+        <div class="guide-tip"><i class="bi bi-file-earmark-arrow-up"></i><strong>Already mapped it in QGIS or ArcGIS?</strong> Click
+            <strong>Import shapefile</strong> instead of drawing, and choose a <code>.zip</code> of the shapefile (or its .shp, .dbf, .shx
+            and .prj files together). Each polygon becomes an area you can check and edit, up to 20 per delineation. Then choose the genus
+            and save as usual.</div>
 
         <h3>What the review status means</h3>
         <dl class="guide-defs">
@@ -812,7 +822,9 @@
         <div class="guide-tip"><i class="bi bi-check2-circle"></i><strong>How to get approved:</strong> trace only the mangrove canopy, not open water,
             fishponds, or roads. Zoom in close for the edges, draw one shape per continuous patch, and always add the genera you saw.</div>
         <div class="guide-actions">
-            <a class="guide-link" href="{{ $delineateRoute }}"><i class="bi bi-pencil-square"></i> Start delineating</a>
+            @unless ($isAdmin)
+                <a class="guide-link" href="{{ $delineateRoute }}"><i class="bi bi-pencil-square"></i> Start delineating</a>
+            @endunless
             <a class="guide-top" href="#guide-top"><i class="bi bi-arrow-up"></i> Back to top</a>
         </div>
     </section>
@@ -823,7 +835,7 @@
         <p class="guide-summary"><strong>In short:</strong> upload your drone orthomosaic, check the mangrove areas the AI finds, choose the genus,
             and confirm. {{ $isExpert ? 'As an expert, your imagery goes on the map right away.' : 'An expert then reviews it before it goes on the map.' }}</p>
         <div class="guide-flow" aria-label="How drone imagery is processed">
-            <span>1. Upload GeoTIFF</span><i class="bi bi-chevron-right"></i>
+            <span>1. Upload GeoTIFF or photos</span><i class="bi bi-chevron-right"></i>
             <span>2. Preview is prepared</span><i class="bi bi-chevron-right"></i>
             <span>3. AI detects mangroves</span><i class="bi bi-chevron-right"></i>
             <span>4. You check the results</span><i class="bi bi-chevron-right"></i>
@@ -834,8 +846,9 @@
         <ol class="guide-steps">
             <li>Open <strong>Drone Upload</strong> from the sidebar.</li>
             <li>Enter a <strong>Survey name</strong>, for example "Brgy. San Isidro, March 2026".</li>
-            <li>Drop your files in the box or click to choose them. Use georeferenced <strong>.tif / .tiff</strong> files (8-bit RGB orthomosaics).
-                You can add several files from the same survey at once.</li>
+            <li>Drop your files in the box or click to choose them: georeferenced <strong>.tif / .tiff</strong> orthomosaics (8-bit RGB), or
+                drone <strong>photos</strong> (.jpg / .png) taken straight down, up to 500. Photos are placed from their GPS (DJI) or a world
+                file, but not stitched, so small seams are normal. One upload is either GeoTIFFs or photos, all from the same place.</li>
             <li>Click <strong>Upload and process</strong>. You can leave the page while it processes, which can take a while for large surveys.</li>
         </ol>
         <div class="guide-tip"><i class="bi bi-arrow-repeat"></i><strong>Upload interrupted?</strong> Choose the same files again on the same device.
@@ -851,7 +864,7 @@
                     <li>Click an area to remove it if it isn't mangrove, for example coconut trees or shadows.</li>
                 </ul>
             </li>
-            <li><strong>Mangrove classification</strong> is optional: click <strong>Show</strong> on its card to see each tree canopy the AI found as a pin, coloured by genus. Click a pin to see it or remove it, and <strong>Hide</strong> to turn it off again.</li>
+            <li><strong>Mangrove classification</strong> is optional: click <strong>Show</strong> on its card to see each tree canopy the AI found as a pin, coloured by genus. Click a pin to see it or remove it, and <strong>Hide</strong> to turn it off again. <strong>Re-run genus detection</strong> runs it again without touching your areas.</li>
         </ol>
 
         <h3>Add the details and confirm</h3>
@@ -875,7 +888,9 @@
         <div class="guide-warn"><i class="bi bi-exclamation-triangle"></i><strong>The AI can be wrong.</strong> Always check its shapes and genus
             suggestion before you confirm. Upload only imagery you took or have permission to use, and follow CAAP drone rules.</div>
         <div class="guide-actions">
-            <a class="guide-link" href="{{ route('drone-imagery.page') }}"><i class="bi bi-cloud-arrow-up"></i> Go to Drone Upload</a>
+            @unless ($isAdmin)
+                <a class="guide-link" href="{{ route('drone-imagery.page') }}"><i class="bi bi-cloud-arrow-up"></i> Go to Drone Upload</a>
+            @endunless
             <a class="guide-top" href="#guide-top"><i class="bi bi-arrow-up"></i> Back to top</a>
         </div>
     </section>
@@ -888,19 +903,24 @@
         <ol class="guide-steps">
             <li>Open <strong>Tile Explorer</strong> from the sidebar.</li>
             <li>Drop a GeoTIFF in the box (.tif / .tiff, 8-bit RGB with coordinates, up to 1 GB).</li>
-            <li>Choose a <strong>Tile size</strong> from 256 to 1280 pixels (640 by default), then click <strong>Upload and make tiles</strong>.</li>
+            <li>Choose a <strong>Tile size</strong> (256, 512, 640, 1024 or 1280 pixels; 640 by default), then click <strong>Upload and make tiles</strong>.</li>
             <li>Wait for the tiles. The AI marks the mangrove areas and shows the mangrove percentage on every tile. Empty tiles are skipped.</li>
             <li>Find tiles with the filters (<em>All</em>, <em>Mangrove</em>, <em>No mangrove</em>), the sort order, or the search box (for example
                 <kbd>r004</kbd> or <kbd>c012</kbd>). <strong>Show mangrove areas</strong> turns the outlines on or off.</li>
             <li>Click a tile to preview it. Use <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to move between tiles, <kbd>Space</kbd> to select, and
                 <kbd>Esc</kbd> to close.</li>
-            <li>Tick the tiles you want, or click <strong>Select mangrove tiles</strong>. Choose a format (<em>GeoTIFF + JPEG</em>,
-                <em>GeoTIFF only</em>, or <em>JPEG only (Roboflow)</em>), then click <strong>Download selected</strong>.</li>
+            <li>Tick the tiles you want, or click <strong>Select mangrove tiles</strong>, then <strong>Download selected</strong>. One tile downloads
+                as a GeoTIFF; several come as one ZIP of GeoTIFFs.</li>
+            <li>Want them on the map? <strong>Send to Drone Imagery</strong> turns the selected tiles into a drone survey that goes through the
+                usual AI check and review on <strong>Drone Upload</strong>.</li>
         </ol>
         <div class="guide-tip"><i class="bi bi-grid"></i><strong>Need a different size?</strong> Open the GeoTIFF from <em>Your GeoTIFFs</em> and pick
-            another tile size next to its name. You don't have to upload it again.</div>
+            another tile size next to its name. You don't have to upload it again. <strong>Detect mangroves again</strong> relabels every tile
+            size with the current AI model.</div>
         <div class="guide-actions">
-            <a class="guide-link" href="{{ route('tile-explorer.page') }}"><i class="bi bi-grid-3x3-gap"></i> Open Tile Explorer</a>
+            @unless ($isAdmin)
+                <a class="guide-link" href="{{ route('tile-explorer.page') }}"><i class="bi bi-grid-3x3-gap"></i> Open Tile Explorer</a>
+            @endunless
             <a class="guide-top" href="#guide-top"><i class="bi bi-arrow-up"></i> Back to top</a>
         </div>
     </section>
@@ -980,7 +1000,9 @@
         <div class="guide-warn"><i class="bi bi-exclamation-triangle"></i>Recommendations are advice, not permits. Remind communities to coordinate
             with DENR (CENRO/PENRO) and the LGU before planting.</div>
         <div class="guide-actions">
-            <a class="guide-link" href="{{ route('expert.recommendations.index') }}"><i class="bi bi-tree"></i> Open Planting Recommendation</a>
+            @unless ($isAdmin)
+                <a class="guide-link" href="{{ route('expert.recommendations.index') }}"><i class="bi bi-tree"></i> Open Planting Recommendation</a>
+            @endunless
             <a class="guide-top" href="#guide-top"><i class="bi bi-arrow-up"></i> Back to top</a>
         </div>
     </section>
@@ -990,27 +1012,40 @@
     @if ($isAdmin)
     <section class="guide-section" id="admin">
         {!! $head('admin') !!}
-        <p class="guide-summary"><strong>In short:</strong> approve expert applications, look after map layers, keep the AI models up to date, and act on feedback.</p>
+        <p class="guide-summary"><strong>In short:</strong> approve expert applications, keep reviews moving, clean up map layers, keep the AI
+            models up to date, and act on feedback. Drawing, uploading and reviewing stay with residents and experts, so the Delineate, Drone
+            Upload and Tile Explorer pages are not open to admins.</p>
 
         <dl class="guide-defs">
             <dt><i class="bi bi-people"></i> Users</dt>
             <dd>Pending expert applications appear at the top. Read the organization and qualifications, then approve or reject them. A rejection
                 reason is optional and is shared with the applicant. Use the view, edit, and delete actions to change a user's details or role,
                 or reset their password.</dd>
+            <dt><i class="bi bi-speedometer2"></i> Dashboard</dt>
+            <dd><em>Needs attention</em> lists what is waiting: a missing AI model, failed drone layers, expert applications, reviews older
+                than a few days, AI drafts their owners haven't confirmed, and new feedback. <strong>Send reminder</strong> notifies the experts or
+                owners (bell, email and phone), at most once a day for the same item.</dd>
             <dt><i class="bi bi-layers"></i> Map Layers</dt>
-            <dd><strong>Delineations:</strong> preview, rename, edit notes, <em>Hide from map</em> (with an optional reason sent to the owner), restore,
-                or delete. <strong>Drone imagery:</strong> preview, rename, <em>Retry processing</em> after a failure, run the AI again, or delete.</dd>
+            <dd>Two tabs, <strong>Delineations</strong> and <strong>Drone Surveys</strong>. Click a row to show it on the preview map; search
+                and filter by status, stage or source; export the list as CSV, or delineations as GeoJSON. Row actions are cleanup only:
+                <strong>Delete</strong>, and <strong>Retry processing</strong> for a failed drone survey. The <i class="bi bi-bell"></i> bell
+                reminds experts about a pending delineation, or an owner about a survey waiting for them. Naming, editing and reviewing stay
+                with the owners and experts.</dd>
             <dt><i class="bi bi-cpu"></i> AI Models</dt>
             <dd>Click <strong>Upload Model</strong> and choose the type: <em>Mangrove Segmentation</em> (a U-Net <code>.pth</code> that finds
                 mangrove areas) or <em>Mangrove Genus Classification</em> (a YOLO <code>.pt</code> that suggests the genus and finds canopies).
-                Each model is checked before use, and the newest active model of each type runs on new imagery.</dd>
+                Each model is checked before use, and the newest active model of each type runs on new imagery. The green check deactivates
+                a model (new runs then use the default file), and delete removes it. When a Roboflow key is set, the two hosted
+                <strong>Roboflow workflows</strong> are shown above the list with <em>In use</em> or <em>Not in use</em>; the local model of
+                the same type is their fallback.</dd>
             <dt><i class="bi bi-chat-dots"></i> Feedback</dt>
             <dd>Read problem reports and ideas from residents and experts, including any screenshot and the page they came from.</dd>
             <dt><i class="bi bi-clock-history"></i> Activity Logs</dt>
             <dd>Filter by date to see who did what and when, to investigate problems or misuse.</dd>
         </dl>
-        <div class="guide-tip"><i class="bi bi-eye-slash"></i>When a record is doubtful, use <strong>Hide from map</strong> rather than delete it.
-            Hiding can be undone, but deleting can't.</div>
+        <div class="guide-warn"><i class="bi bi-exclamation-triangle"></i><strong>Deleting can't be undone.</strong> Deleting a drone survey also
+            deletes its delineation, and the owner is told. When a record is only doubtful, send the experts a reminder to review it
+            instead.</div>
         <div class="guide-actions">
             <a class="guide-link" href="{{ route('admin.users') }}"><i class="bi bi-people"></i> Users</a>
             <a class="guide-link" href="{{ route('admin.map-layers.index') }}"><i class="bi bi-layers"></i> Map Layers</a>
@@ -1067,8 +1102,15 @@
         </details>
         <details>
             <summary>My drone imagery failed or is stuck processing.</summary>
-            <p>Make sure the file is a georeferenced GeoTIFF (.tif/.tiff) exported as an RGB orthomosaic, not a raw photo. Large surveys can take
-                a long time. If it shows <em>Processing failed</em>, click <em>Edit &amp; retry</em> or ask an administrator.</p>
+            <p>Use a georeferenced GeoTIFF (.tif/.tiff) exported as an RGB orthomosaic, or drone photos taken straight down that carry their
+                GPS. Files from places far apart (for example two municipalities) can't be one survey: upload each place separately. Large
+                surveys can take a long time. If it shows <em>Processing failed</em>, click <em>Edit &amp; retry</em> or ask an administrator.</p>
+        </details>
+        <details>
+            <summary>My shapefile won't import.</summary>
+            <p>Choose a <code>.zip</code> that holds the .shp, .dbf, .shx and .prj files, or pick those files together. The .prj tells the
+                map where the shapes are; without it, shapes in UTM or PRS92 can't be placed. Only polygons are imported, not points or
+                lines.</p>
         </details>
         <details>
             <summary>The AI marked areas that aren't mangroves, or suggested the wrong genus.</summary>
