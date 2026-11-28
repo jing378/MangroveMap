@@ -202,6 +202,27 @@ if ($currentUser && $currentUser->role === 'admin') {
         margin: 2px 0 6px;
     }
 
+    .notification-contact {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+    }
+
+    .notification-contact a {
+        color: var(--fg-1e7a4c, #1e7a4c);
+        text-decoration: none;
+        overflow-wrap: anywhere;
+    }
+
+    .notification-contact a:hover {
+        text-decoration: underline;
+    }
+
+    .notification-contact .bi {
+        margin-right: 3px;
+    }
+
     .notification-card-meta {
         font-size: 11px;
         color: #a8bfa8;
@@ -498,8 +519,20 @@ if ($currentUser && $currentUser->role === 'admin') {
                 @if(!empty($notification->data['delineation_name']))
                 <p class="notification-card-detail"><strong>Delineation:</strong> {{ $notification->data['delineation_name'] }}</p>
                 @endif
-                @if(!empty($notification->data['submitted_by']))
-                <p class="notification-card-detail"><strong>Submitted by:</strong> {{ $notification->data['submitted_by'] }}</p>
+                @php $contact = $submitterContacts[$notification->id] ?? null; @endphp
+                @if($contact || !empty($notification->data['submitted_by']))
+                <p class="notification-card-detail"><strong>Submitted by:</strong> {{ $contact['name'] ?? $notification->data['submitted_by'] }}@if(!empty($contact['organization'])) · {{ $contact['organization'] }}@endif</p>
+                @endif
+                @if($contact && (!empty($contact['email']) || !empty($contact['phone'])))
+                <p class="notification-card-detail notification-contact">
+                    <strong>Contact:</strong>
+                    @if(!empty($contact['email']))
+                    <a href="mailto:{{ $contact['email'] }}" data-no-progress><i class="bi bi-envelope"></i> {{ $contact['email'] }}</a>
+                    @endif
+                    @if(!empty($contact['phone']))
+                    <a href="tel:{{ preg_replace('/[^0-9+]/', '', $contact['phone']) }}" data-no-progress><i class="bi bi-telephone"></i> {{ $contact['phone'] }}</a>
+                    @endif
+                </p>
                 @endif
                 @if(!empty($notification->data['applicant_name']))
                 <p class="notification-card-detail"><strong>Applicant:</strong> {{ $notification->data['applicant_name'] }}</p>

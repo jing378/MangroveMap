@@ -1380,14 +1380,31 @@
     #mapRightPanel .scroll {
       width: 100%;
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
-      padding: 20px 18px;
+      padding: 4px 18px 20px;
+    }
+
+    .panel-head {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 14px 10px 18px;
+      border-bottom: 1px solid var(--bd-edf4ef, #edf4ef);
+    }
+
+    .panel-head .sec {
+      margin: 0;
+    }
+
+    #mapRightPanel .scroll > #zoneDetailsContent {
+      padding-top: 14px;
     }
 
     .panel-close-btn {
-      position: absolute;
-      top: 16px;
-      right: 16px;
+      flex-shrink: 0;
       background: var(--bg-f0f5f1, #f0f5f1);
       border: 1px solid var(--bd-d8e5dc, #d8e5dc);
       border-radius: 50%;
@@ -1399,7 +1416,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 20;
       transition: all 0.15s ease;
     }
 
@@ -1434,8 +1450,12 @@
       }
 
       #mapRightPanel .scroll {
-        padding: 6px 16px 20px;
+        padding: 0 16px 20px;
         overscroll-behavior: contain;
+      }
+
+      .panel-head {
+        padding: 2px 10px 8px 16px;
       }
 
       .panel-grip {
@@ -1448,10 +1468,6 @@
         background: var(--bg-cfdcd3, #cfdcd3);
       }
 
-      .panel-close-btn {
-        top: 10px;
-        right: 12px;
-      }
     }
 
     .sec {
@@ -1498,6 +1514,34 @@
       font-weight: 600;
       color: var(--fg-1a3324, #1a3324);
       text-align: right;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .d-row:not(.d-row-stack) .d-key {
+      flex-shrink: 0;
+      padding-right: 12px;
+    }
+
+    .d-row.d-row-stack {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .d-notes {
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--fg-3a5a3a, #3a5a3a);
+      line-height: 1.45;
+      text-align: left;
+    }
+
+    .d-note {
+      margin: 8px 0 0;
+      font-size: 11.5px;
+      line-height: 1.4;
+      color: var(--fg-6a8a6a, #6a8a6a);
     }
 
     .d-empty {
@@ -3086,21 +3130,20 @@
             <!-- Slide-in Delineation Details Drawer -->
             <div class="right-panel" id="mapRightPanel">
               <div class="panel-grip" aria-hidden="true"></div>
-              <button onclick="closeRightPanel()" class="panel-close-btn" title="Close Panel" aria-label="Close details panel">
-                <i class="bi bi-x-lg"></i>
-              </button>
+              {{-- Header stays put while the details scroll, so the close button never sits on top of them. --}}
+              <div class="panel-head">
+                <div class="sec">Mangrove Area Details</div>
+                <button type="button" onclick="closeRightPanel()" class="panel-close-btn" title="Close" aria-label="Close details panel">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
               <div class="scroll">
-                <div class="sec" style="padding-right: 28px;">Delineated Area Details</div>
                 <div id="zoneDetailsContent">
                   <div class="d-card">
                     <div class="d-title" id="dName">Saved Delineation</div>
                     <div style="margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
                       <span class="tag tg" id="dStatusBadge">Approved</span>
                       <span class="tag tb" id="dTypeBadge">Area</span>
-                    </div>
-                    <div class="d-row">
-                      <span class="d-key">Feature Type</span>
-                      <span class="d-val" id="dType">Area</span>
                     </div>
                     <div class="d-row" id="dAreaRow">
                       <span class="d-key">Area</span>
@@ -3110,6 +3153,10 @@
                       <span class="d-key">Location</span>
                       <span class="d-val" id="dLocation">-</span>
                     </div>
+                    <div class="d-row" id="dSourceRow" style="display:none;">
+                      <span class="d-key">Source</span>
+                      <span class="d-val" id="dSource">-</span>
+                    </div>
                     <div class="d-row">
                       <span class="d-key">Contributor</span>
                       <span class="d-val" id="dContributor">Community</span>
@@ -3118,19 +3165,20 @@
                       <span class="d-key">Approved Date</span>
                       <span class="d-val" id="dApprovedDate">-</span>
                     </div>
-                    <div class="d-row" id="dNotesRow" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <div class="d-row d-row-stack" id="dNotesRow">
                       <span class="d-key">Notes</span>
-                      <span class="d-val" id="dNotes" style="font-weight: 400; font-size: 12px; color: var(--fg-3a5a3a, #3a5a3a); line-height: 1.4; word-break: break-word;">-</span>
+                      <span class="d-val d-notes" id="dNotes">-</span>
                     </div>
                   </div>
                   <div class="div"></div>
                   <div class="sec">Mangrove Genera Present</div>
                   <div id="dGenera"></div>
+                  <p class="d-note" id="dGeneraNote" hidden></p>
                   <div class="div"></div>
                   <div class="sec">Planting Recommendation</div>
                   <div id="dRecommendations"></div>
                   <div class="div"></div>
-                  <div class="sec">Coverage Trend (ha)</div>
+                  <div class="sec">Changes Over Time (ha)</div>
                   <div id="trendEmpty" class="d-empty">No yearly observations recorded for this area yet.</div>
                   <div class="cw" id="trendWrap" style="height:110px; display:none;"><canvas id="trendC"></canvas></div>
                 </div>
@@ -3454,6 +3502,35 @@
       });
     }
 
+    // "Mangrove Genera Present": the recorded genera plus any the AI found in the area's drone survey, largest
+    // canopy share first, the share inside each pill (same as the logged-in map's details panel).
+    function renderGenera(record, feature) {
+      const generaEl = document.getElementById('dGenera');
+      const noteEl = document.getElementById('dGeneraNote');
+      if (!generaEl) return;
+      const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+      const shares = {};
+      (Array.isArray(record.genus_canopy?.genera) ? record.genus_canopy.genera : [])
+        .filter(item => item?.genus && Number(item.percent) > 0)
+        .forEach(item => { shares[item.genus] = Number(item.percent); });
+      const genera = [...(Array.isArray(feature.genera) && feature.genera.length ? feature.genera : (record.genera || []))];
+      Object.keys(shares).forEach(genus => { if (!genera.some(name => same(name, genus))) genera.push(genus); });
+      const shareOf = name => Object.entries(shares).find(([genus]) => same(genus, name))?.[1] ?? -1;
+      genera.sort((a, b) => shareOf(b) - shareOf(a));
+
+      generaEl.replaceChildren(...(genera.length
+        ? GenusInfo.chips(genera, { shares })
+        : [Object.assign(document.createElement('div'), { className: 'd-empty', textContent: 'No genera recorded.' })]));
+
+      if (noteEl) {
+        const recognised = Number(record.genus_canopy?.recognised_percent);
+        const pct = value => `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+        noteEl.hidden = Object.keys(shares).length === 0;
+        noteEl.textContent = noteEl.hidden ? ''
+          : `% = share of the canopy, by AI from the drone survey${recognised > 0 ? ` (it named the genus on ${pct(recognised)} of this area)` : ''}.`;
+      }
+    }
+
     // Delineation Details Drawer
     function showDelineationDetails(record, feature, layer) {
       const dNameEl = document.getElementById('dName');
@@ -3487,13 +3564,14 @@
         locationRow.style.display = feature.location ? 'flex' : 'none';
       }
 
-      const generaEl = document.getElementById('dGenera');
-      if (generaEl) {
-        const genera = Array.isArray(feature.genera) && feature.genera.length ? feature.genera : (record.genera || []);
-        generaEl.replaceChildren(...(genera.length
-          ? GenusInfo.chips(genera)
-          : [Object.assign(document.createElement('div'), { className: 'd-empty', textContent: 'No genera recorded.' })]));
+      const sourceRow = document.getElementById('dSourceRow');
+      const dSourceEl = document.getElementById('dSource');
+      if (sourceRow && dSourceEl) {
+        dSourceEl.textContent = record.source_label || '';
+        sourceRow.style.display = record.source_label ? 'flex' : 'none';
       }
+
+      renderGenera(record, feature);
 
       renderDelineationRecommendations(record);
       renderCoverageTrend(record.coverage_trend);
@@ -3595,14 +3673,6 @@
       return node;
     }
 
-    function delineationPopup(record, feature) {
-      const details = [formatHectares(feature.area_ha), feature.location].filter(Boolean).join(' · ');
-      return el('div', {}, [
-        el('strong', { textContent: record.name || 'Approved delineation' }),
-        details && el('div', { textContent: details, style: 'font-size:12px;color:#556b56;margin-top:2px;' }),
-      ]);
-    }
-
     function recommendationPopup(rec) {
       const color = SUITABILITY_COLORS[rec.suitability] || '#7a9a7a';
       const genera = Array.isArray(rec.recommended_genera) ? rec.recommended_genera : [];
@@ -3652,9 +3722,12 @@
           }
 
           if (shape) {
-            shape.bindPopup(delineationPopup(record, feature));
+            // The details panel shows everything, so no popup on top of it (on phones it ended up under the
+            // map controls); a hover tooltip names the area.
+            shape.bindTooltip(record.name || 'Approved delineation', { sticky: true, direction: 'top' });
             shape.on('click', (e) => {
               if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+              shape.closeTooltip();
               showDelineationDetails(record, feature, shape);
             });
           }
@@ -3672,9 +3745,9 @@
         const pinFeature = Number(record.area_ha) > 0 ? { ...feature, area_ha: record.area_ha } : feature;
         const pin = L.marker(position, { icon: pinIcon, title: record.name || 'Approved delineation', riseOnHover: true }).addTo(pinLayer);
         pin.bindTooltip(record.name || 'Approved delineation', { direction: 'top' });
-        pin.bindPopup(delineationPopup(record, pinFeature));
         pin.on('click', (e) => {
           if (e && e.originalEvent) L.DomEvent.stopPropagation(e);
+          pin.closeTooltip();
           showDelineationDetails(record, pinFeature, shape || pin);
         });
       });

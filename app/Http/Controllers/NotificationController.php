@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Delineation;
+use App\Models\User;
 use App\Notifications\Channels\DevicePushChannel;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
@@ -18,7 +21,53 @@ class NotificationController extends Controller
         return view('notifications.notifications', [
             'notifications' => $notifications,
             'unreadCount' => $user->unreadNotifications->count(),
+            'submitterContacts' => $this->submitterContacts($user, $notifications->getCollection()),
         ]);
+    }
+
+    /**
+     * Email/phone of whoever submitted a delineation for review, keyed by notification id, so an expert
+     * (or admin) can reach them. Looked up live: the current details, and older notifications that only
+     * stored the name still find the person through the delineation.
+     *
+     * @return array<string, array{name: ?string, email: ?string, phone: ?string, organization: ?string}>
+     */
+    private function submitterContacts(User $viewer, Collection $notifications): array
+    {
+        if (! $viewer->isExpert() && ! $viewer->isAdmin()) {
+            return [];
+        }
+
+        $submitted = $notifications->filter(fn ($n) => ($n->data['type'] ?? null) === 'delineation_submitted');
+        if ($submitted->isEmpty()) {
+            return [];
+        }
+
+        $ownerByDelineation = Delineation::query()
+            ->whereIn('id', $submitted->map(fn ($n) => $n->data['delineation_id'] ?? null)->filter()->unique())
+            ->pluck('user_id', 'id');
+
+        $userIdFor = fn ($n) => $n->data['submitted_by_id'] ?? $ownerByDelineation[$n->data['delineation_id'] ?? 0] ?? null;
+
+        $users = User::query()
+            ->whereIn('id', $submitted->map($userIdFor)->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        $contacts = [];
+        foreach ($submitted as $notification) {
+            $submitter = $users->get($userIdFor($notification));
+            if ($submitter) {
+                $contacts[$notification->id] = [
+                    'name' => $submitter->name,
+                    'email' => $submitter->email,
+                    'phone' => $submitter->phone,
+                    'organization' => $submitter->organization,
+                ];
+            }
+        }
+
+        return $contacts;
     }
 
     public function markAsRead(Request $request, $id)

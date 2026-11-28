@@ -41,6 +41,8 @@ class DelineationSubmittedForReview extends Notification
             'delineation_id' => $this->delineation->id,
             'delineation_name' => $this->delineation->name,
             'submitted_by' => $this->delineation->user?->name,
+            // The Notifications page looks up this person's email/phone so the expert can contact them.
+            'submitted_by_id' => $this->delineation->user_id,
             'url' => $this->delineation->delineateUrlFor($notifiable),
             'actionLabel' => 'View delineation',
         ];

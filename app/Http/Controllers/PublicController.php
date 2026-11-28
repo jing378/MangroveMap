@@ -22,6 +22,8 @@ class PublicController extends Controller
         $delineations = Delineation::with([
             'user:id,name',
             'annualObservations:id,delineation_id,year,coverage_area_ha',
+            // AI canopy share per genus for areas drawn from a drone survey (no imagery or owner data).
+            'droneImageryLayer:id,classification_status,classification_stats',
         ])
             ->approved()
             ->withoutAppliedReassessments() // shown on the area they re-surveyed
@@ -141,6 +143,8 @@ class PublicController extends Controller
             'user' => ['name' => $delineation->user?->name],
             'area_ha' => round($features->sum('area_ha'), 4),
             'genera' => $features->flatMap(fn(array $feature) => $feature['genera'])->unique()->values(),
+            'source_label' => $delineation->sourceLabel(),
+            'genus_canopy' => $delineation->droneImageryLayer?->genusCanopyShares(),
             'features' => $features,
             'coverage_trend' => $delineation->annualObservations
                 ->sortBy('year')
