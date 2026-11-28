@@ -1381,7 +1381,8 @@
         ? `Drone re-survey of "${feature.reassesses.name}" (approving it updates that area)`
         : feature.drone_imagery_layer_id
           ? 'Drone imagery (AI-assisted)'
-          : (feature.source === 'ai' ? 'Drone imagery AI (draft)' : 'Drawn on the map');
+          : (feature.source === 'ai' ? 'Drone imagery AI (draft)'
+            : feature.source === 'shapefile' ? 'Imported from a shapefile' : 'Drawn on the map');
       document.getElementById('delineationFeatureArea').textContent = formatFeatureAreaHectares(feature);
       const locationEl = document.getElementById('delineationFeatureLocation');
       if (locationEl) {
@@ -2809,6 +2810,162 @@
 
       return features.length;
     };
+
+    // ---- Shapefile import (Delineate page) ----
+    // Read in the browser with shpjs (loaded on first use): a .zip, or the .shp with its .dbf/.shx/.prj picked
+    // together. The .prj reprojects to WGS 84. Each polygon (each part of a multipolygon) becomes one unsaved
+    // area, like a hand-drawn one, so the usual genus/details/save and expert review follow.
+    const SHAPEFILE_LIB_URL = 'https://unpkg.com/shpjs@6.2.0/dist/shp.js';
+    const SHAPEFILE_MAX_POINTS = 5000; // per area; the server accepts up to 10,000
+    let shapefileLibPromise = null;
+
+    function loadShapefileLib() {
+      if (window.shp) return Promise.resolve(window.shp);
+      shapefileLibPromise ??= new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = SHAPEFILE_LIB_URL;
+        script.onload = () => window.shp ? resolve(window.shp) : reject(new Error('The shapefile reader did not load.'));
+        script.onerror = () => {
+          shapefileLibPromise = null;
+          reject(new Error('Could not load the shapefile reader. Check your connection and try again.'));
+        };
+        document.head.appendChild(script);
+      });
+      return shapefileLibPromise;
+    }
+
+    async function readShapefileFiles(files) {
+      const lib = await loadShapefileLib();
+      const zip = files.find(file => /\.zip$/i.test(file.name));
+      if (zip) return { geojson: await lib(await zip.arrayBuffer()), name: zip.name.replace(/\.zip$/i, ''), hasPrj: null };
+
+      const byExt = ext => files.find(file => file.name.toLowerCase().endsWith(`.${ext}`));
+      const shpFile = byExt('shp');
+      if (!shpFile) throw new Error('Pick the .shp file (with its .dbf, .shx and .prj), or a .zip of them.');
+      const prjFile = byExt('prj');
+      const dbfFile = byExt('dbf');
+      const cpgFile = byExt('cpg');
+      const geojson = await lib({
+        shp: await shpFile.arrayBuffer(),
+        dbf: dbfFile ? await dbfFile.arrayBuffer() : undefined,
+        prj: prjFile ? await prjFile.text() : undefined,
+        cpg: cpgFile ? await cpgFile.text() : undefined,
+      });
+      return { geojson, name: shpFile.name.replace(/\.shp$/i, ''), hasPrj: Boolean(prjFile) };
+    }
+
+    // A feature's name from its attributes, else the file name.
+    function shapefileFeatureLabel(properties, fallback) {
+      const key = Object.keys(properties || {}).find(k => /^(name|nombre|label|title|brgy|barangay|site)$/i.test(k));
+      const value = key ? String(properties[key] ?? '').trim() : '';
+      return value || fallback;
+    }
+
+    // Outer ring of every polygon as a closed [lat, lng] ring. Holes are left out (areas have none).
+    function shapefileAreas(geojson, fallbackName) {
+      const collections = Array.isArray(geojson) ? geojson : [geojson];
+      const areas = [];
+      let holes = 0;
+      let skipped = 0;
+      collections.forEach(collection => {
+        (collection?.features || []).forEach(feature => {
+          const geometry = feature?.geometry;
+          const polygons = geometry?.type === 'Polygon' ? [geometry.coordinates]
+            : geometry?.type === 'MultiPolygon' ? geometry.coordinates : null;
+          if (!polygons) { skipped++; return; }
+          const label = shapefileFeatureLabel(feature.properties, collection.fileName || fallbackName);
+          polygons.forEach(rings => {
+            if (!Array.isArray(rings?.[0])) return;
+            holes += Math.max(0, rings.length - 1);
+            let ring = rings[0]
+              .filter(point => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+              .map(([lng, lat]) => [lat, lng]);
+            if (ring.length > SHAPEFILE_MAX_POINTS) {
+              const step = ring.length / SHAPEFILE_MAX_POINTS;
+              ring = Array.from({ length: SHAPEFILE_MAX_POINTS }, (_, i) => ring[Math.floor(i * step)]);
+            }
+            const [first, last] = [ring[0], ring[ring.length - 1]];
+            if (first && (first[0] !== last[0] || first[1] !== last[1])) ring.push([...first]);
+            if (ring.length >= 4) areas.push({ coords: ring, label });
+          });
+        });
+      });
+      return { areas, holes, skipped };
+    }
+
+    async function importShapefileFiles(files) {
+      if (!files.length) return;
+      if (isGeometryEditLocked() || currentFeature) {
+        AppActions.notify('Finish or cancel what you are drawing or editing before importing a shapefile.', 'error');
+        return;
+      }
+      const room = MAX_FEATURES_PER_DELINEATION - drawnFeatures.filter(f => !f.delineation_id).length;
+      if (room <= 0) {
+        AppActions.notify(`A delineation can hold up to ${MAX_FEATURES_PER_DELINEATION} areas. Save or remove your unsaved shapes first.`, 'error');
+        return;
+      }
+
+      const button = document.getElementById('importShapefileBtn');
+      AppActions.setBusy(button, 'Reading…');
+      try {
+        const { geojson, name, hasPrj } = await readShapefileFiles(files);
+        const { areas, holes, skipped } = shapefileAreas(geojson, name);
+        if (!areas.length) {
+          throw new Error(skipped ? 'The shapefile has no polygons (only points or lines). Import a polygon shapefile.' : 'No areas found in the shapefile.');
+        }
+        // Coordinates outside latitude/longitude mean the shapefile is in another projection without its .prj.
+        const outOfRange = areas.some(area => area.coords.some(([lat, lng]) => Math.abs(lat) > 90 || Math.abs(lng) > 180));
+        if (outOfRange) {
+          throw new Error(hasPrj === false
+            ? 'Add the shapefile\'s .prj file too: its coordinates are not in latitude/longitude.'
+            : 'The shapefile\'s coordinates could not be converted to latitude/longitude. Check its .prj file.');
+        }
+
+        // The largest areas first when the file has more than a delineation holds.
+        const size = coords => { const b = L.latLngBounds(coords); return (b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest()); };
+        const kept = areas.length > room ? [...areas].sort((a, b) => size(b.coords) - size(a.coords)).slice(0, room) : areas;
+        const notes = `Imported from shapefile "${name}".`;
+        const features = kept.map(area => ({ type: 'area', coords: area.coords, label: area.label, notes, source: 'shapefile' }))
+          .filter(isValidMapFeature);
+
+        if (!document.getElementById('delineationToolbar')?.classList.contains('active')) window.showEditMode();
+        drawingMode = null;
+        updateDrawingCursor();
+        document.querySelectorAll('.draw-btn').forEach(btn => btn.classList.remove('active'));
+
+        const firstIndex = drawnFeatures.length;
+        drawnFeatures.push(...features);
+        saveDrawingStateToHistory();
+        selectDrawnFeature(firstIndex, { fly: false });
+        redrawFeatures();
+        mainMap.flyToBounds(L.latLngBounds(features.flatMap(f => f.coords)), { padding: [50, 50], maxZoom: 19, duration: 0.8 });
+
+        const extras = [
+          areas.length > kept.length && `${areas.length - kept.length} smaller area(s) left out (up to ${MAX_FEATURES_PER_DELINEATION} per delineation)`,
+          holes > 0 && `${holes} hole(s) inside areas ignored`,
+          skipped > 0 && `${skipped} point/line feature(s) skipped`,
+        ].filter(Boolean);
+        AppActions.notify(`Imported ${features.length} area${features.length === 1 ? '' : 's'}. Check them, pick the genus, then save.`
+          + (extras.length ? ` (${extras.join('; ')}.)` : ''), 'success');
+      } catch (error) {
+        console.error('Shapefile import failed', error);
+        AppActions.notify(error?.message && !/^(no layers|invalid|forgot)/i.test(error.message)
+          ? error.message : 'Could not read that shapefile. Use a .zip of the shapefile, or pick its .shp, .dbf, .shx and .prj together.', 'error');
+      } finally {
+        AppActions.clearBusy(button);
+      }
+    }
+
+    const importShapefileBtn = document.getElementById('importShapefileBtn');
+    const importShapefileInput = document.getElementById('importShapefileInput');
+    if (importShapefileBtn && importShapefileInput) {
+      importShapefileBtn.addEventListener('click', () => importShapefileInput.click());
+      importShapefileInput.addEventListener('change', () => {
+        const files = [...importShapefileInput.files];
+        importShapefileInput.value = ''; // the same file can be picked again
+        importShapefileFiles(files);
+      });
+    }
 
     const saveDelineationMetaBtn = document.getElementById('saveDelineationMetaBtn');
     if (saveDelineationMetaBtn) {

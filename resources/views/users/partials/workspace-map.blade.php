@@ -40,8 +40,14 @@
                   <button type="button" class="draw-btn" data-mode="line" title="Draw a new area">
                     <i class="bi bi-pentagon"></i><span>Draw area</span>
                   </button>
+                  {{-- Shapefile import (workspace-scripts, importShapefileFiles): polygons become unsaved areas. --}}
+                  <button type="button" class="draw-btn" id="importShapefileBtn"
+                    title="Import a shapefile: a .zip, or the .shp with its .dbf, .shx and .prj files">
+                    <i class="bi bi-file-earmark-arrow-up"></i><span>Import shapefile</span>
+                  </button>
                 </div>
-              @else
+                <input type="file" id="importShapefileInput" hidden multiple
+                  accept=".zip,.shp,.dbf,.shx,.prj,.cpg,application/zip">              @else
                 <div class="draw-mode-group" role="group" aria-label="Drawing mode">
                   <button type="button" class="draw-btn" data-mode="point"><i
                       class="bi bi-geo-alt-fill"></i><span>Point</span></button>
