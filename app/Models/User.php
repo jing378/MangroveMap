@@ -180,6 +180,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
         'last_seen_at' => 'datetime',
+        'onboarded_at' => 'datetime',
         'expert_applied_at' => 'datetime',
         'expert_reviewed_at' => 'datetime',
         'password' => 'hashed',

@@ -675,6 +675,10 @@
         <span class="guide-role"><i class="bi bi-person-badge"></i>
             Showing the guide for: {{ $currentUser->roleLabel() }}
         </span>
+        {{-- Replays the welcome walkthrough (partials/onboarding-tour, in both layouts). --}}
+        <button type="button" class="onboarding-replay" data-onboarding-open>
+            <i class="bi bi-signpost-split" aria-hidden="true"></i> Show the welcome tour
+        </button>
     </header>
 
     <h2 class="guide-tasks-title">What do you want to do?</h2>

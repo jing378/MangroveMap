@@ -49,6 +49,7 @@ Limits are per user (or per IP for guests), per minute, and each endpoint counts
 | `PUT /drone-imagery/{id}/segmentation`, `/edits`, `/canopies` | 60 |
 | `POST /push-subscriptions`, `DELETE /push-subscriptions` | 20 |
 | `POST /feedback` | 10 |
+| `POST /onboarding/complete` | 20 |
 | `GET /register/check-email` | 30 |
 | `POST /profile/expert-application` | 5 |
 | `GET /map/mangrove-history`, `GET /map/place-labels` | 60 |
@@ -258,6 +259,7 @@ The live check. Every open page calls it every 20 seconds while visible.
 | Method and URL | Who | Purpose |
 |---|---|---|
 | `POST /feedback` | Residents and experts (admins get `403`) | Send feedback. Multipart: `type` (`bug`, `suggestion`, `question` or `other`), `message` (5–5000 characters), `page_url`, `screenshot` (image, up to 5 MB). Returns `201`. |
+| `POST /onboarding/complete` | Any verified user | The welcome walkthrough was finished or skipped: sets `users.onboarded_at` (once), so it stops opening by itself. No body. Returns `{onboarded_at}`. |
 | `GET /register/check-email?email=` | Guests | Whether an email address is already registered (sign-up form) |
 | `PUT /profile` | Any user | Update the profile. Returns JSON when asked with `Accept: application/json`. |
 | `GET /up` | Anyone | Health check: `200` when the app is running |

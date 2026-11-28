@@ -17,6 +17,7 @@ use App\Http\Controllers\MapLayerController;
 use App\Http\Controllers\MapMangroveHistoryController;
 use App\Http\Controllers\MapPlaceLabelController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PlantingRecommendationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicController;
@@ -301,6 +302,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Help & user guide (sections shown depend on the user's role)
     Route::view('/guide', 'guide')->name('guide');
+    // Welcome walkthrough (partials/onboarding-tour): finished or skipped, so it stops opening by itself.
+    Route::post('/onboarding/complete', [OnboardingController::class, 'complete'])
+        ->middleware('throttle:20,1,onboarding.complete')
+        ->name('onboarding.complete');
 
     // "Send Feedback" pop-up in the sidebar; admins review it under /admin/feedback.
     Route::post('/feedback', [FeedbackController::class, 'store'])

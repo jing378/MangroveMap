@@ -54,6 +54,7 @@
         --bd-edf1ed: #2d3a2d;
         --bd-edf2ed: #2b3b2b;
         --bd-edf2f7: #233241;
+        --bd-edf3ef: #293d2f;
         --bd-edf4ef: #263f2d;
         --bd-eef2ee: #2c3a2c;
         --bd-eef3ee: #2a3b2a;
@@ -144,6 +145,7 @@
         --bg-f8e6c4: #382c15;
         --bg-f8faf7: #151c12;
         --bg-f8faf8: #131b13;
+        --bg-f8fbf9: #101d14;
         --bg-f8fcfa: #16231c;
         --bg-faf5ff: #160c20;
         --bg-fafbfa: #131813;
@@ -152,9 +154,11 @@
         --bg-fbfcfb: #121812;
         --bg-fbfdfb: #0e1c0e;
         --bg-fde8e8: #270f0f;
+        --bg-fdeaea: #260e0e;
         --bg-fdecea: #26110e;
         --bg-fdf0ee: #24110e;
         --bg-fdf3e1: #2a2010;
+        --bg-fdf3e2: #292010;
         --bg-fdf5e8: #271d0f;
         --bg-fdf7ee: #241b0e;
         --bg-fef2f2: #220d0d;
@@ -178,6 +182,7 @@
         --fg-127046: #a7e9cb;
         --fg-145a33: #b4eccd;
         --fg-14653f: #adeacd;
+        --fg-14734a: #a3e8ca;
         --fg-147a46: #9ee7c2;
         --fg-155724: #b6edc2;
         --fg-15803d: #9ae6b6;
@@ -217,6 +222,7 @@
         --fg-374151: #bac3d0;
         --fg-375342: #b8d0c2;
         --fg-3a5a3a: #b3ceb3;
+        --fg-3a5a4a: #b3cec0;
         --fg-3b5445: #b8cdc0;
         --fg-3b5847: #b4cdbe;
         --fg-3c5a3c: #b3ccb3;
@@ -255,6 +261,7 @@
         --fg-a12f22: #de857a;
         --fg-a52f21: #dd8378;
         --fg-a63b30: #d67b72;
+        --fg-b0392b: #da766a;
         --fg-b42318: #dc7c74;
         --fg-b42323: #da6d6d;
         --fg-b73318: #dc8472;

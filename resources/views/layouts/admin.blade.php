@@ -757,6 +757,7 @@
             }
         });
     </script>
+    @include('partials.onboarding-tour')
 </body>
 
 </html>

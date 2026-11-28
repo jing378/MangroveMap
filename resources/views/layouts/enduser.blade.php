@@ -763,6 +763,7 @@
     @unless(auth()->user()?->isAdmin())
     @include('partials.feedback-modal')
     @endunless
+    @include('partials.onboarding-tour')
 
     @yield('scripts')
     @stack('scripts')
